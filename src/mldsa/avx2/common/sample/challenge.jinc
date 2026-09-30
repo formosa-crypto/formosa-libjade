@@ -21,6 +21,8 @@ namespace sample {
         reg u64 sample_at;
         reg u64 signs xof_offset;
         reg u32 coefficient shift;
+        reg bool condition_loop condition_refill condition_resample;
+        #[msf] reg u64 ms;
 
         state = __initialize_xof(seed);
         xof_block = shake256_squeeze_block(xof_block, state);
@@ -34,18 +36,31 @@ namespace sample {
             i += 32;
         }
 
+        ms = #init_msf();
+
         i = COEFFICIENTS_IN_POLYNOMIAL - ONES_IN_VERIFIER_CHALLENGE;
-        while(i < COEFFICIENTS_IN_POLYNOMIAL) {
+        while { condition_loop = i < COEFFICIENTS_IN_POLYNOMIAL; } (condition_loop) {
+            ms = #update_msf(condition_loop, ms);
             while {
-                if(xof_offset >= SHAKE256_RATE) {
+                condition_refill = xof_offset >= SHAKE256_RATE;
+                if(condition_refill) {
                     state = shake256_permute(state);
                     xof_block = shake256_squeeze_block(xof_block, state);
                     xof_offset = 0;
+                    ms = #init_msf();
+                } else {
+                    ms = #update_msf(!condition_refill, ms);
                 }
-                #[declassify] sample_at = (64u) xof_block[xof_offset];
+                sample_at = (64u) xof_block[xof_offset];
+                () = #declassify(sample_at);
+                sample_at = #protect(sample_at, ms);
 
                 xof_offset += 1;
-            } (sample_at > i)
+                condition_resample = sample_at > i;
+            } (condition_resample) {
+                ms = #update_msf(condition_resample, ms);
+            }
+            ms = #update_msf(!condition_resample, ms);
 
             coefficient = output_challenge[sample_at];
             output_challenge[i] = coefficient;

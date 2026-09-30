@@ -211,7 +211,7 @@ have Hlvec := mldsa65_lvec.
 have Hkvec := mldsa65_kvec.
 proc => /=.
 inline {2} M.__keygen_internal.
-wp;sp 0 3.
+wp;sp 0 4.
 seq 0 11 : #pre; 1: by auto.
 
 (* expanding seeds *)

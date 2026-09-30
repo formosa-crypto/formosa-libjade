@@ -10,7 +10,8 @@ namespace signature {
     {
         reg ui64 i j hints_written hint_offset;
         reg u32 hint_coefficient;
-        inline bool condition1, condition2;
+        reg bool condition1, condition2, condition_hint;
+        #[msf] reg u64 ms;
 
         // Clear the hints buffer
         // TODO: Use avx2 to zero this.
@@ -20,25 +21,35 @@ namespace signature {
             i += 1;
         }
 
+        ms = #init_msf();
+
         // Write out hints
         hints_written = 0;
         i = 0;
         while {condition1 = i < ROWS_IN_MATRIX_A;} (condition1) {
+            ms = #update_msf(condition1, ms);
             j = 0;
             while {condition2 = j < COEFFICIENTS_IN_POLYNOMIAL;} (condition2) {
+                ms = #update_msf(condition2, ms);
                 hint_offset = i;
                 hint_offset <<= LOG_2_COEFFICIENTS_IN_POLYNOMIAL;
                 hint_offset += j;
 
                 hint_coefficient = hint[hint_offset];
+                hint_coefficient = #protect_32(hint_coefficient, ms);
 
-                if (hint_coefficient != 0) {
+                condition_hint = hint_coefficient != 0;
+                if (condition_hint) {
+                    ms = #update_msf(condition_hint, ms);
                     signature[START_OF_HINT + hints_written] = (8u)(64u)j;
                     hints_written += 1;
+                } else {
+                    ms = #update_msf(!condition_hint, ms);
                 }
 
                 j += 1;
             }
+            ms = #update_msf(!condition2, ms);
 
             signature[START_OF_HINT + MAX_ONES_IN_HINT + i] = (8u)(64u) hints_written;
             i += 1;
@@ -81,8 +92,13 @@ namespace signature {
         reg ui64 j, index, previous_true_hints_seen current_true_hints_seen;
         reg ui64 decoded_offset encoded_offset;
         reg u8 done1, done2, done3;
-        reg bool within_bounds;
-        reg u64 hint hint_at_j hint_at_j_minus_one ill_formed_hint;
+        reg bool within_bounds not_done1 not_done2 not_done3;
+        reg bool condition_zero condition_decreasing condition_too_many condition_not_first;
+        reg bool condition_unordered condition_well_formed condition_nonzero;
+        reg u64 hint hint_at_j hint_at_j_minus_one ill_formed_hint true_hints_seen;
+        #[msf] reg u64 ms;
+
+        ms = #init_msf();
 
         ill_formed_hint = 0;
         previous_true_hints_seen = 0;
@@ -92,45 +108,71 @@ namespace signature {
             within_bounds = encoded_offset >= ROWS_IN_MATRIX_A;
             done1 = #SETcc(within_bounds);
             done1 |= ill_formed_hint;
-        } (done1 == 0) {
+            not_done1 = done1 == 0;
+        } (not_done1) {
+            ms = #update_msf(not_done1, ms);
             decoded_offset = encoded_offset;
             decoded_offset <<= LOG_2_COEFFICIENTS_IN_POLYNOMIAL;
             j = 0;
 
-            while (j < COEFFICIENTS_IN_POLYNOMIAL) {
+            while { condition_zero = j < COEFFICIENTS_IN_POLYNOMIAL; } (condition_zero) {
+                ms = #update_msf(condition_zero, ms);
                 index = decoded_offset;
                 index += j;
                 hints[index] = 0;
                 j += 1;
             }
+            ms = #update_msf(!condition_zero, ms);
 
-            current_true_hints_seen = (64ui)(64u)hint_encoded[MAX_ONES_IN_HINT + encoded_offset];
+            true_hints_seen = (64u)hint_encoded[MAX_ONES_IN_HINT + encoded_offset];
+            true_hints_seen = #protect(true_hints_seen, ms);
+            current_true_hints_seen = (64ui)true_hints_seen;
 
-            if (current_true_hints_seen < previous_true_hints_seen) {
+            condition_decreasing = current_true_hints_seen < previous_true_hints_seen;
+            if (condition_decreasing) {
+                ms = #update_msf(condition_decreasing, ms);
                 ill_formed_hint = 1;
             } else {
-                if (current_true_hints_seen > MAX_ONES_IN_HINT) {
+                ms = #update_msf(!condition_decreasing, ms);
+                condition_too_many = current_true_hints_seen > MAX_ONES_IN_HINT;
+                if (condition_too_many) {
+                    ms = #update_msf(condition_too_many, ms);
                     ill_formed_hint = 1;
                 } else {
+                    ms = #update_msf(!condition_too_many, ms);
                     j = previous_true_hints_seen;
 
                     while {
                         within_bounds = j >= current_true_hints_seen;
                         done2 = #SETcc(within_bounds);
                         done2 |= ill_formed_hint;
-                    } (done2 == 0) {
+                        not_done2 = done2 == 0;
+                    } (not_done2) {
+                        ms = #update_msf(not_done2, ms);
                         // Coefficients are ordered for strong unforgeability
                         hint_at_j = (64u)hint_encoded[j];
+                        hint_at_j = #protect(hint_at_j, ms);
 
-                        if (j > previous_true_hints_seen) {
+                        condition_not_first = j > previous_true_hints_seen;
+                        if (condition_not_first) {
+                            ms = #update_msf(condition_not_first, ms);
                             hint_at_j_minus_one = (64u)hint_encoded[j - 1];
+                            hint_at_j_minus_one = #protect(hint_at_j_minus_one, ms);
 
-                            if (hint_at_j <= hint_at_j_minus_one) {
+                            condition_unordered = hint_at_j <= hint_at_j_minus_one;
+                            if (condition_unordered) {
+                                ms = #update_msf(condition_unordered, ms);
                                 ill_formed_hint = 1;
+                            } else {
+                                ms = #update_msf(!condition_unordered, ms);
                             }
+                        } else {
+                            ms = #update_msf(!condition_not_first, ms);
                         }
 
-                        if (ill_formed_hint == 0) {
+                        condition_well_formed = ill_formed_hint == 0;
+                        if (condition_well_formed) {
+                            ms = #update_msf(condition_well_formed, ms);
                             // h->vec[i].coeffs[sig[j]] = 1;
                             index = decoded_offset;
                             index += (64ui)hint_at_j;
@@ -138,31 +180,50 @@ namespace signature {
 
                             j += 1;
 
+                        } else {
+                            ms = #update_msf(!condition_well_formed, ms);
                         }
                     }
+                    ms = #update_msf(!not_done2, ms);
                 }
             }
 
-            if (ill_formed_hint == 0) {
+            condition_well_formed = ill_formed_hint == 0;
+            if (condition_well_formed) {
+                ms = #update_msf(condition_well_formed, ms);
                 previous_true_hints_seen = current_true_hints_seen;
                 encoded_offset += 1;
+            } else {
+                ms = #update_msf(!condition_well_formed, ms);
             }
         }
+        ms = #update_msf(!not_done1, ms);
 
         encoded_offset = previous_true_hints_seen;
         while {
             within_bounds = encoded_offset >= MAX_ONES_IN_HINT;
             done3 = #SETcc(within_bounds);
             done3 |= ill_formed_hint;
-        } (done3 == 0) {
+            not_done3 = done3 == 0;
+        } (not_done3) {
+            ms = #update_msf(not_done3, ms);
             hint = (64u)hint_encoded[encoded_offset];
+            hint = #protect(hint, ms);
 
-            if(hint != 0) {
+            condition_nonzero = hint != 0;
+            if (condition_nonzero) {
+                ms = #update_msf(condition_nonzero, ms);
                 ill_formed_hint = 1;
+            } else {
+                ms = #update_msf(!condition_nonzero, ms);
             }
 
-            if (ill_formed_hint == 0) {
+            condition_well_formed = ill_formed_hint == 0;
+            if (condition_well_formed) {
+                ms = #update_msf(condition_well_formed, ms);
                 encoded_offset += 1;
+            } else {
+                ms = #update_msf(!condition_well_formed, ms);
             }
         }
 

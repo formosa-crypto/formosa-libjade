@@ -88,49 +88,13 @@ fn _finish_updstate_avx2
   reg ui64 at, r8;
   reg u8 trailb;
   ststatus = st[25];
+  () = #declassify(ststatus);
+  _ = #init_msf();
   trailb, r8, at = _ststatus_data(ststatus);
   st.[:u8 at] ^= trailb;
   st.[:u8 r8-1] ^= 0x80;
   st.[:u32 8*25] &= 0xFF00FF00; // clear trail-byte and at-position
   
-  return st;
-}
-
-
-export fn keccak_ststatus
-( reg mut ptr u8[3] status
-, reg const ptr keccak_updstate st
-) -> reg ptr u8[3]
-{
-  reg ui64 r8 at;
-  reg u64 ststatus;
-  ststatus = st[25];
-  _, r8, at = _ststatus_data(ststatus);
-  status[0] = (8u) (64u) r8;
-  status[1] = (8u) (64u) at;
-  status[2] = st.[:u8 8*25+2];
-  return status;
-}
-
-export fn init_updstate_avx2
-( reg mut ptr keccak_updstate st
-, reg ui8 r64
-, reg u8 trailb
-) -> reg ptr keccak_updstate
-{
-  st = st;
-  r64 = r64;
-  trailb = trailb;
-  st = _init_updstate_avx2(st, r64, trailb);
-  return st;
-}
-
-export fn finish_updstate_avx2
-( reg mut ptr keccak_updstate st
-) -> reg ptr keccak_updstate /* st */
-{
-  st = st;
-  st = _finish_updstate_avx2(st);
   return st;
 }
 
@@ -206,7 +170,7 @@ fn _add_m_updstate_avx2
 }
 
 fn _absorb_m_updstate_avx2
-( reg mut ptr keccak_updstate st
+( #[spill_to_mmx] reg mut ptr keccak_updstate st
 , reg ui64 buf
 , reg ui64 len
 ) -> reg ptr keccak_updstate /* st */
@@ -216,6 +180,8 @@ fn _absorb_m_updstate_avx2
   reg ptr keccak_state stk;
 
   ststatus = st[25];
+  () = #declassify(ststatus);
+  _ = #init_msf();
   _, r8, at = _ststatus_data(ststatus); // 0 < r8 < 200; r8 |% 8; 0 <= at <= r8
   stk = st[0:25];
   () = #spill(st);
@@ -296,17 +262,19 @@ fn _dump_m_updstate_avx2
 }
 
 fn _squeeze_m_updstate_avx2
-( reg ui64 buf
-, reg ui64 len
-, reg mut ptr keccak_updstate st
+( #[spill_to_mmx] reg ui64 buf
+, #[spill_to_mmx] reg ui64 len
+, #[spill_to_mmx] reg mut ptr keccak_updstate st
 ) -> reg ui64                 /* buf */
    , reg ptr keccak_updstate  /* st */
 {
   reg u64 ststatus;
-  reg ui64 r8, at;
+  #[spill_to_mmx] reg ui64 r8, at;
   reg ptr keccak_state stk;
 
   ststatus = st[25];
+  () = #declassify(ststatus);
+  _ = #init_msf();
   _, r8, at = _ststatus_data(ststatus); // 0 < r8 < 200; r8 |% 8; 0 <= at <= r8
   stk = st[0:25];
   () = #spill(st);
@@ -336,29 +304,5 @@ fn _squeeze_m_updstate_avx2
   st.[:u8 8*25] = (8u) (64u) at;
 
   return buf, st;
-}
-
-export fn absorb_m_updstate_avx2
-( reg mut ptr keccak_updstate st
-, reg ui64 buf
-, reg ui64 len
-) -> reg ptr keccak_updstate /* st */
-{
-  st = st;
-  buf = buf;
-  st = _absorb_m_updstate_avx2(st, buf, len);
-  return st;
-}
-
-export fn squeeze_m_updstate_avx2
-( reg mut ptr keccak_updstate st
-, reg ui64 buf
-, reg ui64 len
-) -> reg ptr keccak_updstate /* st */
-{
-  st = st;
-  buf = buf;
-  _, st = _squeeze_m_updstate_avx2(buf, len, st);
-  return st;
 }
 

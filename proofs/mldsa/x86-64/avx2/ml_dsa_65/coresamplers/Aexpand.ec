@@ -611,9 +611,9 @@ lemma matrix_A__rejection_sample_multiple_blocksP (buf : W8.t Array848.t)
   ].
 proof.
 proc=> /=.
-seq 2 : (#pre /\ shuffle_table_pointer = matrix_A__SHUFFLE_TABLE).
+seq 3 : (#pre /\ shuffle_table_pointer = matrix_A__SHUFFLE_TABLE).
 - by auto.
-sp 4; seq 0 : (#{/~{modulus}}pre /\ modulus = MODULUS8u32).
+sp 5; seq 0 : (#{/~{modulus}}pre /\ modulus = MODULUS8u32).
 - by auto=> &hr |>; rewrite MODULUS8u32E.
 seq 1: (                        (* FIXME: code position *)
      randombytes = buf
@@ -631,6 +631,7 @@ seq 1: (                        (* FIXME: code position *)
     /\ 24 %| to_uint input_offset
     /\ modulus = MODULUS8u32
     /\ shuffle_table_pointer = matrix_A__SHUFFLE_TABLE
+    /\ condition_loop = (stop_sampling <> W64.one)
     /\ (stop_sampling = W64.of_int (b2i (!(
             to_uint bytes_filled < (256 - 8) * 4
          /\ to_uint input_offset < 5 * 168))))
@@ -740,6 +741,7 @@ seq 1: (                        (* FIXME: code position *)
 seq < ^while : (
      randombytes = buf
   /\ sampled buf polynomial (to_uint filled) (to_uint input_offset)
+  /\ condition_loop = (stop_sampling <> W64.one)
   /\ stop_sampling = W64.of_int (b2i (!(to_uint filled < 256 /\ to_uint input_offset < 838)))
 ).
 - by auto=> &hr |> hbf hio h992 hdvd hsz hag; rewrite /sampled !ultE !to_uint_shr2 !of_uintK /=; smt().
@@ -748,16 +750,17 @@ seq < ^while : (
 while (
      randombytes = buf
   /\ sampled buf polynomial (to_uint filled) (to_uint input_offset)
+  /\ condition_loop = (stop_sampling <> W64.one)
   /\ stop_sampling = W64.of_int (b2i (!(to_uint filled < 256 /\ to_uint input_offset < 838)))
 ); last first.
 
 (* loop exit: either the stream is consumed (offset = 840), or the   *)
 (* polynomial is full (filled = 256) and the accepted prefix embeds   *)
 (* into the full stream's reject                                      *)
-- skip=> &hr |> hs0 f off p hs hstop.
+- skip=> &hr |> hs0 cl f off p _ hs hstop.
   move: hs => @/sampled [#] hio hdvd hfle hsz hag.
   have hb : !(to_uint f < 256 /\ to_uint off < 838).
-  - by apply of_int_b2i_eq1P; rewrite -hstop.
+  - by apply of_int_b2i_eq1P; move: hstop; smt().
   case: (838 <= to_uint off) => hoff.
   - move: hsz hag; have -> : to_uint off = 840 by smt().
     by move=> hsz hag; split; [exact hag | smt()].
@@ -779,10 +782,11 @@ seq ^if : (
   /\ to_uint off0 < 838
   /\ input_offset = off0 + W64.of_int 3
   /\ coeff = cand buf (to_uint off0)
+  /\ condition = (coeff \ult W32.of_int 8380417)
 ).
 - auto=> &hr |> hs hne; have {hne} [hf256 hoffb] :
     to_uint filled{hr} < 256 /\ to_uint input_offset{hr} < 838 by smt().
-  by rewrite /cand !to_uintD_small ?of_uintK /= ~-1:/#.
+  by rewrite /SLH64.protect_32 /cand !to_uintD_small ?of_uintK /= ~-1:/#.
 
 (* 2. filter: the candidate joins the accepted prefix iff it is      *)
 (*    below the field modulus, and filled counts the store            *)
@@ -857,6 +861,7 @@ seq < ^while : (
   /\ 3 %| to_uint block_offset
   /\ agree polynomial 0 (reject (S ++ Array168.sub blk 0 (to_uint block_offset)))
   /\ to_uint filled = min 256 (size (reject (S ++ Array168.sub blk 0 (to_uint block_offset))))
+  /\ condition_loop = (stop_sampling <> W8.one)
   /\ stop_sampling = W8.of_int (b2i (!(to_uint filled < 256 /\ to_uint block_offset < 168)))
 ).
 - by auto=> &hr |> hS hag hf; rewrite cats0 !uleE !of_uintK /=; smt().
@@ -869,12 +874,13 @@ while (
   /\ 3 %| to_uint block_offset
   /\ agree polynomial 0 (reject (S ++ Array168.sub blk 0 (to_uint block_offset)))
   /\ to_uint filled = min 256 (size (reject (S ++ Array168.sub blk 0 (to_uint block_offset))))
+  /\ condition_loop = (stop_sampling <> W8.one)
   /\ stop_sampling = W8.of_int (b2i (!(to_uint filled < 256 /\ to_uint block_offset < 168)))
 ); last first.
 (* loop exit: the block is consumed (offset = 168), or filled capped *)
 (* at 256 and the accepted prefix embeds into the full stream         *)
-- skip=> &hr |> hS0 hio0 hdvd0 hag0 hf0 off f p hio hdvd hag hf hstop.
-  have hb : !(to_uint f < 256 /\ to_uint off < 168); 1: by apply of_int_b2i_eq1P8; rewrite -hstop.
+- skip=> &hr |> hS0 hio0 hdvd0 hag0 hf0 off cl f p _ hio hdvd hag hf hstop.
+  have hb : !(to_uint f < 256 /\ to_uint off < 168); 1: by apply of_int_b2i_eq1P8; move: hstop; smt().
   case: (168 <= to_uint off) => hoff.
   - move: hag hf; have -> : to_uint off = 168 by smt().
     by rewrite sub_full_168 => hag hf; split => //.
@@ -904,10 +910,11 @@ seq ^if : (
   /\ to_uint filled = min 256 (size (reject (S ++ Array168.sub blk 0 (to_uint off0))))
   /\ block_offset = off0 + W64.of_int 3
   /\ coeff = cand168 blk (to_uint off0)
+  /\ condition = (coeff \ult W32.of_int 8380417)
 ).
 - auto=> &hr |> hS hio hdvd hag hf hne.
   have {hne} [hf256 hoffb] : to_uint filled{hr} < 256 /\ to_uint block_offset{hr} < 168 by smt().
-  rewrite /cand168 !to_uintD_small ?of_uintK /=; 1,2: smt().
+  rewrite /SLH64.protect_32 /cand168 !to_uintD_small ?of_uintK /=; 1,2: smt().
   by rewrite hf256 hoffb.
 
 (* 2. filter: the candidate joins the accepted stream iff below q    *)

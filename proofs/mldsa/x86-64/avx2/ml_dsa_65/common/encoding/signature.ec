@@ -41,7 +41,7 @@ wp; conseq (_: _ ==>
   by smt().
 
 (* Initialization *)
-seq 3 2  :
+seq 3 3  :
   (#pre /\
    !error{1} /\
    index{1} = previous_true_hints_seen{2} /\
@@ -50,7 +50,7 @@ seq 3 2  :
    1: by auto => />.
 
 (* Check for zero *)
-seq 2 5 :
+seq 2 6 :
   (#{/~!error{1}}{~index{1} = previous_true_hints_seen{2}}pre /\
    (!error{1} => index{1} = previous_true_hints_seen{2}) /\
    (error{1} => ill_formed_hint{2} = W64.one) /\
@@ -81,7 +81,7 @@ seq 2 5 :
    + rcondf {1} ^if;1: by auto.
      rcondf {2} ^if; 1: by auto => /> *;rewrite to_uint_eq  to_uint_zeroextu64 /#.
      rcondt {2} ^if; 1: by auto => />;by smt(W64.to_uint1 W64.to_uint0).
-     auto => /> &1 &2 ??????;split;1:smt().
+     auto => /> &1 &2 ???????;split;1:smt().
      rewrite /SETcc;split.
      +  case (55 <= encoded_offset{2} + 1) => ?;1: smt(W8.wordP orwE W8.nth_one).
         by rewrite or0w /truncateu8 /= to_uint_eq /=;by smt(W64.to_uint1 W64.to_uint0).
@@ -108,16 +108,17 @@ while (0 <= i{1} <= kvec /\
   rewrite /wpolykvec_urng allP => k kb.
   by have := H H0 k _;smt().
 
-seq 0 2 : (#pre /\ decoded_offset{2} = 256*encoded_offset{2});
+seq 0 3 : (#pre /\ decoded_offset{2} = 256*encoded_offset{2});
   1: by auto => /> &1 &2 ???????;rewrite /(`<<`) /= /#.
 
 (* Set Zero *)
-seq 1 2 : (#pre /\ 
+seq 1 3 : (#pre /\
       (liftu_wpolykvec (kvec_unflatten256 hints{2})).[i{1}] = h{1}.[i{1}] /\
       wpoly_urng 2 (kvec_unflatten256 hints{2}).[i{1}]).
  + wp; conseq />;1:smt().
    while {2} (0 <= j{2} <= n /\ 0 <= encoded_offset{2} < kvec /\
       decoded_offset{2} = encoded_offset{2} * n /\
+      condition_zero{2} = (j{2} < n) /\
      (forall (k : int),
         0 <= k < encoded_offset{2} =>
           (liftu_wpolykvec (kvec_unflatten256 hints{2})).[k] =
@@ -125,9 +126,9 @@ seq 1 2 : (#pre /\
      wpoly_urng 2 (kvec_unflatten256 hints{2}).[k]) /\
      (forall jj, 0 <= jj < j{2} =>
   (kvec_unflatten256 hints{2}).[encoded_offset{2}].[jj] = W32.zero)) (n - j{2}); last first.
-   + auto => /> &1 &2 ????????;split;1:smt().
-      move  => h2 j2;split;1:smt().
-      move => ??????H; do split.
+   + auto => /> &1 &2 ?????????;split;1:smt().
+      move  => c2 h2 j2;split;1:smt().
+      move => ???????H; do split.
       + move => k kbl kbh.
         split.
         + by rewrite mapiE 1:/# get_setE 1:/# ifF 1:/#; smt(KArray.mapiE).
@@ -156,31 +157,37 @@ seq 1 2 : (#pre /\
      have /= := H0 jj _;1:smt().
      by rewrite initiE 1:/# /= get_of_list 1:/# nth_sub /#.
 
- sp 0 1;if{2}.
+ seq 0 5 : (#pre /\
+    current_true_hints_seen{2} = to_uint (zeroextu64 hint_encoded{2}.[55 + encoded_offset{2}]) /\
+    condition_decreasing{2} = (current_true_hints_seen{2} < previous_true_hints_seen{2}));
+   1: by auto => />; rewrite /SLH64.protect_64.
+ if{2}.
  + rcondt{1} 1.
-   + auto => /> &2 ??????????H;left.
+   + auto => /> &2 ???????????H;left.
      by move : H; rewrite to_uint_zeroextu64 /#.
      auto => /> &1 &2 *;do split;1:smt(W64.to_uint_eq W64.to_uint0 W64.to_uint1). 
      move => ?; rewrite /SETcc /= wordP.
      by rewrite /truncateu8 /=;smt(W8.orwE W8.nth_one  W8.to_uint1 W8.to_uint0).
+ seq 0 2 : (#pre /\ condition_too_many{2} = (55 < current_true_hints_seen{2})); 1: by auto.
  if{2}.
- + rcondt{1} 1;1: by auto => /> &2 ??????????; rewrite to_uint_zeroextu64 /= /#.
+ + rcondt{1} 1;1: by auto => /> &2 ????????????; rewrite to_uint_zeroextu64 /= /#.
    auto => /> &1 &2 *;do split;1:smt(W64.to_uint_eq W64.to_uint0 W64.to_uint1). 
    move => ?; rewrite /SETcc /= wordP.
    by rewrite /truncateu8 /=;smt(W8.orwE W8.nth_one  W8.to_uint1 W8.to_uint0).
 
    
 rcondf{1} 1.
-+ auto => /> &2 ?????????H H0.
++ auto => /> &2 ???????????H H0.
   move :H H0; rewrite !to_uint_zeroextu64 /= => *.
   by rewrite oraE  negb_or /#.
 
-seq 1 4 : (#pre /\
+seq 1 6 : (#pre /\
     j{2} = index{1} /\
     _first{1} = previous_true_hints_seen{2} /\
+    not_done2{2} = (done2{2} = W8.zero) /\
     ((done2{2} = W8.zero) =
       (index{1} < to_uint (nth witness y{1} (w_hint + i{1})) && !error{1}))).
- + auto => /> &1 &2 ?????????.
+ + auto => /> &1 &2 ???????????.
    rewrite /SETcc to_uint_zeroextu64 /= => H H0.
    have -> : truncateu8 ill_formed_hint{2} = W8.zero; last by rewrite W8.orw0;smt(W8.to_uint_eq W8.to_uint0 W8.to_uint1).
    have -> : ill_formed_hint{2} = W64.zero by smt().
@@ -216,11 +223,13 @@ seq 1 4 : (#pre /\
   
   (* Loop control *)
   done2{2} <> W8.zero /\
+  not_done2{2} = (done2{2} = W8.zero) /\
   ((done2{2} = W8.zero) <=>
     (index{1} < to_uint (nth witness y{1} (w_hint + i{1})) && !error{1}))
 
  ); last first.
- + if{2}; auto => /> &1 &2 [#] *; do split;3:smt(W8u8.to_uint_zeroextu64).
+ + seq 0 2 : (#pre /\ condition_well_formed{2} = (ill_formed_hint{2} = W64.zero)); 1: by auto.
+   if{2}; auto => /> &1 &2 [#] *; do split;3:smt(W8u8.to_uint_zeroextu64).
    move => ?; do split;1..3:smt(W8u8.to_uint_zeroextu64).
    + by move => ?; rewrite /SETcc /truncateu8 /= /#.
    + rewrite /SETcc /truncateu8 /=;smt(W8.orwE W8.nth_one  W8.to_uint1 W8.to_uint0).
@@ -233,19 +242,20 @@ seq 1 4 : (#pre /\
  while (#{/~done2{2} <> W8.zero}post); last by auto => />;smt(W8u8.to_uint_zeroextu64).
 
 if {1}.
-+ seq 1 2 : (#{/~!error{1}}pre /\ error{1} /\ ill_formed_hint{2} = W64.one).
-  + rcondt {2} 2; 1: by  auto => /> /#.
-    rcondt {2} 3;1: by auto => /> &hr *;rewrite uleE /= !to_uint_zeroextu64 /#.
++ seq 1 5 : (#{/~!error{1}}pre /\ error{1} /\ ill_formed_hint{2} = W64.one).
+  + rcondt {2} 5; 1: by  auto => /> /#.
+    rcondt {2} 9;1: by auto => /> &hr *;rewrite /SLH64.protect_64 uleE /= !to_uint_zeroextu64 /#.
     by auto.
     auto => /> => &1 &2 [#] ????????;split;1: smt(W64.to_uint1 W64.to_uint0).
     move => ?; rewrite /SETcc !to_uint_zeroextu64 /truncateu8 /=.
     by rewrite !wordP;split =>  *;smt(W8.orwE W8.nth_one W8.to_uint1 W8.to_uint0).
 
-seq 0 2 : (#pre /\
+seq 0 5 : (#pre /\
     hint_at_j{2} = zeroextu64 hint_encoded{2}.[j{2}]).
 + auto => /> &1 &2 ???????????.
-  by rewrite !to_uint_eq !uleE /= !to_uint_zeroextu64 /#.
+  by rewrite /SLH64.protect_64 !to_uint_eq !uleE /= !to_uint_zeroextu64 /#.
 
+seq 0 1 : (#pre /\ condition_well_formed{2} = (ill_formed_hint{2} = W64.zero)); 1: by auto.
 rcondt {2} 1; 1: by auto => /> /#.
 
 auto => /> &1 &2 ????? H0 H????.
@@ -339,7 +349,7 @@ proof.
 have eq_kvec := mldsa65_kvec.
 have eq_w_hint := mldsa65_w_hint.
 proc => /=.
-seq 3 4 : (#{/~signature{2} = _signature}pre
+seq 3 5 : (#{/~signature{2} = _signature}pre
    /\ y{1} = mkseq (fun i => signature{2}.[3248 + i]) (w_hint+kvec)
    /\ touch_hint _signature signature{2}
    /\ index{1} = 0
@@ -421,14 +431,15 @@ seq 1 2 : (#{/~i{1}}{i{2}}{index{1}}{hints_written{2}}pre
      rewrite get_setE 1:/#  /truncateu8 /= of_uintK /=;smt(W8.to_uint_cmp pow2_8).
    + by smt(Array3309.get_setE).
 
- seq 0 4 : (#pre /\
+ seq 0 6 : (#pre /\
      to_uint hint_coefficient{2} = asint h{1}.[i{1}].[j{1}]).
- + auto => /> &2 Hrng ? Hh2 ????????. 
+ + auto => /> &2 Hrng ? Hh2 ????????.
    have  /= Hrngp := kvec_unflatten256E i{2} j{2} hint_0{2} (fun (ii : W32.t) => 0 <= to_uint ii < 2) _ _ _;1..3:smt().
-   have  /= Hh2p := kvec_unflatten256P i{2} j{2} hint_0{2} (liftu_wpolykvec (kvec_unflatten256 hint_0{2})) (fun (ii : W32.t) => incoeff (to_uint ii)) _ _ _;1..3: smt(). 
-   rewrite /(`<<`) /= -Hh2p;smt( incoeffK).
+   have  /= Hh2p := kvec_unflatten256P i{2} j{2} hint_0{2} (liftu_wpolykvec (kvec_unflatten256 hint_0{2})) (fun (ii : W32.t) => incoeff (to_uint ii)) _ _ _;1..3: smt().
+   rewrite /SLH64.protect_32 /(`<<`) /= -Hh2p;smt( incoeffK).
 
-   
+ seq 0 1 : (#pre /\ condition_hint{2} = (hint_coefficient{2} <> W32.zero)); 1: by auto.
+
 if.
  + auto => /> &2 Hrng ? Hh2 ?????????.
    have  /= Hrngp := kvec_unflatten256E i{2} j{2} hint_0{2} (fun (ii : W32.t) => 0 <= to_uint ii < 2) _ _ _;1..3:smt().

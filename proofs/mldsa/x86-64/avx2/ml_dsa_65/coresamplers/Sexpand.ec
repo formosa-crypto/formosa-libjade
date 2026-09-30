@@ -570,11 +570,11 @@ lemma error_4x__rejection_sample_multiple_blocksP (buf : W8.t Array272.t)
   ].
 proof.
 proc => /=.
-seq 6 : (randombytes = buf
+seq 7 : (randombytes = buf
   /\ eta_0 = VPBROADCAST_32u8 (W8.of_int 4)
   /\ bound = VPBROADCAST_32u8 (W8.of_int 9)).
 - by auto => &hr |>; rewrite !truncateu8_bcastE.
-sp 3.
+sp 4.
 seq 1 : (
      randombytes = buf
   /\ to_uint bytes_filled <= 1020
@@ -591,13 +591,14 @@ seq 1 : (
     /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
     /\ (to_uint bytes_filled < 992 /\ to_uint xof_offset < 256 =>
           16 %| to_uint xof_offset)
+    /\ condition_loop = (stop_sampling <> W64.one)
     /\ stop_sampling = W64.of_int (b2i (!(
             to_uint bytes_filled < 992
          /\ to_uint xof_offset < 256)))
   ); last first.
   - by hoare split; auto=> &hr @/svsampled |> * /=; smt(of_int_b2i_eq1P).
   exlim xof_offset => off0.
-  seq 2 : (
+  seq 3 : (
        randombytes = buf
     /\ eta_0 = VPBROADCAST_32u8 (W8.of_int 4)
     /\ bound = VPBROADCAST_32u8 (W8.of_int 9)
@@ -662,12 +663,13 @@ seq 1 : (
     - exact hag.
     move=> *.
     by rewrite (to_uintD_small16 xof_offset{hr} 4) //.
-  if; last first.
+  sp 1; if; last first.
   - auto=> &hr |> hsv hlt h16 hgo hnl.
     rewrite !uleE ?ultE !of_uintK /= !to_uintD_small ?of_uintK /=.
     - by move: hlt => /#.
     move: hnl; rewrite ultE of_uintK /= => hnl.
     by smt().
+  seq 1 : (#pre); 1: by auto.
   sp 1.
   exlim error => p1.
   exlim bytes_filled => bf1.
@@ -701,12 +703,13 @@ seq 1 : (
     - exact hag.
     move=> *.
     by smt(to_uintD_small16).
-  if; last first.
+  sp 1; if; last first.
   - auto=> &hr |> hsv h256o h16 hgo hnl.
     rewrite !uleE ?ultE !of_uintK /= !to_uintD_small ?of_uintK /=.
     - by move: h256o => /#.
     move: hnl; rewrite ultE of_uintK /= => hnl.
     by smt().
+  seq 1 : (#pre); 1: by auto.
   sp 1.
   exlim error => p2.
   exlim bytes_filled => bf2.
@@ -741,12 +744,13 @@ seq 1 : (
     - exact hag.
     move=> *.
     by smt(to_uintD_small16).
-  if; last first.
+  sp 1; if; last first.
   - auto=> &hr |> hsv h256o h16 hgo hnl.
     rewrite !uleE ?ultE !of_uintK /= !to_uintD_small ?of_uintK /=.
     - by move: h256o => /#.
     move: hnl; rewrite ultE of_uintK /= => hnl.
     by smt().
+  seq 1 : (#pre); 1: by auto.
   sp 1.
   exlim error => p3.
   exlim bytes_filled => bf3.
@@ -783,6 +787,7 @@ seq 1 : (
 seq < ^while : (
      randombytes = buf
   /\ ssampled buf error (to_uint filled) (to_uint xof_offset)
+  /\ condition_loop = (stop_sampling <> W64.one)
   /\ stop_sampling = W64.of_int (b2i (!(
         to_uint xof_offset < 272 /\ to_uint filled < 256)))
 ).
@@ -792,13 +797,14 @@ seq < ^while : (
 while (
      randombytes = buf
   /\ ssampled buf error (to_uint filled) (to_uint xof_offset)
+  /\ condition_loop = (stop_sampling <> W64.one)
   /\ stop_sampling = W64.of_int (b2i (!(
         to_uint xof_offset < 272 /\ to_uint filled < 256)))
 ); last first.
-- skip=> &hr |> _ e0 f0 off0x hs hstop.
+- skip=> &hr |> _ cl e0 f0 off0x _ hs hstop.
   have @/ssampled [#] hoffle hfle hok := hs.
   have hb : !(to_uint off0x < 272 /\ to_uint f0 < 256).
-  - by apply of_int_b2i_eq1P; rewrite -hstop.
+  - by apply of_int_b2i_eq1P; move: hstop; smt().
   case: (272 <= to_uint off0x) => hoff.
   - move: hok; have -> : to_uint off0x = 272 by smt().
     by move=> @/filled_ok.
@@ -806,18 +812,19 @@ while (
   have -> : 272 = to_uint off0x + (272 - to_uint off0x) by ring.
   rewrite sreject_block; 1,2: smt(W64.to_uint_cmp).
   by apply filled_ok_full => //.
-seq 2 : (
+seq 5 : (
      randombytes = buf
   /\ ssampled randombytes error (to_uint filled) (to_uint xof_offset)
   /\ to_uint filled < 256
   /\ to_uint xof_offset < 272
   /\ stop_sampling = W64.of_int 0
   /\ coefficient = zeroextu32 (randombytes.[to_uint xof_offset] `&` W8.of_int 15)
+  /\ condition = (coefficient \ult W32.of_int 9)
 ).
 - auto=> &hr |> hs hne.
   have [hf256 hoff272] : to_uint filled{hr} < 256 /\ to_uint xof_offset{hr} < 272
     by smt(of_int_b2i_eq1P).
-  by rewrite zext_and15E /=; smt(of_int_b2i_eq1P).
+  by rewrite /SLH64.protect_32 zext_and15E /=; smt(of_int_b2i_eq1P).
 seq > ^if : (
      randombytes = buf
   /\ to_uint xof_offset < 272
@@ -845,18 +852,19 @@ seq > ^if : (
   /\ stop_sampling = W64.of_int 0
   /\ ssampled randombytes error (to_uint filled) (to_uint xof_offset + 1)
 ).
-- if.
-  - sp 2; if.
+- sp 1; if.
+  - seq 1 : (#pre); 1: by auto.
+    sp 4; if.
     - auto=> &hr |> hoff272 hfle hok hfu.
       move: hfu; rewrite ultE of_uintK /= => hf256.
-      rewrite zext_shr4E saccept_ultE scoeffE => hsacc.
+      rewrite /SLH64.protect_32 zext_shr4E saccept_ultE scoeffE => hsacc.
       rewrite /ssampled sreject_step272 1:#smt:(W64.to_uint_cmp) hsacc /= catA.
       rewrite !to_uintD_small ?of_uintK /=; 1: smt().
       split*; 1,2: by smt(size_cat size_ge0).
       by apply filled_ok_snoc.
     auto=> &hr |> hoff272 hfle hok hfu.
     move: hfu; rewrite ultE of_uintK /= => hf256.
-    rewrite zext_shr4E saccept_ultE => hrej.
+    rewrite /SLH64.protect_32 zext_shr4E saccept_ultE => hrej.
     have hsrej : saccept (randombytes{hr}.[to_uint xof_offset{hr}] `>>>` 4) = false by smt().
     rewrite /ssampled sreject_step272 1:#smt:(W64.to_uint_cmp) hsrej /= cats0.
     by smt().
@@ -904,6 +912,7 @@ seq < ^while : (
   /\ filled_ok error
        (sreject (S ++ Array136.sub randombytes 0 (to_uint xof_offset)))
        (to_uint filled)
+  /\ condition_loop = (stop_sampling <> W64.one)
   /\ stop_sampling = W64.of_int (b2i (!(
         to_uint xof_offset < 136 /\ to_uint filled < 256)))
 ).
@@ -914,12 +923,13 @@ while (
   /\ filled_ok error
        (sreject (S ++ Array136.sub randombytes 0 (to_uint xof_offset)))
        (to_uint filled)
+  /\ condition_loop = (stop_sampling <> W64.one)
   /\ stop_sampling = W64.of_int (b2i (!(
         to_uint xof_offset < 136 /\ to_uint filled < 256)))
 ); last first.
-- skip=> &hr |> hoff0 hok0 e0 f0 off0x hoffle hok hstop.
+- skip=> &hr |> hoff0 hok0 cl e0 f0 off0x _ hoffle hok hstop.
   have hb : !(to_uint off0x < 136 /\ to_uint f0 < 256).
-  - by apply of_int_b2i_eq1P; rewrite -hstop.
+  - by apply of_int_b2i_eq1P; move: hstop; smt().
   case: (136 <= to_uint off0x) => hoff.
   - move: hok; have -> : to_uint off0x = 136 by smt().
     by rewrite PA_272_136.sub_full_136 => @/filled_ok.
@@ -927,7 +937,7 @@ while (
     1:#smt:(W64.to_uint_cmp).
   rewrite catA sreject_cat 1:dvd1z.
   by apply filled_ok_full => //; smt().
-seq 2 : (
+seq 5 : (
      randombytes = blk
   /\ filled_ok error
        (sreject (S ++ Array136.sub randombytes 0 (to_uint xof_offset)))
@@ -936,11 +946,12 @@ seq 2 : (
   /\ to_uint xof_offset < 136
   /\ stop_sampling = W64.of_int 0
   /\ coefficient = zeroextu32 (randombytes.[to_uint xof_offset] `&` W8.of_int 15)
+  /\ condition = (coefficient \ult W32.of_int 9)
 ).
 - auto=> &hr |> hoffle hok hne.
   have [hf256 hoff136] : to_uint filled{hr} < 256 /\ to_uint xof_offset{hr} < 136
     by smt(of_int_b2i_eq1P).
-  by rewrite zext_and15E /=; smt(of_int_b2i_eq1P).
+  by rewrite /SLH64.protect_32 zext_and15E /=; smt(of_int_b2i_eq1P).
 seq > ^if : (
      randombytes = blk
   /\ to_uint xof_offset < 136
@@ -969,18 +980,19 @@ seq > ^if : (
        (to_uint filled)
   /\ to_uint filled <= 256
 ).
-- if.
-  - sp 2; if.
+- sp 1; if.
+  - seq 1 : (#pre); 1: by auto.
+    sp 4; if.
     - auto=> &hr |> hoff136 hle256 hok hfu.
       move: hfu; rewrite ultE of_uintK /= => hf256.
-      rewrite zext_shr4E saccept_ultE scoeffE => hsacc.
+      rewrite /SLH64.protect_32 zext_shr4E saccept_ultE scoeffE => hsacc.
       rewrite sreject_stepS136 1:#smt:(W64.to_uint_cmp) hsacc /= catA.
       rewrite !to_uintD_small ?of_uintK /=; 1: smt().
       split; 2: smt().
       by apply filled_ok_snoc.
     auto=> &hr |> hoff136 hle256 hok hfu.
     move: hfu; rewrite ultE of_uintK /= => hf256.
-    rewrite zext_shr4E saccept_ultE => hrej.
+    rewrite /SLH64.protect_32 zext_shr4E saccept_ultE => hrej.
     have hsrej : saccept (randombytes{hr}.[to_uint xof_offset{hr}] `>>>` 4) = false by smt().
     rewrite sreject_stepS136 1:#smt:(W64.to_uint_cmp) hsrej /= cats0.
     by smt().

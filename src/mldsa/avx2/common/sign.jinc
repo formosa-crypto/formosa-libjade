@@ -71,7 +71,8 @@ inline fn __compute_z_and_check_norm(
 
     base = 0;
     while {
-        #[declassify] infinity_norm_check_result = infinity_norm_check_result;
+        () = #declassify(infinity_norm_check_result);
+        _ = #init_msf();
         if (infinity_norm_check_result != 0) {
             base = COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL;
         }
@@ -86,7 +87,7 @@ inline fn __compute_z_and_check_norm(
         infinity_norm_check_result =
             polynomial::__check_infinity_norm(
                 signer_response[base : COEFFICIENTS_IN_POLYNOMIAL],
-                (int)(GAMMA1 - BETA)
+                (GAMMA1 - BETA)
             );
         base = base + COEFFICIENTS_IN_POLYNOMIAL;
     }
@@ -108,7 +109,8 @@ inline fn __apply_cs2_and_check_norm(
 
     base = 0;
     while {
-        #[declassify] infinity_norm_check_result = infinity_norm_check_result;
+        () = #declassify(infinity_norm_check_result);
+        _ = #init_msf();
         if (infinity_norm_check_result != 0) {
             base = ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL;
         }
@@ -129,7 +131,7 @@ inline fn __apply_cs2_and_check_norm(
         infinity_norm_check_result =
             polynomial::__check_infinity_norm(
                 w0_minus_cs2[base : COEFFICIENTS_IN_POLYNOMIAL],
-                (int)(GAMMA2 - BETA));
+                (GAMMA2 - BETA));
         base = base + COEFFICIENTS_IN_POLYNOMIAL;
     }
     return w0_minus_cs2, infinity_norm_check_result;
@@ -151,7 +153,8 @@ inline fn __apply_ct0_and_check_norm(
 
     base = 0;
     while {
-        #[declassify] infinity_norm_check_result = infinity_norm_check_result;
+        () = #declassify(infinity_norm_check_result);
+        _ = #init_msf();
         if (infinity_norm_check_result != 0) {
             base = ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL;
         }
@@ -164,7 +167,8 @@ inline fn __apply_ct0_and_check_norm(
         ct0 = polynomial::reduce32(ct0);
         infinity_norm_check_result =
             polynomial::__check_infinity_norm(ct0, GAMMA2);
-        #[declassify] infinity_norm_check_result = infinity_norm_check_result;
+        () = #declassify(infinity_norm_check_result);
+        _ = #init_msf();
         if (infinity_norm_check_result == 0) {
             w0_minus_cs2_plus_ct0[base : COEFFICIENTS_IN_POLYNOMIAL] =
                 polynomial::add(
@@ -197,7 +201,8 @@ inline fn __make_hint_vector(
     total_ones_in_hint = 0;
     base = 0;
     while {
-        #[declassify] infinity_norm_check_result = infinity_norm_check_result;
+        () = #declassify(infinity_norm_check_result);
+        _ = #init_msf();
         if (infinity_norm_check_result != 0) {
             base = ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL;
         }
@@ -227,12 +232,12 @@ param int MASK_DOMAIN_SEPARATOR_UB =
 
 #[sct="{ptr: public, val: transient} *
        {ptr: public, val: secret} *
-       public * public *
+       public * public * public * public *
        {ptr: public, val: secret} ->
        {ptr: public, val: transient} * public"]
 fn __sign_internal(
     #[spill_to_mmx] reg ptr u8[SIGNATURE_SIZE] signature,
-    #[secret] reg ptr u8[SIGNING_KEY_SIZE] signing_key,
+    #[spill_to_mmx] reg ptr u8[SIGNING_KEY_SIZE] signing_key,
     #[spill_to_mmx] reg ui64 context_pointer,
     #[spill_to_mmx] reg ui64 context_size,
     #[spill_to_mmx] reg ui64 message_pointer,
@@ -285,7 +290,8 @@ fn __sign_internal(
     reg ui64 j;
 
     () = #spill(signature, randomness, signing_key, context_pointer, context_size, message_pointer, message_size);
-    #[declassify] seed_for_matrix_A = signing_key[0:32];
+    seed_for_matrix_A = signing_key[0:32];
+    () = #declassify(seed_for_matrix_A);
     matrix_A = sample::__matrix_A(seed_for_matrix_A);
 
     () = #unspill(signing_key, context_pointer, context_size, message_pointer, message_size);
@@ -317,7 +323,7 @@ fn __sign_internal(
 
     // WARNING WARNING WARNING
     //
-    // The |#[declassify]|s in this loop body are only present to allow the
+    // The |#declassify|s in this loop body are only present to allow the
     // constant-time checker to go over the whole code without erroring out and
     // validate those parts whose constant-timedness can be established through
     // type-checking alone.
@@ -375,7 +381,8 @@ fn __sign_internal(
 
         // Branchless loop-exit flag: pass (0) → exit (1), fail (1) → continue (0).
         // infinity_norm_check_result is always 0 or 1 (SETcc values ORed together).
-        #[declassify] infinity_norm_check_result = infinity_norm_check_result;
+        () = #declassify(infinity_norm_check_result);
+        _ = #init_msf();
         last_norm_check_result = infinity_norm_check_result;
         exit_rejection_sampling_loop = infinity_norm_check_result;
         exit_rejection_sampling_loop ^= 1;
@@ -393,14 +400,15 @@ fn __sign_internal(
     }
 
     () = #unspill(signature);
-    #[declassify] hint = hint;
-    #[declassify] commitment_hash = commitment_hash;
-    #[declassify] signer_response = signer_response;
+    () = #declassify(hint);
+    () = #declassify(commitment_hash);
+    () = #declassify(signer_response);
     signature = signature::__encode(signature, commitment_hash, signer_response, hint);
 
     // result = 0 on success, -1 on failure.
     // last_norm_check_result is 0 iff the exiting iteration produced a valid
     // signature (reset to 0 each iteration). Broadcast bit 0 to all 64 bits.
+    _ = #init_msf();
     result = last_norm_check_result;
     result <<= 63;
     result >>s= 63;

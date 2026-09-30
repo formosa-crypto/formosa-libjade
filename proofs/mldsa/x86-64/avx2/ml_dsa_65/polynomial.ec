@@ -72,8 +72,8 @@ proc change ^while.1 : { coefficients <- if (0 <= offset*8 <= 32*256-256)
                   case (0 <= offset{2} * 8 <= 7936); last by auto.
                   by move => ?; rewrite BSWAS_256u32_256_slicegetE /#.
 
-wp 7.
-proc change 7 : { zf <- msb_mask = W32.zero; }.
+wp 6.
+proc change 6 : { zf <- msb_mask = W32.zero; }.
 + by auto => /= &1 &2 ->; rewrite /TEST_32 /rflags_of_bwop /= /ZF_of  /=.
 
 unroll for ^while.

@@ -361,7 +361,7 @@ hoare finish_updstate_avx2_h _st:
     ==> res = finish_updstate_avx2_spec _st.
 proof.
 proc. inline.
-seq 18: (st = _st /\ 
+seq 19: (st = _st /\ 
          (trailb, r8, at) = ststatus_data_spec st.[25]). 
 + auto => />; rewrite /ststatus_data_spec /=; do split. 
   + rewrite /truncateu8 !to_uint_shr ..2:/# of_uintK pmod_small 1:/# of_int_mod /#.
@@ -623,8 +623,8 @@ qed.
 
 lemma absorb_m_updstate_avx2_ll: islossless M._absorb_m_updstate_avx2.
 proof.
-proc. inline 8. wp. seq 6: (true) => //=.
-seq 5: (1 <= r8) => //=; inline; last first.
+proc. inline 9. wp. seq 7: (true) => //=.
+seq 6: (1 <= r8) => //=; inline; last first.
 + hoare. auto => />. rewrite /(\ult) of_uintK pmod_small 1:/#.
   move => &hr. rewrite /(\ule). 
   case(200 < to_uint ((st{hr}.[25] `>>` of_int 8) `&` of_int 255 + one `<<` of_int 3)) => H. 

@@ -232,7 +232,7 @@ conseq (: _ ==>
    BytesSig.to_list sigma{1} = to_list signature{2} /\ result{2} = zero)); 1: by smt().
    
 (* Jasmin: compute context_pointer and context_size from context array *)
-sp 0 2.
+sp 0 4.
 
 (* Jasmin: the context-size guard must hold (given by precondition) *)
 rcondt {2} ^if; 1: by auto => /> /#.

@@ -10,21 +10,21 @@ WArray32 WArray40 WArray160 WArray192 WArray200 WArray208 WArray224 WArray800
 WArray808.
 
 abbrev rOL8 =
-((Array1.of_list witness)
+((Array1.of_list witness<:W256.t>)
 [(W256.of_int
  13620818001941277694121380808605999856886653716761013959207994299728839901191
  )]
 ).
 
 abbrev rOL56 =
-((Array1.of_list witness)
+((Array1.of_list witness<:W256.t>)
 [(W256.of_int
  10910488462195273559651782724632284871561478246514020268633800075540923875841
  )]
 ).
 
 abbrev kECCAK_RHOTATES_RIGHT =
-((Array6.of_list witness)
+((Array6.of_list witness<:W256.t>)
 [(W256.of_int 144373339913893657577751063007562604548177214458152943091773);
 (W256.of_int 232252764209307188274174373867837442080505530800860351692863);
 (W256.of_int 156927543384667019098616994515559168111335794127330162507795);
@@ -33,7 +33,7 @@ abbrev kECCAK_RHOTATES_RIGHT =
 (W256.of_int 313855086769334038206421612937983674734430261968315659321364)]).
 
 abbrev kECCAK_RHOTATES_LEFT =
-((Array6.of_list witness)
+((Array6.of_list witness<:W256.t>)
 [(W256.of_int 257361171150853911329517531560668107745210100483895842570243);
 (W256.of_int 169481746855440380633094220700393270212881784141188433969153);
 (W256.of_int 244806967680080549808651600052671544182051520814718623154221);
@@ -42,7 +42,7 @@ abbrev kECCAK_RHOTATES_LEFT =
 (W256.of_int 87879424295413530700846981630247037558957052973733126340652)]).
 
 abbrev kECCAK1600_RC =
-((Array24.of_list witness)
+((Array24.of_list witness<:W64.t>)
 [(W64.of_int 1); (W64.of_int 32898); (W64.of_int (-9223372036854742902));
 (W64.of_int (-9223372034707259392)); (W64.of_int 32907);
 (W64.of_int 2147483649); (W64.of_int (-9223372034707259263));
@@ -3794,7 +3794,10 @@ module M = {
     var trailb:W8.t;
     var r8:int;
     var at:int;
+    var  _0:W64.t;
     ststatus <- st.[25];
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
     (trailb, r8, at) <@ _ststatus_data (ststatus);
     st <-
     (Array26.init
@@ -3813,34 +3816,6 @@ module M = {
     (WArray208.set32_direct (WArray208.init64 (fun i => st.[i])) (8 * 25)
     ((get32_direct (WArray208.init64 (fun i => st.[i])) (8 * 25)) `&`
     (W32.of_int 4278255360)))));
-    return st;
-  }
-  proc keccak_ststatus (status:W8.t Array3.t, st:W64.t Array26.t) : W8.t Array3.t = {
-    var ststatus:W64.t;
-    var r8:int;
-    var at:int;
-    var  _0:W8.t;
-    ststatus <- st.[25];
-    ( _0, r8, at) <@ _ststatus_data (ststatus);
-    status.[0] <- (truncateu8 (W64.of_int r8));
-    status.[1] <- (truncateu8 (W64.of_int at));
-    status.[2] <-
-    (get8_direct (WArray208.init64 (fun i => st.[i])) ((8 * 25) + 2));
-    return status;
-  }
-  proc init_updstate_avx2 (st:W64.t Array26.t, r64:int, trailb:W8.t) : 
-  W64.t Array26.t = {
-    
-    st <- st;
-    r64 <- r64;
-    trailb <- trailb;
-    st <@ _init_updstate_avx2 (st, r64, trailb);
-    return st;
-  }
-  proc finish_updstate_avx2 (st:W64.t Array26.t) : W64.t Array26.t = {
-    
-    st <- st;
-    st <@ _finish_updstate_avx2 (st);
     return st;
   }
   proc _add_m_updstate_avx2 (st:W64.t Array25.t, at:int, buf:int, upto:int) : 
@@ -3914,11 +3889,14 @@ module M = {
     var stk:W64.t Array25.t;
     var r8:int;
     var at:int;
-    var  _0:W8.t;
-    var  _1:int;
+    var  _0:W64.t;
+    var  _1:W8.t;
+    var  _2:int;
     stk <- witness;
     ststatus <- st.[25];
-    ( _0, r8, at) <@ _ststatus_data (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data (ststatus);
     stk <- (Array25.init (fun i => st.[(0 + i)]));
     (* Erased call to spill *)
     len <- (len + at);
@@ -3930,7 +3908,7 @@ module M = {
     }
     len <- len;
     (* Erased call to unspill *)
-    (stk, at,  _1) <@ _add_m_updstate_avx2 (stk, at, buf, len);
+    (stk, at,  _2) <@ _add_m_updstate_avx2 (stk, at, buf, len);
     st <-
     (Array26.init
     (fun i => (if (0 <= i < (0 + 25)) then stk.[(i - 0)] else st.[i])));
@@ -4000,10 +3978,13 @@ module M = {
     var stk:W64.t Array25.t;
     var r8:int;
     var at:int;
-    var  _0:W8.t;
+    var  _0:W64.t;
+    var  _1:W8.t;
     stk <- witness;
     ststatus <- st.[25];
-    ( _0, r8, at) <@ _ststatus_data (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data (ststatus);
     stk <- (Array25.init (fun i => st.[(0 + i)]));
     (* Erased call to spill *)
     if ((at = 0)) {
@@ -4033,6 +4014,35 @@ module M = {
     (WArray208.set8_direct (WArray208.init64 (fun i => st.[i])) (8 * 25)
     (truncateu8 (W64.of_int at)))));
     return (buf, st);
+  }
+  proc keccak_ststatus (status:W8.t Array3.t, st:W64.t Array26.t) : W8.t Array3.t = {
+    var ststatus:W64.t;
+    var r8:int;
+    var at:int;
+    var  _0:W8.t;
+    ststatus <- st.[25];
+    (* Erased call to declassify *)
+    ( _0, r8, at) <@ _ststatus_data (ststatus);
+    status.[0] <- (truncateu8 (W64.of_int r8));
+    status.[1] <- (truncateu8 (W64.of_int at));
+    status.[2] <-
+    (get8_direct (WArray208.init64 (fun i => st.[i])) ((8 * 25) + 2));
+    return status;
+  }
+  proc init_updstate_avx2 (st:W64.t Array26.t, r64:int, trailb:W8.t) : 
+  W64.t Array26.t = {
+    
+    st <- st;
+    r64 <- r64;
+    trailb <- trailb;
+    st <@ _init_updstate_avx2 (st, r64, trailb);
+    return st;
+  }
+  proc finish_updstate_avx2 (st:W64.t Array26.t) : W64.t Array26.t = {
+    
+    st <- st;
+    st <@ _finish_updstate_avx2 (st);
+    return st;
   }
   proc absorb_m_updstate_avx2 (st:W64.t Array26.t, buf:int, len:int) : 
   W64.t Array26.t = {

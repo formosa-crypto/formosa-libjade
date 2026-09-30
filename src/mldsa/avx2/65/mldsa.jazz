@@ -58,6 +58,7 @@ export fn ml_dsa_65_keygen(
 ) -> reg ptr u8[VERIFICATION_KEY_SIZE],
      reg ptr u8[SIGNING_KEY_SIZE]
 {
+    _ = #init_msf();
     () = #spill(randomness);
     verification_key, signing_key = __keygen_internal(verification_key, signing_key, randomness);
 
@@ -67,7 +68,8 @@ export fn ml_dsa_65_keygen(
 #[sct="{ptr: transient, val: transient} *
        {ptr: transient, val: secret} *
        {ptr: transient, val: transient} *
-       {ptr: transient, val: transient} *
+       transient *
+       transient *
        {ptr: transient, val: secret} ->
        {ptr: transient, val: transient} * public"]
 export fn ml_dsa_65_sign(
@@ -81,8 +83,10 @@ export fn ml_dsa_65_sign(
 {
     reg u64 result;
     reg ui64 context_pointer context_size;
+    _ = #init_msf();
     context_pointer = (64ui) context[0];
     context_size = (64ui) context[1];
+    _ = #init_msf();
 
     if (context_size <= 255) {
         signature, result = __sign_internal(signature, signing_key, context_pointer, context_size, message_pointer, message_size, randomness);
@@ -95,7 +99,8 @@ export fn ml_dsa_65_sign(
 
 #[sct="{ptr: transient, val: transient} *
        {ptr: transient, val: transient} *
-       {ptr: transient, val: transient} *
+       transient *
+       transient *
        {ptr: transient, val: transient} ->
        public"]
 export fn ml_dsa_65_verify(
@@ -107,8 +112,10 @@ export fn ml_dsa_65_verify(
 ) -> reg u64 {
     reg u64 verification_result;
     reg ui64 context_pointer context_size;
+    _ = #init_msf();
     context_pointer = (64ui) context[0];
     context_size = (64ui) context[1];
+    _ = #init_msf();
 
     if (context_size <= 255) {
         verification_result = __verify_internal(verification_key, context_pointer, context_size, message_pointer, message_size, signature);

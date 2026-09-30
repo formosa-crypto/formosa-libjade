@@ -79,10 +79,7 @@ $(BUILD):
 #    make ct-mlkem768        # just that one
 #    make sct-mldsa65
 #
-#  STATUS: ML-KEM passes both CT and SCT. ML-DSA does NOT yet pass either
-#  (the Keccak state in fips202/avx2/keccak1600_updstate.jinc lacks the
-#  security annotations on its result type), so `make ct` / `make sct`
-#  currently fail on mldsa65. The mlkem-only goals are what CI gates on.
+#  STATUS: ML-KEM and ML-DSA pass both CT and SCT; CI gates on all of them.
 # ==========================================================================
 
 MLDSA_INC := -I Common=$(MLDSA_COMMON) -I Keccak=$(KECCAK)

@@ -384,7 +384,7 @@ proc => /=; conseq |>.
 sp 0 2.
 rcondt {2} ^if; 1: by auto => /> /#.
 inline {2} M.__verify_internal.
-sp 0 6.
+sp 0 8.
 seq 1 9 : #pre; 1: by auto.
 sp 1 0.
 seq 1 0 : (#pre /\
@@ -420,7 +420,7 @@ seq 0 1 : (#pre /\
   by smt(). 
   
 if {1}; last first.
-+ sp 0 1; rcondf {2} 1.
++ sp 0 2; rcondf {2} 1.
   + auto => |> &hr ?????-> ??. 
     have ? : (- W64.one <> W64.zero); last by smt(or64_ne0).
     by rewrite to_uint_eq to_uintN  /=.
@@ -455,7 +455,7 @@ seq 1 1 : (#pre /\
     by rewrite BytesPK.get_of_list 1:/# get_to_list.
 
 (* anticipate hashing *)
-swap {2} [6..7] -5.
+swap {2} [8..9] -7.
 
 (* verification key hash. *)
 sp 1 0.
@@ -501,7 +501,7 @@ exlim signer_response{2} => _sr_pre.
 exlim challenge{2} => _ch_pre.
 
 (* jump over algebra *)
-seq 2 4 :
+seq 2 5 :
   (#{/~signer_response{2}}{/~challenge{2}}pre /\
     lifts_wpolylvec (lvec_unflatten256 _sr_pre) = z{1} /\
     wpolylvec_srng (lvec_unflatten256 _sr_pre) (gamma1 - 1) gamma1 /\
@@ -512,7 +512,7 @@ seq 2 4 :
     BytesW1.of_list (to_list reconstructed_signer_commitment{2}) = w1Encode w1{1}); last first.
 
 (* recompute hash *)
-sp 1 0.
+sp 1 1.
 seq 0 1 : (#pre /\
       expected_commitment_hash{2} =
         Array48.of_list witness (BytesCT.to_list (H_ct mu{1} (w1Encode w1{1})))).

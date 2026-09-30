@@ -9,4 +9,4 @@ param int KECCAK_PERMUTATION
 from Keccak require "avx2/keccakf1600.jinc"
 from Keccak require "common/subreadwrite_imem.jinc"
 from Keccak require "avx2/keccak1600_fixedsizes.jinc"
-from Keccak require "avx2/keccak1600_updstate.jinc"
+from Keccak require "avx2/keccak1600_updstate_export.jinc"

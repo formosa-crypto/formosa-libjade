@@ -49,8 +49,8 @@ inline fn __compute_t0_t1(
        {ptr: public, val: secret} ->
        {ptr: public, val: transient} * {ptr: public, val: secret}"]
 fn __keygen_internal(
-    reg ptr u8[VERIFICATION_KEY_SIZE] verification_key,
-    reg ptr u8[SIGNING_KEY_SIZE] signing_key,
+    #[spill_to_mmx] reg ptr u8[VERIFICATION_KEY_SIZE] verification_key,
+    #[spill_to_mmx] reg ptr u8[SIGNING_KEY_SIZE] signing_key,
     reg ptr u8[32] randomness
 )
     -> reg ptr u8[VERIFICATION_KEY_SIZE],
@@ -81,7 +81,8 @@ fn __keygen_internal(
 
     prf_output = __keygen_prf(prf_output, randomness);
 
-    #[declassify] seed_for_matrix_A = prf_output[:u8 0:SEED_FOR_MATRIX_A_SIZE];
+    seed_for_matrix_A = prf_output[:u8 0:SEED_FOR_MATRIX_A_SIZE];
+    () = #declassify(seed_for_matrix_A);
     matrix_A = sample::__matrix_A(seed_for_matrix_A);
 
     seed_for_error_vectors = prf_output[:u8 SEED_FOR_MATRIX_A_SIZE:SEED_FOR_ERROR_VECTORS_SIZE];
@@ -117,7 +118,7 @@ fn __keygen_internal(
     // Encode t1 into the verification key.
     verification_key[32: T1_ENCODED_SIZE]
         = t1::__encode(verification_key[32: T1_ENCODED_SIZE], t1);
-    #[declassify] verification_key = verification_key;
+    () = #declassify(verification_key);
 
     // Hash the verification key → tr, store in signing key.
     // Unspill signing_key here: the tr goes into signing_key[64:],
