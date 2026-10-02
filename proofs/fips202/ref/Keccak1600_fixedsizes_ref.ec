@@ -427,21 +427,77 @@ rewrite addstate_atE 1:/# cats0 take_cat' size_nseq ifT 1:/# take_nseq -nseq1 by
 by rewrite -cat0s bytes2state_zext bytes2state0 -cat0s bytes2state_zext bytes2state0.
 qed.
 
-lemma addstate_msubread_u64 mem w cur st at buf len tb at0 buf0 len0 tb0 cur1 at1 buf1 len1 tb1:
- 0 <= at => 0 <= len =>
+lemma bytes2state_nthE l1 l2:
+ (forall i, 0 <= i < 200 => nth W8.zero l1 i = nth W8.zero l2 i) =>
+ bytes2state l1 = bytes2state l2.
+proof.
+move=> H; rewrite -!bytes2stbytesP; apply stbytes_inj; rewrite !stwordsK tP => i Hi.
+by rewrite !get_of_list 1..2:// H.
+qed.
+
+(* A word read by `srspec` at offset `cur` is the `size lw`-byte window of the
+   padded stream `u8zeros at ++ l ++ [tb]` starting at `cur` (generic in the
+   word size: reused for the u64/u128/u256 reads). *)
+lemma srspec_window lw cur at l len tb:
+ srpre cur at l len tb =>
+ srspec lw cur at l len tb =>
+ bytes2state (u8zeros cur ++ lw)
+ = bytes2state (take (cur + size lw) (u8zeros at ++ l ++ [W8.of_int tb])).
+proof.
+move=> Hpre Hspec; have [_ /u8prefAbsorbP Hp] := Hspec Hpre.
+move: Hpre; rewrite /srpre => |> Hcur Hat Htb0 Htb1 Hor.
+apply bytes2state_nthE => i Hi.
+rewrite nth_cat size_nseq ler_maxr // nth_nseq_if cats1.
+case: (i < cur + size lw) => C.
+ rewrite nth_take; 1,2: smt(size_ge0).
+ rewrite nth_rcons size_cat size_nseq ler_maxr // nth_cat size_nseq ler_maxr // nth_nseq_if Hp.
+ by case: Hor => [Hle|[-> ->]]; smt(nth_out size_ge0).
+rewrite nth_out; first smt(size_take size_ge0).
+rewrite nth_out; first smt(size_take size_ge0).
+by case: (i < cur).
+qed.
+
+(* One u64 read step: `stc` is the state after the first `cur` bytes (NB: not
+   the global zero state `st0`); the word is XORed into it at offset `cur`. *)
+lemma addstate_msubread_u64 mem w cur st at buf len tb stc at0 buf0 len0 tb0 cur1 at1 buf1 len1 tb1:
+ 0 <= at => 0 <= len => 0 <= tb < 256 =>
  0 <= cur <= at0 < cur+8 =>
  cur1 = cur + 8 =>
- addstate_spec st at (memread mem buf len) tb cur buf buf0 st0 at0 len0 tb0 =>
+ addstate_spec st at (memread mem buf len) tb cur buf buf0 stc at0 len0 tb0 =>
  msubread mem (u64bytes w) cur at0 buf0 len0 tb0 at1 buf1 len1 tb1 =>
- addstate_spec st at (memread mem buf len) tb cur1 buf buf1 (addstate_at st cur (u64bytes w)) at1 len1 tb1.
+ addstate_spec st at (memread mem buf len) tb cur1 buf buf1 (addstate_at stc cur (u64bytes w)) at1 len1 tb1.
 proof.
-move => |> Hat Hlen Hcur Hat0_1 Hat0_2; rewrite /addstate_spec addstate_atE // Hat /= => [#].
-move => Hst0 -> -> -> ->; rewrite size_memread 1:// => Hsub.
+move => |> Hat Hlen Htb0 Htb1 Hcur Hat0_1 Hat0_2; rewrite /addstate_spec addstate_atE // Hat /= => [#].
+move => Hst0 ->> ->> ->> ->>; rewrite size_memread 1:// => Hsub.
 split.
- (* st-equation: addstate st (bytes2state (u8zeros cur ++ u64bytes w))
-    = addstate st (bytes2state (take (cur+8) (u8zeros at ++ memread .. ++ [tb])));
-    needs the take/cat reconciliation of the single word against the stream. *)
- admit.
+ (* state: the word is the stream window [cur, cur+8) of the *remaining*
+    stream (srspec_window); that window coincides byte-wise with the one of
+    the original stream S, whose [0, cur) prefix is already absorbed in stc. *)
+ rewrite Hst0 -addstateA; congr.
+ move: Hsub; rewrite /msubread => [#] Hspec _ _ _ _.
+ rewrite (srspec_window _ _ _ _ _ _ _ Hspec); first by rewrite /srpre size_memread 1:/#; smt(size_memread).
+ have ->: size (u64bytes w) = 8 by rewrite /u64bytes size_to_list.
+ pose S := u8zeros at ++ memread mem buf len ++ [W8.of_int tb].
+ have Hsz: size (take cur S) = cur.
+  by rewrite size_take // /S !size_cat size_nseq size_memread //=; move: Hat0_1; rewrite size_memread // /b2i; smt().
+ rewrite (takeD S cur 8) 1,2:/# bytes2state_cat Hsz; congr.
+ apply bytes2state_nthE => i Hi.
+ have nthT: forall (s: W8.t list) n j, 0 <= n => nth W8.zero (take n s) j = if j < n then nth W8.zero s j else W8.zero.
+  move=> s n j Hn; case: (j < n) => C; first by rewrite nth_take.
+  by rewrite nth_out //; smt(size_take size_ge0).
+ have nthM: forall b n j, 0 <= n => nth W8.zero (memread mem b n) j = if 0 <= j < n then loadW8 mem (b + j) else W8.zero.
+  move=> b n j Hn; case: (0 <= j < n) => C; first by rewrite nth_memread.
+  by rewrite nth_out ?size_memread.
+ move: Hat0_1 Hat0_2; rewrite size_memread // /b2i => Hat0_1 Hat0_2.
+ rewrite nthT 1:/# (nth_cat _ (u8zeros cur)) size_nseq (_: max 0 cur = cur) 1:/# nth_nseq_if.
+ case: (i < cur) => C1 /=.
+  by rewrite ifT 1:/# -catA (nth_cat _ (u8zeros _)) size_nseq ifT 1:/# nth_nseq_if /#.
+ rewrite nthT // nth_drop 1,2:/# /S (_: cur + (i - cur) = i) 1:/#.
+ case: (i < cur + 8) => C2; last by rewrite ifF 1:/#.
+ rewrite (_: (i - cur < 8) = true) 1:/# /=.
+ have Hl0: 0 <= (if at < cur then max 0 (at + len - cur) else len) by smt().
+ rewrite !cats1 !nth_rcons !size_cat !size_nseq !size_memread // !nth_cat !size_nseq !nth_nseq_if !nthM //.
+ smt().
 (* len'/at'/tb'/cur' are msubread bookkeeping: unfold the sr* ops in Hsub. *)
 split; first by move: Hsub; rewrite /msubread /srlen /srincr /srfnsh /srtb size_to_list /= => |> *; smt().
 split; first by move: Hsub; rewrite /msubread /srlen /srincr /srfnsh /srtb size_to_list /= => |> *; smt().
