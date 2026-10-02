@@ -62,126 +62,6 @@ lemma stateabsorb_iblocks_rcons l x st:
  = keccak_f1600_op (stateabsorb (stateabsorb_iblocks l st) x).
 proof. by rewrite /stateabsorb_iblocks foldl_rcons /=. qed.
 
-lemma srspecP lw at l len tb:
- srpre 0 at l len tb =>
- at + len + b2i (tb<>0) <= size lw =>
- srspec lw 0 at l len tb =>
- bytes2state (u8zeros at ++ l ++ [W8.of_int tb])
- = bytes2state lw.
-proof.
-move=> Hpre Hat H.
-move: (H Hpre) => {H}[_ H].
-rewrite -!bytes2stbytesP; apply stbytes_inj; rewrite !stwordsK tP => i Hi.
-rewrite !get_of_list 1..2:// H ler_maxr 1:/# /=.
-rewrite -catA nth_cat size_nseq nth_u8zeros ler_maxr 1:/#.
-case: (i<at) => ?; first smt(nth_out).
-rewrite nth_cat nth_rcons.
-case: (i-at < size l) => ?.
- by rewrite ifT 1:/#.
-case: (i - at = size l) => ?; first smt().
-rewrite ifF /#.
-qed.
-
-lemma srspecP0 lw at l len tb:
- len=0 /\ tb=0 =>
- srpre 0 at l len tb =>
- srspec lw 0 at l len tb =>
- bytes2state (u8zeros at ++ l ++ [W8.of_int tb])
- = bytes2state lw.
-proof.
-move=> [-> ->] /> Hat Hsz.
-have ->: l=[] by smt(size_eq0).
-move=> H; move: (H _); first smt().
-move => {H}[_ H].
-rewrite cats0 /= cats1 -nseqSr 1:/#.
-have ->: lw = u8zeros (size lw).
-apply (u8prefAt0 _ 0 at [] 0); first 2 smt(nseq0).
-by rewrite -cat0s bytes2state_zext eq_sym -cat0s bytes2state_zext.
-qed.
-
-op msubread_pre (cur at buf len tb: int): bool =
- 0<=cur /\ 0<=at /\ 0<=buf /\ 0<=len /\ 0<=tb<256 /\
- at + len + b2i(tb<>0) <= 200.
-
-lemma msubreadP m lw at buf len tb at1 buf1 len1 tb1:
- msubread_pre 0 at buf len tb =>
- (at+len+b2i(tb<>0) <= size lw) \/ len1=0 /\ tb1=0 =>
- msubread m lw 0 at buf len tb at1 buf1 len1 tb1 =>
- bytes2state (u8zeros at ++ memread m buf len ++ [of_int tb])
- = bytes2state lw
- /\ at1 = at + len + b2i (tb<>0)
- /\ buf1 = buf + len
- /\ len1 = 0
- /\ tb1 = 0.
-proof.
-move => /> ?????? Hlw H; split; last smt().
-case: (at <= size lw) => C; last first.
- have Elen: len=0 by smt().
- have Etb: tb=0 by smt().
- apply (srspecP0 _ _ _ _ _ _ _ H); first smt().
- by move=> />; rewrite Elen size_memread /#.
-have HHlw: at + len + b2i (tb <> 0) <= size lw by smt().
-apply (srspecP _ _ _ _ _ _ _ H) => //.
-by rewrite /srpre size_memread 1:/# /#.
-qed.
-
-lemma memread0' mem buf len:
- len <= 0 =>
- memread mem buf len = [].
-proof. by move=> ?; rewrite /memread mkseq0_le. qed.
-
-lemma chunk_cat_memread mem r8 l buf len:
- let at = size l %% r8 in
- let lastpos = (at + len) %/ r8 * r8 - at in
- 0 < r8 =>
- 0 <= len =>
- chunk r8 (l ++ memread mem buf len)
- = chunk r8 (l ++ memread mem buf lastpos).
-proof.
-move=> /= Hr8 Hlen.
-rewrite !(chunk_cat' l) /= 1..2:/# /=; congr.
-rewrite chunk_take_eq 1:/# size_cat size_chunkremains size_memread 1:/#.
-rewrite take_cat' !size_chunkremains.
-case: (r8 <= size l %% r8 + len) => C.
- rewrite ifF 1:/#; congr; congr.
- by rewrite take_memread /#.
-rewrite divz_small /=; first smt(size_ge0).
-rewrite ifT; first smt(size_ge0).
-rewrite take0 /memread mkseq0_le 1:/# cats0.
-by rewrite eq_sym chunk_take_eq 1:/# size_chunkremains divz_small 1:/# take0.
-qed.
-
-lemma chunkremains_cat_memread mem r8 l buf len tb:
- let at = size l %% r8 in
- let lastpos = (at + len) %/ r8 * r8 - at in
- let lastlen = if r8 <= at + len then (at + len) %% r8 else len in
- 0 < r8 =>
- 0 <= len =>
- bytes2state (chunkremains r8 (l ++ memread mem buf len) ++ [tb])
- = addstate
-    (bytes2state (chunkremains r8 (l ++ memread mem buf lastpos)))
-    (bytes2state (u8zeros (if r8 <= size l %% r8 + len then 0 else size l %% r8)
-                 ++ memread mem (buf+len-lastlen) lastlen ++ [tb])).
-proof.
-move=> at lastpos lastlen Hr8 Hlen.
-case: (r8 <= at + len) => C.
- rewrite eq_sym chunkremains_cat 1:/# eq_sym chunkremains_cat 1:/#.
- rewrite /chunkremains !drop_cat !size_cat !size_memread 1..2:/#.
- rewrite !size_drop; first smt(size_ge0).
- rewrite ifF 1:/# ifF 1:/#.
- have ->: (size l - size l %/ r8 * r8) = size l %% r8 by smt().
- rewrite eq_sym drop_oversize 1:size_memread 1..2:/#.
- rewrite nseq0_le 1:/# /=.
- rewrite drop_memread 1:/# bytes2state0 addstate_st0; congr; congr.
- by rewrite /lastlen C /= ler_maxr /#.
-rewrite {2}/memread mkseq0_le 1:/# cats0.
-rewrite chunkremains_cat 1:// chunkremains_small.
- by rewrite size_cat size_chunkremains size_memread /#.
-rewrite -!catA bytes2state_cat; congr; congr; congr.
- by rewrite size_chunkremains /#.
-rewrite /memread /=; congr; smt().
-qed.
-
 (* ------------------------------------------------------------------------ *)
 (* Bridges between the extracted WArray200 word-stores and the abstract       *)
 (* addstate_at / addstate operations.  These are what let the memory-based    *)
@@ -205,21 +85,6 @@ rewrite filliE 1:// map2iE 1:// get_of_list 1:// nth_cat size_nseq ler_maxr 1:/#
 smt(nth_out nth_change_dfl W8.xorw0).
 qed.
 
-(*
-op addstate_at_pred st0 at0 l0 tb0 sz st1 at1 tb1 =
- st1 = addstate_at st0 at0 (take sz (l0++[of_int tb0]))
- /\ at1 = srat sz 0 at0 (size l0) tb0
- /\ tb1 = srtb sz 0 at0 (size l0) tb0.
-
-print msubread.
-(*
-lemma m_addstate_at_cat m st0 at0 sz0 off0 len0 tb0 sz0 st1 at1 tb1 sz1 st2 at2 tb2:
- addstate_at_pred st0 at0 (memread m off0 len0) tb0 sz0 st1 at1 tb1 =>
- msubread m (memread m (off0+sz0) sz1 =>
- st2 <- stxxx =>
- addstate_at_pred st0 at0 (memread m off0 len0) tb0 (sz0+sz1) st2 (at1+sz1) 
-*)
-*)
 lemma u64bits8_xor (a b: W64.t) j:
  (a `^` b) \bits8 j = (a \bits8 j) `^` (b \bits8 j).
 proof.
@@ -350,18 +215,6 @@ while true (aT + _LEN %/ 8 *8 - at).
  by move=> z; auto; smt().
 by auto => /> /#.
 qed.
-
-lemma mullR: 
-forall (x y z: int), (x + y) * z = x * z + y * z by smt().
-
-print msubread.
-(*
-at' = max (cur+sz) (at+size l+b2i (tb<>0))
-len' = if cur+sz <= at+size l then cur+sz else at+size l
-tb' = (u8pref at ++ l ++ [tb]).[at+size l]
-
-msubread _mem (u64bytes w) (8 * (_at %/ 8)) _at _buf _len _tb buf _LEN aT _TRAILB
-*)
 
 (* (cur0,cur') is an abstract input cursor (memory pointer `buf` / array
    `offset`): the consumed count is recoverable from the remaining data, so
@@ -567,6 +420,13 @@ move=> Hat; case: (tb <> 0) => // /= ->.
 by rewrite cats0 !addstate_atE // catA -nseq1 bytes2state_zext.
 qed.
 
+(* The addstate_at postcondition in additive form, with the trailing byte explicit. *)
+lemma addstate_at_bytes st at l tb:
+ 0 <= at =>
+ addstate_at st at (l ++ if tb <> 0 then [W8.of_int tb] else [])
+ = addstate st (bytes2state (u8zeros at ++ l ++ [W8.of_int tb])).
+proof. by move=> Hat; rewrite -addstate_at_trail // addstate_atE // catA. qed.
+
 (* Finishing with the last (aligned, partial) word read at at0. *)
 lemma addstate_spec_finish (l lw: W8.t list) n sz st at tb stc c0 c at0 len0 tb0 at1 c1:
  size l = n => 0 <= at => 0 <= tb < 256 => at <= sz => size lw = 8 => len0 < 8 =>
@@ -617,6 +477,20 @@ move: Hc Hl1; rewrite size_memread // => Hc Hl1.
 by rewrite drop_memread 1:/# Hc; congr; ring.
 qed.
 
+(* MEMORY instance of the absorb input: the memread at _buf, read through memread. *)
+lemma take_memread' mem b len k:
+ 0 <= k <= len => take k (memread mem b len) = memread mem b k.
+proof. by move=> Hk; rewrite take_memread 1:/#; congr; smt(). qed.
+
+lemma slice_memread mem b len k n:
+ 0 <= k => 0 <= n => k + n <= len =>
+ take n (drop k (memread mem b len)) = memread mem (b + k) n.
+proof. by move=> Hk Hn Hkn; rewrite drop_memread 1:/# take_memread //; congr; smt(). qed.
+lemma drop_memread_cur mem b len c:
+ b <= c <= b + len =>
+ drop (c - b) (memread mem b len) = memread mem c (len - (c - b)).
+proof. by move=> Hc; rewrite drop_memread 1:/#; congr; ring. qed.
+
 (* One u64 msubread step (prefix and last word of the memory absorb). *)
 lemma addstate_msubread_u64 mem w cur st at buf len tb stc at0 buf0 len0 tb0 cur1 at1 buf1 len1 tb1:
  0 <= at => 0 <= len => 0 <= tb < 256 =>
@@ -648,69 +522,17 @@ hoare addstate_m_h _mem _st _at _buf _len _tb:
         /\ res.`2 = _at + _len + b2i (_tb<>0)
         /\ res.`3 = _buf + _len.
 proof.
-(* STRATEGY (memory absorb-into-state; both hAS_AVX2 branches).
-
-   The postcondition `res.`1 = addstate_at _st _at l` is established in the
-   equivalent additive form
-      res.`1 = addstate _st (bytes2state (u8zeros _at ++ l))
-   (they agree by `addstate_atE`, valid since _at + size l <= 200), because the
-   additive form composes over successive word reads via `bytes2state_cat` +
-   `addstateA` / `addstate_at_cat`.
-
-   Invariant threaded through every read segment (k = bytes consumed so far):
-      st  = addstate _st (bytes2state (u8zeros _at ++ memread _mem _buf k))
-      buf = _buf + k
-   with the running (aT,_LEN) bookkeeping supplied by the msubread contracts.
-
-   proc; generalise hAS_AVX2 (seq 1 off the __HAS_FEATURE call, do NOT let auto
-   fold it to a constant), then:
-   1. Alignment prefix  `if (aT %% 8 <> 0)`:
-        ecall (m_ilen_read_upto8_at_h buf _LEN _TRAILB (8*(aT%%8`s block)) aT);
-      the returned word is shifted into place; the store
-        stwords (set64_direct (stbytes st) aT8 (get64_direct .. ^ w))
-      re-establishes the invariant by `set64_addstate_at` (the msubread fact
-      identifies `u64bytes w` with the leading `8-aT%%8` bytes of memread laid at
-      offset aT via the `srspec`/shift, discharged with `msubread`/`srspecP`).
-   2. `if hAS_AVX2` — prove BOTH branches (feature-independent):
-        * AVX2 branch: 32-byte `while` with the invariant above; each iteration
-          uses `loadW256_memread` + `set256_addstate_at` + `addstate_atE` +
-          `bytes2state_cat`/`memread_split` to append 32 bytes; then the
-          `16 <= _LEN%%32` tail (`set128_addstate_at`) and the `8 <= _LEN%%16`
-          tail (`set64_addstate_at`).
-        * scalar branch: 8-byte `while`, each iteration `loadW64_memread` +
-          `set64_addstate_at`, appending 8 bytes.
-   3. `aT += 8*(_LEN/8); _LEN %%= 8`  — pure bookkeeping.
-   4. Final partial word `if (0 < _LEN%%8 \/ _TRAILB%%256 <> 0)`:
-        ecall (m_ilen_read_upto8_at_h ..); store via `set64_addstate_at`; here the
-      `msubreadP` finaliser turns the completed msubread chain into
-        bytes2state (u8zeros _at ++ memread _mem _buf _len ++ [tb]) = ..
-      and `bytes2state_zext` drops the trailing byte when _tb = 0.
-   5. Conclude by `addstate_atE` back to the `addstate_at` postcondition.
-
-   Depends on: set64/128/256_addstate_at, addstate_atE, addstate_at_cat,
-   bytes2state_cat, memread_split, m_ilen_read_upto8_at_h, msubread{,_u64,_cat},
-   msubreadP, loadW{64,128,256}_memread.  Mechanical but long; deferred. *)
+(* On the shared read-step layer (input `memread _mem _buf _len`, cursor `buf`):
+   the alignment prefix and the final word are addstate_msubread_u64 /
+   addstate_spec_finish steps, every plain load is one addstate_spec_fullword
+   step.  The array addstate_h has the same structure. *)
 proc; simplify.
-(* Invariant threaded through the reads (k = bytes of input consumed so far):
-     st  = addstate_at _st _at (memread _mem _buf k)
-     buf = _buf + k ;  aT = _at + k
-   Here `k = _len - _LEN` at the phase boundaries (after the prefix, stmt 2, and
-   after the bookkeeping, stmts 4-5).  The hAS_AVX2 loops (stmt 3) keep _LEN fixed
-   while advancing buf, so their exit uses the explicit count `8*(_LEN%/8)`. *)
-
 (* stmts 1-2 : __HAS_FEATURE (hAS_AVX2 kept symbolic) + the alignment prefix. *)
 pose base:= 8 * (_at %/ 8).
 pose nbase:= 8 * ((_at-1) %/ 8 + 1).
 seq 2: (Glob.mem=_mem /\ 0 <= _tb < 256 /\ 0 <= _at <= 200
        /\ 0 <= _len /\ _at + _len <= 200 - b2i (_tb<>0) /\ _buf + _len < W64.modulus
        /\ addstate_spec _st _at (memread _mem _buf _len) _tb nbase _buf buf st aT _LEN _TRAILB).
-(*
-seq 2: (Glob.mem=_mem /\ _TRAILB=_tb /\ 0 <= _tb < 256 /\ 0 <= _at <= 200
-       /\ 0 <= _len /\ _at + _len <= 200 - b2i (_tb<>0) /\ _buf + _len < W64.modulus
-       /\ st = addstate_at _st _at (memread _mem _buf (_len - _LEN))
-       /\ buf = _buf + (_len - _LEN) /\ aT = _at + (_len - _LEN)
-       /\ 0 <= _LEN <= _len /\ (aT %% 8 = 0 \/ _LEN = 0)).
-*)
 + seq 1: (#pre); first by inline*; auto.
   if => //.
    wp; ecall (m_ilen_read_upto8_at_h buf _LEN _TRAILB aT8 aT); auto => |> &m ???????.
@@ -851,6 +673,73 @@ if => //.
 by call addratebit_ll.
 qed.
 
+(* ------------------------------------------------------------------
+   SHARED absorb algebra (list-generic: the input is an abstract list M of
+   which the first k bytes are already absorbed; used by the memory and the
+   array absorbs).
+   ------------------------------------------------------------------ *)
+
+(* Complete the current block: absorb the r8 - a bytes that follow (a is the
+   position in the block) and permute.  Covers the first (partial) block
+   (k = 0) and every full block (a = 0). *)
+lemma pabsorb_fill r8 (l M: W8.t list) k st:
+ 0 <= k => k + (r8 - (size l + k) %% r8) <= size M =>
+ pabsorb_spec_ref r8 (l ++ take k M) st =>
+ pabsorb_spec_ref r8 (l ++ take (k + (r8 - (size l + k) %% r8)) M)
+   (keccak_f1600_op
+     (addstate st (bytes2state (u8zeros ((size l + k) %% r8)
+                                ++ take (r8 - (size l + k) %% r8) (drop k M) ++ [W8.zero])))).
+proof.
+move=> Hk Hfit; rewrite /pabsorb_spec_ref => [[Hr8 Est]]; split => //.
+have Ha0: 0 <= (size l + k) %% r8 < r8 by smt(modz_ge0 ltz_pmod).
+have HsL: size (l ++ take k M) = size l + k by rewrite size_cat size_take //; smt().
+have HsB: size (take (r8 - (size l + k) %% r8) (drop k M)) = r8 - (size l + k) %% r8.
+ by rewrite size_take 1:/# size_drop //; smt().
+rewrite (takeD M k (r8 - (size l + k) %% r8)) 1,2:/# catA.
+pose L := l ++ take k M.
+pose B := take (r8 - (size l + k) %% r8) (drop k M).
+rewrite (chunk_cat' L) 1:/# (chunk_size _ (chunkremains r8 L ++ B)) 1:/#.
+ by rewrite size_cat size_chunkremains HsL HsB; smt().
+rewrite (chunkremains_nil r8 (L ++ B)) 1:/#.
+ rewrite size_cat HsL HsB; apply dvdzP; exists ((size l + k) %/ r8 + 1); smt(divz_eq).
+rewrite (cats1 (chunk r8 L)) stateabsorb_iblocks_rcons bytes2state0 (addstateC _ st0) addstate_st0 /stateabsorb Est.
+congr; rewrite -addstateA; congr; first by rewrite /L.
+by rewrite /L -nseq1 bytes2state_zext (bytes2state_cat (chunkremains r8 (l ++ take k M))) size_chunkremains HsL.
+qed.
+
+(* The final partial block (shorter than a block, so it fits with the trailing
+   byte): closes the absorb (tb <> 0) or extends the partial absorb (tb = 0). *)
+lemma pabsorb_last r8 (l M: W8.t list) k st tb:
+ 0 <= k <= size M =>
+ (size l + k) %% r8 + (size M - k) < r8 =>
+ pabsorb_spec_ref r8 (l ++ take k M) st =>
+ (tb <> 0 =>
+  addratebit r8 (addstate st (bytes2state (u8zeros ((size l + k) %% r8) ++ drop k M ++ [W8.of_int tb])))
+  = ABSORB1600 (W8.of_int tb) r8 (l ++ M))
+ /\ (tb = 0 =>
+  pabsorb_spec_ref r8 (l ++ M)
+    (addstate st (bytes2state (u8zeros ((size l + k) %% r8) ++ drop k M ++ [W8.of_int tb])))).
+proof.
+move=> Hk Hfit; rewrite /pabsorb_spec_ref => [[Hr8 Est]].
+have HsL: size (l ++ take k M) = size l + k by rewrite size_cat size_take //; smt().
+have HsR: size (drop k M) = size M - k by rewrite size_drop //; smt().
+have EM: l ++ M = (l ++ take k M) ++ drop k M by rewrite -catA cat_take_drop.
+have Hsm: size (chunkremains r8 (l ++ take k M) ++ drop k M) < r8.
+ by rewrite size_cat size_chunkremains HsL HsR.
+have Hch: chunk r8 (l ++ M) = chunk r8 (l ++ take k M).
+ by rewrite EM (chunk_cat' (l ++ take k M)) 1:/# (chunk0 r8 (chunkremains r8 (l ++ take k M) ++ drop k M)) // cats0.
+have Hcr: chunkremains r8 (l ++ M) = chunkremains r8 (l ++ take k M) ++ drop k M.
+ by rewrite EM (chunkremains_cat (l ++ take k M)) 1:/# chunkremains_small.
+have Hcat: forall x, bytes2state (chunkremains r8 (l ++ take k M) ++ drop k M ++ [x])
+          = addstate (bytes2state (chunkremains r8 (l ++ take k M)))
+                     (bytes2state (u8zeros ((size l + k) %% r8) ++ drop k M ++ [x])).
+ by move=> x; rewrite -catA bytes2state_cat size_chunkremains HsL catA.
+split => Htb.
+ rewrite /ABSORB1600 /stateabsorb_last /stateabsorb Hch Hcr -cats1 Hcat Est -addstateA; congr.
+split => //; rewrite Hch Hcr Est -addstateA; congr.
+by rewrite Htb /= -nseq1 bytes2state_zext (bytes2state_cat (chunkremains r8 (l ++ take k M))) size_chunkremains HsL.
+qed.
+
 (* addstate_m_h in the shape of addstate_m_avx2_h (trailing byte always present). *)
 hoare addstate_m_h2 _mem _st _at _buf _len _tb:
  M.__addstate_m
@@ -885,136 +774,98 @@ hoare absorb_m_h _l _mem _buf _len _tb _r8:
        /\ res.`2 = (size _l + _len) %% _r8
        /\ res.`3 = _buf + _len.
 proof.
-(* Port of absorb_m_avx2_h (avx2/Keccak1600_fixedsizes_avx2.ec): the ref state is
-   the logical 25-lane state, so all the stavx2 conversions drop out. *)
+(* `buf - _buf` bytes of the input are absorbed; each block is closed by the shared
+   pabsorb_fill and the last one by pabsorb_last (as in absorb_h). *)
 proc => /=.
-pose _at := size _l %% _r8.
-pose niters := (_at + _len) %/ _r8.
-pose lastlen := if _r8 <= _at + _len then (_at + _len) %% _r8 else _len.
-pose lastpos := niters * _r8 - _at.
-seq 1: (Glob.mem=_mem /\ _RATE8=_r8 /\ _TRAILB = _tb /\ 0 <= _len /\ _buf + _len < W64.modulus /\ 0 <= _tb < 256
-       /\ pabsorb_spec_ref _r8 (_l ++ memread Glob.mem _buf lastpos) st
-       /\ buf = _buf + _len - lastlen /\ _LEN = lastlen
-       /\ aT = if _RATE8 <= _at + _len then 0 else _at).
- sp; if => //; last first.
-  auto => |> *.
-  have ?: lastpos <= 0. smt().
-  rewrite memread0' ?cats0.
-    rewrite /lastpos /niters divz_small 1:/# /= /#.
-  smt().
- wp; while ( _RATE8 = _r8 /\ _TRAILB = _tb /\ 0 <= _len /\ _buf + _len < W64.modulus /\ 0 <= _tb < 256 /\
-             iTERS= (size _l %% _r8 + _len) %/ _r8 - 1 /\
-             buf = _buf + (i+1)*_r8 - size _l %% _r8 /\
-             0 <= i <= iTERS /\
-             pabsorb_spec_ref _r8 (_l ++ memread Glob.mem _buf ((i+1)*_r8-size _l %% _r8)) st
-           ).
-  wp; ecall (keccakf1600_h st).
-  ecall (addstate_m_h2 Glob.mem st 0 buf _RATE8 0).
-  auto => |> &m.
-  move=> H0 Hb Htb0 Htb1 Hi0 Hi1.
-  rewrite {1}/pabsorb_spec_ref => [[Hr8]].
-  rewrite chunkremains_nil 1:/#.
-   rewrite size_cat size_memread 1:/# addzA (addzC (size _l)) -addzA.
-   rewrite {1}(divz_eq (size _l) _r8) -addzA /= -mulzDl dvdzP.
-   by exists (i{m} + 1 + size _l %/ _r8).
-  rewrite bytes2state0 addstateC addstate_st0 => Est Hlt.
-  rewrite !b2i0 /=; split.
+seq 1: (Glob.mem = _mem /\ _RATE8 = _r8 /\ _TRAILB = _tb /\ 0 <= _tb < 256 /\ 0 < _r8 <= 200
+       /\ 0 <= _len /\ _buf + _len < W64.modulus
+       /\ _buf <= buf <= _buf + _len /\ _LEN = _len - (buf - _buf)
+       /\ aT = (size _l + (buf - _buf)) %% _r8 /\ aT + _LEN < _r8
+       /\ pabsorb_spec_ref _r8 (_l ++ take (buf - _buf) (memread _mem _buf _len)) st).
++ if => //; last first.
+   auto => |> &m.
+   move=> H Htb0 Htb1 Hlen Hbuf Hg.
+   have Hr8: 0 < _r8 <= 200 by move: H; rewrite /pabsorb_spec_ref => [#].
    split; first smt().
    split; first smt().
-   have h1: (i{m} + 2) * _r8 <= (size _l %% _r8 + _len) %/ _r8 * _r8 by rewrite ler_pmul2r 1:/#; smt().
-   have h2:= lez_floor (size _l %% _r8 + _len) _r8 _; first smt().
-   smt().
-  move => Hr80 Hr81 Hbnd [st' at' buf'] /= Est' _ Ebuf'.
+   split; first smt().
+   by rewrite take0 cats0.
+  wp; while (Glob.mem = _mem /\ _RATE8 = _r8 /\ _TRAILB = _tb /\ 0 <= _tb < 256 /\ 0 < _r8 <= 200 /\
+             0 <= _len /\ _buf + _len < W64.modulus /\
+             iTERS = (_len - (_r8 - size _l %% _r8)) %/ _r8 /\ 0 <= i <= iTERS /\
+             buf = _buf + (_r8 - size _l %% _r8 + i * _r8) /\
+             pabsorb_spec_ref _r8 (_l ++ take (_r8 - size _l %% _r8 + i * _r8) (memread _mem _buf _len)) st).
+  + wp; ecall (keccakf1600_h st); ecall (addstate_m_h2 Glob.mem st 0 buf _RATE8 0); auto => |> &m.
+    move=> Htb0 Htb1 Hr0 Hr1 Hlen Hbuf Hi0 Hi1 IH Hb.
+    have Hm: 0 <= i{m} * _r8 by apply mulr_ge0 => /#.
+    have Hat: 0 <= size _l %% _r8 < _r8 by smt(modz_ge0 ltz_pmod).
+    have h1: (i{m} + 1) * _r8 <= (_len - (_r8 - size _l %% _r8)) %/ _r8 * _r8 by rewrite ler_pmul2r 1:/#; smt().
+    have h2:= lez_floor (_len - (_r8 - size _l %% _r8)) _r8 _; first smt().
+    split; first smt().
+    move=> ??? [st' at' buf'] /= Est _ Ebuf.
+    split; first smt().
+    split; first smt().
+    have Ed: size _l = size _l %/ _r8 * _r8 + size _l %% _r8 by exact divz_eq.
+    have Ha0: (size _l + (_r8 - size _l %% _r8 + i{m} * _r8)) %% _r8 = 0.
+     by rewrite (_: size _l + (_r8 - size _l %% _r8 + i{m} * _r8) = (size _l %/ _r8 + i{m} + 1) * _r8) 1:/# modzMl.
+    have Hf := pabsorb_fill _r8 _l (memread _mem _buf _len) (_r8 - size _l %% _r8 + i{m} * _r8) st{m}.
+    move: Hf; rewrite Ha0 /= => Hf.
+    rewrite (_: _r8 - size _l %% _r8 + (i{m} + 1) * _r8 = _r8 - size _l %% _r8 + i{m} * _r8 + _r8) 1:/#.
+    rewrite Est -(slice_memread _mem _buf _len (_r8 - size _l %% _r8 + i{m} * _r8) _r8) 1..3:/#.
+    by apply Hf => //; rewrite ?size_memread //; smt().
+  wp; ecall (keccakf1600_h st); wp; ecall (addstate_m_h2 Glob.mem st aT buf (_RATE8 - aT) 0); auto => |> &m.
+  move=> H Htb0 Htb1 Hlen Hbuf Hg.
+  have Hr8: 0 < _r8 <= 200 by move: H; rewrite /pabsorb_spec_ref => [#].
+  have Hat: 0 <= size _l %% _r8 < _r8 by smt(modz_ge0 ltz_pmod).
   split; first smt().
-  split; first smt().
-  rewrite /pabsorb_spec_ref; split; first smt().
-  rewrite chunkremains_nil 1:/#.
-   rewrite size_cat size_memread 1:/# addzA (addzC (size _l)) -addzA.
-   rewrite {1}(divz_eq (size _l) _r8) -addzA /= -mulzDl dvdzP.
-   by exists (i{m} + 2 + size _l %/ _r8).
-  rewrite bytes2state0 addstateC addstate_st0.
-  rewrite (memread_split ((i{m} + 1) * _r8 - size _l %% _r8)).
-   split; last smt().
-   have: 0 <= i{m} * _r8 by apply mulr_ge0 => /#.
-   smt(modz_cmp).
-  rewrite catA chunk_cat /=.
-   rewrite size_cat size_memread 1:/# addzA (addzC (size _l)) -addzA.
-   rewrite {1}(divz_eq (size _l) _r8) -addzA /= -mulzDl dvdzP.
-   by exists (i{m} + 1 + size _l %/ _r8).
-  rewrite (chunk_size _ (memread _ _ _)) 1:/#.
-   by rewrite size_memread /#.
-  rewrite cats1 stateabsorb_iblocks_rcons Est' /stateabsorb; congr; congr.
-  by rewrite nseq0 /= -(nseq1 W8.zero) bytes2state_zext; congr; congr; smt().
- wp; ecall (keccakf1600_h st).
- wp; ecall (addstate_m_h2 Glob.mem st aT buf (_RATE8 - aT) 0).
- auto => |> &m.
- rewrite /pabsorb_spec_ref => [[Hr8 Est]] Htb0 Htb1 Hlen Hbuf Hc.
- split; first smt().
- move=> |> ????? [st' at' buf'] /=.
- rewrite !b2i0 /= => Est' Eat' Ebuf'.
- split.
+  move=> ????? [st' at' buf'] /= Est _ Ebuf.
   split.
-   by rewrite (:_len - (_r8 - size _l %% _r8) = size _l %% _r8 + _len + (-1)*_r8) 1:/# divzMDr /#.
+   split; first smt().
+   split; first smt(divz_ge0).
+   have Hf := pabsorb_fill _r8 _l (memread _mem _buf _len) 0 st{m}.
+   move: Hf => /=; rewrite take0 drop0 cats0 => Hf.
+   rewrite Est -(take_memread' _mem _buf _len (_r8 - size _l %% _r8)) 1:/#.
+   by apply Hf => //; rewrite ?size_memread //; smt().
+  move=> i0 st0 Hex _ _ Hi0 Hi1 Hs.
+  have Ei: i0 = (_len - (_r8 - size _l %% _r8)) %/ _r8 by smt().
+  have Ed: _len - (_r8 - size _l %% _r8) = (_len - (_r8 - size _l %% _r8)) %/ _r8 * _r8 + (_len - (_r8 - size _l %% _r8)) %% _r8 by exact divz_eq.
+  have Ed2: size _l = size _l %/ _r8 * _r8 + size _l %% _r8 by exact divz_eq.
+  have Hq: 0 <= (_len - (_r8 - size _l %% _r8)) %/ _r8 by smt(divz_ge0).
+  have Hqm: 0 <= (_len - (_r8 - size _l %% _r8)) %/ _r8 * _r8 by apply mulr_ge0 => /#.
+  have Hmd: 0 <= (_len - (_r8 - size _l %% _r8)) %% _r8 < _r8 by smt(modz_ge0 ltz_pmod).
+  move: Hs; rewrite Ei => Hs.
+  rewrite (_: _buf + (_r8 - size _l %% _r8 + (_len - (_r8 - size _l %% _r8)) %/ _r8 * _r8) - _buf = _r8 - size _l %% _r8 + (_len - (_r8 - size _l %% _r8)) %/ _r8 * _r8) 1:/#.
   split; first smt().
   split; first smt().
-  rewrite chunkremains_nil 1:/#.
-   rewrite size_cat size_memread 1:/# addzA (addzC (size _l)) -addzA.
-   rewrite {1}(divz_eq (size _l) _r8) -addzA /= -{2}(mul1z _r8) -mulzDl dvdzP.
-   by exists (1 + size _l %/ _r8).
-  rewrite bytes2state0 addstateC addstate_st0.
-  rewrite chunk_cat' 1:/# (chunk_size _ (_++_)) 1:/#.
-   by rewrite size_cat size_chunkremains size_memread /#.
-  rewrite cats1 stateabsorb_iblocks_rcons Est' Est /stateabsorb.
-  rewrite -addstateA; congr; congr.
-  rewrite -(nseq1 W8.zero) bytes2state_zext eq_sym bytes2state_cat; congr; congr.
-  by rewrite size_chunkremains.
- move => i ??????.
- have ->: i=(_len - (_r8 - size _l %% _r8)) %/ _r8 by smt().
- have E: (_len - (_r8 - size _l %% _r8))%/_r8 = (size _l %% _r8 + _len)%/_r8 - 1.
-  have ->: _len - (_r8 - size _l %% _r8) = (size _l %% _r8 + _len + (-1)*_r8) by smt().
-  by rewrite divzMDr /#.
- split.
-  by rewrite (_: ((_len - (_r8 - size _l %% _r8)) %/ _r8 + 1) * _r8 - size _l %% _r8 = lastpos) // /lastpos /niters /_at E /=.
- split.
-  by rewrite /lastlen ifT 1:/# /_at E /= /#.
- split.
-  rewrite /lastlen ifT 1:/# /_at.
-  by rewrite (:_len - (_r8 - size _l %% _r8) = _len + size _l %% _r8 + (-1)*_r8) 1:/# modzMDr /#.
- by rewrite ifT /#.
+  split.
+   by rewrite (_: size _l + (_r8 - size _l %% _r8 + (_len - (_r8 - size _l %% _r8)) %/ _r8 * _r8) = (size _l %/ _r8 + 1 + (_len - (_r8 - size _l %% _r8)) %/ _r8) * _r8) 1:/# modzMl.
+  by split; first smt().
 case: (_TRAILB <> 0).
 + rcondt 2; first by call (: true ==> true) => //.
-  ecall (addratebit_h _RATE8 st).
-  ecall (addstate_m_h2 Glob.mem st aT buf _LEN _TRAILB).
-  auto => |> &m ???? H Htb.
-  have Hr8: 0 < _r8 <= 200 by move: H; rewrite /pabsorb_spec_ref => [#].
-  have Hat: 0 <= _at < _r8 by rewrite /_at; smt(modz_ge0 ltz_pmod).
-  split; first by rewrite /lastlen; smt(modz_ge0 ltz_pmod).
-  move => ????? [st' at' buf'] /= Est' Eat' Ebuf'.
-  move: H; rewrite /pabsorb_spec_ref => [[? H]].
-  rewrite Est' H /ABSORB1600 /stateabsorb_last /stateabsorb -cats1.
+  ecall (addratebit_h _RATE8 st); ecall (addstate_m_h2 Glob.mem st aT buf _LEN _TRAILB); auto => |> &m.
+  move=> Htb0 Htb1 Hr0 Hr1 Hlen Hbuf Hb0 Hb1 Hfit H Htb.
+  split; first smt().
+  move=> ????? [st' at' buf'] /= Est _ Ebuf.
+  have Hk: 0 <= buf{m} - _buf <= size (memread _mem _buf _len) by rewrite size_memread //; smt().
+  have Hfit': (size _l + (buf{m} - _buf)) %% _r8 + (size (memread _mem _buf _len) - (buf{m} - _buf)) < _r8 by rewrite size_memread.
+  have [Hl1 _] := pabsorb_last _r8 _l (memread _mem _buf _len) (buf{m} - _buf) st{m} _tb Hk Hfit' H.
   split; last smt().
-  congr; rewrite -addstateA; congr.
-   by congr; rewrite -chunk_cat_memread 1:// /#.
-  by rewrite chunkremains_cat_memread /#.
+  by rewrite Est -(drop_memread_cur _mem _buf _len buf{m}) 1:/# Hl1.
 rcondf 2; first by call (: true ==> true) => //.
-ecall (addstate_m_h2 Glob.mem st aT buf _LEN _TRAILB).
-auto => |> &m ?? H.
-have Hr8: 0 < _r8 <= 200 by move: H; rewrite /pabsorb_spec_ref => [#].
-have Hat: 0 <= _at < _r8 by rewrite /_at; smt(modz_ge0 ltz_pmod).
-split; first by rewrite /lastlen; smt(modz_ge0 ltz_pmod).
-move => ????? [st' at' buf'] /= Est' Eat' Ebuf'.
+ecall (addstate_m_h2 Glob.mem st aT buf _LEN _TRAILB); auto => |> &m.
+move=> Hr0 Hr1 Hlen Hbuf Hb0 Hb1 Hfit H.
+split; first smt().
+move=> ????? [st' at' buf'] /= Est Eat Ebuf.
+have Hk: 0 <= buf{m} - _buf <= size (memread _mem _buf _len) by rewrite size_memread //; smt().
+have Hfit': (size _l + (buf{m} - _buf)) %% _r8 + (size (memread _mem _buf _len) - (buf{m} - _buf)) < _r8 by rewrite size_memread.
+have [_ Hl0] := pabsorb_last _r8 _l (memread _mem _buf _len) (buf{m} - _buf) st{m} 0 Hk Hfit' H.
 split.
- move: H; rewrite /pabsorb_spec_ref => [[? H]]; split; first smt().
- rewrite Est' H -addstateA; congr.
-  by rewrite -chunk_cat_memread /#.
- rewrite -chunkremains_cat_memread 1..2:/#.
- by rewrite -nseq1 bytes2state_zext.
-split.
- rewrite Eat' b2i0 /lastlen /_at /=.
- case: ( _r8 <= size _l %% _r8 + _len ) => C /=.
-  by rewrite modzDml.
- by rewrite eq_sym -modzDml modz_small /#.
-smt().
+ by move: (Hl0 (eq_refl 0)) => /=; rewrite Est -(drop_memread_cur _mem _buf _len buf{m}) 1:/#.
+split; last smt().
+rewrite Eat b2i0 /=.
+have E: (size _l + (buf{m} - _buf)) %% _r8 + (_len - (buf{m} - _buf)) = (size _l + _len) + (- (size _l + (buf{m} - _buf)) %/ _r8) * _r8 by smt(divz_eq).
+rewrite -(modz_small ((size _l + (buf{m} - _buf)) %% _r8 + (_len - (buf{m} - _buf))) _r8); first smt(modz_ge0).
+by rewrite E modzMDr.
 qed.
 
 phoare absorb_m_ph _l _mem _buf _len _tb _r8:
@@ -1606,6 +1457,40 @@ proof.
 by conseq addstate_ll (addstate_h _st _at _buf _off _len _tb).
 qed.
 
+(* ARRAY instance of the absorb input: the whole array, read through sub. *)
+lemma to_list_sub (buf: W8.t A.t): to_list buf = sub buf 0 _ASIZE.
+proof. by rewrite /to_list /sub; apply eq_mkseq => i /=. qed.
+
+lemma take_to_list (buf: W8.t A.t) k:
+ 0 <= k <= _ASIZE => take k (to_list buf) = sub buf 0 k.
+proof. by move=> Hk; rewrite to_list_sub take_sub /#. qed.
+
+lemma slice_to_list (buf: W8.t A.t) k n:
+ 0 <= k => 0 <= n => k + n <= _ASIZE =>
+ take n (drop k (to_list buf)) = sub buf k n.
+proof. by move=> Hk Hn Hkn; rewrite to_list_sub drop_sub take_sub; congr; smt(). qed.
+
+lemma drop_to_list (buf: W8.t A.t) k:
+ 0 <= k <= _ASIZE => drop k (to_list buf) = sub buf k (_ASIZE - k).
+proof. by move=> Hk; rewrite to_list_sub drop_sub; congr; smt(). qed.
+
+(* addstate_h with the trailing byte made explicit (the shape used by absorb_h). *)
+hoare addstate_h2 _st _at _buf _off _len _tb:
+ MM.__addstate
+ : st=_st /\ aT=_at /\ buf=_buf /\ offset=_off /\ _LEN=_len /\ _TRAILB=_tb
+ /\ 0 <= _at <= 200
+ /\ 0 <= _len
+ /\ _at + _len <= 200 - b2i (_tb<>0)
+ /\ 0 <= _off /\ _off + _len <= _ASIZE
+ /\ 0 <= _tb < 256
+ ==> res.`1 = addstate _st (bytes2state (u8zeros _at ++ sub _buf _off _len ++ [W8.of_int _tb]))
+     /\ res.`2 = _at + _len + b2i (_tb<>0)
+     /\ res.`3 = _off + _len.
+proof.
+conseq (addstate_h _st _at _buf _off _len _tb) => /> &m ???????? r -> _ _.
+by rewrite addstate_at_bytes.
+qed.
+
 lemma absorb_ll: islossless MM.__absorb.
 proof.
 proc; simplify.
@@ -1628,18 +1513,103 @@ hoare absorb_h _l _buf _tb _r8:
  MM.__absorb
  : aT=size _l %% _r8 /\ buf=_buf /\ _RATE8=_r8 /\ _TRAILB=_tb
  /\ pabsorb_spec_ref _r8 _l st
+ /\ 0 <= _tb < 256
  ==> if _tb <> 0
      then res.`1 = ABSORB1600 (W8.of_int _tb) _r8 (_l ++ to_list _buf)
      else pabsorb_spec_ref _r8 (_l ++ to_list _buf) res.`1
        /\ res.`2 = (size _l + _ASIZE) %% _r8.
 proof.
-proc.
-admitted.
+(* `offset` bytes of the input are absorbed; each block is closed by the shared
+   pabsorb_fill and the last one by pabsorb_last (as in absorb_m_h). *)
+proc => /=.
+have HA := _ASIZE_ge0.
+seq 3: (buf = _buf /\ _RATE8 = _r8 /\ _TRAILB = _tb /\ 0 <= _tb < 256 /\ 0 < _r8 <= 200
+       /\ 0 <= offset <= _ASIZE /\ _LEN = _ASIZE - offset
+       /\ aT = (size _l + offset) %% _r8 /\ aT + _LEN < _r8
+       /\ pabsorb_spec_ref _r8 (_l ++ take offset (to_list _buf)) st).
++ sp; if => //; last first.
+   auto => |> &m.
+   move=> H Htb0 Htb1 Hg.
+   have Hr8: 0 < _r8 <= 200 by move: H; rewrite /pabsorb_spec_ref => [#].
+   split; first smt().
+   split; first smt().
+   by rewrite take0 cats0.
+  wp; while (buf = _buf /\ _RATE8 = _r8 /\ _TRAILB = _tb /\ 0 <= _tb < 256 /\ 0 < _r8 <= 200 /\
+             iTERS = (_ASIZE - (_r8 - size _l %% _r8)) %/ _r8 /\ 0 <= i <= iTERS /\
+             offset = _r8 - size _l %% _r8 + i * _r8 /\
+             pabsorb_spec_ref _r8 (_l ++ take offset (to_list _buf)) st).
+  + wp; ecall (keccakf1600_h st); ecall (addstate_h2 st 0 buf offset _RATE8 0); auto => |> &m.
+    move=> Htb0 Htb1 Hr0 Hr1 Hi0 Hi1 IH Hb.
+    have Hm: 0 <= i{m} * _r8 by apply mulr_ge0 => /#.
+    have Hat: 0 <= size _l %% _r8 < _r8 by smt(modz_ge0 ltz_pmod).
+    have h1: (i{m} + 1) * _r8 <= (_ASIZE - (_r8 - size _l %% _r8)) %/ _r8 * _r8 by rewrite ler_pmul2r 1:/#; smt().
+    have h2:= lez_floor (_ASIZE - (_r8 - size _l %% _r8)) _r8 _; first smt().
+    split; first smt().
+    move=> ???? [st' at' off'] /= Est _ Eoff.
+    split; first smt().
+    split; first smt().
+    have Ed: size _l = size _l %/ _r8 * _r8 + size _l %% _r8 by exact divz_eq.
+    have Ha0: (size _l + (_r8 - size _l %% _r8 + i{m} * _r8)) %% _r8 = 0.
+     by rewrite (_: size _l + (_r8 - size _l %% _r8 + i{m} * _r8) = (size _l %/ _r8 + i{m} + 1) * _r8) 1:/# modzMl.
+    have Hf := pabsorb_fill _r8 _l (to_list _buf) (_r8 - size _l %% _r8 + i{m} * _r8) st{m}.
+    move: Hf; rewrite Ha0 /= => Hf.
+    rewrite Eoff Est -(slice_to_list _buf (_r8 - size _l %% _r8 + i{m} * _r8) _r8) 1..3:/#.
+    by apply Hf => //; rewrite ?size_to_list; smt().
+  wp; ecall (keccakf1600_h st); wp; ecall (addstate_h2 st aT buf offset (_RATE8 - aT) 0); auto => |> &m.
+  move=> H Htb0 Htb1 Hg.
+  have Hr8: 0 < _r8 <= 200 by move: H; rewrite /pabsorb_spec_ref => [#].
+  have Hat: 0 <= size _l %% _r8 < _r8 by smt(modz_ge0 ltz_pmod).
+  split; first smt().
+  move=> ????? [st' at' off'] /= Est _ Eoff.
+  split.
+   split; first smt().
+   split; first smt(divz_ge0).
+   have Hf := pabsorb_fill _r8 _l (to_list _buf) 0 st{m}.
+   move: Hf => /=; rewrite take0 drop0 cats0 => Hf.
+   rewrite Eoff Est -(take_to_list _buf (_r8 - size _l %% _r8)) 1:/#.
+   by apply Hf => //; rewrite ?size_to_list; smt().
+  move=> i0 st0 Hex _ _ Hi0 Hi1 Hs.
+  have Ei: i0 = (_ASIZE - (_r8 - size _l %% _r8)) %/ _r8 by smt().
+  have Ed: _ASIZE - (_r8 - size _l %% _r8) = (_ASIZE - (_r8 - size _l %% _r8)) %/ _r8 * _r8 + (_ASIZE - (_r8 - size _l %% _r8)) %% _r8 by exact divz_eq.
+  have Ed2: size _l = size _l %/ _r8 * _r8 + size _l %% _r8 by exact divz_eq.
+  have Hq: 0 <= (_ASIZE - (_r8 - size _l %% _r8)) %/ _r8 by smt(divz_ge0).
+  have Hqm: 0 <= (_ASIZE - (_r8 - size _l %% _r8)) %/ _r8 * _r8 by apply mulr_ge0 => /#.
+  have Hmd: 0 <= (_ASIZE - (_r8 - size _l %% _r8)) %% _r8 < _r8 by smt(modz_ge0 ltz_pmod).
+  rewrite Ei; split; first smt().
+  split; first smt().
+  split; last smt().
+  by rewrite (_: size _l + (_r8 - size _l %% _r8 + (_ASIZE - (_r8 - size _l %% _r8)) %/ _r8 * _r8) = (size _l %/ _r8 + 1 + (_ASIZE - (_r8 - size _l %% _r8)) %/ _r8) * _r8) 1:/# modzMl.
+case: (_TRAILB <> 0).
++ rcondt 2; first by call (: true ==> true) => //.
+  ecall (addratebit_h _RATE8 st); ecall (addstate_h2 st aT buf offset _LEN _TRAILB); auto => |> &m.
+  move=> Htb0 Htb1 Hr0 Hr1 Ho0 Ho1 Hfit H Htb.
+  split; first smt().
+  move=> ????? [st' at' off'] /= Est _ _.
+  have Hk: 0 <= offset{m} <= size (to_list _buf) by rewrite size_to_list.
+  have Hfit': (size _l + offset{m}) %% _r8 + (size (to_list _buf) - offset{m}) < _r8 by rewrite size_to_list.
+  have [Hl1 _] := pabsorb_last _r8 _l (to_list _buf) offset{m} st{m} _tb Hk Hfit' H.
+  by rewrite Est -(drop_to_list _buf offset{m}) 1:/# Hl1.
+rcondf 2; first by call (: true ==> true) => //.
+ecall (addstate_h2 st aT buf offset _LEN _TRAILB); auto => |> &m.
+move=> Hr0 Hr1 Ho0 Ho1 Hfit H.
+split; first smt().
+move=> ????? [st' at' off'] /= Est Eat _.
+have Hk: 0 <= offset{m} <= size (to_list _buf) by rewrite size_to_list.
+have Hfit': (size _l + offset{m}) %% _r8 + (size (to_list _buf) - offset{m}) < _r8 by rewrite size_to_list.
+have [_ Hl0] := pabsorb_last _r8 _l (to_list _buf) offset{m} st{m} 0 Hk Hfit' H.
+split.
+ by move: (Hl0 (eq_refl 0)) => /=; rewrite Est -(drop_to_list _buf offset{m}) 1:/#.
+rewrite Eat b2i0 /=.
+have E: (size _l + offset{m}) %% _r8 + (_ASIZE - offset{m}) = (size _l + _ASIZE) + (- (size _l + offset{m}) %/ _r8) * _r8 by smt(divz_eq).
+rewrite -(modz_small ((size _l + offset{m}) %% _r8 + (_ASIZE - offset{m})) _r8); first smt(modz_ge0).
+by rewrite E modzMDr.
+qed.
 
 phoare absorb_ph _l _buf _tb _r8:
  [ MM.__absorb
  : aT=size _l %% _r8 /\ buf=_buf /\ _RATE8=_r8 /\ _TRAILB=_tb
  /\ pabsorb_spec_ref _r8 _l st
+ /\ 0 <= _tb < 256
  ==> if _tb <> 0
      then res.`1 = ABSORB1600 (W8.of_int _tb) _r8 (_l ++ to_list _buf)
      else pabsorb_spec_ref _r8 (_l ++ to_list _buf) res.`1
