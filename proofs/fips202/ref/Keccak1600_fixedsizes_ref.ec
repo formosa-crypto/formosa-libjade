@@ -438,14 +438,14 @@ proof.
 move => |> Hat Hlen Hcur Hat0_1 Hat0_2; rewrite /addstate_spec addstate_atE // Hat /= => [#].
 move => Hst0 -> -> -> ->; rewrite size_memread 1:// => Hsub.
 split.
+ (* st-equation: addstate st (bytes2state (u8zeros cur ++ u64bytes w))
+    = addstate st (bytes2state (take (cur+8) (u8zeros at ++ memread .. ++ [tb])));
+    needs the take/cat reconciliation of the single word against the stream. *)
  admit.
-split.
- admit.
-split.
- admit.
-split.
- admit.
-admit.
+(* len'/at'/tb'/cur' are msubread bookkeeping: unfold the sr* ops in Hsub. *)
+split; first by move: Hsub; rewrite /msubread /srlen /srincr /srfnsh /srtb size_to_list /= => |> *; smt().
+split; first by move: Hsub; rewrite /msubread /srlen /srincr /srfnsh /srtb size_to_list /= => |> *; smt().
+by move: Hsub; rewrite /msubread /srlen /srincr /srfnsh /srtb size_to_list /= => |> *; smt().
 qed.
 
 
@@ -586,14 +586,9 @@ addstate_AT nbase (16 * (len0 %/ 16)) _st _at (memread _mem _buf _len) _tb
          get128_direct (stbytes st1) (at1 + len1 %/ 32 * 32)))) at1 len1 tb1
 *).
     auto => |> ??????? H Hb.
-    admit (*
-H: addstate_AT nbase (32 * (len0 %/ 32)) _st _at (memread _mem _buf _len) _tb
-     st1 at1 len1 tb1
-Hb: ! 16 <= len1 %% 32
-------------------------------------------------------------------------
-addstate_AT nbase (16 * (len0 %/ 16)) _st _at (memread _mem _buf _len) _tb
-  st1 at1 len1 tb1
-*).
+    (* 16-tail skipped: 16*(_LEN%/16) = 32*(_LEN%/32) when _LEN%%32 < 16. *)
+    move => Hc; have E: forall n, !16 <= n %% 32 => 16 * (n %/ 16) = 32 * (n %/ 32) by smt().
+    by rewrite !(E _ Hc); exact Hb.
    if => //.
      auto => |> ???????? H Hb.
      admit (*
@@ -608,14 +603,9 @@ addstate_AT nbase (8 * (len0 %/ 8)) _st _at (memread _mem _buf _len) _tb
          loadW64 _mem buf{`&hr}))) aT{`&hr} _LEN{`&hr} _TRAILB{`&hr}
 *).
     auto => |> ???????? H Hb.
-    admit (*
-H: addstate_AT nbase (16 * (len0 %/ 16)) _st _at (memread _mem _buf _len) _tb
-     st{`&hr} aT{`&hr} _LEN{`&hr} _TRAILB{`&hr}
-Hb: ! 8 <= _LEN{`&hr} %% 16
-------------------------------------------------------------------------
-addstate_AT nbase (8 * (len0 %/ 8)) _st _at (memread _mem _buf _len) _tb
-  st{`&hr} aT{`&hr} _LEN{`&hr} _TRAILB{`&hr}
-*).
+    (* 8-tail skipped: 8*(_LEN%/8) = 16*(_LEN%/16) when _LEN%%16 < 8. *)
+    have E: forall n, !8 <= n %% 16 => 8 * (n %/ 8) = 16 * (n %/ 16) by smt().
+    by rewrite !(E _ Hb); exact H.
  - (* scalar branch : 8-byte `while`.
       while-invariant (iteration i, consumed (_len-_LEN)+8*i):
         st = addstate_at _st _at (memread _mem _buf ((_len-_LEN)+8*i))
