@@ -857,19 +857,19 @@ split.
  rewrite tP => i Hi.
  rewrite initiE //=.
 have KEY: forall (sts : FIPS202_Keccakf1600.state * FIPS202_Keccakf1600.state * FIPS202_Keccakf1600.state * FIPS202_Keccakf1600.state) (k j : int), 0 <= j < 25 => (st4x_get (st4x_pack sts) k).[j] = Keccak_bindings.sliceget64_256_25 (st4x_pack sts) (8 * (4 * j + k) * 8) by move=> sts k j Hj; rewrite /st4x_get /init_25_64 initiE 1:/# /=.
-rewrite (_: 8 * (4 * i) * 8 = 8 * (4 * i + 0) * 8) 1:/# -KEY 1:/# Keccakf1600_avx2x4_generic.st4x_get_pack0 /=.
+rewrite (_: 8 * (4 * i) * 8 = 8 * (4 * i + 0) * 8) 1:/# -KEY 1:/# Keccak1600_avx2x4.st4x_get_pack0 /=.
 rewrite /st0; congr.
 rewrite /SHAKE_ABSORB /c512_r8 /=.
 congr => //.
 by congr; rewrite /to_list /mkseq -iotaredE /=.
 split.
-rewrite Keccakf1600_avx2x4_generic.st4x_get_pack1 /=.
+rewrite Keccak1600_avx2x4.st4x_get_pack1 /=.
 congr; rewrite /SHAKE256 /KECCAK1600 /=.
 rewrite /SHAKE256_SQUEEZE /c512_r8 /=; congr.
 rewrite /st1; congr => //; by congr; rewrite /to_list /mkseq -iotaredE /=.
 split.
-rewrite Keccakf1600_avx2x4_generic.st4x_get_pack2 /=; congr; rewrite /SHAKE256 /KECCAK1600 /SHAKE256_SQUEEZE /c512_r8 /=; congr; rewrite /st2; congr => //; by congr; rewrite /to_list /mkseq -iotaredE /=.
-rewrite Keccakf1600_avx2x4_generic.st4x_get_pack3 /=; congr; rewrite /SHAKE256 /KECCAK1600 /SHAKE256_SQUEEZE /c512_r8 /=; congr; rewrite /st3; congr => //; by congr; rewrite /to_list /mkseq -iotaredE /=.
+rewrite Keccak1600_avx2x4.st4x_get_pack2 /=; congr; rewrite /SHAKE256 /KECCAK1600 /SHAKE256_SQUEEZE /c512_r8 /=; congr; rewrite /st2; congr => //; by congr; rewrite /to_list /mkseq -iotaredE /=.
+rewrite Keccak1600_avx2x4.st4x_get_pack3 /=; congr; rewrite /SHAKE256 /KECCAK1600 /SHAKE256_SQUEEZE /c512_r8 /=; congr; rewrite /st3; congr => //; by congr; rewrite /to_list /mkseq -iotaredE /=.
 qed.
 
 lemma shake256x4_A128__A32_A1_ll: islossless K._shake256x4_A128__A32_A1.
@@ -1021,8 +1021,8 @@ move=> /> Eb00 Eb10 Eb20 Eb30.
 move=> Eb40 Eo5; split; first smt(); move=> _ result2 [#] Ec0 Ec1 Ec2 Ec3 Eo2.
 move: Pre; rewrite /st4x_match => Hst.
 (* map-commute + base-state facts, and the SHAKE128_SQUEEZE 504 block-decomposition *)
-have MG: forall (X : W256.t Array25.t) (k : int), 0 <= k < 4 => st4x_get (st4x_map keccak_f1600_op X) k = keccak_f1600_op (st4x_get X k) by move=> X k Hk; rewrite st4x_mapE; smt(Keccakf1600_avx2x4_generic.st4x_get_pack0 Keccakf1600_avx2x4_generic.st4x_get_pack1 Keccakf1600_avx2x4_generic.st4x_get_pack2 Keccakf1600_avx2x4_generic.st4x_get_pack3).
-have GP: forall k, 0 <= k < 4 => st4x_get st{!m} k = nth witness [_st0; _st1; _st2; _st3] k by move=> k Hk; rewrite Hst; smt(Keccakf1600_avx2x4_generic.st4x_get_pack0 Keccakf1600_avx2x4_generic.st4x_get_pack1 Keccakf1600_avx2x4_generic.st4x_get_pack2 Keccakf1600_avx2x4_generic.st4x_get_pack3).
+have MG: forall (X : W256.t Array25.t) (k : int), 0 <= k < 4 => st4x_get (st4x_map keccak_f1600_op X) k = keccak_f1600_op (st4x_get X k) by move=> X k Hk; rewrite st4x_mapE; smt(Keccak1600_avx2x4.st4x_get_pack0 Keccak1600_avx2x4.st4x_get_pack1 Keccak1600_avx2x4.st4x_get_pack2 Keccak1600_avx2x4.st4x_get_pack3).
+have GP: forall k, 0 <= k < 4 => st4x_get st{!m} k = nth witness [_st0; _st1; _st2; _st3] k by move=> k Hk; rewrite Hst; smt(Keccak1600_avx2x4.st4x_get_pack0 Keccak1600_avx2x4.st4x_get_pack1 Keccak1600_avx2x4.st4x_get_pack2 Keccak1600_avx2x4.st4x_get_pack3).
 have SQ: forall (s : FIPS202_Keccakf1600.state), SHAKE128_SQUEEZE 504 s = squeezestate_i 168 s 0 ++ squeezestate_i 168 s 1 ++ squeezestate_i 168 s 2.
 move=> s; rewrite /SHAKE128_SQUEEZE /SQUEEZE1600 /c256_r8 /=.
 rewrite /squeezeblocks -iotaredE /=.
