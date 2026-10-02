@@ -110,6 +110,6 @@ ML-KEM = NIST ACVP v1.1.0.41). Regenerate with `bench/tools/import_kat.py`.
 ## Sync log
 
 - 2026-10-02: `src/fips202` and `proofs/fips202` synced with formosa-keccak
-  `13218ad` (plus WIP `Keccak1600_fixedsizes_ref.ec` from `7204cd0`); the
-  dependent mlkem/mldsa models re-extracted together. Details and rationale:
-  `proofs/fips202/notes/merge-with-formosa-keccak.md`.
+  `13218ad` (plus WIP `Keccak1600_fixedsizes_ref.ec` from `352b416`, the
+  repaired `7204cd0`); the dependent mlkem/mldsa models re-extracted together.
+  Details and rationale: `proofs/fips202/notes/merge-with-formosa-keccak.md`.

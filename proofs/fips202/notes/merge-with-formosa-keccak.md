@@ -104,6 +104,14 @@ clean, as does its `checkXtr` clone. To land the WIP later: fix the two defects
 upstream in formosa-keccak, re-check there, and re-port this single file (re-applying
 the `require import JWordList.` edit at line 22).
 
+**UPDATE (2026-10-02, later):** done. The WIP was repaired upstream as formosa-keccak
+`352b416` (structural fixes + an abstract input cursor `(cur0,cur')` added to
+`addstate_spec`, so the invariant chain now pins `buf`/`offset` via
+`cur' = cur0 + (size l - len')`) and re-ported here with the line-22 require edit.
+The file and its `checkXtr` clone compile clean under this repo's configuration;
+24 admit sites remain, all genuine proof obligations of the absorb correctness
+development (see the lemma-level notes inside the file).
+
 ## Outcome (2026-10-02)
 
 Landed as commit "fips202: sync src and proofs with formosa-keccak 13218ad" on branch
