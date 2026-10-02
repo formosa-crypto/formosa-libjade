@@ -457,30 +457,29 @@ rewrite nth_out; first smt(size_take size_ge0).
 by case: (i < cur).
 qed.
 
-(* One u64 read step: `stc` is the state after the first `cur` bytes (NB: not
-   the global zero state `st0`); the word is XORed into it at offset `cur`. *)
-lemma addstate_msubread_u64 mem w cur st at buf len tb stc at0 buf0 len0 tb0 cur1 at1 buf1 len1 tb1:
+(* One read step of an arbitrary word `lw` (srspec at offset `cur`): `stc` is the
+   state after the first `cur` bytes; the word is XORed into it at `cur`. *)
+lemma addstate_srspec_step mem lw cur st at buf len tb stc at0 buf0 len0 tb0 cur1 at1 buf1 len1 tb1:
  0 <= at => 0 <= len => 0 <= tb < 256 =>
- 0 <= cur <= at0 < cur+8 =>
- cur1 = cur + 8 =>
+ 0 <= cur <= at0 < cur + size lw =>
+ cur1 = cur + size lw =>
+ at1 = srat (size lw) cur at0 len0 tb0 =>
+ buf1 = buf0 + srincr (size lw) cur at0 len0 =>
+ len1 = srlen (size lw) cur at0 len0 =>
+ tb1 = srtb (size lw) cur at0 len0 tb0 =>
  addstate_spec st at (memread mem buf len) tb cur buf buf0 stc at0 len0 tb0 =>
- msubread mem (u64bytes w) cur at0 buf0 len0 tb0 at1 buf1 len1 tb1 =>
- addstate_spec st at (memread mem buf len) tb cur1 buf buf1 (addstate_at stc cur (u64bytes w)) at1 len1 tb1.
+ srspec lw cur at0 (memread mem buf0 len0) len0 tb0 =>
+ addstate_spec st at (memread mem buf len) tb cur1 buf buf1 (addstate_at stc cur lw) at1 len1 tb1.
 proof.
 move => |> Hat Hlen Htb0 Htb1 Hcur Hat0_1 Hat0_2; rewrite /addstate_spec addstate_atE // Hat /= => [#].
-move => Hst0 ->> ->> ->> ->>; rewrite size_memread 1:// => Hsub.
+move => Hst0 ->> ->> ->> ->>; rewrite size_memread 1:// => Hspec.
 split.
- (* state: the word is the stream window [cur, cur+8) of the *remaining*
-    stream (srspec_window); that window coincides byte-wise with the one of
-    the original stream S, whose [0, cur) prefix is already absorbed in stc. *)
  rewrite Hst0 -addstateA; congr.
- move: Hsub; rewrite /msubread => [#] Hspec _ _ _ _.
  rewrite (srspec_window _ _ _ _ _ _ _ Hspec); first by rewrite /srpre size_memread 1:/#; smt(size_memread).
- have ->: size (u64bytes w) = 8 by rewrite /u64bytes size_to_list.
  pose S := u8zeros at ++ memread mem buf len ++ [W8.of_int tb].
  have Hsz: size (take cur S) = cur.
   by rewrite size_take // /S !size_cat size_nseq size_memread //=; move: Hat0_1; rewrite size_memread // /b2i; smt().
- rewrite (takeD S cur 8) 1,2:/# bytes2state_cat Hsz; congr.
+ rewrite (takeD S cur (size lw)) 1:/# 1:size_ge0 bytes2state_cat Hsz; congr.
  apply bytes2state_nthE => i Hi.
  have nthT: forall (s: W8.t list) n j, 0 <= n => nth W8.zero (take n s) j = if j < n then nth W8.zero s j else W8.zero.
   move=> s n j Hn; case: (j < n) => C; first by rewrite nth_take.
@@ -492,16 +491,38 @@ split.
  rewrite nthT 1:/# (nth_cat _ (u8zeros cur)) size_nseq (_: max 0 cur = cur) 1:/# nth_nseq_if.
  case: (i < cur) => C1 /=.
   by rewrite ifT 1:/# -catA (nth_cat _ (u8zeros _)) size_nseq ifT 1:/# nth_nseq_if /#.
- rewrite nthT // nth_drop 1,2:/# /S (_: cur + (i - cur) = i) 1:/#.
- case: (i < cur + 8) => C2; last by rewrite ifF 1:/#.
- rewrite (_: (i - cur < 8) = true) 1:/# /=.
+ rewrite nthT 1:size_ge0 nth_drop 1,2:/# /S (_: cur + (i - cur) = i) 1:/#.
+ case: (i < cur + size lw) => C2; last by rewrite ifF 1:/#.
+ rewrite (_: (i - cur < size lw) = true) 1:/# /=.
  have Hl0: 0 <= (if at < cur then max 0 (at + len - cur) else len) by smt().
  rewrite !cats1 !nth_rcons !size_cat !size_nseq !size_memread // !nth_cat !size_nseq !nth_nseq_if !nthM //.
  smt().
-(* len'/at'/tb'/cur' are msubread bookkeeping: unfold the sr* ops in Hsub. *)
-split; first by move: Hsub; rewrite /msubread /srlen /srincr /srfnsh /srtb size_to_list /= => |> *; smt().
-split; first by move: Hsub; rewrite /msubread /srlen /srincr /srfnsh /srtb size_to_list /= => |> *; smt().
-by move: Hsub; rewrite /msubread /srlen /srincr /srfnsh /srtb size_to_list /= => |> *; smt().
+move: Hat0_1 Hat0_2; rewrite size_memread // => Hat0_1 Hat0_2.
+do 3! (split; first by rewrite /srincr /srfnsh /b2i /=; smt()).
+by rewrite /srincr /srfnsh /b2i /=; smt().
+qed.
+
+(* A full in-data word read at the aligned position. *)
+lemma srspec_full lw cur l len tb:
+ size lw <= size l =>
+ u8prefAt lw 0 l =>
+ srspec lw cur cur l len tb.
+proof.
+move=> Hsz Hw Hpre; split; first by apply srpre_next => //; apply size_ge0.
+by rewrite (_: cur - cur = 0) 1:// u8prefAbsorbW.
+qed.
+
+lemma addstate_msubread_u64 mem w cur st at buf len tb stc at0 buf0 len0 tb0 cur1 at1 buf1 len1 tb1:
+ 0 <= at => 0 <= len => 0 <= tb < 256 =>
+ 0 <= cur <= at0 < cur+8 =>
+ cur1 = cur + 8 =>
+ addstate_spec st at (memread mem buf len) tb cur buf buf0 stc at0 len0 tb0 =>
+ msubread mem (u64bytes w) cur at0 buf0 len0 tb0 at1 buf1 len1 tb1 =>
+ addstate_spec st at (memread mem buf len) tb cur1 buf buf1 (addstate_at stc cur (u64bytes w)) at1 len1 tb1.
+proof.
+have Hs: size (u64bytes w) = 8 by rewrite /u64bytes size_to_list.
+move=> Hat Hlen Htb Hc Hc1 Hspec; rewrite /msubread => [#] Hsr Eat Ebuf Elen Etb.
+by apply (addstate_srspec_step mem (u64bytes w) cur st at buf len tb stc at0 buf0 len0 tb0); rewrite ?Hs.
 qed.
 
 
@@ -588,117 +609,139 @@ seq 2: (Glob.mem=_mem /\ _TRAILB=_tb /\ 0 <= _tb < 256 /\ 0 <= _at <= 200
    wp; ecall (m_ilen_read_upto8_at_h buf _LEN _TRAILB aT8 aT); auto => |> &m ???????.
    move=> [buf0 len0 tb0 at0 w0] /=.
    move => H; rewrite set64_addstate_at 1:/#.
-admit(* w0: W64.t
-H: msubread _mem (u64bytes w0) (8 * (_at %/ 8)) _at _buf _len _tb at0 buf0
-     len0 tb0
-------------------------------------------------------------------------
-addstate_spec _st _at (memread _mem _buf _len) _tb nbase
-  (addstate_at _st (8 * (_at %/ 8)) (u64bytes w0)) at0 len0 tb0
-*).
+(* prefix word = one step from the initial spec at base; nbase = base + 8
+   since _at is not 8-aligned in this branch. *)
+   apply (addstate_msubread_u64 _mem w0 (8 * (_at %/ 8)) _st _at _buf _len _tb _st _at _buf _len _tb nbase at0 buf0 len0 tb0) => //;
+    [smt() | by rewrite /nbase; smt() | by apply addstate_spec_init => //; smt(size_memread)].
   auto => |> *.
   have ->@/base: nbase = base by smt().
   by apply addstate_spec_init; smt(size_memread).
 (* stmt 3 : if hAS_AVX2 — both branches consume `8*(_LEN%/8)` further aligned bytes. *)
 seq 1: (Glob.mem=_mem /\ 0 <= _tb < 256 /\ 0 <= _at <= 200
        /\ 0 <= _len /\ _at + _len <= 200 - b2i (_tb<>0) /\ _buf + _len < W64.modulus
-       /\ addstate_spec _st _at (memread _mem _buf _len) _tb (nbase+8*(_LEN%/8)) _buf buf st (aT+8*(_LEN%/8)) (_LEN-8*(_LEN%/8)) _TRAILB).
+       /\ addstate_spec _st _at (memread _mem _buf _len) _tb (nbase+8*(_LEN%/8)) _buf buf st (aT+8*(_LEN%/8)) (_LEN-8*(_LEN%/8)) _TRAILB /\ 0 <= _LEN).
  if => //.
  - seq 3: (Glob.mem=_mem /\ 0 <= _tb < 256 /\ 0 <= _at <= 200
        /\ 0 <= _len /\ _at + _len <= 200 - b2i (_tb<>0) /\ _buf + _len < W64.modulus
-       /\ addstate_spec _st _at (memread _mem _buf _len) _tb (nbase+32*(_LEN%/32)) _buf buf st (aT+32*(_LEN%/32)) (_LEN-32*(_LEN%/32)) _TRAILB).
+       /\ addstate_spec _st _at (memread _mem _buf _len) _tb (nbase+32*(_LEN%/32)) _buf buf st (aT+32*(_LEN%/32)) (_LEN-32*(_LEN%/32)) _TRAILB /\ 0 <= _LEN).
    while (#[/1:8]pre /\ inc = _LEN%/32 /\
           0 <= i <= _LEN%/32 /\ 
           addstate_spec _st _at (memread _mem _buf _len) _tb (nbase+32*i) _buf buf st (aT+32*i) (_LEN-32*i) _TRAILB).
     auto => |> &m ????????? IH Hb; split; first smt().
     rewrite xorwC set256_addstate_at 1:/#.
-    admit (*
-IH: addstate_spec _st _at (memread _mem _buf _len) _tb (nbase + 32 * i{m})
-      st{m} (aT{m} + 32 * i{m}) (_LEN{m} - 32 * i{m}) _TRAILB{m}
-Hb: i{m} < _LEN{m} %/ 32
-------------------------------------------------------------------------
-addstate_spec _st _at (memread _mem _buf _len) _tb (nbase + 32 * (i{m} + 1))
-  (addstate_at st{m} (aT{m} + 32 * i{m}) (u256bytes (loadW256 _mem buf{m})))
-  (aT{m} + 32 * (i{m} + 1)) (_LEN{m} - 32 * (i{m} + 1)) _TRAILB{m}
-*).
+    (* u256 step: aligned (aT = nbase via addstate_spec_sz), full in-data word. *)
+    have Hl: 32 <= _LEN{m} - 32 * i{m} by smt().
+    have HaT: aT{m} + 32 * i{m} = nbase + 32 * i{m}.
+     apply (addstate_spec_sz _st _at (memread _mem _buf _len) _tb (nbase + 32 * i{m}) _buf buf{m} st{m} (aT{m} + 32 * i{m}) (_LEN{m} - 32 * i{m}) _TRAILB{m}) => //; smt().
+    rewrite HaT; move: IH; rewrite HaT => IH.
+    apply (addstate_srspec_step _mem (u256bytes (loadW256 _mem buf{m})) (nbase + 32 * i{m}) _st _at _buf _len _tb st{m} (nbase + 32 * i{m}) buf{m} (_LEN{m} - 32 * i{m}) _TRAILB{m}) => //; rewrite ?size_to_list.
+    smt().
+    smt().
+    rewrite /srincr /srfnsh /b2i /=; smt().
+    rewrite /srincr; smt().
+    rewrite /srincr; smt().
+    rewrite /srfnsh; smt().
+    apply srspec_full; [by rewrite size_to_list size_memread //; smt() | by apply loadW256_memread].
    auto => |> &m ??????? H ?; split. 
 have ?: 0<= _LEN{m}.
  move: H; rewrite /addstate_spec => />. smt(size_ge0).
     smt().
-   by move => buf1 i st1 ???; have ->: i=_LEN{m} %/ 32 by smt().
+   move => buf1 i st1 ???; have ->: i=_LEN{m} %/ 32 by smt().
+   by move=> Hs; split => //; smt().
    seq 1: (Glob.mem=_mem /\ 0 <= _tb < 256 /\ 0 <= _at <= 200
        /\ 0 <= _len /\ _at + _len <= 200 - b2i (_tb<>0) /\ _buf + _len < W64.modulus
-       /\ addstate_spec _st _at (memread _mem _buf _len) _tb (nbase+16*(_LEN%/16)) _buf buf st (aT+16*(_LEN%/16)) (_LEN-16*(_LEN%/16)) _TRAILB).
+       /\ addstate_spec _st _at (memread _mem _buf _len) _tb (nbase+16*(_LEN%/16)) _buf buf st (aT+16*(_LEN%/16)) (_LEN-16*(_LEN%/16)) _TRAILB /\ 0 <= _LEN).
    if => //.
-     auto => |> &m ??????? IH Hb.
-     admit (*
-IH: addstate_AT nbase (32 * (len0 %/ 32)) _st _at (memread _mem _buf _len)
-      _tb st1 at1 len1 tb1
-H: 16 <= len1 %% 32
-------------------------------------------------------------------------
-addstate_AT nbase (16 * (len0 %/ 16)) _st _at (memread _mem _buf _len) _tb
-  (stwords
-     (set128_direct (stbytes st1) (at1 + len1 %/ 32 * 32)
-        (truncateu128 (loadW256 _mem buf{m}) `^`
-         get128_direct (stbytes st1) (at1 + len1 %/ 32 * 32)))) at1 len1 tb1
-*).
-    auto => |> ??????? H Hb.
+     auto => |> &m ??????? IH HL Hb.
+     (* u128 16-tail step: aligned (aT = nbase via addstate_spec_sz), full in-data word. *)
+     rewrite xorwC set128_addstate_at 1:/#.
+     have Hs: size (u128bytes (loadW128 _mem buf{m})) = 16 by rewrite size_to_list.
+     have Hl: 16 <= _LEN{m} - 32 * (_LEN{m} %/ 32) by smt().
+     have HaT: aT{m} + 32 * (_LEN{m} %/ 32) = nbase + 32 * (_LEN{m} %/ 32).
+      apply (addstate_spec_sz _st _at (memread _mem _buf _len) _tb (nbase + 32 * (_LEN{m} %/ 32)) _buf buf{m} st{m} (aT{m} + 32 * (_LEN{m} %/ 32)) (_LEN{m} - 32 * (_LEN{m} %/ 32)) _TRAILB{m}) => //; smt().
+     rewrite (_: aT{m} + _LEN{m} %/ 32 * 32 = nbase + 32 * (_LEN{m} %/ 32)) 1:/#; move: IH; rewrite HaT => IH.
+     apply (addstate_srspec_step _mem (u128bytes (loadW128 _mem buf{m})) (nbase + 32 * (_LEN{m} %/ 32)) _st _at _buf _len _tb st{m} (nbase + 32 * (_LEN{m} %/ 32)) buf{m} (_LEN{m} - 32 * (_LEN{m} %/ 32)) _TRAILB{m}) => //; rewrite ?Hs.
+     smt(). smt(). rewrite /srincr /srfnsh /b2i /=; smt(). rewrite /srincr; smt(). rewrite /srincr; smt(). rewrite /srfnsh; smt().
+     apply srspec_full; [by rewrite Hs size_memread //; smt() | by apply loadW128_memread].
+    auto => |> ??????? H Hb HL.
     (* 16-tail skipped: 16*(_LEN%/16) = 32*(_LEN%/32) when _LEN%%32 < 16. *)
     move => Hc; have E: forall n, !16 <= n %% 32 => 16 * (n %/ 16) = 32 * (n %/ 32) by smt().
     by rewrite !(E _ Hc); exact Hb.
    if => //.
-     auto => |> ???????? H Hb.
-     admit (*
-H: addstate_AT nbase (16 * (len0 %/ 16)) _st _at (memread _mem _buf _len) _tb
-     st{`&hr} aT{`&hr} _LEN{`&hr} _TRAILB{`&hr}
-Hb: 8 <= _LEN{`&hr} %% 16
-------------------------------------------------------------------------
-addstate_AT nbase (8 * (len0 %/ 8)) _st _at (memread _mem _buf _len) _tb
-  (stwords
-     (set64_direct (stbytes st{`&hr}) (aT{`&hr} + _LEN{`&hr} %/ 16 * 16)
-        (get64_direct (stbytes st{`&hr}) (aT{`&hr} + _LEN{`&hr} %/ 16 * 16) `^`
-         loadW64 _mem buf{`&hr}))) aT{`&hr} _LEN{`&hr} _TRAILB{`&hr}
-*).
-    auto => |> ???????? H Hb.
+     (* u64 8-tail step: aligned (aT = nbase via addstate_spec_sz), full in-data word. *)
+     auto => |> &m ??????? H HL Hb.
+     rewrite set64_addstate_at 1:/#.
+     have Hs: size (u64bytes (loadW64 _mem buf{m})) = 8 by rewrite /u64bytes size_to_list.
+     have Hl: 8 <= _LEN{m} - 16 * (_LEN{m} %/ 16) by smt().
+     have HaT: aT{m} + 16 * (_LEN{m} %/ 16) = nbase + 16 * (_LEN{m} %/ 16).
+      apply (addstate_spec_sz _st _at (memread _mem _buf _len) _tb (nbase + 16 * (_LEN{m} %/ 16)) _buf buf{m} st{m} (aT{m} + 16 * (_LEN{m} %/ 16)) (_LEN{m} - 16 * (_LEN{m} %/ 16)) _TRAILB{m}) => //; smt().
+     rewrite (_: aT{m} + _LEN{m} %/ 16 * 16 = nbase + 16 * (_LEN{m} %/ 16)) 1:/#; move: H; rewrite HaT => H.
+     apply (addstate_srspec_step _mem (u64bytes (loadW64 _mem buf{m})) (nbase + 16 * (_LEN{m} %/ 16)) _st _at _buf _len _tb st{m} (nbase + 16 * (_LEN{m} %/ 16)) buf{m} (_LEN{m} - 16 * (_LEN{m} %/ 16)) _TRAILB{m}) => //; rewrite ?Hs.
+     smt(). smt(). rewrite /srincr /srfnsh /b2i /=; smt(). rewrite /srincr; smt(). rewrite /srincr; smt(). rewrite /srfnsh; smt().
+     apply srspec_full; [by rewrite Hs size_memread //; smt() | by apply loadW64_memread].
+    auto => |> ???????? H HL Hb.
     (* 8-tail skipped: 8*(_LEN%/8) = 16*(_LEN%/16) when _LEN%%16 < 8. *)
     have E: forall n, !8 <= n %% 16 => 8 * (n %/ 8) = 16 * (n %/ 16) by smt().
     by rewrite !(E _ Hb); exact H.
- - (* scalar branch : 8-byte `while`.
-      while-invariant (iteration i, consumed (_len-_LEN)+8*i):
-        st = addstate_at _st _at (memread _mem _buf ((_len-_LEN)+8*i))
-        /\ buf = _buf + (_len-_LEN)+8*i /\ at = aT + 8*i /\ 0 <= i <= _LEN%/8.
-      body: `loadW64_memread` + `set64_addstate_at` + `addstate_at_cat`. *)
-   admit.
-(* stmts 4-5 : aT += 8*(_LEN/8); _LEN %%= 8 — bookkeeping; restores the invariant
-   since (_len-_LEN)+8*(_LEN%/8) = _len - _LEN%%8. *)
-seq 2: (Glob.mem=_mem /\ _TRAILB=_tb /\ 0 <= _tb < 256 /\ 0 <= _at <= 200
+ - (* scalar branch: invariant = spec advanced by the (at - aT) bytes consumed. *)
+   while (#[/1:8]pre /\ 0 <= _LEN /\ aT <= at <= aT + _LEN %/ 8 * 8 /\ (at - aT) %% 8 = 0 /\
+           addstate_spec _st _at (memread _mem _buf _len) _tb (nbase + (at - aT)) _buf buf st at (_LEN - (at - aT)) _TRAILB).
+   + auto => |> &m ??????? HL H1 H2 Hm H Hb.
+     split; first smt().
+     split; first smt().
+     rewrite set64_addstate_at 1:/#.
+     have Hs: size (u64bytes (loadW64 _mem buf{m})) = 8 by rewrite /u64bytes size_to_list.
+     have Hl: 8 <= _LEN{m} - (at{m} - aT{m}) by smt().
+     have Hsz: at{m} = nbase + (at{m} - aT{m}).
+      apply (addstate_spec_sz _st _at (memread _mem _buf _len) _tb (nbase + (at{m} - aT{m})) _buf buf{m} st{m} at{m} (_LEN{m} - (at{m} - aT{m})) _TRAILB{m}) => //; smt().
+     move: H; rewrite -Hsz => H.
+     apply (addstate_srspec_step _mem (u64bytes (loadW64 _mem buf{m})) at{m} _st _at _buf _len _tb st{m} at{m} buf{m} (_LEN{m} - (at{m} - aT{m})) _TRAILB{m}) => //; rewrite ?Hs.
+     smt(). smt(). rewrite /srincr /srfnsh /b2i /=; smt(). rewrite /srincr; smt(). rewrite /srincr; smt(). rewrite /srfnsh; smt().
+     apply srspec_full; [by rewrite Hs size_memread //; smt() | by apply loadW64_memread].
+   + auto => |> &m ??????? H Hn.
+     have HL: 0 <= _LEN{m} by have := addstate_spec_len _ _ _ _ _ _ _ _ _ _ _ H; smt().
+     split; first smt().
+     move=> at0 buf0 st0 Hex _ H1 H2 Hm Hs.
+     have E: at0 = aT{m} + 8 * (_LEN{m} %/ 8) by smt().
+     by move: Hs; rewrite E (_: aT{m} + 8 * (_LEN{m} %/ 8) - aT{m} = 8 * (_LEN{m} %/ 8)) 1:/#.
+(* stmts 4-5 : aT += 8*(_LEN/8); _LEN %%= 8 -- pure bookkeeping, the spec carries
+   over with sz = nbase + 8*(_LEN/8) (kept existential: not expressible in the new
+   _LEN).  stmt 6: the final word is one more step that finishes the stream. *)
+seq 2: (Glob.mem=_mem /\ 0 <= _tb < 256 /\ 0 <= _at <= 200
        /\ 0 <= _len /\ _at + _len <= 200 - b2i (_tb<>0) /\ _buf + _len < W64.modulus
-       /\ st = addstate_at _st _at (memread _mem _buf (_len - _LEN))
-       /\ buf = _buf + (_len - _LEN) /\ aT = _at + (_len - _LEN)
-       /\ 0 <= _LEN < 8).
-+ auto => /> &m *.
-  have E: (_len - _LEN{m}) + 8 * (_LEN{m} %/ 8) = _len - _LEN{m} %% 8 by smt().
-  admit. (* bridge addstate_spec (post stmt-3 invariant) back to the explicit
-    `st = addstate_at _st _at (memread _mem _buf (_len - _LEN%%8))` form:
-    unfold addstate_spec, rewrite with addstate_atE and E; the cursor fact
-    `buf = _buf + (_len - _LEN%%8)` comes from the spec's cur' clause
-    (addstate_spec_cur) + E.  Previous (old-form) closing script:
-    `rewrite !E; smt(modz_ge0 ltz_pmod).` *)
-(* stmt 6 : final partial word + trailing byte. *)
+       /\ 0 <= _LEN < 8
+       /\ exists sz, _at <= sz /\ addstate_spec _st _at (memread _mem _buf _len) _tb sz _buf buf st aT _LEN _TRAILB).
++ auto => |> &m ??????? H HL.
+  split; first smt().
+  exists (nbase + 8 * (_LEN{m} %/ 8)); split; first smt().
+  by rewrite (_: _LEN{m} %% 8 = _LEN{m} - 8 * (_LEN{m} %/ 8)) 1:/#.
 if.
-+ wp; ecall (m_ilen_read_upto8_at_h buf _LEN _TRAILB aT aT); auto => /> &m ????????? Hlast.
-  move => [buf0 len0 tb0 at0 w0] /= ? Eat0 Ebuf0 ? Etb0; split.
-   admit.
-  (* ADMIT: the last (shifted) word stored via `set64_addstate_at`, combined with
-     the running invariant, gives st = addstate_at _st _at (memread _mem _buf _len
-     ++ [tb]); `msubreadP` finalises the msubread chain and `bytes2state_zext`
-     drops the trailing byte when _tb = 0.  aT = _at + _len + b2i(_tb<>0). *)
-  by rewrite Eat0 Ebuf0 size_to_list /srat /srincr /srfnsh /= /#.
-(* guard false: _LEN = 0 /\ _tb = 0, so l = memread _mem _buf _len and the running
-   invariant already gives the postcondition. *)
-auto => /> &m *.
-have HL: _LEN{m} = 0 by smt().
-have HT: _tb = 0 by smt().
-rewrite HL HT /= cats0; smt(size_memread).
++ wp; ecall (m_ilen_read_upto8_at_h buf _LEN _TRAILB aT aT); auto => |> &m ??????? HL0 HL1 sz Hsz H Hg [buf1 len1 tb1 at1 w] /= Hsub.
+  have HaT: aT{m} = sz.
+   by apply (addstate_spec_sz _st _at (memread _mem _buf _len) _tb sz _buf buf{m} st{m} aT{m} _LEN{m} _TRAILB{m}) => //; smt().
+  move: H; rewrite -HaT => H.
+  rewrite set64_addstate_at; first smt().
+  have Hstep: addstate_spec _st _at (memread _mem _buf _len) _tb (aT{m} + 8) _buf buf1 (addstate_at st{m} aT{m} (u64bytes w)) at1 len1 tb1.
+   by apply (addstate_msubread_u64 _mem w aT{m} _st _at _buf _len _tb st{m} aT{m} buf{m} _LEN{m} _TRAILB{m}) => //; smt().
+  have [Hl1 Ht1]: len1 = 0 /\ tb1 = 0.
+   by move: Hsub; rewrite /msubread /u64bytes size_to_list /srincr /srfnsh /= => |> *; smt().
+  have [Hst Hat1] := addstate_spec_finished _ _ _ _ _ _ _ _ _ _ _ Hl1 Ht1 Hstep.
+  have Hbuf := addstate_spec_cur _ _ _ _ _ _ _ _ _ _ _ Hstep.
+  rewrite Hst; split.
+   case: (_tb <> 0) => Htb /=; first done.
+   by rewrite cats0 !addstate_atE // (_: _tb = 0) 1:/# catA -nseq1 bytes2state_zext.
+  by rewrite Hat1 Hbuf Hl1 size_memread.
+auto => |> &m ??????? HL0 HL1 sz Hsz H Hg.
+have Hl: _LEN{m} = 0 by smt().
+have Htb: 0 <= _TRAILB{m} < 256.
+ by move: H; rewrite /addstate_spec => [#] _ _ _ _ -> _; smt().
+have Ht: _TRAILB{m} = 0 by smt().
+have [Hst Hat1] := addstate_spec_finished _ _ _ _ _ _ _ _ _ _ _ Hl Ht H.
+have Hbuf := addstate_spec_cur _ _ _ _ _ _ _ _ _ _ _ H.
+rewrite Hst; split.
+ case: (_tb <> 0) => Htb' /=; first done.
+ by rewrite cats0 !addstate_atE // (_: _tb = 0) 1:/# catA -nseq1 bytes2state_zext.
+by rewrite Hat1 Hbuf Hl size_memread.
 qed.
 
 phoare addstate_m_ph _mem _st _at _buf _len _tb:
@@ -737,10 +780,30 @@ if => //.
 by call addratebit_ll.
 qed.
 
+(* addstate_m_h in the shape of addstate_m_avx2_h (trailing byte always present). *)
+hoare addstate_m_h2 _mem _st _at _buf _len _tb:
+ M.__addstate_m
+ : Glob.mem=_mem /\ st=_st /\ aT=_at /\ buf=_buf /\ _LEN=_len /\ _TRAILB=_tb
+ /\ 0 <= _at <= 200
+ /\ 0 <= _len
+ /\ _at+_len <= 200 - b2i (_tb<>0)
+ /\ _buf + _len < W64.modulus
+ /\ 0 <= _tb < 256
+ ==> Glob.mem=_mem
+     /\ res.`1 = addstate _st (bytes2state (u8zeros _at ++ memread _mem _buf _len ++ [W8.of_int _tb]))
+     /\ res.`2 = _at + _len + b2i (_tb<>0)
+     /\ res.`3 = _buf + _len.
+proof.
+conseq (addstate_m_h _mem _st _at _buf _len _tb) => /> &m ??????? r -> _ _.
+rewrite addstate_atE // catA; case: (_TRAILB{m} <> 0) => [//|/= ->].
+by rewrite cats0 -nseq1 bytes2state_zext.
+qed.
+
 hoare absorb_m_h _l _mem _buf _len _tb _r8:
  M.__absorb_m
  : Glob.mem=_mem /\ aT=size _l %% _r8 /\ buf=_buf /\ _LEN=_len /\ _RATE8=_r8 /\ _TRAILB=_tb
  /\ pabsorb_spec_ref _r8 _l st
+ /\ 0 <= _tb < 256
  /\ 0 <= _len
  /\ _buf + _len < W64.modulus
  ==> Glob.mem = _mem
@@ -751,63 +814,143 @@ hoare absorb_m_h _l _mem _buf _len _tb _r8:
        /\ res.`2 = (size _l + _len) %% _r8
        /\ res.`3 = _buf + _len.
 proof.
-(* STRATEGY: direct port of `absorb_m_avx2_h`
-   (amd64/avx2/Keccak1600_fixedsizes_avx2.ec:534-699).  The ref state is already
-   the logical 25-lane state, so every `stavx2_to_st25` / `stavx2_from_st25` /
-   `stavx2INV*` step of that proof is DROPPED and `pabsorb_spec_avx2` becomes
-   `pabsorb_spec_ref` (= PABSORB1600 with no packing wrapper), `addstate_avx2`
-   becomes `addstate`, `keccakf1600_avx2_h` becomes `keccakf1600_h`,
-   `addratebit_avx2_h` becomes `addratebit_h`, and `addstate_m_avx2_h` becomes
-   `addstate_m_h` (whose `addstate_at` postcondition is turned into the additive
-   `addstate ∘ bytes2state` form via `addstate_atE`).  Skeleton below; the
-   spec-arithmetic leaves are the only admits. *)
+(* Port of absorb_m_avx2_h (avx2/Keccak1600_fixedsizes_avx2.ec): the ref state is
+   the logical 25-lane state, so all the stavx2 conversions drop out. *)
 proc => /=.
 pose _at := size _l %% _r8.
 pose niters := (_at + _len) %/ _r8.
 pose lastlen := if _r8 <= _at + _len then (_at + _len) %% _r8 else _len.
 pose lastpos := niters * _r8 - _at.
-(* After the multi-block prefix, `st` has absorbed the first `lastpos` bytes and
-   `lastlen` bytes remain for the final (partial) block. *)
-seq 1: (Glob.mem=_mem /\ _RATE8=_r8 /\ _TRAILB=_tb /\ 0 <= _len /\ 0 <= _buf
-       /\ 0 <= _tb < 256
-       /\ pabsorb_spec_ref _r8 (_l ++ memread _mem _buf lastpos) st
-       /\ buf = _buf + lastpos /\ _LEN = lastlen
-       /\ aT = if _r8 <= _at + _len then 0 else _at).
-+ (* STRATEGY (multi-block prefix, `if (_RATE8 <= aT+_LEN)`): mirror avx2 552-645.
-     `sp; if => //` — the empty case rewrites `lastpos <= 0` with `memread0'`;
-     the non-empty case runs the first partial `addstate_m_h` + `keccakf1600_h`,
-     then the `while` with invariant
-       pabsorb_spec_ref _r8 (_l ++ memread _mem _buf ((i+1)*_r8 - _at)) st
-     each iteration `ecall (addstate_m_h ..)` (rewritten to additive form via
-     addstate_atE) then `ecall (keccakf1600_h ..)`, closed with `chunkremains_nil`
-     (rate-boundary ⇒ empty remainder, discharged by `dvdzP; exists ..`),
-     `stateabsorb_iblocks_rcons`, `chunk_cat`/`chunk_size`, `memread_split`. *)
-  admit.
-(* final partial block + trailing byte *)
-case: (_tb <> 0).
+seq 1: (Glob.mem=_mem /\ _RATE8=_r8 /\ _TRAILB = _tb /\ 0 <= _len /\ _buf + _len < W64.modulus /\ 0 <= _tb < 256
+       /\ pabsorb_spec_ref _r8 (_l ++ memread Glob.mem _buf lastpos) st
+       /\ buf = _buf + _len - lastlen /\ _LEN = lastlen
+       /\ aT = if _RATE8 <= _at + _len then 0 else _at).
+ sp; if => //; last first.
+  auto => |> *.
+  have ?: lastpos <= 0. smt().
+  rewrite memread0' ?cats0.
+    rewrite /lastpos /niters divz_small 1:/# /= /#.
+  smt().
+ wp; while ( _RATE8 = _r8 /\ _TRAILB = _tb /\ 0 <= _len /\ _buf + _len < W64.modulus /\ 0 <= _tb < 256 /\
+             iTERS= (size _l %% _r8 + _len) %/ _r8 - 1 /\
+             buf = _buf + (i+1)*_r8 - size _l %% _r8 /\
+             0 <= i <= iTERS /\
+             pabsorb_spec_ref _r8 (_l ++ memread Glob.mem _buf ((i+1)*_r8-size _l %% _r8)) st
+           ).
+  wp; ecall (keccakf1600_h st).
+  ecall (addstate_m_h2 Glob.mem st 0 buf _RATE8 0).
+  auto => |> &m.
+  move=> H0 Hb Htb0 Htb1 Hi0 Hi1.
+  rewrite {1}/pabsorb_spec_ref => [[Hr8]].
+  rewrite chunkremains_nil 1:/#.
+   rewrite size_cat size_memread 1:/# addzA (addzC (size _l)) -addzA.
+   rewrite {1}(divz_eq (size _l) _r8) -addzA /= -mulzDl dvdzP.
+   by exists (i{m} + 1 + size _l %/ _r8).
+  rewrite bytes2state0 addstateC addstate_st0 => Est Hlt.
+  rewrite !b2i0 /=; split.
+   split; first smt().
+   split; first smt().
+   have h1: (i{m} + 2) * _r8 <= (size _l %% _r8 + _len) %/ _r8 * _r8 by rewrite ler_pmul2r 1:/#; smt().
+   have h2:= lez_floor (size _l %% _r8 + _len) _r8 _; first smt().
+   smt().
+  move => Hr80 Hr81 Hbnd [st' at' buf'] /= Est' _ Ebuf'.
+  split; first smt().
+  split; first smt().
+  rewrite /pabsorb_spec_ref; split; first smt().
+  rewrite chunkremains_nil 1:/#.
+   rewrite size_cat size_memread 1:/# addzA (addzC (size _l)) -addzA.
+   rewrite {1}(divz_eq (size _l) _r8) -addzA /= -mulzDl dvdzP.
+   by exists (i{m} + 2 + size _l %/ _r8).
+  rewrite bytes2state0 addstateC addstate_st0.
+  rewrite (memread_split ((i{m} + 1) * _r8 - size _l %% _r8)).
+   split; last smt().
+   have: 0 <= i{m} * _r8 by apply mulr_ge0 => /#.
+   smt(modz_cmp).
+  rewrite catA chunk_cat /=.
+   rewrite size_cat size_memread 1:/# addzA (addzC (size _l)) -addzA.
+   rewrite {1}(divz_eq (size _l) _r8) -addzA /= -mulzDl dvdzP.
+   by exists (i{m} + 1 + size _l %/ _r8).
+  rewrite (chunk_size _ (memread _ _ _)) 1:/#.
+   by rewrite size_memread /#.
+  rewrite cats1 stateabsorb_iblocks_rcons Est' /stateabsorb; congr; congr.
+  by rewrite nseq0 /= -(nseq1 W8.zero) bytes2state_zext; congr; congr; smt().
+ wp; ecall (keccakf1600_h st).
+ wp; ecall (addstate_m_h2 Glob.mem st aT buf (_RATE8 - aT) 0).
+ auto => |> &m.
+ rewrite /pabsorb_spec_ref => [[Hr8 Est]] Htb0 Htb1 Hlen Hbuf Hc.
+ split; first smt().
+ move=> |> ????? [st' at' buf'] /=.
+ rewrite !b2i0 /= => Est' Eat' Ebuf'.
+ split.
+  split.
+   by rewrite (:_len - (_r8 - size _l %% _r8) = size _l %% _r8 + _len + (-1)*_r8) 1:/# divzMDr /#.
+  split; first smt().
+  split; first smt().
+  rewrite chunkremains_nil 1:/#.
+   rewrite size_cat size_memread 1:/# addzA (addzC (size _l)) -addzA.
+   rewrite {1}(divz_eq (size _l) _r8) -addzA /= -{2}(mul1z _r8) -mulzDl dvdzP.
+   by exists (1 + size _l %/ _r8).
+  rewrite bytes2state0 addstateC addstate_st0.
+  rewrite chunk_cat' 1:/# (chunk_size _ (_++_)) 1:/#.
+   by rewrite size_cat size_chunkremains size_memread /#.
+  rewrite cats1 stateabsorb_iblocks_rcons Est' Est /stateabsorb.
+  rewrite -addstateA; congr; congr.
+  rewrite -(nseq1 W8.zero) bytes2state_zext eq_sym bytes2state_cat; congr; congr.
+  by rewrite size_chunkremains.
+ move => i ??????.
+ have ->: i=(_len - (_r8 - size _l %% _r8)) %/ _r8 by smt().
+ have E: (_len - (_r8 - size _l %% _r8))%/_r8 = (size _l %% _r8 + _len)%/_r8 - 1.
+  have ->: _len - (_r8 - size _l %% _r8) = (size _l %% _r8 + _len + (-1)*_r8) by smt().
+  by rewrite divzMDr /#.
+ split.
+  by rewrite (_: ((_len - (_r8 - size _l %% _r8)) %/ _r8 + 1) * _r8 - size _l %% _r8 = lastpos) // /lastpos /niters /_at E /=.
+ split.
+  by rewrite /lastlen ifT 1:/# /_at E /= /#.
+ split.
+  rewrite /lastlen ifT 1:/# /_at.
+  by rewrite (:_len - (_r8 - size _l %% _r8) = _len + size _l %% _r8 + (-1)*_r8) 1:/# modzMDr /#.
+ by rewrite ifT /#.
+case: (_TRAILB <> 0).
 + rcondt 2; first by call (: true ==> true) => //.
   ecall (addratebit_h _RATE8 st).
-  ecall (addstate_m_h Glob.mem st aT buf _LEN _TRAILB).
-  (* STRATEGY: avx2 647-671.  addstate_m_h gives the last block XORed in;
-     addratebit_h adds the rate/padding bit; reconcile to
-     `ABSORB1600 (of_int _tb) _r8 (_l ++ memread _mem _buf _len)` via
-     `chunk_cat_memread` + `chunkremains_cat_memread` (extend buffer from
-     `lastpos` to `_len`), `addstate_atE`, `-addstateA` and unfolding
-     `ABSORB1600`/`PABSORB1600`/`stateabsorb_last`. *)
-  auto => />; admit.
+  ecall (addstate_m_h2 Glob.mem st aT buf _LEN _TRAILB).
+  auto => |> &m ???? H Htb.
+  have Hr8: 0 < _r8 <= 200 by move: H; rewrite /pabsorb_spec_ref => [#].
+  have Hat: 0 <= _at < _r8 by rewrite /_at; smt(modz_ge0 ltz_pmod).
+  split; first by rewrite /lastlen; smt(modz_ge0 ltz_pmod).
+  move => ????? [st' at' buf'] /= Est' Eat' Ebuf'.
+  move: H; rewrite /pabsorb_spec_ref => [[? H]].
+  rewrite Est' H /ABSORB1600 /stateabsorb_last /stateabsorb -cats1.
+  split; last smt().
+  congr; rewrite -addstateA; congr.
+   by congr; rewrite -chunk_cat_memread 1:// /#.
+  by rewrite chunkremains_cat_memread /#.
 rcondf 2; first by call (: true ==> true) => //.
-ecall (addstate_m_h Glob.mem st aT buf _LEN _TRAILB).
-(* STRATEGY: avx2 672-698.  Same chunk_cat_memread / chunkremains_cat_memread
-   reconciliation to `pabsorb_spec_ref _r8 (_l ++ memread _mem _buf _len)`, plus
-   `bytes2state_zext` for the (absent) trailing byte, and
-   `res.`2 = (size _l + _len) %% _r8` by `modzDml`/`modz_small`. *)
-auto => />; admit.
+ecall (addstate_m_h2 Glob.mem st aT buf _LEN _TRAILB).
+auto => |> &m ?? H.
+have Hr8: 0 < _r8 <= 200 by move: H; rewrite /pabsorb_spec_ref => [#].
+have Hat: 0 <= _at < _r8 by rewrite /_at; smt(modz_ge0 ltz_pmod).
+split; first by rewrite /lastlen; smt(modz_ge0 ltz_pmod).
+move => ????? [st' at' buf'] /= Est' Eat' Ebuf'.
+split.
+ move: H; rewrite /pabsorb_spec_ref => [[? H]]; split; first smt().
+ rewrite Est' H -addstateA; congr.
+  by rewrite -chunk_cat_memread /#.
+ rewrite -chunkremains_cat_memread 1..2:/#.
+ by rewrite -nseq1 bytes2state_zext.
+split.
+ rewrite Eat' b2i0 /lastlen /_at /=.
+ case: ( _r8 <= size _l %% _r8 + _len ) => C /=.
+  by rewrite modzDml.
+ by rewrite eq_sym -modzDml modz_small /#.
+smt().
 qed.
 
 phoare absorb_m_ph _l _mem _buf _len _tb _r8:
  [ M.__absorb_m
  : Glob.mem=_mem /\ aT=size _l %% _r8 /\ buf=_buf /\ _LEN=_len /\ _RATE8=_r8 /\ _TRAILB=_tb
  /\ pabsorb_spec_ref _r8 _l st
+ /\ 0 <= _tb < 256
  /\ 0 <= _len
  /\ _buf + _len < W64.modulus
  ==> Glob.mem = _mem
