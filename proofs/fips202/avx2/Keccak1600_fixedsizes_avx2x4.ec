@@ -678,9 +678,6 @@ apply (asubread_cat _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ H).
 by rewrite size_w64L_to_bytes /=.
 qed.
 
-abbrev st4x_xor64 (st: state4x) (x: int) (t: W64.t) : state4x =
- Array25.init (WArray800.get256 (WArray800.set64 (WArray800.init256 (fun i => st.[i])) x (WArray800.get64 (WArray800.init256 (fun i => st.[i])) x `^` t))).
-
 lemma asx4_step _st st b0 b1 b2 b3 _off _at _len _tb j at dlt len tb t0 t1 t2 t3 a0 d0 l0 e0 a1 d1 l1 e1 a2 d2 l2 e2 at' dlt' len' tb':
  0 <= j < 25 =>
  asx4_inv _st st b0 b1 b2 b3 _off _at _len _tb j at dlt len tb =>
@@ -702,25 +699,6 @@ split; first by move: (asx4_lane_step (st4x_get _st 0) (st4x_get st 0) b0 _off _
 split; first by move: (asx4_lane_step (st4x_get _st 1) (st4x_get st 1) b1 _off _at _len _tb ws1 at dlt len tb t1 at' dlt' len' tb'); rewrite Hs1; apply => //; smt().
 split; first by move: (asx4_lane_step (st4x_get _st 2) (st4x_get st 2) b2 _off _at _len _tb ws2 at dlt len tb t2 at' dlt' len' tb'); rewrite Hs2; apply => //; smt().
 by move: (asx4_lane_step (st4x_get _st 3) (st4x_get st 3) b3 _off _at _len _tb ws3 at dlt len tb t3 at' dlt' len' tb'); rewrite Hs3; apply => //; smt().
-qed.
-
-lemma st4x_get_bcast (st: state4x) j w k:
- 0 <= j < 25 => 0 <= k < 4 =>
- st4x_get (st.[j <- VPBROADCAST_4u64 w `^` st.[j]]) k = (st4x_get st k).[j <- (st4x_get st k).[j] `^` w].
-proof.
-move=> Hj Hk; apply Array25.ext_eq => i Hi; rewrite !st4x_getiE // !get_setE //; case: (i = j) => C //.
-+ by rewrite W4u64.xorb64E VPBROADCAST_4u64_bits64 // xorwC.
-by rewrite st4x_getiE.
-qed.
-
-lemma st4x_set256 (st: state4x) j x:
- 0 <= j < 25 =>
- Array25.init (WArray800.get256 (WArray800.set256_direct (WArray800.init256 (fun i => st.[i])) (32*j) (x `^` WArray800.get256_direct (WArray800.init256 (fun i => st.[i])) (32*j))))
- = st.[j <- x `^` st.[j]].
-proof.
-move=> Hj; have G : forall i, 0 <= i < 25 => WArray800.get256 (WArray800.init256 (fun i => st.[i])) i = st.[i].
-+ move=> i Hi; rewrite WArray800.get256E; apply W256.wordP => b Hb; rewrite W32u8.pack32wE 1:// W32u8.Pack.initiE 1:/# /= /WArray800.init256 WArray800.initiE 1:/# /= W32u8.bits8iE 1:/#; congr; smt().
-by apply Array25.ext_eq => i Hi; rewrite initiE //= get_set256E 1,2:/# get_setE //; case: (i = j) => C; rewrite ?C G.
 qed.
 
 lemma asx4_step_bcast _st st buf _off _at _len _tb j at dlt len tb t at' dlt' len' tb':
@@ -1439,19 +1417,6 @@ move=> Hm; apply W256.wordP => b Hb; rewrite /WArray800.get256_direct pack32E in
 by rewrite /WArray800.init256 WArray800.initiE 1:/# /= bits8iE 1:/#; congr; smt().
 qed.
 
-lemma st4x_get64_direct (st: state4x) m k:
- 0 <= m < 25 => 0 <= k < 4 =>
- WArray800.get64_direct (WArray800.init256 (fun i => st.[i])) (32*m + 8*k) = st.[m] \bits64 k.
-proof.
-move=> Hm Hk; apply W64.wordP => b Hb; rewrite /WArray800.get64_direct pack8E initiE 1:/# /= initiE 1:/# /=.
-by rewrite /WArray800.init256 WArray800.initiE 1:/# /= bits8iE 1:/# bits64iE 1:/#; congr; smt().
-qed.
-
-lemma stbytes_st4x (st: state4x) l j:
- 0 <= l < 4 => 0 <= j < 200 =>
- (stbytes (st4x_get st l)).[j] = st.[j %/ 8] \bits64 l \bits8 (j %% 8).
-proof. by move=> Hl Hj; rewrite /WArray200.init64 WArray200.initiE //= st4x_getiE // /#. qed.
-
 lemma dump_step256 (st: state4x) l (x: W256.t) (buf: W8.t A.t) off i:
  0 <= l < 4 => 0 <= i => i %% 8 = 0 => i + 32 <= 200 =>
  (forall q, 0 <= q < 4 => x \bits64 q = st.[i %/ 8 + q] \bits64 l) =>
@@ -1590,14 +1555,6 @@ seq 5: true => //.
 if => //.
 call  dumpstate_avx2x4_ll.
 by call keccakf1600_avx2x4_ll; auto => /#.
-qed.
-
-lemma st4x_get_iter k (st: state4x) l:
- 0 <= k => 0 <= l < 4 =>
- st4x_get (iter k keccak_f1600_x4 st) l = st_i (st4x_get st l) k.
-proof.
-move=> Hk Hl; elim: k Hk => [|k Hk IH]; first by rewrite /st_i !iter0.
-by rewrite iterS // /keccak_f1600_x4 st4x_get_map // IH /st_i iterS.
 qed.
 
 lemma sq_step (st: state4x) l r8 i n (b: W8.t A.t):
