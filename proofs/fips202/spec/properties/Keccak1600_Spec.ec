@@ -301,44 +301,6 @@ rewrite get_setE 1:/# ifF 1:/# initiE 1:/# /=.
 by rewrite bits8iE /#.
 qed.
 
-(*
-(* BDEP checks... *)
-module MM = {
- proc t1(st: state): state = {
-    var l;
-    l <- state2bytes st;
-    st <- bytes2state l;
-    return st;
-  }
- proc t2(st: state): state = {
-    st <- addratebitX 168 st;
-    return st;
-  }
-}.
-
-op idstate (st:state): state = st.
-op addrbit (st:state): state = addratebitX 168 st.
-op ppp (st:state): bool = true.
-hoare ttt1 _st:
- MM.t1
- : st = _st
- ==> res = _st.
-proc.
-cfold 1. (*obs: there's no native support for bytes... *)
-wp.
-bdep 1600 1600 [_st] [st] [st] idstate ppp.
-admitted.
-hoare ttt2 _st:
- MM.t2
- : st = _st
- ==> res = addratebitX 168 _st.
-proc.
-bdep 1600 1600 [_st] [st] [st] addrbit ppp.
-admitted.
-*)
-
-
-
 (* Absorbs a byte-list [m] into the state *)
 op stateabsorb st m = addstate st (bytes2state m).
 
@@ -619,6 +581,27 @@ proof.
 move=> Hr Hlen8.
 rewrite size_take' // ifT //.
 by rewrite size_squeezeblocks /#.
+qed.
+
+lemma nth_SQUEEZE1600 r8 len st i:
+ 0 < r8 <= 200 =>
+ 0 <= i < len =>
+ nth W8.zero (SQUEEZE1600 r8 len st) i
+ = (stbytes (st_i st (i %/ r8 + 1))).[i %% r8].
+proof.
+move=> Hr8 Hi; rewrite /SQUEEZE1600 nth_take 1..2:/# /squeezeblocks.
+rewrite (BitEncoding.BitChunking.nth_flatten W8.zero r8).
+ apply/List.allP => x /mapP [y [Hy ->]] /=.
+ by rewrite size_squeezestate_i /#.
+rewrite (nth_map 0).
+ rewrite size_iota; split; first smt().
+ move=> _; rewrite ltzE lez_maxr 1:/#.
+ rewrite StdOrder.IntOrder.ler_add2r.
+ smt(leq_div2r).
+rewrite /squeezestate_i /squeezestate nth_take 1..2:/#
+ state2bytesE; congr; congr; congr; congr.
+rewrite nth_iota; split; first smt().
+move=> _; rewrite ltzE; smt(leq_div2r).
 qed.
 
 lemma SQUEEZE1600_iblocks_last r8 st outlen8:

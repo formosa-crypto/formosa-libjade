@@ -57,7 +57,7 @@ lemma stavx2_packE w0 w1 w2 w3 w4 w5 w6 w7 w8 w9:
  stavx2_pack w0 w1 w2 w3 w4 w5 w6 w7 w8 w9
  = bytes2state (stavx2bytes_pack w0 w1 w2 w3 w4 w5 w6 w7 w8 w9).
 proof.
-rewrite /bytes2state /Wpack /w64L_from_bytes /chunkify.
+rewrite /bytes2state /w64L_from_bytes /chunkify.
 have ->/=: size
                 (u64bytes w0 ++ u256bytes w1 ++ u64bytes w2 ++
                  u256bytes w3 ++ u64bytes w4 ++ u256bytes w5 ++
@@ -94,76 +94,6 @@ require import BitEncoding.
 import BitChunking.
 
 
-
-lemma bytes2state_cat l1 l2:
- bytes2state (l1++l2)
- = addstate (bytes2state l1) (bytes2state (u8zeros (size l1)++l2)).
-proof.
-rewrite -bytes2stbytesP.
-have: bytes2stbytes (l1 ++ l2)
-      = stbytes (addstate (bytes2state l1) (bytes2state (u8zeros (size l1) ++ l2))).
- rewrite tP stbytes_addstate => i Hi.
- rewrite /addstbytes map2iE // -!bytes2stbytesP !stwordsK !get_of_list // !nth_cat size_nseq ler_maxr.
-  smt(size_ge0).
- case: (i < size l1) => C.
-  by rewrite nth_u8zeros.
- by rewrite (nth_out _ l1) 1:/#.
-by move => ->; rewrite stbytesK.
-qed.
- 
-(*
-lemma chunk1 ['a] r (l: 'a list):
- r <> 0 =>
- size l = r =>
- chunk r l = [l].
-proof.
-move=> Hr Hsz.
-by rewrite /chunk Hsz divzz Hr b2i1 mkseq1 /= drop0 -Hsz take_size.
-qed.
-*)
-
-lemma stateabsorb_iblocks_rcons l x st:
- stateabsorb_iblocks (rcons l x) st
- = keccak_f1600_op (stateabsorb (stateabsorb_iblocks l st) x).
-proof. by rewrite /stateabsorb_iblocks foldl_rcons /=. qed.
-
-lemma srspecP lw at l len tb:
- srpre 0 at l len tb =>
- at + len + b2i (tb<>0) <= size lw =>
- srspec lw 0 at l len tb =>
- bytes2state (u8zeros at ++ l ++ [W8.of_int tb])
- = bytes2state lw.
-proof.
-move=> Hpre Hat H.
-move: (H Hpre) => {H}[_ H].
-rewrite -!bytes2stbytesP; apply stbytes_inj; rewrite !stwordsK tP => i Hi.
-rewrite !get_of_list 1..2:// H ler_maxr 1:/# /=.
-rewrite -catA nth_cat size_nseq nth_u8zeros ler_maxr 1:/#.
-case: (i<at) => ?; first smt(nth_out).
-rewrite nth_cat nth_rcons.
-case: (i-at < size l) => ?.
- by rewrite ifT 1:/#.
-case: (i - at = size l) => ?; first smt().
-rewrite ifF /#.
-qed.
-
-lemma srspecP0 lw at l len tb:
- len=0 /\ tb=0 =>
- srpre 0 at l len tb =>
- srspec lw 0 at l len tb =>
- bytes2state (u8zeros at ++ l ++ [W8.of_int tb])
- = bytes2state lw.
-proof.
-move=> [-> ->] /> Hat Hsz.
-search (size _ = 0).
-have ->: l=[] by smt(size_eq0).
-move=> H; move: (H _); first smt().
-move => {H}[_ H].
-rewrite cats0 /= cats1 -nseqSr 1:/#.
-have ->: lw = u8zeros (size lw).
-apply (u8prefAt0 _ 0 at [] 0); first 2 smt(nseq0).
-by rewrite -cat0s bytes2state_zext eq_sym -cat0s bytes2state_zext.
-qed.
 
 (*  msubread *)
 
@@ -713,79 +643,6 @@ phoare absorb_m_avx2_ph _mem _l _buf _len _r8 _tb:
 proof. by conseq absorb_m_avx2_ll (absorb_m_avx2_h _mem _l _buf _len _r8 _tb). qed.
 
 
-(*
-   ONE-SHOT (FIXED-SIZE) MEMORY SQUEEZE
-   ====================================
-*)
-
-lemma dumpstate_m_avx2_ll: islossless M.__dumpstate_m_avx2
- by islossless.
-
-hoare dumpstate_m_avx2_h _mem _buf _len _st:
- M.__dumpstate_m_avx2
- : Glob.mem=_mem /\ buf=_buf /\ _LEN=_len /\ st=_st
- /\ 0 <= _len <= 200
- /\ _buf + _len < W64.modulus
- ==> Glob.mem = stores _mem _buf (sub (stbytes (stavx2_to_st25 _st)) 0 _len)
-  /\ res = _buf + _len.
-proof.
-proc => /=.
-admitted.
-
-phoare dumpstate_m_avx2_ph _mem _buf _len _st:
- [ M.__dumpstate_m_avx2
- : Glob.mem=_mem /\ buf=_buf /\ _LEN=_len /\ st=_st
- /\ 0 <= _len <= 200
- /\ _buf + _len < W64.modulus
- ==> Glob.mem = stores _mem _buf (sub (stbytes (stavx2_to_st25 _st)) 0 _len)
-  /\ res = _buf + _len
- ] = 1%r.
-proof.
-by conseq dumpstate_m_avx2_ll (dumpstate_m_avx2_h _mem _buf _len _st).
-qed.
-
-lemma squeeze_m_avx2_ll: islossless M.__squeeze_m_avx2.
-proof.
-proc.
-seq 4: true => //.
- while true (iTERS-i).
-  move=> z.
-  wp; call dumpstate_m_avx2_ll.
-  call keccakf1600_avx2_ll.
-  by auto => /#.
- auto => /#.
-if => //.
-call dumpstate_m_avx2_ll.
-call keccakf1600_avx2_ll.
-by auto.
-qed.
-
-hoare squeeze_m_avx2_h _mem _buf _len _st _r8:
- M.__squeeze_m_avx2
- : Glob.mem=_mem /\ buf=_buf /\ _LEN=_len /\ st=_st /\ _RATE8=_r8
- /\ 0 <= _len
- /\ 0 < _r8 <= 200
- /\ _buf + _len < W64.modulus
- ==> Glob.mem = stores _mem _buf (SQUEEZE1600 _r8 _len (stavx2_to_st25 _st))
-  /\ res = stavx2_from_st25 (st_i (stavx2_to_st25 _st) ((_len-1) %/ _r8 + 1)).
-proof.
-proc.
-admitted.
-
-phoare squeeze_m_avx2_ph _mem _buf _len _st _r8:
- [ M.__squeeze_m_avx2
- : Glob.mem=_mem /\ buf=_buf /\ _LEN=_len /\ st=_st /\ _RATE8=_r8
- /\ 0 <= _len
- /\ 0 < _r8 <= 200
- /\ _buf + _len < W64.modulus
- ==> Glob.mem = stores _mem _buf (SQUEEZE1600 _r8 _len (stavx2_to_st25 _st))
-  /\ res = stavx2_from_st25 (st_i (stavx2_to_st25 _st) ((_len-1) %/ _r8 + 1))
- ] = 1%r.
-proof.
-by conseq squeeze_m_avx2_ll (squeeze_m_avx2_h _mem _buf _len _st _r8).
-qed.
-
-
 
 abstract theory KeccakArrayAvx2.
 
@@ -807,125 +664,6 @@ clone import ReadWriteArray as RW
       theory WA <- WA
       proof _ASIZE_ge0 by exact _ASIZE_ge0
       proof _ASIZE_u64 by exact _ASIZE_u64.
-
-
-(* TODO: move/refactor this to somewhere else *)
-
-lemma take_to_list (buf: W8.t A.t) sz:
- sz <= _ASIZE =>
- take sz (A.to_list buf) = sub buf 0 sz.
-proof.
-move=> Hsz; case: (0 <= sz) => C.
- by rewrite take_mkseq //.
-by rewrite take_le0 1:/# /sub mkseq0_le /#.
-qed.
-
-lemma drop_to_list (buf: W8.t A.t) sz:
- 0 <= sz =>
- drop sz (A.to_list buf) = sub buf sz (_ASIZE-sz).
-proof.
-move=> Hsz; case: (sz < _ASIZE) => C.
- rewrite drop_mkseq 1:/#.
- apply eq_mkseq => x.
- by rewrite /(\o) /=.
-by rewrite drop_oversize ?size_to_list 1:/# /sub mkseq0_le 1:/#.
-qed.
-
-lemma chunk_cat_buf r8 l (buf: W8.t A.t):
- let at = size l %% r8 in
- let lastpos = (at + _ASIZE) %/ r8 * r8 - at in
- 0 < r8 =>
- chunk r8 (l ++ to_list buf)
- = chunk r8 (l ++ sub buf 0 lastpos).
-proof.
-move=> /= H.
-rewrite !(chunk_cat' l) /= 1..2:/# /=; congr.
-rewrite chunk_take_eq 1:/# size_cat size_chunkremains size_to_list.
-rewrite take_cat' !size_chunkremains.
-case: (r8 <= size l %% r8 + _ASIZE) => C.
- rewrite ifF 1:/#; congr; congr.
- by rewrite take_to_list /#.
-rewrite divz_small /=; first smt(size_ge0 _ASIZE_ge0).
-rewrite ifT; first smt(size_ge0).
-rewrite take0 /sub mkseq0_le 1:/# cats0.
-by rewrite eq_sym chunk_take_eq 1:/# size_chunkremains divz_small 1:/# take0.
-qed.
-
-lemma sub0' (buf: W8.t A.t) off len:
- len <= 0 =>
- sub buf off len = [].
-proof. by move=> ?; rewrite /sub mkseq0_le. qed.
-
-lemma chunkremains_cat_buf r8 l (buf: W8.t A.t) tb:
- let at = size l %% r8 in
- let lastpos = (at + _ASIZE) %/ r8 * r8 - at in
- let lastlen = if r8 <= at + _ASIZE then (at + _ASIZE) %% r8 else _ASIZE in
- 0 < r8 =>
- bytes2state (chunkremains r8 (l ++ to_list buf) ++ [tb])
- = addstate
-    (bytes2state (chunkremains r8 (l ++ sub buf 0 lastpos)))
-    (bytes2state (u8zeros (if r8 <= size l %% r8 + _ASIZE then 0 else size l %% r8)
-                 ++ sub buf (_ASIZE - lastlen) lastlen ++ [tb])).
-proof.
-move=> at lastpos lastlen H.
-case: (r8 <= at + _ASIZE) => C.
- rewrite eq_sym chunkremains_cat 1:/# eq_sym chunkremains_cat 1:/#.
- rewrite /chunkremains !drop_cat !size_cat !size_to_list !size_sub 1:/#.
- rewrite !size_drop; first smt(size_ge0).
- rewrite ifF 1:/# ifF 1:/#.
- have ->: (size l - size l %/ r8 * r8) = size l %% r8 by smt().
- rewrite eq_sym drop_oversize 1:size_sub 1..2:/#.
- rewrite nseq0_le 1:/# /=.
- rewrite drop_to_list 1:/# bytes2state0 addstate_st0; congr; congr.
- by rewrite /lastlen C /= ler_maxr /#. 
-rewrite {1}/A.sub mkseq0_le 1:/# cats0.
-rewrite chunkremains_cat 1:// chunkremains_small.
- by rewrite size_cat size_chunkremains size_to_list /#.
-rewrite -!catA bytes2state_cat; congr; congr; congr.
- by rewrite size_chunkremains /#. 
-rewrite /to_list /sub /=; congr; smt().
-qed.
-
-lemma sub_split len' (buf: W8.t A.t) off len:
- 0 <= len' <= len =>
- sub buf off len = sub buf off len' ++ sub buf (off+len') (len-len').
-proof.
-move=> Hlen.
-rewrite (:len=len'+(len-len')) 1:/# /sub mkseq_add 1..2:/#; congr.
-rewrite (:len' + (len - len') - len'=len-len') 1:/#.
-by apply eq_mkseq => i /= /#.
-qed.
-
-(* end TODO *)
-
-op asubread_pre (cur at off dlt len tb: int): bool = 
- 0<=cur /\ 0<=at /\ 0<=off /\ 0<=dlt /\ 0<=len /\ 0<=tb<256 /\
- off + dlt + len <= _ASIZE /\
- at + len + b2i(tb<>0) <= 200.
-
-lemma asubreadP buf off lw at dlt len tb at1 dlt1 len1 tb1:
- asubread_pre 0 at off dlt len tb =>
- (at+len+b2i(tb<>0) <= size lw) \/ len1=0 /\ tb1=0 =>
- asubread buf off lw 0 at dlt len tb at1 dlt1 len1 tb1 =>
- bytes2state (u8zeros at ++ sub buf (off+dlt) len ++ [of_int tb])
- = bytes2state lw
- /\ at1 = at + len + b2i (tb<>0)
- /\ dlt1 = dlt + len
- /\ len1 = 0
- /\ tb1 = 0.
-proof.
-move => /> ???????? Hlw H; split; last smt().
-move: (H _); first smt().
-move=> {H}H.
-case: (at <= size lw) => C; last first.
- have Elen: len=0 by smt().
- have Etb: tb=0 by smt().
- apply (srspecP0 _ _ _ _ _ _ _ H); first smt().
- by move=> />; rewrite Elen size_sub /#.
-have HHlw: at + len + b2i (tb <> 0) <= size lw by smt().
-apply (srspecP _ _ _ _ _ _ _ H) => //.
-by rewrite /srpre size_sub 1:/# /#.
-qed.
 
 module MM = {
   proc __addstate_avx2 (st:W256.t Array7.t, aT:int, buf:W8.t A.t,
@@ -1720,6 +1458,62 @@ qed.
 lemma dumpstate_avx2_ll: islossless MM.__dumpstate_avx2
  by islossless.
 
+lemma dmp_step (s: state) (lw: W8.t list) (buf b': W8.t A.t) off d len d' len':
+ 0 <= d => 0 <= len => d + min (size lw) len <= 200 =>
+ (forall k, 0 <= k < min (size lw) len => lw.[k] = s.[(d + k) %/ 8] \bits8 ((d + k) %% 8)) =>
+ asubwrite (A.fill (fun i => (stbytes s).[i - off]) off d buf) b' off lw d len d' len' =>
+ b' = A.fill (fun i => (stbytes s).[i - off]) off d' buf /\ d' = d + min (size lw) len /\ len' = len - min (size lw) len.
+proof.
+move=> Hd Hl Hb H A; have := asubwrite_fill_step _ _ _ _ _ _ _ _ _ Hd _ A; last by rewrite (: max 0 len = len) 1:/#.
+by move=> k Hk /=; rewrite (: off + d + k - off = d + k) 1:/# stbytes_get 1:/#; apply H; smt().
+qed.
+
+lemma dmp_words (st: W256.t Array7.t):
+    st.[0] \bits64 0 = (stavx2_to_st25 st).[0]
+ /\ (forall q, 0 <= q < 4 => st.[1] \bits64 q = (stavx2_to_st25 st).[1 + q])
+ /\ truncateu64 (VEXTRACTI128 st.[2] W8.one) = (stavx2_to_st25 st).[5]
+ /\ (forall q, 0 <= q < 4 => VPBLENDD_256 (VPBLENDD_256 st.[3] st.[4] (W8.of_int 240)) (VPBLENDD_256 st.[6] st.[5] (W8.of_int 240)) (W8.of_int 195) \bits64 q = (stavx2_to_st25 st).[6 + q])
+ /\ truncateu64 (truncateu128 st.[2]) = (stavx2_to_st25 st).[10]
+ /\ (forall q, 0 <= q < 4 => VPBLENDD_256 (VPBLENDD_256 st.[6] st.[5] (W8.of_int 240)) (VPBLENDD_256 st.[4] st.[3] (W8.of_int 240)) (W8.of_int 195) \bits64 q = (stavx2_to_st25 st).[11 + q])
+ /\ VEXTRACTI128 st.[2] W8.one \bits64 1 = (stavx2_to_st25 st).[15]
+ /\ (forall q, 0 <= q < 4 => VPBLENDD_256 (VPBLENDD_256 st.[5] st.[6] (W8.of_int 240)) (VPBLENDD_256 st.[3] st.[4] (W8.of_int 240)) (W8.of_int 195) \bits64 q = (stavx2_to_st25 st).[16 + q])
+ /\ truncateu128 st.[2] \bits64 1 = (stavx2_to_st25 st).[20]
+ /\ (forall q, 0 <= q < 4 => VPBLENDD_256 (VPBLENDD_256 st.[4] st.[3] (W8.of_int 240)) (VPBLENDD_256 st.[5] st.[6] (W8.of_int 240)) (W8.of_int 195) \bits64 q = (stavx2_to_st25 st).[21 + q]).
+proof.
+do !split; try (move=> q Hq; (have : q = 0 \/ q = 1 \/ q = 2 \/ q = 3 by smt()); case => [->|[->|[->|->]]] /=);
+ by rewrite /stavx2_to_st25 get_of_list //=; circuit.
+qed.
+
+op dmp_inv (buf _buf: W8.t A.t) (off len: int) (s: state) (w dlt l: int) =
+ buf = A.fill (fun i => (stbytes s).[i - off]) off dlt _buf /\ dlt = min (8 * w) len /\ l = len - dlt.
+
+lemma dmp_inv_step (s: state) (buf _buf b': W8.t A.t) off len w c (lw: W8.t list) d l d' l':
+ 0 <= w => 0 <= c => 8 * (w + c) <= 200 => 0 <= len =>
+ dmp_inv buf _buf off len s w d l =>
+ size lw = 8 * c =>
+ (forall k, 0 <= k < min (8 * c) l => lw.[k] = s.[w + k %/ 8] \bits8 (k %% 8)) =>
+ asubwrite buf b' off lw d l d' l' =>
+ dmp_inv b' _buf off len s (w + c) d' l'.
+proof.
+move=> Hw Hc Hb Hl; rewrite /dmp_inv => [#] -> -> -> Hs H A.
+have := dmp_step s lw _buf b' off (min (8 * w) len) (len - min (8 * w) len) d' l' _ _ _ _ A; 1..3: smt().
++ by move=> k Hk; rewrite H 1:/# (: min (8 * w) len = 8 * w) 1:/# (: (8 * w + k) %/ 8 = w + k %/ 8) 1:/# (: (8 * w + k) %% 8 = k %% 8) 1:/#.
+by rewrite Hs => [#] -> -> ->; smt().
+qed.
+
+lemma dmp_inv_skip (s: state) (buf _buf: W8.t A.t) off len w w' d l:
+ l <= 0 => w <= w' => dmp_inv buf _buf off len s w d l => dmp_inv buf _buf off len s w' d l.
+proof. by rewrite /dmp_inv => Hl Hw [#] -> Ed El; smt(). qed.
+
+lemma dmp_b64 (s: state) (t: W64.t) w l:
+ t = s.[w] => forall k, 0 <= k < min 8 l => (u64bytes t).[k] = s.[w + k %/ 8] \bits8 (k %% 8).
+proof. by move=> -> k Hk; rewrite get_u64bytes (divz_small k 8) 1:/# (modz_small k 8) 1:/#. qed.
+
+lemma dmp_b256 (s: state) (x: W256.t) w l:
+ (forall q, 0 <= q < 4 => x \bits64 q = s.[w + q]) =>
+ forall k, 0 <= k < min 32 l => (u256bytes x).[k] = s.[w + k %/ 8] \bits8 (k %% 8).
+proof. by move=> Hx k Hk; rewrite get_u256bytes bits8_256_bits64 1:/# Hx 1:/#. qed.
+
 hoare dumpstate_avx2_h _buf _off _len _st:
  MM.__dumpstate_avx2
  : buf=_buf /\ offset=_off /\ _LEN=_len /\ st=_st
@@ -1727,8 +1521,112 @@ hoare dumpstate_avx2_h _buf _off _len _st:
  ==> res.`1 = A.fill (fun i=>(stbytes (stavx2_to_st25 _st)).[i-_off]) _off _len _buf
   /\ res.`2 = _off + _len.
 proof.
-proc => /=.
-admitted.
+proc => /=; have W := dmp_words _st.
+seq 2 : (dmp_inv buf _buf _off _len (stavx2_to_st25 _st) 1 dELTA _LEN /\ offset = _off /\ st = _st /\ 0 <= _len <= 200).
++ sp; if.
+  + wp; ecall (a_ilen_write_upto32_h buf offset dELTA 8 st.[0]); skip => &hr [#] -> -> -> -> -> H0 H1 H8 r R /=.
+    have E0 : A.fill (fun i => (stbytes (stavx2_to_st25 _st)).[i - _off]) _off 0 _buf = _buf by rewrite A.fillE; apply A.tP => i Hi; rewrite A.initiE //= /#.
+    have S32 : size (u256bytes _st.[0]) = 32 by rewrite /u256bytes size_to_list.
+    move: R; rewrite -{1}E0 => R; have := dmp_step (stavx2_to_st25 _st) (u256bytes _st.[0]) _buf r.`1 _off 0 8 r.`2 r.`3 _ _ _ _ R; rewrite ?S32 //.
+    + by move=> k Hk; rewrite get_u256bytes bits8_256_bits64 1:/# /= (divz_small k 8) 1:/# (modz_small k 8) 1:/#; case: W => -> _.
+    by move=> [#] E1 E2 _; rewrite /dmp_inv E1 E2 /=; smt().
+  ecall (a_ilen_write_upto32_h buf offset dELTA _LEN st.[0]); skip => &hr [#] -> -> -> -> -> H0 H1 H8 r R /=.
+  have E0 : A.fill (fun i => (stbytes (stavx2_to_st25 _st)).[i - _off]) _off 0 _buf = _buf by rewrite A.fillE; apply A.tP => i Hi; rewrite A.initiE //= /#.
+  have S32 : size (u256bytes _st.[0]) = 32 by rewrite /u256bytes size_to_list.
+  move: R; rewrite -{1}E0 => R; have := dmp_step (stavx2_to_st25 _st) (u256bytes _st.[0]) _buf r.`1 _off 0 _len r.`2 r.`3 _ _ _ _ R; rewrite ?S32 //; first smt().
+  + by move=> k Hk; rewrite get_u256bytes bits8_256_bits64 1:/# /= (divz_small k 8) 1:/# (modz_small k 8) 1:/#; case: W => -> _.
+  by move=> [#] E1 E2 E3; rewrite /dmp_inv E1 E2 E3 /=; smt().
+seq 1 : (dmp_inv buf _buf _off _len (stavx2_to_st25 _st) 5 dELTA _LEN /\ offset = _off /\ st = _st /\ 0 <= _len <= 200).
++ ecall (a_ilen_write_upto32_h buf offset dELTA _LEN st.[1]); skip => &hr [#] Hinv -> -> H0 H1 r R; split => //.
+  have /= := dmp_inv_step _ _ _ _ _ _ 1 4 _ _ _ _ _ _ _ _ _ Hinv _ _ R; 1..4: done.
+  + by rewrite /u256bytes size_to_list.
+  + move=> /=; apply dmp_b256; have [_ [W1 _]] := W; exact W1.
+  done.
+seq 1 : (dmp_inv buf _buf _off _len (stavx2_to_st25 _st) 25 dELTA _LEN /\ offset = _off /\ 0 <= _len <= 200); last first.
++ by wp; skip => &hr [#]; rewrite /dmp_inv => [#] -> -> _ -> H0 H1; split; [congr; smt() | smt()].
+if; last first.
++ by skip => &hr [#] Hinv -> _ H0 H1 Hc; split => //; apply (dmp_inv_skip _ _ _ _ _ 5 25 _ _ _ _ Hinv); smt().
+seq 5 : (dmp_inv buf _buf _off _len (stavx2_to_st25 _st) 6 dELTA _LEN /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
+         /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] W8.one) (VEXTRACTI128 _st.[2] W8.one) /\ t128_0 = truncateu128 _st.[2]).
++ wp; ecall (a_ilen_write_upto8_h buf offset dELTA _LEN t); wp; skip => &hr [#] Hinv -> -> H0 H1 Hc /= r R; split => //.
+  have /= := dmp_inv_step _ _ _ _ _ _ 5 1 _ _ _ _ _ _ _ _ _ Hinv _ _ R; 1..4: done.
+  + by rewrite /u64bytes size_to_list.
+  + move=> /=; apply dmp_b64; have [_ [_ [W5 _]]] := W; by rewrite /MOVV_64.
+  done.
+if; last first.
++ by skip => &hr [#] Hinv -> _ H0 H1 _ _ Hc; split => //; apply (dmp_inv_skip _ _ _ _ _ 6 25 _ _ _ _ Hinv); smt().
+seq 6 : (dmp_inv buf _buf _off _len (stavx2_to_st25 _st) 10 dELTA _LEN /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
+         /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] W8.one) (VEXTRACTI128 _st.[2] W8.one) /\ t128_0 = truncateu128 _st.[2]
+         /\ t256_0 = VPBLENDD_256 _st.[3] _st.[4] (W8.of_int 240) /\ t256_1 = VPBLENDD_256 _st.[4] _st.[3] (W8.of_int 240)
+         /\ t256_2 = VPBLENDD_256 _st.[5] _st.[6] (W8.of_int 240) /\ t256_3 = VPBLENDD_256 _st.[6] _st.[5] (W8.of_int 240)).
++ ecall (a_ilen_write_upto32_h buf offset dELTA _LEN t256_4); wp; skip => &hr [#] Hinv -> -> H0 H1 -> -> Hc /= r R.
+  split => //; have /= := dmp_inv_step _ _ _ _ _ _ 6 4 _ _ _ _ _ _ _ _ _ Hinv _ _ R; 1..4: done.
+  + by rewrite /u256bytes size_to_list.
+  + move=> /=; apply dmp_b256; have [_ [_ [_ [W6 _]]]] := W; exact W6.
+  done.
+seq 1 : (dmp_inv buf _buf _off _len (stavx2_to_st25 _st) 11 dELTA _LEN /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
+         /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] W8.one) (VEXTRACTI128 _st.[2] W8.one)
+         /\ t256_0 = VPBLENDD_256 _st.[3] _st.[4] (W8.of_int 240) /\ t256_1 = VPBLENDD_256 _st.[4] _st.[3] (W8.of_int 240)
+         /\ t256_2 = VPBLENDD_256 _st.[5] _st.[6] (W8.of_int 240) /\ t256_3 = VPBLENDD_256 _st.[6] _st.[5] (W8.of_int 240)
+         /\ (0 < _LEN => t128_0 = VPUNPCKH_2u64 (truncateu128 _st.[2]) (truncateu128 _st.[2]))).
++ if; last by skip => &hr [#] Hinv -> -> H0 H1 -> _ -> -> -> -> Hc /=; split; [apply (dmp_inv_skip _ _ _ _ _ 10 11 _ _ _ _ Hinv); smt() | smt()].
+  wp; ecall (a_ilen_write_upto8_h buf offset dELTA _LEN t); wp; skip => &hr [#] Hinv -> -> H0 H1 -> -> -> -> -> -> Hc /= r R; split => //.
+  have /= := dmp_inv_step _ _ _ _ _ _ 10 1 _ _ _ _ _ _ _ _ _ Hinv _ _ R; 1..4: done.
+  + by rewrite /u64bytes size_to_list.
+  + move=> /=; apply dmp_b64; have [_ [_ [_ [_ [W10 _]]]]] := W; by rewrite /MOVV_64.
+  done.
+seq 1 : (dmp_inv buf _buf _off _len (stavx2_to_st25 _st) 15 dELTA _LEN /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
+         /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] W8.one) (VEXTRACTI128 _st.[2] W8.one)
+         /\ t256_0 = VPBLENDD_256 _st.[3] _st.[4] (W8.of_int 240) /\ t256_1 = VPBLENDD_256 _st.[4] _st.[3] (W8.of_int 240)
+         /\ t256_2 = VPBLENDD_256 _st.[5] _st.[6] (W8.of_int 240) /\ t256_3 = VPBLENDD_256 _st.[6] _st.[5] (W8.of_int 240)
+         /\ (0 < _LEN => t128_0 = VPUNPCKH_2u64 (truncateu128 _st.[2]) (truncateu128 _st.[2]))).
++ if; last by skip => &hr [#] Hinv -> -> H0 H1 -> -> -> -> -> HT Hc /=; split; [apply (dmp_inv_skip _ _ _ _ _ 11 15 _ _ _ _ Hinv); smt() | smt()].
+  ecall (a_ilen_write_upto32_h buf offset dELTA _LEN t256_4); wp; skip => &hr [#] Hinv -> -> H0 H1 -> -> -> -> -> HT Hc /= r R.
+  split; first (have /= := dmp_inv_step _ _ _ _ _ _ 11 4 _ _ _ _ _ _ _ _ _ Hinv _ _ R; 1..4: done).
+  + by rewrite /u256bytes size_to_list.
+  + move=> /=; apply dmp_b256; have [_ [_ [_ [_ [_ [W11 _]]]]]] := W; exact W11.
+  + done.
+  smt().
+seq 1 : (dmp_inv buf _buf _off _len (stavx2_to_st25 _st) 16 dELTA _LEN /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
+         /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] W8.one) (VEXTRACTI128 _st.[2] W8.one)
+         /\ t256_0 = VPBLENDD_256 _st.[3] _st.[4] (W8.of_int 240) /\ t256_1 = VPBLENDD_256 _st.[4] _st.[3] (W8.of_int 240)
+         /\ t256_2 = VPBLENDD_256 _st.[5] _st.[6] (W8.of_int 240) /\ t256_3 = VPBLENDD_256 _st.[6] _st.[5] (W8.of_int 240)
+         /\ (0 < _LEN => t128_0 = VPUNPCKH_2u64 (truncateu128 _st.[2]) (truncateu128 _st.[2]))).
++ if; last by skip => &hr [#] Hinv -> -> H0 H1 -> -> -> -> -> HT Hc /=; split; [apply (dmp_inv_skip _ _ _ _ _ 15 16 _ _ _ _ Hinv); smt() | smt()].
+  wp; ecall (a_ilen_write_upto8_h buf offset dELTA _LEN t); wp; skip => &hr [#] Hinv -> -> H0 H1 -> -> -> -> -> HT Hc /= r R.
+  split; first (have /= := dmp_inv_step _ _ _ _ _ _ 15 1 _ _ _ _ _ _ _ _ _ Hinv _ _ R; 1..4: done).
+  + by rewrite /u64bytes size_to_list.
+  + move=> /=; apply dmp_b64; have [_ [_ [_ [_ [_ [_ [W15 _]]]]]]] := W; by rewrite /MOVV_64 truncateu64_unpackh.
+  + done.
+  smt().
+seq 1 : (dmp_inv buf _buf _off _len (stavx2_to_st25 _st) 20 dELTA _LEN /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
+         /\ t256_0 = VPBLENDD_256 _st.[3] _st.[4] (W8.of_int 240) /\ t256_1 = VPBLENDD_256 _st.[4] _st.[3] (W8.of_int 240)
+         /\ t256_2 = VPBLENDD_256 _st.[5] _st.[6] (W8.of_int 240)
+         /\ (0 < _LEN => t128_0 = VPUNPCKH_2u64 (truncateu128 _st.[2]) (truncateu128 _st.[2]))).
++ if; last by skip => &hr [#] Hinv -> -> H0 H1 _ -> -> -> _ HT Hc /=; split; [apply (dmp_inv_skip _ _ _ _ _ 16 20 _ _ _ _ Hinv); smt() | smt()].
+  ecall (a_ilen_write_upto32_h buf offset dELTA _LEN t256_4); wp; skip => &hr [#] Hinv -> -> H0 H1 _ -> -> -> _ HT Hc /= r R.
+  split; first (have /= := dmp_inv_step _ _ _ _ _ _ 16 4 _ _ _ _ _ _ _ _ _ Hinv _ _ R; 1..4: done).
+  + by rewrite /u256bytes size_to_list.
+  + move=> /=; apply dmp_b256; have [_ [_ [_ [_ [_ [_ [_ [W16 _]]]]]]]] := W; exact W16.
+  + done.
+  smt().
+seq 1 : (dmp_inv buf _buf _off _len (stavx2_to_st25 _st) 21 dELTA _LEN /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
+         /\ t256_1 = VPBLENDD_256 _st.[4] _st.[3] (W8.of_int 240) /\ t256_2 = VPBLENDD_256 _st.[5] _st.[6] (W8.of_int 240)).
++ if; last by skip => &hr [#] Hinv -> -> H0 H1 _ -> -> HT Hc /=; split; [apply (dmp_inv_skip _ _ _ _ _ 20 21 _ _ _ _ Hinv); smt() | smt()].
+  wp; ecall (a_ilen_write_upto8_h buf offset dELTA _LEN t); wp; skip => &hr [#] Hinv -> -> H0 H1 _ -> -> HT Hc /= r R.
+  move: R; rewrite (HT Hc) => R; split; first (have /= := dmp_inv_step _ _ _ _ _ _ 20 1 _ _ _ _ _ _ _ _ _ Hinv _ _ R; 1..4: done).
+  + by rewrite /u64bytes size_to_list.
+  + move=> /=; apply dmp_b64; have [_ [_ [_ [_ [_ [_ [_ [_ [W20 _]]]]]]]]] := W; by rewrite /MOVV_64 truncateu64_unpackh.
+  + done.
+  smt().
+if; last by skip => &hr [#] Hinv -> _ H0 H1 _ _ Hc /=; split; [apply (dmp_inv_skip _ _ _ _ _ 21 25 _ _ _ _ Hinv); smt() | smt()].
+ecall (a_ilen_write_upto32_h buf offset dELTA _LEN t256_4); wp; skip => &hr [#] Hinv -> _ H0 H1 -> -> Hc /= r R.
+split; first (have /= := dmp_inv_step _ _ _ _ _ _ 21 4 _ _ _ _ _ _ _ _ _ Hinv _ _ R; 1..4: done).
++ by rewrite /u256bytes size_to_list.
++ move=> /=; apply dmp_b256; have [_ [_ [_ [_ [_ [_ [_ [_ [_ W21]]]]]]]]] := W; exact W21.
++ done.
+smt().
+qed.
 
 phoare dumpstate_avx2_ph _buf _off _len _st:
  [ MM.__dumpstate_avx2
@@ -1761,16 +1659,54 @@ hoare squeeze_avx2_h _buf _st _r8:
  MM.__squeeze_avx2
  : buf=_buf /\ st=_st /\ _RATE8=_r8
  /\ 0 < _r8 <= 200
+ /\ stavx2INV _st
  ==> res.`1 = stavx2_from_st25 (st_i (stavx2_to_st25 _st) ((_ASIZE-1) %/ _r8 + 1))
      /\ res.`2 = of_list W8.zero (SQUEEZE1600 _r8 _ASIZE (stavx2_to_st25 _st)).
 proof.
-proc.
-admitted.
+proc; have ?:= _ASIZE_ge0; pose S := stavx2_to_st25 _st.
+seq 6 : (offset = i * _r8 /\ i = _ASIZE %/ _r8 /\ st = stavx2_from_st25 (st_i S i) /\ buf = A.fill (fun j => (SQUEEZE1600 _r8 _ASIZE S).[j]) 0 (i * _r8) _buf /\ _RATE8 = _r8 /\ 0 < _r8 <= 200 /\ lO = _ASIZE %% _r8).
++ while (0 <= i <= iTERS /\ iTERS = _ASIZE %/ _r8 /\ offset = i * _r8 /\ st = stavx2_from_st25 (st_i S i) /\ buf = A.fill (fun j => (SQUEEZE1600 _r8 _ASIZE S).[j]) 0 (i * _r8) _buf /\ _RATE8 = _r8 /\ 0 < _r8 <= 200 /\ lO = _ASIZE %% _r8).
+  + wp; ecall (dumpstate_avx2_h buf offset _RATE8 st); ecall (keccakf1600_avx2_h (st_i S i)); skip => &hr [#] Hi0 Hi1 -> -> -> -> -> Hr0 Hr1 -> Hc /=.
+    move=> _ ->; rewrite stavx2_from_st25K; have -> : keccak_f1600_op (st_i S i{hr}) = st_i S (i{hr} + 1) by rewrite /st_i iterS.
+    have Hb : (i{hr} + 1) * _r8 <= _ASIZE by apply (ler_trans (_ASIZE %/ _r8 * _r8)); [by apply ler_wpmul2r; smt() | by apply lez_floor; smt()].
+    split; first smt().
+    move=> _ r [#] -> ->; rewrite (: (i{hr} + 1) * _r8 = i{hr} * _r8 + _r8) 1:/#; have /= -> // := rsq_step_len S _r8 _ASIZE i{hr} _r8 _buf; smt().
+  auto => &hr [#] /= -> -> -> Hr0 Hr1 Hinv.
+  split; last smt().
+  rewrite /st_i iter0 //= /S stavx2_to_st25K //=; split; first smt(divz_ge0).
+  by split; [rewrite A.fillE; apply A.tP => j Hj; rewrite A.initiE //= /# | smt()].
+have FL : forall (b: W8.t A.t), A.fill (nth W8.zero (SQUEEZE1600 _r8 _ASIZE S)) 0 _ASIZE b = A.of_list W8.zero (SQUEEZE1600 _r8 _ASIZE S).
++ by move=> b; rewrite A.fillE; apply A.tP => j Hj; rewrite A.initiE //= A.get_of_list // ifT /#.
+if; last first.
++ skip => &hr [#] _ Ei Es Eb Er Hr0 Hr1 Hl /=; rewrite Es Eb Ei.
+  move=> Hc0; have Ea : _ASIZE %/ _r8 * _r8 = _ASIZE.
+  + by have := divz_eq _ASIZE _r8; have := modz_ge0 _ASIZE _r8 _; [smt() | clear FL Eb; smt()].
+  have Hr0' : _r8 <> 0 by move: Hr0; apply contraL => ->.
+  have E1 : _ASIZE - 1 = (_ASIZE %/ _r8 - 1) * _r8 + (_r8 - 1) by rewrite -{1}Ea; ring.
+  have Hs : 0 <= _r8 - 1 < `|_r8| by rewrite ger0_norm 1:ltzW //; split; [move: Hr0; rewrite -ltzS //= | move=> _; rewrite ltzE].
+  have Ei' : (_ASIZE - 1) %/ _r8 + 1 = _ASIZE %/ _r8 by rewrite E1 divzMDl // (divz_small _ _ Hs); ring.
+  by move: FL; rewrite /S => FL; rewrite Ea Ei' /= FL.
+ecall (dumpstate_avx2_h buf offset lO st); ecall (keccakf1600_avx2_h (st_i S (_ASIZE %/ _r8))); skip => &hr [#] -> -> -> -> Er Hr0 Hr1 -> Hl /=.
+move=> _ ->; rewrite stavx2_from_st25K; have -> : keccak_f1600_op (st_i S (_ASIZE %/ _r8)) = st_i S (_ASIZE %/ _r8 + 1) by rewrite /st_i iterS // divz_ge0.
+have Ea : _ASIZE %/ _r8 * _r8 + _ASIZE %% _r8 = _ASIZE by rewrite -divz_eq.
+have Hm : 0 <= _ASIZE %% _r8 < _r8 by split; [apply modz_ge0; move: Hr0; apply contraL => -> | move=> _; apply ltz_pmod].
+split; first by move: Hm Hr1; clear FL; smt().
+move=> _ r [#] -> _; have Hs : 0 <= _ASIZE %% _r8 - 1 < `|_r8| by move: Hm Hl Hr0; clear FL; smt().
+have E1 : _ASIZE - 1 = _ASIZE %/ _r8 * _r8 + (_ASIZE %% _r8 - 1) by rewrite -{1}Ea; ring.
+have Ei : (_ASIZE - 1) %/ _r8 = _ASIZE %/ _r8 by rewrite E1 divzMDl; [move: Hr0; apply contraL => -> | rewrite (divz_small _ _ Hs)].
+rewrite Ei /=; have /= -> := rsq_step_len S _r8 _ASIZE (_ASIZE %/ _r8) (_ASIZE %% _r8) _buf _ _ _ _.
++ by split.
++ by apply divz_ge0.
++ by move: Hm; clear FL; smt().
++ by rewrite Ea.
+by rewrite Ea FL.
+qed.
 
 phoare squeeze_avx2_ph _buf _st _r8:
  [ MM.__squeeze_avx2
  : buf=_buf /\ st=_st /\ _RATE8=_r8
  /\ 0 < _r8 <= 200
+ /\ stavx2INV _st
  ==> res.`1 = stavx2_from_st25 (st_i (stavx2_to_st25 _st) ((_ASIZE-1) %/ _r8 + 1))
      /\ res.`2 = of_list W8.zero (SQUEEZE1600 _r8 _ASIZE (stavx2_to_st25 _st))
  ] = 1%r.

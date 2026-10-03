@@ -13,7 +13,7 @@ move=> H; rewrite size_flatten.
 rewrite StdBigop.Bigint.sumzE.
 rewrite StdBigop.Bigint.BIA.big_map.
 rewrite -(StdBigop.Bigint.BIA.eq_big_seq (fun _ => sz)) /=.
- by move=> x Hx; rewrite /(\o) /= H.
+ by move=> x Hx; rewrite H.
 by rewrite StdBigop.Bigint.big_constz count_predT.
 qed.
 
@@ -309,16 +309,6 @@ op sra (w1 w2 : W.t) : W.t =
 W.sar w1 (to_uint w2).
 
 (* ------------------ V TO ADD TO JWORD.ec V --------------------- *)
-
-(* 
-lemma W_to_sint_pos (w: W.t):
- to_uint w < 2^(JCircuits.size - 1) =>
- to_sint w = to_uint w.
-proof.
-rewrite to_sintE /smod /= => H.
-by rewrite ifF 1:/#.
-qed.
-*)
 
 lemma W_get_ule (w: W.t) k:
  w.[k] => 2^k <= W.to_uint w.

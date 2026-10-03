@@ -10,21 +10,21 @@ WArray3 WArray32 WArray40 WArray160 WArray192 WArray200 WArray208 WArray224
 WArray800 WArray808 WArray999.
 
 abbrev rOL8 =
-((Array1.of_list witness<:W256.t>)
+((Array1.of_list witness)
 [(W256.of_int
  13620818001941277694121380808605999856886653716761013959207994299728839901191
  )]
 ).
 
 abbrev rOL56 =
-((Array1.of_list witness<:W256.t>)
+((Array1.of_list witness)
 [(W256.of_int
  10910488462195273559651782724632284871561478246514020268633800075540923875841
  )]
 ).
 
 abbrev kECCAK_RHOTATES_RIGHT =
-((Array6.of_list witness<:W256.t>)
+((Array6.of_list witness)
 [(W256.of_int 144373339913893657577751063007562604548177214458152943091773);
 (W256.of_int 232252764209307188274174373867837442080505530800860351692863);
 (W256.of_int 156927543384667019098616994515559168111335794127330162507795);
@@ -33,7 +33,7 @@ abbrev kECCAK_RHOTATES_RIGHT =
 (W256.of_int 313855086769334038206421612937983674734430261968315659321364)]).
 
 abbrev kECCAK_RHOTATES_LEFT =
-((Array6.of_list witness<:W256.t>)
+((Array6.of_list witness)
 [(W256.of_int 257361171150853911329517531560668107745210100483895842570243);
 (W256.of_int 169481746855440380633094220700393270212881784141188433969153);
 (W256.of_int 244806967680080549808651600052671544182051520814718623154221);
@@ -42,7 +42,7 @@ abbrev kECCAK_RHOTATES_LEFT =
 (W256.of_int 87879424295413530700846981630247037558957052973733126340652)]).
 
 abbrev kECCAK1600_RC =
-((Array24.of_list witness<:W64.t>)
+((Array24.of_list witness)
 [(W64.of_int 1); (W64.of_int 32898); (W64.of_int (-9223372036854742902));
 (W64.of_int (-9223372034707259392)); (W64.of_int 32907);
 (W64.of_int 2147483649); (W64.of_int (-9223372034707259263));
@@ -942,7 +942,7 @@ module M = {
     r12 <- ((invw r9) `&` r14);
     rC <- kECCAK1600_RC;
     r14 <- cnt;
-    r12 <- (r12 `^` rC.[(W64.to_uint (r14 + (W64.of_int 2)))]);
+    r12 <- (r12 `^` rC.[(W64.to_uint r14)]);
     r12 <- (r12 `^` rbp);
     rsi <- (rsi `^` r9);
     e.[6] <- rsi;
@@ -1126,7 +1126,7 @@ module M = {
     rbp <- ((invw rax) `&` rcx);
     rcx <- cnt;
     rC <- kECCAK1600_RC;
-    rbp <- (rbp `^` rC.[(W64.to_uint (rcx + (W64.of_int 3)))]);
+    rbp <- (rbp `^` rC.[(W64.to_uint (rcx + (W64.of_int 1)))]);
     rbp <- (rbp `^` r12);
     e.[9] <- rbp;
     r10 <- (r10 `^` rax);
@@ -1246,8 +1246,9 @@ module M = {
     rbp <- e.[9];
     return (rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e);
   }
-  proc __keccakf1600_opt (a:W64.t Array25.t) : W64.t Array25.t = {
-    var rax:W64.t;
+  proc read_regs_opt (a:W64.t Array25.t) : W64.t * W64.t * W64.t * W64.t *
+                                           W64.t * W64.t * W64.t * W64.t *
+                                           W64.t = {
     var rbp:W64.t;
     var rdi:W64.t;
     var r13:W64.t;
@@ -1257,10 +1258,6 @@ module M = {
     var rsi:W64.t;
     var r15:W64.t;
     var rbx:W64.t;
-    var e:W64.t Array25.t;
-    e <- witness;
-    rax <- (W64.of_int 0);
-    rax <- (rax - (W64.of_int 2));
     rbp <- a.[0];
     rdi <- a.[10];
     r13 <- a.[12];
@@ -1270,12 +1267,12 @@ module M = {
     rsi <- a.[21];
     r15 <- a.[22];
     rbx <- a.[24];
-    (rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e) <@ keccakf1600_opt_loop_body (
-    rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e);
-    while ((rax \ult (W64.of_int 22))) {
-      (rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e) <@ keccakf1600_opt_loop_body (
-      rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e);
-    }
+    return (rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx);
+  }
+  proc store_regs_opt (a:W64.t Array25.t, rbp:W64.t, rdi:W64.t, r13:W64.t,
+                       r10:W64.t, r11:W64.t, r8:W64.t, rsi:W64.t, r15:W64.t,
+                       rbx:W64.t) : W64.t Array25.t = {
+    
     a.[0] <- rbp;
     a.[10] <- rdi;
     a.[12] <- r13;
@@ -1285,6 +1282,30 @@ module M = {
     a.[21] <- rsi;
     a.[22] <- r15;
     a.[24] <- rbx;
+    return a;
+  }
+  proc __keccakf1600_opt (a:W64.t Array25.t) : W64.t Array25.t = {
+    var rbp:W64.t;
+    var rdi:W64.t;
+    var r13:W64.t;
+    var r10:W64.t;
+    var r11:W64.t;
+    var r8:W64.t;
+    var rsi:W64.t;
+    var r15:W64.t;
+    var rbx:W64.t;
+    var rax:W64.t;
+    var e:W64.t Array25.t;
+    e <- witness;
+    (rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx) <@ read_regs_opt (a);
+    rax <- (W64.of_int 0);
+    (rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e) <@ keccakf1600_opt_loop_body (
+    rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e);
+    while ((rax \ult (W64.of_int 24))) {
+      (rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e) <@ keccakf1600_opt_loop_body (
+      rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e);
+    }
+    a <@ store_regs_opt (a, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx);
     return a;
   }
   proc _keccakf1600_opt (a:W64.t Array25.t) : W64.t Array25.t = {
@@ -4197,8 +4218,8 @@ module M = {
     st3.[24] <- t3;
     return (st0, st1, st2, st3);
   }
-  proc _keccakf1600_4x_pround (e:W256.t Array25.t, a:W256.t Array25.t,
-                               r8:W256.t, r56:W256.t) : W256.t Array25.t = {
+  proc _keccakf1600_4x_pround_ref (e:W256.t Array25.t, a:W256.t Array25.t,
+                                   r8:W256.t, r56:W256.t) : W256.t Array25.t = {
     var c_571:W256.t Array5.t;
     var d_619:W256.t Array5.t;
     var t_574:W256.t;
@@ -4554,12 +4575,12 @@ module M = {
     c <- 0;
     while ((c < 24)) {
       rc <- (VPBROADCAST_4u64 rC.[c]);
-      e <@ _keccakf1600_4x_pround (e, a, r8, r56);
+      e <@ _keccakf1600_4x_pround_ref (e, a, r8, r56);
       t <- (rc `^` e.[0]);
       e.[0] <- t;
       (a, e) <- (swap_ e a);
       rc <- (VPBROADCAST_4u64 rC.[(c + 1)]);
-      a <@ _keccakf1600_4x_pround (a, e, r8, r56);
+      a <@ _keccakf1600_4x_pround_ref (a, e, r8, r56);
       t <- (rc `^` a.[0]);
       a.[0] <- t;
       (a, e) <- (swap_ e a);
@@ -4571,42 +4592,6 @@ module M = {
     
     a <@ __keccakf1600_avx2x4_ref (a);
     return a;
-  }
-  proc __keccakf1600_4x_pround_unpacked (st0:W64.t Array25.t,
-                                         st1:W64.t Array25.t,
-                                         st2:W64.t Array25.t,
-                                         st3:W64.t Array25.t) : W64.t Array25.t *
-                                                                W64.t Array25.t *
-                                                                W64.t Array25.t *
-                                                                W64.t Array25.t = {
-    var r8:W256.t;
-    var r56:W256.t;
-    var st4x1:W256.t Array25.t;
-    var st4x2:W256.t Array25.t;
-    st4x1 <- witness;
-    st4x2 <- witness;
-    r8 <- rOL8.[0];
-    r56 <- rOL56.[0];
-    st4x1 <@ __st4x_pack (st4x1, st0, st1, st2, st3);
-    st4x2 <@ _keccakf1600_4x_pround (st4x2, st4x1, r8, r56);
-    (st0, st1, st2, st3) <@ __st4x_unpack (st0, st1, st2, st3, st4x2);
-    return (st0, st1, st2, st3);
-  }
-  proc __keccakf1600_4x_pround_equiv (e:W256.t Array25.t, a:W256.t Array25.t) : 
-  W256.t Array25.t = {
-    var st0:W64.t Array25.t;
-    var st1:W64.t Array25.t;
-    var st2:W64.t Array25.t;
-    var st3:W64.t Array25.t;
-    st0 <- witness;
-    st1 <- witness;
-    st2 <- witness;
-    st3 <- witness;
-    (st0, st1, st2, st3) <@ __st4x_unpack (st0, st1, st2, st3, a);
-    (st0, st1, st2, st3) <@ __keccakf1600_4x_pround_unpacked (st0, st1, 
-    st2, st3);
-    e <@ __st4x_pack (e, st0, st1, st2, st3);
-    return e;
   }
   proc __rol_4u64_rho56 (a:W256.t) : W256.t = {
     var r:W256.t;
@@ -7232,7 +7217,7 @@ module M = {
       at <- (at `|>>` 3);
       at <- (at `<<` 3);
       (off2, t64) <@ __a_rlen_read_upto8 (buf, off, len);
-      len <- (len + at);
+      len <- (len + (W64.to_uint at8));
       sh <- (truncateu8 at8);
       sh <- (sh `<<` (W8.of_int 3));
       t64 <- (t64 `<<` (sh `&` (W8.of_int 63)));
@@ -7917,7 +7902,7 @@ module M = {
       at <- (at `|>>` 3);
       at <- (at `<<` 3);
       (off2, t64) <@ __a_rlen_read_upto8 (buf, off, len);
-      len <- (len + at);
+      len <- (len + (W64.to_uint at8));
       sh <- (truncateu8 at8);
       sh <- (sh `<<` (W8.of_int 3));
       t64 <- (t64 `<<` (sh `&` (W8.of_int 63)));

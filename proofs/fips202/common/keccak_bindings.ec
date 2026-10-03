@@ -2,6 +2,8 @@ require import AllCore List IntDiv QFABV.
 
 from Jasmin require import JModel_x86.
 
+require JWordExtra.
+
 from CryptoSpecs require export Keccak1600_arrays.
 from JazzEC require import Array7 WArray200 WArray800 Array100.
 
@@ -213,22 +215,19 @@ lemma W16_sar_div (w1 : W16.t) k:
  0 <= k =>
  to_sint (w1 `|>>>` k)
  = to_sint w1 %/ 2 ^ k.
-proof.
-admitted.
+proof. exact JWordExtra.WE16.to_sint_sar. qed.
 
 lemma W32_sar_div (w1 : W32.t) k:
  0 <= k =>
  to_sint (w1 `|>>>` k)
  = to_sint w1 %/ 2 ^ k.
-proof.
-admitted.
+proof. exact JWordExtra.WE32.to_sint_sar. qed.
 
 lemma W64_sar_div (w1 : W64.t) k:
  0 <= k =>
  to_sint (w1 `|>>>` k)
  = to_sint w1 %/ 2 ^ k.
-proof.
-admitted.
+proof. exact JWordExtra.WE64.to_sint_sar. qed.
 
 
 (* ----------- BEGIN W16 BINDINGS ---------- *)

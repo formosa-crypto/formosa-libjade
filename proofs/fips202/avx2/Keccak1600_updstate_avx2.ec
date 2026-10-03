@@ -26,6 +26,7 @@ from CryptoSpecs require import FIPS202_SHA3_Spec Keccakf1600_Spec Keccak1600_Sp
 require import Keccak1600_ref Keccakf1600_ref.
 require import Keccak1600_avx2 Keccakf1600_avx2.
 require import Keccak1600_subreadwrite.
+require import Keccak1600_fixedsizes_ref.
 
 import IntOrder.
 
@@ -82,22 +83,6 @@ op absorb_spec_updstate_avx2 (tb: int) (l: W8.t list) (st: W64.t Array26.t) : bo
 (* The procs _init_updstate_avx2, _finish_updstate_avx2,                     *)
 (* _absorb_m_updstate_avx2 use only Array26 and don't depend on _ASIZE, so   *)
 (* they live outside the abstract theory and reference M directly.           *)
-(*                                                                           *)
-(* The spec layer below is the *minimal* surface a client needs to conclude  *)
-(* that init -> (absorb_m | update)* -> finish -> squeeze produces           *)
-(*    SQUEEZE1600 r8 (ABSORB1600 trailb r8 msg) outlen                       *)
-(* i.e. a SHA3 / SHAKE call. It introduces:                                  *)
-(*                                                                           *)
-(*   - absorb_msg, sponge_state : opaque viewers of the abstract sponge      *)
-(*     phase carried by an updstate state;                                   *)
-(*   - rate8_of, trailb_of      : concrete (r8, trailb) decoders;            *)
-(*   - init_*, finish_* specs    : concrete bodies (init zeros + packs       *)
-(*     ststatus; finish XORs the FIPS-202 padding into the keccak portion); *)
-(*   - absorb_m_* spec           : opaque (the streaming primitive itself).  *)
-(*                                                                           *)
-(* Composition is then captured by five admitted lemmas — see "Client-       *)
-(* facing composition lemmas" below. Each `admitted` is an explicit proof    *)
-(* obligation; nothing is stated as an axiom.                                *)
 (* ------------------------------------------------------------------------- *)
 
 
@@ -115,9 +100,6 @@ op ststatus_data_spec (s : W64.t) : W8.t * int * int =
   let at      = if r8 <= raw_at then 0 else raw_at in
   let trailb  = W8.of_int ((W64.to_uint s %/ 65536) %% 256) in
   (trailb, r8, at).
-
-op rate8_of  (st : W64.t Array26.t) : int  = (ststatus_data_spec st.[25]).`2.
-op trailb_of (st : W64.t Array26.t) : W8.t = (ststatus_data_spec st.[25]).`1.
 
 
 (* Helpers used by finish: byte-XOR into the keccak state, and the
@@ -154,75 +136,11 @@ op finish_updstate_avx2_spec (st : W64.t Array26.t) : W64.t Array26.t =
   Array26.init (fun i =>
     if i < 25 then stk2.[i] else clear_at_trailb st.[25]).
 
-(* Streaming-absorb primitive: opaque. Its behaviour is pinned down by the
-   admitted client-facing lemma `absorb_msg_absorb_m` below. *)
-op absorb_m_updstate_avx2_spec :
-  global_mem_t -> W64.t Array26.t -> int -> int -> W64.t Array26.t.
-
-
-(* ------------------------------------------------------------------------- *)
-(* Sponge-phase viewers (opaque).                                            *)
-(*                                                                           *)
-(*   absorb_msg st    — the bytes absorbed-so-far that st represents (in     *)
-(*                      the absorbing phase).                                *)
-(*   sponge_state st  — the 25-word sponge state ready to be squeezed (in    *)
-(*                      the squeezing phase, i.e. post-finish).              *)
-(* ------------------------------------------------------------------------- *)
-
-op absorb_msg   : W64.t Array26.t -> W8.t list.
-op sponge_state : W64.t Array26.t -> W64.t Array25.t.
-
-
-(* ------------------------------------------------------------------------- *)
-(* Client-facing composition lemmas (admitted).                              *)
-(* ------------------------------------------------------------------------- *)
-
-(* (1) init produces an empty absorb buffer at the requested r8 / trailb. *)
-lemma absorb_msg_init _st r64 trailb:
-  absorb_msg (init_updstate_avx2_spec _st r64 trailb) = []
-  /\ rate8_of  (init_updstate_avx2_spec _st r64 trailb) = r64 * 8
-  /\ trailb_of (init_updstate_avx2_spec _st r64 trailb) = trailb.
-proof.
-do split. 
-+ admit. (* Wrong unless we have = nseq 25 W64.zero *) 
-+ rewrite /init_updstate_avx2_spec /rate8_of /ststatus_data_spec /encode_ststatus /= of_uintK.
-  have->: 256 = 2^8 by smt(). have->: 65536 = 2^16 by smt().
-  rewrite dvdz_mod_div ..3:/# expz_div ..2:/# modz_dvd_pow 1:/# (Ring.IntID.mulrC W8.modulus).
-  rewrite divzMDl 1:/# -modzDm. have{3 7}->: W8.modulus = 2^16 %/ 2^8 by smt().
-  rewrite -!dvdz_mod_div ..3:/# modzMr addr0 modz_mod.
-  admit. (* Neeed to know r64 < 25 *)
-+ rewrite /init_updstate_avx2_spec /trailb_of /ststatus_data_spec /encode_ststatus /= of_uintK.
-  have->: 256 = 2^8 by smt(). have->: 65536 = 2^16 by smt().
-  rewrite dvdz_mod_div ..3:/# expz_div ..2:/# modz_dvd_pow 1:/# (Ring.IntID.mulrC W16.modulus).
-  rewrite divzMDr 1:/# pdiv_small. 
-  admit. (* Neeed to know r64 < 25 *) 
-  rewrite addr0 of_int_mod to_uintK /#.
-qed.
-
-(* (2) absorb_m appends `len` bytes of memory at `buf` to the absorb buffer.
-       The rate and trail-byte are preserved. *)
-lemma absorb_msg_absorb_m _mem _st _buf _len:
-  absorb_msg (absorb_m_updstate_avx2_spec _mem _st _buf _len)
-    = absorb_msg _st ++ memread _mem _buf _len
-  /\ rate8_of  (absorb_m_updstate_avx2_spec _mem _st _buf _len) = rate8_of _st
-  /\ trailb_of (absorb_m_updstate_avx2_spec _mem _st _buf _len) = trailb_of _st.
-proof. admitted.
-
-(* (3) finish closes the absorb phase: the resulting sponge state equals
-       ABSORB1600 over the accumulated message. *)
-lemma sponge_state_finish _st:
-  sponge_state (finish_updstate_avx2_spec _st)
-    = ABSORB1600 (trailb_of _st) (rate8_of _st) (absorb_msg _st)
-  /\ rate8_of (finish_updstate_avx2_spec _st) = rate8_of _st.
-proof. admitted.
-
 
 (* ------------------------------------------------------------------------- *)
 (* Bridge lemmas: composition rules for the partial-absorb predicate         *)
 (* `pabsorb_spec_updstate_avx2`. These let a client chain                    *)
-(*   init → update → absorb_m → finish → squeeze                             *)
-(* entirely in the predicate world without ever touching the opaque viewers  *)
-(* `absorb_msg` / `sponge_state`.                                            *)
+(*   init → update → absorb_m → finish → squeeze.                            *)
 (* ------------------------------------------------------------------------- *)
 
 (* (B1) Init produces the empty-message predicate. *)
@@ -231,34 +149,144 @@ lemma init_pabsorb (_st : W64.t Array26.t) (r64 : int) (trailb : W8.t):
   pabsorb_spec_updstate_avx2 [] (init_updstate_avx2_spec _st r64 trailb)
   /\ ststatus_r8     (init_updstate_avx2_spec _st r64 trailb).[25] = r64 * 8
   /\ ststatus_trailb (init_updstate_avx2_spec _st r64 trailb).[25] = trailb.
-proof. admitted.
+proof.
+move=> Hr; have Ht := W8.to_uint_cmp trailb; pose s := encode_ststatus 0 (r64 - 1) (W8.to_uint trailb); have Es : (init_updstate_avx2_spec _st r64 trailb).[25] = s by rewrite /init_updstate_avx2_spec Array26.initiE.
+have Ht' : 0 <= to_uint trailb < 256 by smt(W8.to_uint_cmp pow2_8).
+have Us : W64.to_uint s = 256 * (r64 - 1) + 65536 * to_uint trailb by rewrite /s /encode_ststatus of_uintK pmod_small; smt(pow2_64).
+have R8 : W64.to_uint ((s `>>` W8.of_int 8) `&` W64.of_int 255) = r64 - 1.
++ rewrite (W64.to_uint_and_mod 8) //.
+  rewrite W64.shr_div_le // Us /= (: 256 * (r64 - 1) + 65536 * to_uint trailb = (r64 - 1 + 256 * to_uint trailb) * 256) 1:/#.
+  by rewrite mulzK // (: r64 - 1 + 256 * to_uint trailb = (r64 - 1) + to_uint trailb * 256) 1:/# modzMDr modz_small /#.
+have AT : W64.to_uint (s `&` W64.of_int 255) = 0 by rewrite (W64.to_uint_and_mod 8) // Us (: 256 * (r64 - 1) + 65536 * to_uint trailb = (r64 - 1 + 256 * to_uint trailb) * 256) 1:/# /= modzMl.
+have TB : truncateu8 (s `>>` W8.of_int 16) = trailb.
++ rewrite /truncateu8 W64.shr_div_le // Us (: 256 * (r64 - 1) + 65536 * to_uint trailb = 256 * (r64 - 1) + to_uint trailb * 65536) 1:/# /= divzMDr // divz_small 1:/# /=.
+  done.
+have Er8 : ststatus_r8 s = r64 * 8 by rewrite /ststatus_r8 /= R8; smt().
+have Eat : ststatus_at_norm s = 0 by rewrite /ststatus_at_norm /ststatus_at /= AT; smt().
+rewrite /pabsorb_spec_updstate_avx2 /= Es Er8 Eat /ststatus_trailb TB /=; split; first smt().
+split; first smt().
+rewrite (: Array25.init (fun i => (init_updstate_avx2_spec _st r64 trailb).[i]) = st0); last by apply pabsorb_spec_ref_nil; smt().
+apply Array25.tP => i Hi; rewrite Array25.initiE //=.
+by rewrite /init_updstate_avx2_spec Array26.initiE 1:/# /= (: i < 25) 1:/# /= /st0 Array25.initiE.
+qed.
 
-(* (B2) absorb_m preserves the predicate, extending the absorbed list by the
-       memory read, and preserves the rate/trailb bytes of st.[25]. *)
-lemma absorb_m_pabsorb _mem (_st : W64.t Array26.t) (_buf _len : int)
-                      (_l : W8.t list):
-  pabsorb_spec_updstate_avx2 _l _st =>
-  0 <= _len =>
-  _buf + _len < W64.modulus =>
-  pabsorb_spec_updstate_avx2
-    (_l ++ memread _mem _buf _len)
-    (absorb_m_updstate_avx2_spec _mem _st _buf _len)
-  /\ ststatus_r8 (absorb_m_updstate_avx2_spec _mem _st _buf _len).[25]
-       = ststatus_r8 _st.[25]
-  /\ ststatus_trailb (absorb_m_updstate_avx2_spec _mem _st _buf _len).[25]
-       = ststatus_trailb _st.[25].
-proof. admitted.
 
 (* (B3) finish lands the first 25 words of the state at ABSORB1600 of the
        accumulated message, and preserves the rate byte. This is the bridge
        to the squeeze contract, which reads `Array25.init (fun i => _st.[i])`
        directly. *)
+lemma ststatus_data_specE s:
+  ststatus_data_spec s = (ststatus_trailb s, ststatus_r8 s, ststatus_at_norm s).
+proof.
+rewrite /ststatus_data_spec /ststatus_trailb /ststatus_r8 /ststatus_at_norm /ststatus_r8 /ststatus_at /= (W64.to_uint_and_mod 8) // (W64.to_uint_and_mod 8) // !W64.shr_div_le // /truncateu8 W64.shr_div_le //=.
+rewrite (mulzC _ 8) /=.
+by rewrite -(W8.of_int_mod (to_uint s %/ 65536)).
+qed.
+
+lemma zext_bits8 (b: W8.t) j:
+  0 <= j < 8 => W64.of_int (W8.to_uint b) \bits8 j = if j = 0 then b else W8.zero.
+proof.
+move=> Hj; have Hb := W8.to_uint_cmp b; rewrite W8u8.bits8_div 1:/# of_uintK (pmod_small (to_uint b)); first smt(pow2_8 pow2_64).
+case: (j = 0) => C; first by rewrite C /=.
+have P : 256 <= 2 ^ (8 * j) by rewrite (: 8 * j = 8 + 8 * (j - 1)) 1:/# exprD_nneg 1,2:/#; smt(expr_gt0).
+by rewrite divz_small //; smt(pow2_8).
+qed.
+
+lemma xor_byte_at_st25E stk pos b:
+  0 <= pos < 200 =>
+  xor_byte_at_st25 stk pos b = stwords ((stbytes stk).[pos <- (stbytes stk).[pos] `^` b]).
+proof.
+move=> Hp; apply stbytes_inj; rewrite stwordsK; apply WArray200.tP => i Hi; rewrite /xor_byte_at_st25 /= stbytes_get // WArray200.get_setE // Array25.get_setE 1:/#.
+rewrite !stbytes_get //; case: (i %/ 8 = pos %/ 8) => C; last by rewrite ifF 1:/#.
+rewrite W8u8.xorb8E shl_shlw 1:/# bits8_u64_shl8 1:/# -C.
+case: (i = pos) => E; first by rewrite -E /= zext_bits8.
+by case: (i %% 8 < pos %% 8) => C2; [ | rewrite zext_bits8 1:/# ifF 1:/#]; rewrite W8.xorw0.
+qed.
+
+lemma clear_at_trailb_r8 s:
+  (clear_at_trailb s `>>` W8.of_int 8) `&` W64.of_int 255 = (s `>>` W8.of_int 8) `&` W64.of_int 255.
+proof.
+apply W64.wordP => k Hk; rewrite /clear_at_trailb !shr_shrw // !W64.andwE !W64.shrwE (: 255 = 2^8 - 1) 1:// W64.of_int_powm1 //=.
+case: (k < 8) => C //=; have : k \in iota_ 0 8 by rewrite mem_iota /#.
+move: k Hk C; rewrite -iotaredE /= => k _ _; rewrite W64.of_intwE /int_bit.
+by do 7! (case => [-> //= |]); move=> -> //=.
+qed.
+
 lemma finish_absorb (_st : W64.t Array26.t) (_l : W8.t list):
   pabsorb_spec_updstate_avx2 _l _st =>
   Array25.init (fun i => (finish_updstate_avx2_spec _st).[i])
     = ABSORB1600 (ststatus_trailb _st.[25]) (ststatus_r8 _st.[25]) _l
   /\ ststatus_r8 (finish_updstate_avx2_spec _st).[25] = ststatus_r8 _st.[25].
-proof. admitted.
+proof.
+rewrite /pabsorb_spec_updstate_avx2 /= => [#] Hr0 Hr1 Hat [_ Est]; rewrite /finish_updstate_avx2_spec ststatus_data_specE /=.
+split; last by rewrite /ststatus_r8 /= clear_at_trailb_r8.
+pose r8 := ststatus_r8 _st.[25]; pose tb := ststatus_trailb _st.[25]; pose at := ststatus_at_norm _st.[25]; pose I := stateabsorb_iblocks (BitEncoding.BitChunking.chunk r8 _l) st0; pose CR := chunkremains r8 _l.
+have E : xor_byte_at_st25 (xor_byte_at_st25 (Array25.init (fun i => _st.[i])) at tb) (r8 - 1) (W8.of_int 128) = ABSORB1600 tb r8 _l; last first.
++ by apply Array25.tP => i Hi; rewrite Array25.initiE // Array26.initiE 1:/# /= ifT 1:/# E.
+have Hsz : size CR = at by rewrite /CR size_chunkremains /at Hat.
+have Hat2 : 0 <= at < r8 by rewrite /at Hat; smt(modz_ge0 ltz_pmod).
+rewrite xor_byte_at_st25E 1:/# xor_byte_at_st25E 1:/# stwordsK /ABSORB1600 /stateabsorb_last /addratebit /addratebit8 /stateabsorb.
+have K : (stbytes (Array25.init (fun i => _st.[i]))).[at <- (stbytes (Array25.init (fun i => _st.[i]))).[at] `^` tb] = stbytes (addstate I (bytes2state (rcons CR tb))); last by rewrite K.
+rewrite Est; apply WArray200.tP => i Hi; rewrite WArray200.get_setE 1:/# !stbytes_addstate /addstbytes !WArray200.map2iE //.
++ smt().
+rewrite -(bytes2stbytesP (chunkremains (ststatus_r8 _st.[25]) _l)) -(bytes2stbytesP (rcons CR tb)) !stwordsK.
+rewrite !WArray200.get_of_list 1..3:/# nth_rcons -/CR -/I Hsz; case: (i = at) => C.
++ by rewrite C /= (nth_out _ CR) 1:/# W8.xorw0.
+by case: (i < at) => C2 //; rewrite (nth_out _ CR) 1:/#.
+qed.
+
+lemma finish_at0 (_st : W64.t Array26.t):
+  ststatus_at_norm (finish_updstate_avx2_spec _st).[25] = 0.
+proof.
+rewrite /finish_updstate_avx2_spec ststatus_data_specE /= /ststatus_at_norm /ststatus_at /=.
+have -> : clear_at_trailb _st.[25] `&` W64.of_int 255 = W64.zero.
++ apply W64.wordP => k Hk; rewrite /clear_at_trailb !W64.andwE (: 255 = 2^8 - 1) 1:// W64.of_int_powm1 //=.
+  case: (k < 8) => C //=; have : k \in iota_ 0 8 by rewrite mem_iota /#.
+  move: k Hk C; rewrite -iotaredE /= => k _ _; rewrite W64.of_intwE /int_bit.
+  by do 7! (case => [-> //= |]); move=> -> //=.
+by rewrite W64.to_uint0.
+qed.
+
+hoare ststatus_data_h _s:
+ M._ststatus_data : ststatus = _s ==> res = ststatus_data_spec _s.
+proof.
+proc; auto => />; rewrite /ststatus_data_spec /=; do split.
++ by rewrite /truncateu8 !to_uint_shr ..2:/# of_uintK pmod_small 1:/# of_int_mod /#.
++ rewrite /(\ult) of_uintK pmod_small 1:/# shl_shlw 1:/# to_uint_shl 1:/# (W64.and_mod 8) 1:/# shr_shrw 1:/# to_uintD_small.
+  + by rewrite to_uint1 of_uintK to_uint_shr /#.
+  rewrite of_uintK to_uint_shr 1:/# to_uint1 !(pmod_small _ W64.modulus) ..3:/# -of_intD shlMP 1:/# /=.
+  by case: (200 < (to_uint _s %/ 256 %% 256 + 1) * 8) => C; rewrite of_uintK ?(pmod_small _ W64.modulus) /#.
+rewrite /(\ult) /(\ule) of_uintK pmod_small 1:/# shl_shlw 1:/# to_uint_shl 1:/# (W64.and_mod 8) 1:/# shr_shrw 1:/# to_uintD_small.
++ by rewrite to_uint1 of_uintK to_uint_shr /#.
+rewrite of_uintK to_uint_shr 1:/# to_uint1 (W64.and_mod 8) 1:/# of_uintK !(pmod_small _ W64.modulus) ..4:/# -of_intD shlMP 1:/# /=.
+case: (200 < (to_uint _s %/ 256 %% 256 + 1) * 8) => C; rewrite of_uintK (pmod_small _ W64.modulus) 1:/#.
++ by case: (200 <= to_uint _s %% 256) => *; rewrite of_uintK /#.
+by case: ((to_uint _s %/ 256 %% 256 + 1) * 8 <= to_uint _s %% 256) => *; rewrite of_uintK /#.
+qed.
+
+lemma st26_set8_bits8 (s: W64.t Array26.t) (b: W8.t) i j:
+ 0 <= i < 26 => 0 <= j < 8 =>
+ WArray208.get64 (WArray208.init64 (fun i0 => s.[i0])).[200 <- b] i \bits8 j
+ = if 8 * i + j = 200 then b else s.[i] \bits8 j.
+proof.
+move=> Hi Hj; rewrite WArray208.get64E W8u8.pack8bE // W8u8.Pack.initiE //= WArray208.get_setE 1:/#.
+by case: (8 * i + j = 200) => C //; rewrite /init64 WArray208.initiE 1:/# /=; congr; smt().
+qed.
+
+lemma ststatus_byte0 (w' w: W64.t) (b: W8.t):
+ (forall j, 0 <= j < 8 => w' \bits8 j = if j = 0 then b else w \bits8 j) =>
+ ststatus_at w' = W8.to_uint b /\ ststatus_r8 w' = ststatus_r8 w /\ ststatus_trailb w' = ststatus_trailb w.
+proof.
+move=> H; have Hb : forall k, 0 <= k < 64 => w'.[k] = if k < 8 then b.[k] else w.[k].
++ move=> k Hk; rewrite (W8u8.get_bits8 w' k) // (W8u8.get_bits8 w k) // H 1:/#.
+  by case: (k < 8) => C; [rewrite ifT 1:/# (: k %% 8 = k) 1:/# | rewrite ifF 1:/#].
+have S : forall n, 8 <= n < 64 => w' `>>` W8.of_int n = w `>>` W8.of_int n.
++ move=> n Hn; apply W64.wordP => k Hk; rewrite !W64.shr_shrw 1,2:/# /=.
+  by rewrite Hk /=; case: (k + n < 64) => C; [rewrite Hb /# | rewrite !W64.get_out /#].
+rewrite /ststatus_r8 /ststatus_trailb (S 8) // (S 16) //=.
+rewrite /ststatus_at -W8u8.to_uint_zeroextu64; congr; apply W64.wordP => k Hk.
+by rewrite W64.andwE W8u8.zeroextu64_bit (: 255 = 2^8 - 1) 1:// W64.of_int_powm1 // Hb //; case: (k < 8) => C /=; smt().
+qed.
 
 
 lemma init_updstate_avx2_ll: islossless M._init_updstate_avx2.
@@ -658,26 +686,136 @@ while(true) (upto + 8 - newat) => //=. move => z.
 + auto => /#. auto => /#.
 qed.
 
-hoare absorb_m_updstate_avx2_h _mem _st _buf _len:
+lemma shr3_shl3 (x: int): (x `|>>` 3) `<<` 3 = 8 * (x %/ 8).
+proof. by rewrite /(`|>>`) /(`<<`) /= /#. qed.
+
+lemma trunc_shl3_and63 k:
+ 0 <= k < 8 =>
+ (truncateu8 (W64.of_int k) `<<` W8.of_int 3) `&` W8.of_int 63 = W8.of_int (8 * k).
+proof.
+move=> Hk0; rewrite /truncateu8 W64.of_uintK /W8.(`<<`) W8.of_uintK /= -(W8.to_uintK (W8.of_int (k %% W64.modulus))).
+by rewrite W8.shlMP // (W8.and_mod 6) // !W8.of_uintK; smt(modz_small pow2_64).
+qed.
+
+hoare add_m_updstate_avx2_h _mem _st _at _buf _upto:
+  M._add_m_updstate_avx2
+  : Glob.mem = _mem /\ st = _st /\ at = _at /\ buf = _buf /\ upto = _upto
+    /\ 0 <= _at <= _upto /\ _upto <= 200
+  ==> Glob.mem = _mem
+    /\ res.`1 = addstate_at _st _at (memread _mem _buf (_upto - _at))
+    /\ res.`2 = _upto
+    /\ res.`3 = _buf + (_upto - _at).
+proof.
+proc => /=; pose L := memread _mem _buf (_upto - _at).
+seq 2 : (#pre /\ W64.to_uint at8 = _at %% 8).
++ by auto => /> H0 H1 H2; rewrite (W64.to_uint_and_mod 3) // W64.of_uintK; smt(modz_small pow2_64).
+seq 1 : (st = xabs _st _at L at /\ buf = _buf + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ Glob.mem = _mem /\ upto = _upto /\ 0 <= _at /\ _upto <= 200).
++ if; last first.
+  + by skip => /> &hr H1 H2 H3; rewrite xabs0 //; left; rewrite -H3.
+  wp; ecall (m_rlen_read_upto8_h buf len); wp; skip => /> &hr H0 H1 H2 Hk Hnz.
+  have Ea8 : at8{hr} = W64.of_int (_at %% 8) by rewrite -Hk W64.to_uintK.
+  have Hk0 : _at %% 8 <> 0 by move: Hnz; rewrite Ea8; apply contra => ->.
+  rewrite Hk shr3_shl3 Ea8 trunc_shl3_and63 1:/#; split; first smt().
+  move=> _ [o2 t] /= Hs Ho2.
+  have U := upd64_xabs _st _at L _at (8 * (_at %/ 8)) (t `<<` W8.of_int (8 * (_at %% 8))) _ _.
+  + smt().
+  + move=> r Hr; have B := srspec_u64_bits8 t (memread _mem _buf (_upto - _at)) (_upto - _at) _ _ Hs; 1,2: rewrite ?size_memread /#.
+    rewrite W64.shl_shlw 1:/# bits8_u64_shl8 //.
+    by case: (r < _at %% 8) => C; [rewrite ifF 1:/# | rewrite ifT 1:/# B 1:/# /L; congr; smt()].
+  rewrite (xabs0 _st _at L _at) // in U; rewrite U /=.
+  have SL : size L = _upto - _at by rewrite /L size_memread /#.
+  by split; [smt() | move=> C; rewrite !xabs_addstate_at 1,2:/#; smt()].
+seq 3 : (st = xabs _st _at L at /\ buf = _buf + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto) /\ _upto < at + 8
+         /\ Glob.mem = _mem /\ upto = _upto /\ 0 <= _at /\ _upto <= 200).
++ while (st = xabs _st _at L at /\ newat = at + 8 /\ buf = _buf + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ Glob.mem = _mem /\ upto = _upto /\ 0 <= _at /\ _upto <= 200); last by auto => /#.
+  wp; skip => &hr [#] Est En Eo Ha0 Ha1 Ha8 Em -> H0 H1 Hc /=.
+  rewrite Est (upd64_xabs _st _at L at{hr} at{hr}) 1:/#; last by rewrite En /=; smt().
+  by move=> r Hr; rewrite loadW64_bits8 // ifT 1:/# /L nth_memread 1:/# Em Eo; congr; ring.
+seq 1 : (st = addstate_at _st _at L /\ buf = _buf + (_upto - _at) /\ upto = _upto /\ Glob.mem = _mem); last by auto.
+if; last by skip => &hr [#] -> -> Ha0 Ha1 Ha8 Hlt Em -> H0 H1 Hc /=; rewrite xabs_addstate_at; [rewrite /L size_memread /# | smt()].
+wp; ecall (m_rlen_read_upto8_h buf (W64.to_uint upto8)); wp; skip => &hr [#] Est Eo Ha0 Ha1 Ha8 Hlt Em -> H0 H1 Hc /=.
+have Eu : W64.to_uint (W64.of_int _upto `&` W64.of_int 7) = _upto - at{hr}.
++ by rewrite (W64.to_uint_and_mod 3) // W64.of_uintK; smt(modz_small pow2_64).
+rewrite Eu Em; split; first smt().
+move=> _ [o t] /= [Hs ->]; have B := srspec_u64_bits8 t (memread _mem buf{hr} (_upto - at{hr})) (_upto - at{hr}) _ _ Hs; 1,2: rewrite ?size_memread /#.
+have SL : size L = _upto - _at by rewrite /L size_memread /#.
+rewrite Est (upd64_xabs _st _at L at{hr} at{hr}) 1:/#; last by rewrite xabs_addstate_at /#.
+move=> r Hr; rewrite B // ifT 1:/#; case: (r < _upto - at{hr}) => C; first by rewrite /L !nth_memread 1,2:/# Eo; congr; ring.
+by rewrite !nth_out ?size_memread /#.
+qed.
+
+hoare absorb_m_updstate_avx2_h _l _mem _st _buf _len:
   M._absorb_m_updstate_avx2
   : Glob.mem = _mem /\ st = _st /\ buf = _buf /\ len = _len
-  ==> res = absorb_m_updstate_avx2_spec _mem _st _buf _len.
-proof. 
-admitted.
+    /\ pabsorb_spec_updstate_avx2 _l _st /\ 0 <= _len /\ _buf + _len < W64.modulus
+  ==> pabsorb_spec_updstate_avx2 (_l ++ memread _mem _buf _len) res
+    /\ ststatus_r8     res.[25] = ststatus_r8     _st.[25]
+    /\ ststatus_trailb res.[25] = ststatus_trailb _st.[25].
+proof.
+proc => /=.
+seq 4 : (#pre /\ r8 = ststatus_r8 _st.[25] /\ at = ststatus_at_norm _st.[25]).
++ by ecall (ststatus_data_h st.[25]); wp; skip => /> &hr *; rewrite ststatus_data_specE.
+seq 3 : (pabsorb_spec_ref (ststatus_r8 _st.[25]) (_l ++ memread _mem _buf (buf - _buf)) stk
+         /\ at = (size _l + (buf - _buf)) %% ststatus_r8 _st.[25] /\ len = _len - (buf - _buf) + at /\ 0 <= buf - _buf <= _len
+         /\ len < r8 /\ r8 = ststatus_r8 _st.[25] /\ Glob.mem = _mem /\ st = _st /\ 0 < ststatus_r8 _st.[25] <= 200).
++ while (pabsorb_spec_ref (ststatus_r8 _st.[25]) (_l ++ memread _mem _buf (buf - _buf)) stk
+         /\ at = (size _l + (buf - _buf)) %% ststatus_r8 _st.[25] /\ len = _len - (buf - _buf) + at /\ 0 <= buf - _buf <= _len
+         /\ r8 = ststatus_r8 _st.[25] /\ Glob.mem = _mem /\ st = _st /\ 0 < ststatus_r8 _st.[25] <= 200).
+  + wp; ecall (keccakf1600_st25_avx2_h stk); ecall (add_m_updstate_avx2_h Glob.mem stk at buf r8).
+    skip => &hr [#] Hp Ea El Ho0 Ho1 -> -> -> Hr0 Hr1 Hc /=.
+    have Hs : size (_l ++ memread _mem _buf (buf{hr} - _buf)) = size _l + (buf{hr} - _buf) by rewrite size_cat size_memread.
+    split; first smt(modz_ge0 ltz_pmod).
+    move=> _ [s a o] [/= Es [_ Eo]] r -> /=; rewrite Es Eo.
+    have B := pabsorb_spec_ref_block (ststatus_r8 _st.[25]) (_l ++ memread _mem _buf (buf{hr} - _buf)) (memread _mem buf{hr} (ststatus_r8 _st.[25] - at{hr})) stk{hr} Hp _.
+    + by rewrite Hs size_memread; smt(modz_ge0 ltz_pmod).
+    rewrite Hs -Ea -catA in B.
+    rewrite (: buf{hr} + (ststatus_r8 _st.[25] - at{hr}) - _buf = (buf{hr} - _buf) + (ststatus_r8 _st.[25] - at{hr})) 1:/#.
+    rewrite memread_add 1,2:/# (: _buf + (buf{hr} - _buf) = buf{hr}) 1:/# B /=.
+    have -> : size _l + (buf{hr} - _buf + (ststatus_r8 _st.[25] - at{hr})) = ((size _l + (buf{hr} - _buf)) %/ ststatus_r8 _st.[25] + 1) * ststatus_r8 _st.[25].
+    + by rewrite Ea; have := divz_eq (size _l + (buf{hr} - _buf)) (ststatus_r8 _st.[25]); smt().
+    by rewrite modzMl /=; smt(modz_ge0 ltz_pmod).
+  auto => /> &hr; rewrite /pabsorb_spec_updstate_avx2 /= => [#] Hr0 Hr1 Hat Hp H0 H1.
+  by move=> HA; split; [rewrite cats0 | smt()].
+seq 3 : (pabsorb_spec_ref (ststatus_r8 _st.[25]) (_l ++ memread _mem _buf _len) (Array25.init (fun i => st.[i]))
+         /\ at = (size _l + _len) %% ststatus_r8 _st.[25] /\ st.[25] = _st.[25] /\ 0 < ststatus_r8 _st.[25] <= 200 /\ 0 <= _len).
++ wp; ecall (add_m_updstate_avx2_h Glob.mem stk at buf len); wp; skip => &hr [#] Hp Ea El Ho0 Ho1 Hlt Er -> -> Hr0 Hr1 /=.
+  split; first smt().
+  move=> _ [s a o] [/= Es [Ea2 _]].
+  have -> : Array25.init ("_.[_]" (Array26.init (fun i => if 0 <= i < 25 then s.[i] else _st.[i]))) = s.
+  + by apply Array25.tP => i Hi; rewrite Array25.initiE // Array26.initiE /#.
+  have Hs : size (_l ++ memread _mem _buf (buf{hr} - _buf)) = size _l + (buf{hr} - _buf) by rewrite size_cat size_memread.
+  have B := pabsorb_spec_ref_add (ststatus_r8 _st.[25]) (_l ++ memread _mem _buf (buf{hr} - _buf)) (memread _mem buf{hr} (len{hr} - at{hr})) stk{hr} Hp _.
+  + by rewrite Hs size_memread; smt(modz_ge0 ltz_pmod).
+  rewrite Hs -Ea -catA in B; rewrite Es Ea2 (: _len = (buf{hr} - _buf) + (len{hr} - at{hr})) 1:/#.
+  rewrite memread_add 1,2:/# (: _buf + (buf{hr} - _buf) = buf{hr}) 1:/# B /=.
+  have -> : size _l + (buf{hr} - _buf + (len{hr} - at{hr})) = (size _l + (buf{hr} - _buf)) %/ ststatus_r8 _st.[25] * ststatus_r8 _st.[25] + len{hr}.
+  + by rewrite Ea; have := divz_eq (size _l + (buf{hr} - _buf)) (ststatus_r8 _st.[25]); smt().
+  by rewrite modzMDl modz_small; smt(modz_ge0 ltz_pmod).
+wp; skip => &hr [#] Hp Ea E25 Hr0 Hr1 H0.
+have /= [Wa [Wr Wt]] := ststatus_byte0 (WArray208.get64 (WArray208.init64 (fun i0 => st{hr}.[i0])).[200 <- truncateu8 (W64.of_int at{hr})] 25) st{hr}.[25] (truncateu8 (W64.of_int at{hr})) _.
++ by move=> j Hj; rewrite st26_set8_bits8 //; smt().
+rewrite Wr Wt E25 /= /pabsorb_spec_updstate_avx2 /ststatus_at_norm /= Wr Wa E25.
+have Tb : W8.to_uint (truncateu8 (W64.of_int at{hr})) = at{hr}.
++ by rewrite /truncateu8 W8.of_uintK W64.of_uintK; smt(modz_small modz_ge0 ltz_pmod pow2_64).
+have Ei : Array25.init ("_.[_]" (Array26.init (fun i => WArray208.get64 (WArray208.init64 ("_.[_]" st{hr})).[200 <- truncateu8 (W64.of_int at{hr})] i)))
+          = Array25.init (fun i => st{hr}.[i]).
++ by apply Array25.tP => i Hi; rewrite !Array25.initiE // Array26.initiE 1:/# /=; apply W8u8.wordP => j Hj; rewrite st26_set8_bits8 1,2:/#; smt().
+by rewrite Tb Ei size_cat size_memread //; do ! split => //; smt(modz_ge0 ltz_pmod).
+qed.
 
-
-
-
-
-
-phoare absorb_m_updstate_avx2_ph _mem _st _buf _len:
+phoare absorb_m_updstate_avx2_ph _l _mem _st _buf _len:
   [ M._absorb_m_updstate_avx2
   : Glob.mem = _mem /\ st = _st /\ buf = _buf /\ len = _len
-  ==> res = absorb_m_updstate_avx2_spec _mem _st _buf _len
+    /\ pabsorb_spec_updstate_avx2 _l _st /\ 0 <= _len /\ _buf + _len < W64.modulus
+  ==> pabsorb_spec_updstate_avx2 (_l ++ memread _mem _buf _len) res
+    /\ ststatus_r8     res.[25] = ststatus_r8     _st.[25]
+    /\ ststatus_trailb res.[25] = ststatus_trailb _st.[25]
   ] = 1%r.
 proof.
 by conseq absorb_m_updstate_avx2_ll
-       (absorb_m_updstate_avx2_h _mem _st _buf _len).
+       (absorb_m_updstate_avx2_h _l _mem _st _buf _len).
 qed.
 
 
@@ -754,7 +892,7 @@ module MM = {
       at <- (at `|>>` 3);
       at <- (at `<<` 3);
       (off2, t64) <@ RW.MM.__a_rlen_read_upto8 (buf, off, len);
-      len <- (len + at);
+      len <- (len + (W64.to_uint at8));
       sh <- (truncateu8 at8);
       sh <- (sh `<<` (W8.of_int 3));
       t64 <- (t64 `<<` (sh `&` (W8.of_int 63)));
@@ -995,50 +1133,68 @@ module MM = {
 
 lemma add_updstate_avx2_ll: islossless MM._add_updstate_avx2.
 proof.
-proc.
-admit.
+proc; seq 3 : true.
++ sp; if; last by auto.
+  by inline *; auto.
++ by inline *; auto.
+seq 6 : true.
++ by while true; auto; while true; auto.
++ while true (upto + 8 - newat); first by move=> z; auto => /#.
+  by wp; while true (upto + 32 - newat); [move=> z; auto => /# | auto => /#].
++ by inline *; auto.
++ by hoare; while true; auto; while true; auto.
++ done.
++ by hoare; inline *; auto.
+done.
 qed.
+
+hoare ststatus_data_r8_h: M._ststatus_data : true ==> 1 <= res.`2.
+proof.
+proc; auto => /> &hr.
+pose X := (((ststatus{hr} `>>` W8.of_int 8) `&` W64.of_int 255) + W64.one) `<<` W8.of_int 3.
+case: (W64.of_int 200 \ult X) => C /=.
++ done.
+by rewrite /X shl_shlw 1:/# to_uint_shl 1:/# to_uintD_small (W64.to_uint_and_mod 8) ..2:/# 1:/# to_uint1 /#.
+qed.
+
+lemma ststatus_data_ll: islossless M._ststatus_data by islossless.
 
 lemma update_updstate_avx2_ll: islossless MM._update_updstate_avx2.
 proof.
-proc.
-wp; call add_updstate_avx2_ll.
-admit(*
-while true (len %/ r8 + 1).
- move=> z; wp.
- call keccakf1600_st25_avx2_ll.
- call add_updstate_avx2_ll.
- by auto => /> /#.
-by islossless.
-*).
+proc; seq 3 : (1 <= r8).
++ by inline *; auto.
++ call (: true ==> 1 <= res.`2); first by conseq ststatus_data_ll ststatus_data_r8_h.
+  by auto.
++ wp; call add_updstate_avx2_ll; wp; while (1 <= r8) len; [move=> z; wp; call keccakf1600_st25_avx2_ll; call add_updstate_avx2_ll; auto => /# | auto => /#].
++ by hoare; call ststatus_data_r8_h; auto.
+done.
 qed.
 
 lemma dump_updstate_avx2_ll: islossless MM._dump_updstate_avx2.
 proof.
-admit(*
-proc.
-while true ((upto - at + 8) %/ 8).
- move=> z; wp; auto => /> /#.
-while true ((upto - at + 32) %/ 32).
- move=> z; wp; auto => /> /#.
-by islossless.
-*).
+proc; seq 3 : true.
++ by inline *; auto.
++ by inline *; auto.
++ seq 6 : true.
+  + by while true; auto; while true; auto.
+  + while true (upto + 8 - newat); first by move=> z; auto => /#.
+    by wp; while true (upto + 32 - newat); [move=> z; auto => /# | auto => /#].
+  + by inline *; auto.
+  + by hoare; while true; auto; while true; auto.
+  + done.
++ by hoare; inline *; auto.
+done.
 qed.
 
 lemma squeeze_updstate_avx2_ll: islossless MM._squeeze_updstate_avx2.
 proof.
-admit(*
-proc.
-wp; call dump_updstate_avx2_ll.
-while true (len %/ r8 + 1).
- move=> z; wp.
- call keccakf1600_st25_avx2_ll.
- call dump_updstate_avx2_ll.
- by auto => /> /#.
-if => //.
- call keccakf1600_st25_avx2_ll; by auto.
-by islossless.
-*).
+proc; seq 3 : (1 <= r8).
++ by inline *; auto.
++ call (: true ==> 1 <= res.`2); first by conseq ststatus_data_ll ststatus_data_r8_h.
+  by auto.
++ wp; call dump_updstate_avx2_ll; wp; while (1 <= r8) len; [move=> z; wp; call keccakf1600_st25_avx2_ll; call dump_updstate_avx2_ll; auto => /# | wp; sp; if; [wp; call keccakf1600_st25_avx2_ll; auto => /# | auto => /#]].
++ by hoare; call ststatus_data_r8_h; auto.
+done.
 qed.
 
 lemma absorb_updstate_avx2_ll: islossless MM.absorb_updstate_avx2.
@@ -1063,8 +1219,54 @@ hoare add_updstate_avx2_h _st _at _buf _off _upto:
      /\ res.`1 = _upto
      /\ res.`2 = _off + (_upto - _at).
 proof.
-proc.
-admitted.
+proc => /=; pose L := sub _buf _off (_upto - _at).
+seq 2 : (#pre /\ W64.to_uint at8 = _at %% 8).
++ auto => /> H0 H1 H2 H3 H4; rewrite (W64.to_uint_and_mod 3) // W64.of_uintK; smt(modz_small pow2_64).
+seq 1 : (st = xabs _st _at L at /\ off = _off + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ buf = _buf /\ upto = _upto /\ 0 <= _at /\ _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE).
++ if; last first.
+  + by skip => /> &hr H1 H2 H3 H4 H5; rewrite xabs0 //; left; rewrite -H5.
+  wp; ecall (a_rlen_read_upto8_h buf off len); wp; skip => /> &hr H0 H1 H2 H3 H4 Hk Hnz.
+  have Ea8 : at8{hr} = W64.of_int (_at %% 8) by rewrite -Hk W64.to_uintK.
+  have Hk0 : _at %% 8 <> 0 by move: Hnz; rewrite Ea8; apply contra => ->.
+  rewrite Hk shr3_shl3 Ea8 trunc_shl3_and63 1:/#; split; first smt().
+  move=> _ [o2 t] /= Hs Ho2.
+  have U := upd64_xabs _st _at L _at (8 * (_at %/ 8)) (t `<<` W8.of_int (8 * (_at %% 8))) _ _.
+  + smt().
+  + move=> r Hr; have B := srspec_u64_bits8 t (sub _buf _off (_upto - _at)) (_upto - _at) _ _ Hs; 1,2: rewrite ?size_sub /#.
+    rewrite W64.shl_shlw 1:/# bits8_u64_shl8 //.
+    by case: (r < _at %% 8) => C; [rewrite ifF 1:/# | rewrite ifT 1:/# B 1:/# /L; congr; smt()].
+  rewrite (xabs0 _st _at L _at) // in U; rewrite U /=.
+  have SL : size L = _upto - _at by rewrite /L size_sub /#.
+  by split; [smt() | move=> C; rewrite !xabs_addstate_at 1,2:/#; smt()].
+seq 3 : (st = xabs _st _at L at /\ off = _off + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto) /\ _upto < at + 32
+         /\ buf = _buf /\ upto = _upto /\ 0 <= _at /\ _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE).
++ while (st = xabs _st _at L at /\ newat = at + 32 /\ off = _off + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ buf = _buf /\ upto = _upto /\ 0 <= _at /\ _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE); last by auto => /#.
+  wp; skip => &hr [#] Est En Eo Ha0 Ha1 Ha8 -> -> H0 H1 H2 H3 Hc /=.
+  have SL : size L = _upto - _at by rewrite /L size_sub /#.
+  rewrite W256.xorwC Est (upd256_xabs _st _at L at{hr} at{hr}) 1:/#.
+  + by move=> r Hr; rewrite wget256_bits8 // 1:/# ifT 1:/# /L nth_sub 1:/# Eo; congr; ring.
+  by rewrite En /=; smt().
+seq 3 : (st = xabs _st _at L at /\ off = _off + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto) /\ _upto < at + 8
+         /\ buf = _buf /\ upto = _upto /\ 0 <= _at /\ _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE).
++ while (st = xabs _st _at L at /\ newat = at + 8 /\ off = _off + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ buf = _buf /\ upto = _upto /\ 0 <= _at /\ _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE); last by auto => /#.
+  wp; skip => &hr [#] Est En Eo Ha0 Ha1 Ha8 -> -> H0 H1 H2 H3 Hc /=.
+  rewrite Est (upd64_xabs _st _at L at{hr} at{hr}) 1:/#; last by rewrite En /=; smt().
+  by move=> r Hr; rewrite wget64_bits8 // 1:/# ifT 1:/# /L nth_sub 1:/# Eo; congr; ring.
+seq 1 : (st = addstate_at _st _at L /\ off = _off + (_upto - _at) /\ upto = _upto); last by auto.
+if; last by skip => &hr [#] -> -> Ha0 Ha1 Ha8 Hlt Hb -> H0 H1 H2 H3 Hc /=; rewrite xabs_addstate_at; [rewrite /L size_sub /# | smt()].
+wp; ecall (a_rlen_read_upto8_h buf off (W64.to_uint upto8)); wp; skip => &hr [#] Est Eo Ha0 Ha1 Ha8 Hlt -> -> H0 H1 H2 H3 Hc /=.
+have Eu : W64.to_uint (W64.of_int _upto `&` W64.of_int 7) = _upto - at{hr}.
++ by rewrite (W64.to_uint_and_mod 3) // W64.of_uintK; smt(modz_small pow2_64).
+rewrite Eu; split; first smt().
+move=> _ [o t] /= [Hs ->]; have B := srspec_u64_bits8 t (sub _buf off{hr} (_upto - at{hr})) (_upto - at{hr}) _ _ Hs; 1,2: rewrite ?size_sub /#.
+have SL : size L = _upto - _at by rewrite /L size_sub /#.
+rewrite Est (upd64_xabs _st _at L at{hr} at{hr}) 1:/#; last by rewrite xabs_addstate_at /#.
+move=> r Hr; rewrite B // ifT 1:/#; case: (r < _upto - at{hr}) => C; first by rewrite /L !nth_sub 1,2:/# Eo; congr; ring.
+by rewrite !nth_out ?size_sub /#.
+qed.
 
 phoare add_updstate_avx2_ph _st _at _buf _off _upto:
  [ MM._add_updstate_avx2
@@ -1095,7 +1297,53 @@ hoare update_updstate_avx2_h _l _buf _len _st:
   /\ ststatus_trailb res.[25] = ststatus_trailb _st.[25].
 proof.
 proc => /=.
-admitted.
+seq 3 : (#pre /\ r8 = ststatus_r8 _st.[25] /\ at = ststatus_at_norm _st.[25]).
++ by ecall (ststatus_data_h st.[25]); wp; skip => /> &hr *; rewrite ststatus_data_specE.
+seq 4 : (pabsorb_spec_ref (ststatus_r8 _st.[25]) (_l ++ sub _buf 0 off) stk /\ at = (size _l + off) %% ststatus_r8 _st.[25]
+         /\ len = _len - off + at /\ 0 <= off <= _len /\ len < r8 /\ r8 = ststatus_r8 _st.[25] /\ buf = _buf /\ st = _st
+         /\ 0 < ststatus_r8 _st.[25] <= 200 /\ _len <= _ASIZE).
++ while (pabsorb_spec_ref (ststatus_r8 _st.[25]) (_l ++ sub _buf 0 off) stk /\ at = (size _l + off) %% ststatus_r8 _st.[25]
+         /\ len = _len - off + at /\ 0 <= off <= _len /\ r8 = ststatus_r8 _st.[25] /\ buf = _buf /\ st = _st
+         /\ 0 < ststatus_r8 _st.[25] <= 200 /\ _len <= _ASIZE).
+  + wp; ecall (keccakf1600_st25_avx2_h stk); ecall (add_updstate_avx2_h stk at buf off r8).
+    skip => &hr [#] Hp Ea El Ho0 Ho1 -> -> -> Hr0 Hr1 HA Hc /=.
+    have Hs : size (_l ++ sub _buf 0 off{hr}) = size _l + off{hr} by rewrite size_cat size_sub.
+    split; first smt(modz_ge0 ltz_pmod).
+    move=> _ [a o s] [/= Es [_ Eo]] r -> /=; rewrite Es Eo.
+    have B := pabsorb_spec_ref_block (ststatus_r8 _st.[25]) (_l ++ sub _buf 0 off{hr}) (sub _buf off{hr} (ststatus_r8 _st.[25] - at{hr})) stk{hr} Hp _.
+    + by rewrite Hs size_sub; smt(modz_ge0 ltz_pmod).
+    rewrite Hs -Ea -catA in B; rewrite (sub_split off{hr} _buf 0 (off{hr} + (ststatus_r8 _st.[25] - at{hr}))) 1:/# /=.
+    rewrite (: off{hr} + (ststatus_r8 _st.[25] - at{hr}) - off{hr} = ststatus_r8 _st.[25] - at{hr}) 1:/# B /=.
+    have -> : size _l + (off{hr} + (ststatus_r8 _st.[25] - at{hr})) = ((size _l + off{hr}) %/ ststatus_r8 _st.[25] + 1) * ststatus_r8 _st.[25].
+    + by rewrite Ea; smt(divz_eq).
+    by rewrite modzMl /=; smt(modz_ge0 ltz_pmod).
+  auto => /> &hr; rewrite /pabsorb_spec_updstate_avx2 /= => [#] Hr0 Hr1 Hat Hp H0 H1.
+  by move=> HA; split; [rewrite (: sub _buf 0 0 = []) 1:-size_eq0 1:size_sub // cats0 | smt()].
+seq 3 : (pabsorb_spec_ref (ststatus_r8 _st.[25]) (_l ++ sub _buf 0 _len) (Array25.init (fun i => st.[i]))
+         /\ at = (size _l + _len) %% ststatus_r8 _st.[25] /\ st.[25] = _st.[25] /\ 0 < ststatus_r8 _st.[25] <= 200 /\ 0 <= _len <= _ASIZE).
++ wp; ecall (add_updstate_avx2_h stk at buf off len); wp; skip => &hr [#] Hp Ea El Ho0 Ho1 Hlt Er -> -> Hr0 Hr1 HA /=.
+  split; first smt().
+  move=> _ [a o s] [/= Es [Ea2 _]].
+  have -> : Array25.init ("_.[_]" (Array26.init (fun i => if 0 <= i < 25 then s.[i] else _st.[i]))) = s.
+  + by apply Array25.tP => i Hi; rewrite Array25.initiE // Array26.initiE /#.
+  have Hs : size (_l ++ sub _buf 0 off{hr}) = size _l + off{hr} by rewrite size_cat size_sub.
+  have B := pabsorb_spec_ref_add (ststatus_r8 _st.[25]) (_l ++ sub _buf 0 off{hr}) (sub _buf off{hr} (len{hr} - at{hr})) stk{hr} Hp _.
+  + by rewrite Hs size_sub; smt(modz_ge0 ltz_pmod).
+  rewrite Hs -Ea -catA in B; rewrite Es Ea2 (sub_split off{hr} _buf 0 _len) 1:/# /= (: _len - off{hr} = len{hr} - at{hr}) 1:/# B /=.
+  have -> : size _l + _len = (size _l + off{hr}) %/ ststatus_r8 _st.[25] * ststatus_r8 _st.[25] + len{hr}.
+  + by rewrite El Ea; have := divz_eq (size _l + off{hr}) (ststatus_r8 _st.[25]); smt().
+  by rewrite modzMDl modz_small; smt(modz_ge0 ltz_pmod).
+wp; skip => &hr [#] Hp Ea E25 Hr0 Hr1 H0 HA.
+have /= [Wa [Wr Wt]] := ststatus_byte0 (WArray208.get64 (WArray208.init64 (fun i0 => st{hr}.[i0])).[200 <- truncateu8 (W64.of_int at{hr})] 25) st{hr}.[25] (truncateu8 (W64.of_int at{hr})) _.
++ by move=> j Hj; rewrite st26_set8_bits8 //; smt().
+rewrite Wr Wt E25 /= /pabsorb_spec_updstate_avx2 /ststatus_at_norm /= Wr Wa E25.
+have Tb : W8.to_uint (truncateu8 (W64.of_int at{hr})) = at{hr}.
++ by rewrite /truncateu8 W8.of_uintK W64.of_uintK; smt(modz_small modz_ge0 ltz_pmod pow2_64).
+have Ei : Array25.init ("_.[_]" (Array26.init (fun i => WArray208.get64 (WArray208.init64 ("_.[_]" st{hr})).[200 <- truncateu8 (W64.of_int at{hr})] i)))
+          = Array25.init (fun i => st{hr}.[i]).
++ by apply Array25.tP => i Hi; rewrite !Array25.initiE // Array26.initiE 1:/# /=; apply W8u8.wordP => j Hj; rewrite st26_set8_bits8 1,2:/#; smt().
+by rewrite Tb Ei size_cat size_sub //; do ! split => //; smt(modz_ge0 ltz_pmod).
+qed.
 
 phoare update_updstate_avx2_ph _l _buf _len _st:
  [ MM._update_updstate_avx2
@@ -1154,8 +1402,68 @@ hoare dump_updstate_avx2_h _buf _off _st _at _upto:
      /\ res.`1 = _upto
      /\ res.`2 = _off + (_upto - _at).
 proof.
-proc => /=.
-admitted.
+proc => /=; pose F := fun i => (stbytes _st).[i - _off + _at].
+seq 2 : (#pre /\ W64.to_uint at8 = _at %% 8).
++ by auto => /> H0 H1 H2 H3 H4; rewrite (W64.to_uint_and_mod 3) // W64.of_uintK; smt(modz_small pow2_64).
+seq 1 : (off = _off + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ (forall i, 0 <= i < _ASIZE => !(_off <= i < _off + (_upto - _at)) => buf.[i] = _buf.[i])
+         /\ (forall i, _off <= i < _off + (at - _at) => buf.[i] = F i)
+         /\ st = _st /\ upto = _upto /\ 0 <= _at /\ _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE).
++ if; last by skip => /> &hr H1 H2 H3 H4 H5; split; [rewrite -H5 | smt()].
+  wp; ecall (a_rlen_write_upto8_h buf off t64 len); wp; skip => /> &hr H0 H1 H2 H3 H4 Hk Hnz.
+  have Ea8 : at8{hr} = W64.of_int (_at %% 8) by rewrite -Hk W64.to_uintK.
+  have Hk0 : _at %% 8 <> 0 by move: Hnz; rewrite Ea8; apply contra => ->.
+  rewrite Hk shr3_shl3 Ea8 trunc_shl3_and63 1:/#; split; first smt().
+  have Fv : forall i, _off <= i => i - _off + _at %% 8 < 8 =>
+            (u64bytes (WArray200.get64_direct (stbytes _st) (8 * (_at %/ 8)) `>>` W8.of_int (8 * (_at %% 8)))).[i - _off] = F i.
+  + by move=> i Hi0 Hi1; rewrite get_u64bytes W64.shr_shrw 1:/# bits8_u64_shr8 1,2:/# get64d_bits8 1:/# /F; congr; smt().
+  move=> _ [b o] /= -> ->; split => C.
+  + do 3! (split; first smt()); split => i Hi0 Hi1; first by move=> Hn; rewrite A.filliE 1:/# ifF 1:/#.
+    by rewrite A.filliE 1:/# ifT 1:/# /= Fv /#.
+  split; first smt().
+  by split => i Hi0 Hi1; [move=> Hn; rewrite A.filliE 1:/# ifF 1:/# | rewrite A.filliE 1:/# ifT 1:/# /= Fv /#].
+seq 3 : (off = _off + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto) /\ _upto < at + 32
+         /\ (forall i, 0 <= i < _ASIZE => !(_off <= i < _off + (_upto - _at)) => buf.[i] = _buf.[i])
+         /\ (forall i, _off <= i < _off + (at - _at) => buf.[i] = F i)
+         /\ st = _st /\ upto = _upto /\ 0 <= _at /\ _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE).
++ while (newat = at + 32 /\ off = _off + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ (forall i, 0 <= i < _ASIZE => !(_off <= i < _off + (_upto - _at)) => buf.[i] = _buf.[i])
+         /\ (forall i, _off <= i < _off + (at - _at) => buf.[i] = F i)
+         /\ st = _st /\ upto = _upto /\ 0 <= _at /\ _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE); last by auto => /#.
+  wp; skip => &hr [#] En Eo Ha0 Ha1 Ha8 Hout Hin -> -> H0 H1 H2 H3 Hc /=.
+  have /= -> := a_set256_fill buf{hr} off{hr} (WArray200.get256_direct (stbytes _st) at{hr}).
+  do 3! (split; first smt()); split; first by move=> i Hi Hn; rewrite A.filliE 1:/# ifF 1:/# Hout /#.
+  split; last smt().
+  move=> i Hi; rewrite A.filliE 1:/#; case: (off{hr} <= i < off{hr} + 32) => C /=; last by apply Hin => /#.
+  by rewrite get256d_bits8 1:/# /F; congr; smt().
+seq 3 : (off = _off + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto) /\ _upto < at + 8
+         /\ (forall i, 0 <= i < _ASIZE => !(_off <= i < _off + (_upto - _at)) => buf.[i] = _buf.[i])
+         /\ (forall i, _off <= i < _off + (at - _at) => buf.[i] = F i)
+         /\ st = _st /\ upto = _upto /\ 0 <= _at /\ _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE).
++ while (newat = at + 8 /\ off = _off + (at - _at) /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ (forall i, 0 <= i < _ASIZE => !(_off <= i < _off + (_upto - _at)) => buf.[i] = _buf.[i])
+         /\ (forall i, _off <= i < _off + (at - _at) => buf.[i] = F i)
+         /\ st = _st /\ upto = _upto /\ 0 <= _at /\ _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE); last by auto => /#.
+  wp; skip => &hr [#] En Eo Ha0 Ha1 Ha8 Hout Hin -> -> H0 H1 H2 H3 Hc /=.
+  have /= -> := a_set64_fill buf{hr} off{hr} (WArray200.get64_direct (stbytes _st) at{hr}).
+  do 3! (split; first smt()); split; first by move=> i Hi Hn; rewrite A.filliE 1:/# ifF 1:/# Hout /#.
+  split; last smt().
+  move=> i Hi; rewrite A.filliE 1:/#; case: (off{hr} <= i < off{hr} + 8) => C /=; last by apply Hin => /#.
+  by rewrite get64d_bits8 1:/# /F; congr; smt().
+seq 1 : ((forall i, 0 <= i < _ASIZE => !(_off <= i < _off + (_upto - _at)) => buf.[i] = _buf.[i])
+         /\ (forall i, _off <= i < _off + (_upto - _at) => buf.[i] = F i) /\ off = _off + (_upto - _at) /\ upto = _upto).
++ if; last by skip => &hr [#] -> Ha0 Ha1 Ha8 Hlt Hout Hin _ -> H0 H1 H2 H3 Hc /=; smt().
+  wp; ecall (a_rlen_write_upto8_h buf off t64 (W64.to_uint upto8)); wp; skip => &hr [#] Eo Ha0 Ha1 Ha8 Hlt Hout Hin -> -> H0 H1 H2 H3 Hc /=.
+  have Eu : W64.to_uint (W64.of_int _upto `&` W64.of_int 7) = _upto - at{hr}.
+  + by rewrite (W64.to_uint_and_mod 3) // W64.of_uintK; smt(modz_small pow2_64).
+  rewrite Eu; split; first smt().
+  move=> _ [b o] /= [-> ->]; split; first by move=> i Hi Hn; rewrite A.filliE 1:/# ifF 1:/# Hout /#.
+  split; last smt().
+  move=> i Hi; rewrite A.filliE 1:/#; case: (off{hr} <= i < off{hr} + min 8 (max 0 (_upto - at{hr}))) => C /=; last by apply Hin => /#.
+  by rewrite get_u64bytes get64d_bits8 1:/# /F; congr; smt().
+auto => /> &hr Hout Hin; apply A.tP => i Hi; rewrite A.filliE //.
+by case: (_off <= i < _off + (_upto - _at)) => C; [exact (Hin i C) | exact (Hout i Hi C)].
+qed.
 
 phoare dump_updstate_avx2_ph _buf _off _st _at _upto:
  [ MM._dump_updstate_avx2
@@ -1178,26 +1486,77 @@ qed.
 
 hoare squeeze_updstate_avx2_h _buf _st _r8 _len:
  MM._squeeze_updstate_avx2
- : buf=_buf /\ len=_len /\ st=_st /\ ststatus_r8 _st.[25] = _r8
- /\ 0 < _r8 <= 200 /\ 0 <= _len <= _ASIZE
+ : buf=_buf /\ len=_len /\ st=_st /\ ststatus_r8 _st.[25] = _r8 /\ ststatus_at_norm _st.[25] = 0
+ /\ 0 < _r8 <= 200 /\ 0 < _len <= _ASIZE
  ==> let stk = Array25.init (fun i => _st.[i]) in
-     res.`2 = of_list W8.zero (SQUEEZE1600 _r8 _len stk)
-     /\ res.`1 = Array26.init (fun i =>
-          if i < 25 then (st_i stk ((_len - 1) %/ _r8 + 1)).[i]
-          else _st.[i]).
+     res.`2 = A.fill (fun i => (SQUEEZE1600 _r8 _len stk).[i]) 0 _len _buf
+     /\ Array25.init (fun i => res.`1.[i]) = st_i stk ((_len - 1) %/ _r8 + 1)
+     /\ ststatus_at res.`1.[25] = (_len - 1) %% _r8 + 1
+     /\ ststatus_r8 res.`1.[25] = _r8
+     /\ ststatus_trailb res.`1.[25] = ststatus_trailb _st.[25].
 proof.
-proc => /=.
-admitted.
+proc => /=; seq 3 : (#pre /\ r8 = _r8 /\ at = 0).
++ by ecall (ststatus_data_h st.[25]); wp; skip => /> &hr *; rewrite ststatus_data_specE.
+rcondt 2; first by auto.
+seq 6 : (off %% _r8 = 0 /\ stk = st_i (Array25.init (fun i => _st.[i])) (off %/ _r8 + 1) /\ at = 0 /\ len = _len - off /\ 0 < len <= _r8
+         /\ 0 <= off /\ buf = A.fill (fun i => (SQUEEZE1600 _r8 _len (Array25.init (fun i => _st.[i]))).[i]) 0 off _buf
+         /\ r8 = _r8 /\ st = _st /\ ststatus_r8 _st.[25] = _r8 /\ 0 < _r8 <= 200 /\ 0 < _len <= _ASIZE).
++ while (off %% _r8 = 0 /\ stk = st_i (Array25.init (fun i => _st.[i])) (off %/ _r8 + 1) /\ at = 0 /\ len = _len - off /\ 0 < len
+         /\ 0 <= off /\ buf = A.fill (fun i => (SQUEEZE1600 _r8 _len (Array25.init (fun i => _st.[i]))).[i]) 0 off _buf
+         /\ r8 = _r8 /\ st = _st /\ ststatus_r8 _st.[25] = _r8 /\ 0 < _r8 <= 200 /\ 0 < _len <= _ASIZE).
+  + wp; ecall (keccakf1600_st25_avx2_h stk); ecall (dump_updstate_avx2_h buf off stk at r8).
+    skip => &hr [#] Hm -> -> El Hl0 Ho0 -> -> -> Er Hr0 Hr1 Hn0 Hn1 Hc /=.
+    split; first smt().
+    move=> _ [a o b] [/= Eb [_ Eo]] r ->; rewrite Eb Eo /=.
+    have Ek : off{hr} %/ _r8 * _r8 = off{hr} by have := divz_eq off{hr} _r8; smt().
+    have R := rsq_step_len (Array25.init (fun i => _st.[i])) _r8 _len (off{hr} %/ _r8) _r8 _buf _ _ _ _; 1..4: smt(divz_ge0).
+    rewrite Ek in R.
+    split; first by rewrite modzDr.
+    have Ed : (off{hr} + _r8) %/ _r8 = off{hr} %/ _r8 + 1 by rewrite divzDr //; smt(divzz).
+    have Hk0 : 0 <= off{hr} %/ _r8 + 1 by smt(divz_ge0).
+    move: R => /= ->; rewrite Ed /st_i iterS //=.
+    + smt(divz_ge0).
+    have Ek2 : 0 <= off{hr} %/ _r8 by smt(divz_ge0).
+    by rewrite (: off{hr} %/ _r8 + 2 = off{hr} %/ _r8 + 1 + 1) 1:/# iterS 1:/# iterS //; clear Eb Ek Ed; smt().
+  wp; ecall (keccakf1600_st25_avx2_h stk); wp; skip => /> &hr H0 H1 H2 H3.
+  by split; [split; [by rewrite /st_i iter1 | by rewrite A.fillE; apply A.tP => k Hk; rewrite A.initiE //= /#] | smt()].
+seq 3 : (buf = A.fill (fun i => (SQUEEZE1600 _r8 _len (Array25.init (fun i => _st.[i]))).[i]) 0 _len _buf
+         /\ Array25.init (fun i => st.[i]) = st_i (Array25.init (fun i => _st.[i])) ((_len - 1) %/ _r8 + 1)
+         /\ at = (_len - 1) %% _r8 + 1 /\ st.[25] = _st.[25] /\ ststatus_r8 _st.[25] = _r8 /\ 0 < _r8 <= 200).
++ wp; ecall (dump_updstate_avx2_h buf off stk at len); wp; skip => &hr [#] Hm -> -> El Hl0 Hl1 Ho0 -> Er -> Er8 Hr0 Hr1 Hn0 Hn1 /=.
+  split; first smt().
+  move=> _ [a o b] [/= Eb [Ea Eo]]; have Ek : off{hr} %/ _r8 * _r8 = off{hr} by have := divz_eq off{hr} _r8; smt().
+  have El1 : _len - 1 = off{hr} %/ _r8 * _r8 + (len{hr} - 1) by smt().
+  have Hlr : 0 <= len{hr} - 1 < `|_r8| by smt().
+  have Eq : (_len - 1) %/ _r8 = off{hr} %/ _r8 by rewrite El1 divzMDl 1:/# (divz_small _ _ Hlr).
+  have Em : (_len - 1) %% _r8 + 1 = len{hr} by rewrite El1 modzMDl (modz_small _ _ Hlr).
+  have R := rsq_step_len (Array25.init (fun i => _st.[i])) _r8 _len (off{hr} %/ _r8) len{hr} _buf _ _ _ _; 1..4: smt(divz_ge0).
+  rewrite Ek (: off{hr} + len{hr} = _len) 1:/# in R.
+  rewrite Eb Ea Eq Em; move: R => /= ->; rewrite Er8 /=.
+  split; last smt().
+  by apply Array25.tP => i Hi; rewrite !Array25.initiE // Array26.initiE 1:/# /= ifT 1:/#.
+wp; skip => &hr [#] Eb Est Ea E25 Er8 Hr0 Hr1.
+have /= [Wa [Wr Wt]] := ststatus_byte0 (WArray208.get64 (WArray208.init64 (fun i0 => st{hr}.[i0])).[200 <- truncateu8 (W64.of_int at{hr})] 25) st{hr}.[25] (truncateu8 (W64.of_int at{hr})) _.
++ by move=> j Hj; rewrite st26_set8_bits8 //; smt().
+have Tb : W8.to_uint (truncateu8 (W64.of_int at{hr})) = at{hr}.
++ by rewrite /truncateu8 W8.of_uintK W64.of_uintK; smt(modz_small modz_ge0 ltz_pmod pow2_64).
+have Ei : Array25.init ("_.[_]" (Array26.init (fun i => WArray208.get64 (WArray208.init64 ("_.[_]" st{hr})).[200 <- truncateu8 (W64.of_int at{hr})] i)))
+          = Array25.init (fun i => st{hr}.[i]).
++ by apply Array25.tP => i Hi; rewrite !Array25.initiE // Array26.initiE 1:/# /=; apply W8u8.wordP => j Hj; rewrite st26_set8_bits8 1,2:/#; smt().
+rewrite Wa Wr Wt Tb Ei Est Ea E25 Er8 /=.
+by move: Eb => /=.
+qed.
 
 phoare squeeze_updstate_avx2_ph _buf _st _r8 _len:
  [ MM._squeeze_updstate_avx2
- : buf=_buf /\ len=_len /\ st=_st /\ ststatus_r8 _st.[25] = _r8
- /\ 0 < _r8 <= 200 /\ 0 <= _len <= _ASIZE
+ : buf=_buf /\ len=_len /\ st=_st /\ ststatus_r8 _st.[25] = _r8 /\ ststatus_at_norm _st.[25] = 0
+ /\ 0 < _r8 <= 200 /\ 0 < _len <= _ASIZE
  ==> let stk = Array25.init (fun i => _st.[i]) in
-     res.`2 = of_list W8.zero (SQUEEZE1600 _r8 _len stk)
-     /\ res.`1 = Array26.init (fun i =>
-          if i < 25 then (st_i stk ((_len - 1) %/ _r8 + 1)).[i]
-          else _st.[i])
+     res.`2 = A.fill (fun i => (SQUEEZE1600 _r8 _len stk).[i]) 0 _len _buf
+     /\ Array25.init (fun i => res.`1.[i]) = st_i stk ((_len - 1) %/ _r8 + 1)
+     /\ ststatus_at res.`1.[25] = (_len - 1) %% _r8 + 1
+     /\ ststatus_r8 res.`1.[25] = _r8
+     /\ ststatus_trailb res.`1.[25] = ststatus_trailb _st.[25]
  ] = 1%r.
 proof.
 by conseq squeeze_updstate_avx2_ll (squeeze_updstate_avx2_h _buf _st _r8 _len).
@@ -1210,13 +1569,14 @@ qed.
 
 hoare squeeze_updstate_avx2_outer_h _buf _st _r8 _len:
  MM.squeeze_updstate_avx2
- : buf=_buf /\ len=_len /\ st=_st /\ ststatus_r8 _st.[25] = _r8
- /\ 0 < _r8 <= 200 /\ 0 <= _len <= _ASIZE
+ : buf=_buf /\ len=_len /\ st=_st /\ ststatus_r8 _st.[25] = _r8 /\ ststatus_at_norm _st.[25] = 0
+ /\ 0 < _r8 <= 200 /\ 0 < _len <= _ASIZE
  ==> let stk = Array25.init (fun i => _st.[i]) in
-     res.`2 = of_list W8.zero (SQUEEZE1600 _r8 _len stk)
-     /\ res.`1 = Array26.init (fun i =>
-          if i < 25 then (st_i stk ((_len - 1) %/ _r8 + 1)).[i]
-          else _st.[i]).
+     res.`2 = A.fill (fun i => (SQUEEZE1600 _r8 _len stk).[i]) 0 _len _buf
+     /\ Array25.init (fun i => res.`1.[i]) = st_i stk ((_len - 1) %/ _r8 + 1)
+     /\ ststatus_at res.`1.[25] = (_len - 1) %% _r8 + 1
+     /\ ststatus_r8 res.`1.[25] = _r8
+     /\ ststatus_trailb res.`1.[25] = ststatus_trailb _st.[25].
 proof.
 proc.
 call (squeeze_updstate_avx2_h _buf _st _r8 _len).
@@ -1225,13 +1585,14 @@ qed.
 
 phoare squeeze_updstate_avx2_outer_ph _buf _st _r8 _len:
  [ MM.squeeze_updstate_avx2
- : buf=_buf /\ len=_len /\ st=_st /\ ststatus_r8 _st.[25] = _r8
- /\ 0 < _r8 <= 200 /\ 0 <= _len <= _ASIZE
+ : buf=_buf /\ len=_len /\ st=_st /\ ststatus_r8 _st.[25] = _r8 /\ ststatus_at_norm _st.[25] = 0
+ /\ 0 < _r8 <= 200 /\ 0 < _len <= _ASIZE
  ==> let stk = Array25.init (fun i => _st.[i]) in
-     res.`2 = of_list W8.zero (SQUEEZE1600 _r8 _len stk)
-     /\ res.`1 = Array26.init (fun i =>
-          if i < 25 then (st_i stk ((_len - 1) %/ _r8 + 1)).[i]
-          else _st.[i])
+     res.`2 = A.fill (fun i => (SQUEEZE1600 _r8 _len stk).[i]) 0 _len _buf
+     /\ Array25.init (fun i => res.`1.[i]) = st_i stk ((_len - 1) %/ _r8 + 1)
+     /\ ststatus_at res.`1.[25] = (_len - 1) %% _r8 + 1
+     /\ ststatus_r8 res.`1.[25] = _r8
+     /\ ststatus_trailb res.`1.[25] = ststatus_trailb _st.[25]
  ] = 1%r.
 proof.
 by conseq squeeze_updstate_avx2_outer_ll (squeeze_updstate_avx2_outer_h _buf _st _r8 _len).

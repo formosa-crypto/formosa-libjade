@@ -51,9 +51,9 @@ namespace polynomial {
 
             hint_block = #VPSRL_8u32(hint_block, 31);
             hints.[:u256 offset] = hint_block;
-            offset += 32;
-
             weight += (64ui)num_hints;
+
+            offset += 32;
         }
 
         return hints, weight;

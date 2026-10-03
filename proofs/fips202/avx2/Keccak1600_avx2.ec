@@ -132,18 +132,6 @@ rewrite /PABSORB1600 chunk0 /= 1:/#.
 by rewrite /stateabsorb_iblocks /= /chunkremains /= /stateabsorb bytes2state0 addstate_st0.
 qed.
 
-(*
-lemma pabsorb_spec_avx2_cat r8 l1 l2 pst1 st1 pst2 st2:
- pabsorb_spec_avx2 r8 l1 st1 =>
- pabsorb_spec_avx2 r8 st1 l22 st2 (l12++l2)=>
- pabsorb_spec_avx2 r8 st0 l22 st2 (l1++l2).
-proof.
-rewrite /pabsorb_spec_avx2 => /> Hr0 Hr1; split.
- admit.
-admit.
-qed.
-*)
-
 op fillpst_at (st: W64.t Array25.t) (at:int) (l: W8.t list) =
  stwords
   (WArray200.fill 
@@ -333,48 +321,34 @@ rewrite !initiE // xorwE shlwE of_uintK modz_small 1:/# Hk /=.
 by rewrite nth_one /#.
 qed.
 
-
+lemma stavx2_pos_l n: 0 <= (stavx2_pos n).`2 < 4.
+proof.
+rewrite /stavx2_pos; case: (0 <= n < 25) => C.
++ smt().
+smt().
+qed.
 
 hoare addratebit_avx2_h _r8 _stavx2:
  M.__addratebit_avx2
  : st = _stavx2 /\ rATE_8=_r8 /\ 0 < _r8 <= 200 /\ stavx2INV st
  ==> res = stavx2_from_st25 (addratebit _r8 (stavx2_to_st25 _stavx2)).
 proof.
-proc; simplify.
-sp.
-seq 1: (#pre /\ (r,l) = stavx2_pos ((rATE_8 - 1) %/ 8)).
- by ecall (stavx2_pos_avx2_h ((rATE_8 - 1) %/ 8)); auto => /> /#.
-case: (r=0).
- rcondt 1; first by auto.
- auto => |> &m  ??Hinv H.
- have := stavx2_pos0 ((_r8 - 1) %/ 8) _; first smt().
- rewrite -H /= => {H} H.
- rewrite (stavx2_pos0' _ (stavx2_to_st25 _stavx2)).
-  admit.
- pose x:= (W64.one `<<` W8.of_int ((8 * _r8 - 1) %% 64)).
- congr.
- move: (Top.stavx2_to_st25 _stavx2) => _s.
- rewrite /addratebit /addratebit8 -stbytesK.
- apply stbytes_inj; rewrite !stwordsK tP => i Hi.
- rewrite initiE 1:/# /= initiE 1:/# get_setE // get_setE 1:/# /=.
- case: (i%/8=0) => C1.
-  case: (i=_r8-1) => C2.
-   rewrite -C2 C1 xorb8E; congr.
-   admit.
-  rewrite xorb8E initiE //= C1. 
-   have ->: (x \bits8 i %% 8) = W8.zero. admit.
-   smt().
- case: (i=_r8-1) => ?; first smt().
- by rewrite initiE //=. 
-rcondf 1; first by auto.
-wp; ecall (u64_to_u256_h l t64); auto => |> &m ??Hinv H ?.
-split.
- admit.
-move=> ??.
-rewrite (stavx2_posP _stavx2 ((_r8 - 1) %/ 8) r{m} l{m} _ Hinv _ H). admit.
-rewrite /addratebit -addratebitE 1:/#.
-congr.
-move: H; rewrite u64_xorbitE /#.
+proc; simplify; sp; seq 1: (#pre /\ (r,l) = stavx2_pos ((rATE_8 - 1) %/ 8)); first by ecall (stavx2_pos_avx2_h ((rATE_8 - 1) %/ 8)); auto => /> /#.
+have AR : forall s, addratebit _r8 s = s.[(_r8 - 1) %/ 8 <- s.[(_r8 - 1) %/ 8] `^` (W64.one `<<` W8.of_int ((8 * _r8 - 1) %% 64))] \/ !(0 < _r8 <= 200).
++ move=> s; case: (0 < _r8 <= 200) => C; last by right.
+  by left; rewrite /addratebit -addratebitE // u64_xorbitE //; smt().
+if.
++ auto => |> &m Hr0 Hr1 Hinv H.
+  have := stavx2_pos0 ((_r8 - 1) %/ 8) _; first smt().
+  rewrite -H /= => En; rewrite (stavx2_pos0' _ (stavx2_to_st25 _stavx2)); first by rewrite stavx2_to_st25K.
+  have [E | /#] := AR (stavx2_to_st25 _stavx2).
+  by rewrite E En.
+wp; ecall (u64_to_u256_h l t64); auto => |> &m Hr0 Hr1 Hinv H Hr; split; first by have := stavx2_pos_l ((_r8 - 1) %/ 8); rewrite -H.
+move=> _ _; have Hn : 0 < (_r8 - 1) %/ 8 < 25.
++ case: ((_r8 - 1) %/ 8 = 0) => E0; last smt().
+  by move: H; rewrite E0 /stavx2_pos /=; smt().
+rewrite (stavx2_posP _stavx2 ((_r8 - 1) %/ 8) r{m} l{m} _ Hinv Hn H); have [E | /#] := AR (stavx2_to_st25 _stavx2).
+by rewrite E.
 qed.
 
 phoare addratebit_avx2_ph _r8 _stavx2:

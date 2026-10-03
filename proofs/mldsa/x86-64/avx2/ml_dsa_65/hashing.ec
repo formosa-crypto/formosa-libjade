@@ -979,8 +979,8 @@ proc.
    to the squeeze precondition. *)
 ecall (A64updstate.squeeze_updstate_avx2_h message_representative state 136 len).
 wp; ecall (finish_updstate_avx2_h state).
-wp; ecall (absorb_m_updstate_avx2_h Glob.mem state buf len).
-wp; ecall (absorb_m_updstate_avx2_h Glob.mem state buf len).
+wp; ecall (absorb_m_updstate_avx2_h (sub prefix 0 66 ++ memread Glob.mem context_pointer context_size) Glob.mem state buf len).
+wp; ecall (absorb_m_updstate_avx2_h (sub prefix 0 66) Glob.mem state buf len).
 wp; ecall (A66updstate.update_updstate_avx2_h [] prefix len state).
 wp; ecall (init_updstate_avx2_h state rate64 trailb).
 wp; skip => />.
@@ -1036,43 +1036,30 @@ split.
 move=> _ _ _ _ _ _
        result0 Ho1 Ho2 Ho3 Ho4 Ho5 Ho6 Ho_r8_inv Ho_tb_inv.
 
-(* Refold the unfolded post predicate parts into a single pabsorb fact
-   for result0. *)
-have Hro_p :
-  pabsorb_spec_updstate_avx2 (sub prefix_built 0 66) result0.
+(* Chain through absorb_m × 2 (their posts give the pabsorb facts), then
+   finish via the bridge. *)
+split; first smt(size_ge0).
+move=> _ result1 Ha1 Ha2 Ha3 Ha4 Ha5 Ha6 Hac_r8 Hac_tb.
+split; first smt(size_ge0).
+move=> _ result2 Hm1 Hm2 Hm3 Hm4 Hm5 Hm6 Ham_r8 Ham_tb.
+have Ham_p :
+  pabsorb_spec_updstate_avx2
+    ((sub prefix_built 0 66
+      ++ memread Glob.mem{hr} context_pointer{hr} (size _ctx))
+      ++ memread Glob.mem{hr} message_pointer{hr} (size _msg)) result2.
 + rewrite /pabsorb_spec_updstate_avx2 /Keccak1600_ref.pabsorb_spec_ref /=.
   smt().
 
-(* Chain through absorb_m × 2 and finish using the bridges. *)
-have [Hac_p [Hac_r8 Hac_tb]] := absorb_m_pabsorb Glob.mem{hr} result0
-  context_pointer{hr} (size _ctx) (sub prefix_built 0 66)
-  Hro_p _ _; 1,2: smt(size_ge0).
+have [Hf_eq Hf_r8] := finish_absorb result2 _ Ham_p.
 
-have [Ham_p [Ham_r8 Ham_tb]] := absorb_m_pabsorb Glob.mem{hr}
-  (absorb_m_updstate_avx2_spec Glob.mem{hr} result0
-     context_pointer{hr} (size _ctx))
-  message_pointer{hr} (size _msg)
-  (sub prefix_built 0 66 ++ memread Glob.mem{hr} context_pointer{hr} (size _ctx))
-  Hac_p _ _; 1,2: smt(size_ge0).
-
-have [Hf_eq Hf_r8] := finish_absorb
-  (absorb_m_updstate_avx2_spec Glob.mem{hr}
-     (absorb_m_updstate_avx2_spec Glob.mem{hr} result0
-        context_pointer{hr} (size _ctx))
-     message_pointer{hr} (size _msg))
-  (sub prefix_built 0 66
-     ++ memread Glob.mem{hr} context_pointer{hr} (size _ctx)
-     ++ memread Glob.mem{hr} message_pointer{hr} (size _msg))
-  Ham_p.
-
-(* Goal now: (r8 of post-finish = 136) /\ ((r8 = 136) => forall result4, ...). *)
-split; first by rewrite Hf_r8 Ham_r8 Hac_r8 Ho_r8_inv Hi_r8.
-move=> _ result4 Hres4_2 _.
+(* Goal now: (r8 of post-finish = 136 /\ at of post-finish = 0) /\ (... => forall result4, ...). *)
+split; first by split; [rewrite Hf_r8 Ham_r8 Hac_r8 Ho_r8_inv Hi_r8 | exact (finish_at0 result2)].
+move=> _ _ result4 Hres4_2 _ _ _ _.
 
 (* Close: substitute squeeze post, apply finish bridge, unfold SHAKE256. *)
 rewrite Hres4_2.
 apply Array64.tP => i Hi.
-rewrite Array64.get_of_list //.
+rewrite Array64.filliE // ifT 1:/# /=.
 rewrite Hf_eq Ham_r8 Hac_r8 Ho_r8_inv Hi_r8
         Ham_tb Hac_tb Ho_tb_inv Hi_tb.
 rewrite prefix_msg Hctx Hmsg -!catA.

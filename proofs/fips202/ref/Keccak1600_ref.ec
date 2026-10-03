@@ -111,7 +111,11 @@ conseq (:_ ==> st=st0) => //=.
 seq 1: #pre; first inline*; auto.
 if => //.
  (* AVX2 path *)
- admit (* circuit *).
+ wp; skip => /> *.
+ rewrite !stwordsK; apply Array25.tP => j Hj; rewrite Array25.get_setE //; case: (j = 24) => [-> |Cj]; first by rewrite /st0 Array25.initiE.
+ rewrite /st0 !Array25.initiE //= WArray200.get64E; apply W64.wordP => b Hb; rewrite pack8wE // W8u8.Pack.initiE 1:/# /=.
+ rewrite /WArray200.set256_direct WArray200.initiE 1:/# /=.
+ by do 5! (rewrite /WArray200.set256_direct WArray200.initiE 1:/# /=); rewrite !W32u8.get_zero; smt(W8.zerowE).
 (* scalar path *)
 while (0 <= i <= 25 /\ forall k, 0 <= k < i => st.[k] = z64).
  auto => /> &m Hi1 _ IH Hi2; split; first smt().
