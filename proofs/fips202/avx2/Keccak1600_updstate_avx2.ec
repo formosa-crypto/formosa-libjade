@@ -343,18 +343,6 @@ qed.
 lemma finish_updstate_avx2_ll: islossless M._finish_updstate_avx2.
 proof. islossless. qed.
 
-lemma shl0:
-    forall (x: W64.t), x `<<<` 0 = x.
-  move => x. rewrite -(W64.to_uintK x) shlMP /#. qed. 
-
-lemma shr0:
-    forall (x: W64.t), x `>>>` 0 = x.
-proof.
-  move => x. rewrite -(W64.to_uintK x) shrDP 1:/# expr0 pmod_small.
-  rewrite to_uint_cmp. rewrite divz1 /#. 
-qed. 
-
-
 hoare finish_updstate_avx2_h _st:
   M._finish_updstate_avx2
   : st = _st
@@ -497,7 +485,7 @@ case(x < 25) => state_eq /=.
       + rewrite /= ifF 1:/# initE ifT 1:/# /= initE ifT 1:/# (pdiv_small (x0 %% 8)) 1:/# /=.
         rewrite /xor_byte_at_st25 /= shl_shlw 1:/# /=. 
         have->: 56 + x0 %% 8 = x0 by smt(). have->: x0 %% 8 = x0 - 56 by smt().
-        rewrite shl0  shl_shlw 1:/# shlMP 1:/# mulrC !modzMDl divzMDl 1:/# eq_sym.
+        rewrite u64_shl0 shl_shlw 1:/# shlMP 1:/# mulrC !modzMDl divzMDl 1:/# eq_sym.
         rewrite (Ring.IntID.mulrC _ (2^(8*((-1) %% 8)))) {3}/W64.of_int int2bs_mod.
         rewrite int2bs_mulr_pow2 1:/# /= get_setE 1:/# -H' ifT 1:/# /= get_setE 1:/#.
         rewrite divzMDl 1:/# divz_small 1:/# addr0. 

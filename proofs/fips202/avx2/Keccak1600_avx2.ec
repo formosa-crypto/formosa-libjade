@@ -17,6 +17,7 @@ from Jasmin require import JModel.
 require import JWordList.
 from CryptoSpecs require import Keccakf1600_Spec FIPS202_SHA3_Spec.
 from CryptoSpecs require export Keccak1600_Spec.
+require export Keccak1600_statebytes.
 
 from JazzEC require import Keccak1600_Jazz.
 from JazzEC require import WArray200.
@@ -116,9 +117,6 @@ op stavx2_keccakf1600 = stF_avx2 keccak_f1600_op.
 op absorb_spec_avx2 (r8: int) (tb: int) (l: W8.t list) st =
  st = stavx2_from_st25 (ABSORB1600 (W8.of_int tb) r8 l).
 
-op PABSORB1600 r8 m =
- stateabsorb (stateabsorb_iblocks (chunk r8 m) st0) (chunkremains r8 m).
-
 op pabsorb_spec_avx2 r8 l (st: W256.t Array7.t): bool =
  0 < r8 <= 200 /\
  st=stavx2_from_st25 (PABSORB1600 r8 l).
@@ -143,11 +141,6 @@ rewrite /pabsorb_spec_avx2 => /> Hr0 Hr1; split.
 admit.
 qed.
 *)
-
-op fillpst_at (st: W64.t Array25.t) (at:int) (l: W8.t list) =
- stwords
-  (WArray200.fill 
-   (fun i => nth W8.zero l (i-at)) at (size l) (stbytes st)).
 
 (*
 op squeeze_spec_avx2 r8 st l =

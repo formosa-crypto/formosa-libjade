@@ -15,6 +15,7 @@ from Jasmin require import JModel.
 
 require import JWordList.
 from CryptoSpecs require export Keccakf1600_Spec Keccak1600_Spec.
+require export Keccak1600_statebytes.
 
 require import Keccak_bindings.
 
@@ -58,16 +59,6 @@ qed.
 (* end: MOVE TO CryptoSpecs *)
 
 
-op fillstate_at (st: W64.t Array25.t) (at:int) (l: W8.t list) =
- stwords
-  (WArray200.fill 
-   (fun i => l.[i-at]) at (size l) (stbytes st)).
-
-op addstate_at (st: W64.t Array25.t) (at:int) (l: W8.t list) =
- stwords
-  (WArray200.fill 
-   (fun i => (stbytes st).[i] `^` l.[i-at]) at (size l) (stbytes st)).
-
 op absorb_spec_ref (r8: int) (tb: int) (l: W8.t list) st =
  st = ABSORB1600 (W8.of_int tb) r8 l.
 
@@ -84,6 +75,12 @@ rewrite chunk0 /= 1:/#.
 rewrite /stateabsorb_iblocks /= /chunkremains /=.
 by rewrite addstate_st0 bytes2state0.
 qed.
+
+(* the shared predicate (Keccak1600_statebytes) under its ref name; kept as
+   a separate op because downstream proofs unfold it by qualified name *)
+lemma pabsorb_spec_refE r8 l st:
+ pabsorb_spec_ref r8 l st = pabsorb_spec r8 l st.
+proof. by []. qed.
 
 
 (******************************************************************************

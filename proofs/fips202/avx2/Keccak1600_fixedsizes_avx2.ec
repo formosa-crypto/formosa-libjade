@@ -28,9 +28,6 @@ import IntOrder.
 op addstate_avx2 (s1: W256.t Array7.t, s2:state): W256.t Array7.t =
  stavx2_from_st25 (addstate (stavx2_to_st25 s1) s2).
 
-op absorb_state_avx2 (st: W256.t Array7.t, l: W8.t list): W256.t Array7.t =
- addstate_avx2 st (bytes2state l).
-
 op stavx2_pack w0 w1 w2 w3 w4 w5 w6 w7 w8 w9 =
  sliceset256_64_25 
   (sliceset256_64_25 
@@ -93,39 +90,6 @@ qed.
 require import BitEncoding.
 import BitChunking.
 
-
-
-lemma bytes2state_cat l1 l2:
- bytes2state (l1++l2)
- = addstate (bytes2state l1) (bytes2state (u8zeros (size l1)++l2)).
-proof.
-rewrite -bytes2stbytesP.
-have: bytes2stbytes (l1 ++ l2)
-      = stbytes (addstate (bytes2state l1) (bytes2state (u8zeros (size l1) ++ l2))).
- rewrite tP stbytes_addstate => i Hi.
- rewrite /addstbytes map2iE // -!bytes2stbytesP !stwordsK !get_of_list // !nth_cat size_nseq ler_maxr.
-  smt(size_ge0).
- case: (i < size l1) => C.
-  by rewrite nth_u8zeros.
- by rewrite (nth_out _ l1) 1:/#.
-by move => ->; rewrite stbytesK.
-qed.
- 
-(*
-lemma chunk1 ['a] r (l: 'a list):
- r <> 0 =>
- size l = r =>
- chunk r l = [l].
-proof.
-move=> Hr Hsz.
-by rewrite /chunk Hsz divzz Hr b2i1 mkseq1 /= drop0 -Hsz take_size.
-qed.
-*)
-
-lemma stateabsorb_iblocks_rcons l x st:
- stateabsorb_iblocks (rcons l x) st
- = keccak_f1600_op (stateabsorb (stateabsorb_iblocks l st) x).
-proof. by rewrite /stateabsorb_iblocks foldl_rcons /=. qed.
 
 lemma srspecP lw at l len tb:
  srpre 0 at l len tb =>
@@ -464,21 +428,6 @@ wp; call addstate_m_avx2_ll.
 by auto => /#.
 qed.
 
-lemma memread0' mem buf len:
- len <= 0 =>
- memread mem buf len = [].
-proof. by move=> ?; rewrite /memread mkseq0_le. qed.
-
-lemma memread_split len' mem buf len:
- 0 <= len' <= len =>
- memread mem buf len = memread mem buf len' ++ memread mem (buf+len') (len-len').
-proof.
-move=> Hlen.
-rewrite (:len=len'+(len-len')) 1:/# /memread mkseq_add 1..2:/#; congr.
-rewrite (:len' + (len - len') - len'=len-len') 1:/#.
-by apply eq_mkseq => i /= /#.
-qed.
-
 lemma chunk_cat_memread mem r8 l buf len:
  let at = size l %% r8 in
  let lastpos = (at + len) %/ r8 * r8 - at in
@@ -786,7 +735,6 @@ by conseq squeeze_m_avx2_ll (squeeze_m_avx2_h _mem _buf _len _st _r8).
 qed.
 
 
-
 abstract theory KeccakArrayAvx2.
 
 op _ASIZE: int.
@@ -809,28 +757,6 @@ clone import ReadWriteArray as RW
       proof _ASIZE_u64 by exact _ASIZE_u64.
 
 
-(* TODO: move/refactor this to somewhere else *)
-
-lemma take_to_list (buf: W8.t A.t) sz:
- sz <= _ASIZE =>
- take sz (A.to_list buf) = sub buf 0 sz.
-proof.
-move=> Hsz; case: (0 <= sz) => C.
- by rewrite take_mkseq //.
-by rewrite take_le0 1:/# /sub mkseq0_le /#.
-qed.
-
-lemma drop_to_list (buf: W8.t A.t) sz:
- 0 <= sz =>
- drop sz (A.to_list buf) = sub buf sz (_ASIZE-sz).
-proof.
-move=> Hsz; case: (sz < _ASIZE) => C.
- rewrite drop_mkseq 1:/#.
- apply eq_mkseq => x.
- by rewrite /(\o) /=.
-by rewrite drop_oversize ?size_to_list 1:/# /sub mkseq0_le 1:/#.
-qed.
-
 lemma chunk_cat_buf r8 l (buf: W8.t A.t):
  let at = size l %% r8 in
  let lastpos = (at + _ASIZE) %/ r8 * r8 - at in
@@ -850,11 +776,6 @@ rewrite ifT; first smt(size_ge0).
 rewrite take0 /sub mkseq0_le 1:/# cats0.
 by rewrite eq_sym chunk_take_eq 1:/# size_chunkremains divz_small 1:/# take0.
 qed.
-
-lemma sub0' (buf: W8.t A.t) off len:
- len <= 0 =>
- sub buf off len = [].
-proof. by move=> ?; rewrite /sub mkseq0_le. qed.
 
 lemma chunkremains_cat_buf r8 l (buf: W8.t A.t) tb:
  let at = size l %% r8 in
@@ -886,17 +807,6 @@ rewrite -!catA bytes2state_cat; congr; congr; congr.
 rewrite /to_list /sub /=; congr; smt().
 qed.
 
-lemma sub_split len' (buf: W8.t A.t) off len:
- 0 <= len' <= len =>
- sub buf off len = sub buf off len' ++ sub buf (off+len') (len-len').
-proof.
-move=> Hlen.
-rewrite (:len=len'+(len-len')) 1:/# /sub mkseq_add 1..2:/#; congr.
-rewrite (:len' + (len - len') - len'=len-len') 1:/#.
-by apply eq_mkseq => i /= /#.
-qed.
-
-(* end TODO *)
 
 op asubread_pre (cur at off dlt len tb: int): bool = 
  0<=cur /\ 0<=at /\ 0<=off /\ 0<=dlt /\ 0<=len /\ 0<=tb<256 /\
@@ -951,14 +861,14 @@ module MM = {
       buf, offset, dELTA, _LEN, _TRAILB, 0, aT);
       st.[0] <- (st.[0] `^` r0);
     } else {
-      
+
     }
     if (((aT < 40) /\ ((0 < _LEN) \/ (_TRAILB <> 0)))) {
       (dELTA, _LEN, _TRAILB, aT, r1) <@ RW.MM.__a_ilen_read_upto32_at (buf, 
       offset, dELTA, _LEN, _TRAILB, 8, aT);
       st.[1] <- (st.[1] `^` r1);
     } else {
-      
+
     }
     if (((0 < _LEN) \/ (_TRAILB <> 0))) {
       (dELTA, _LEN, _TRAILB, aT, t64_2) <@ RW.MM.__a_ilen_read_upto8_at (buf,
@@ -985,13 +895,13 @@ module MM = {
         offset, dELTA, _LEN, _TRAILB, 168, aT);
         st <@ M.__addstate_r3456_avx2 (st, r3, r4, r5, r6);
       } else {
-        
+
       }
       r2 <- (zeroextu256 t128_2);
       r2 <- (VINSERTI128 r2 t128_1 (W8.of_int 1));
       st.[2] <- (st.[2] `^` r2);
     } else {
-      
+
     }
     offset <- (offset + dELTA);
     return (st, aT, offset);
@@ -1022,13 +932,13 @@ module MM = {
       }
       _LEN <- (_LEN %% _RATE8);
     } else {
-      
+
     }
     (st, aT,  _2) <@ __addstate_avx2 (st, aT, buf, offset, _LEN, _TRAILB);
     if ((_TRAILB <> 0)) {
       st <@ M.__addratebit_avx2 (st, _RATE8);
     } else {
-      
+
     }
     return (st, aT);
   }
@@ -1146,7 +1056,7 @@ module MM = {
           _LEN, t);
           t128_0 <- (VPUNPCKH_2u64 t128_0 t128_0);
         } else {
-          
+
         }
         if ((0 < _LEN)) {
           t256_4 <-
@@ -1167,14 +1077,14 @@ module MM = {
           (buf, dELTA, _LEN) <@ RW.MM.__a_ilen_write_upto32 (buf, offset, dELTA,
           _LEN, t256_4);
         } else {
-          
+
         }
         if ((0 < _LEN)) {
           t <- (MOVV_64 (truncateu64 t128_1));
           (buf, dELTA, _LEN) <@ RW.MM.__a_ilen_write_upto8 (buf, offset, dELTA,
           _LEN, t);
         } else {
-          
+
         }
         if ((0 < _LEN)) {
           t256_4 <-
@@ -1195,14 +1105,14 @@ module MM = {
           (buf, dELTA, _LEN) <@ RW.MM.__a_ilen_write_upto32 (buf, offset, dELTA,
           _LEN, t256_4);
         } else {
-          
+
         }
         if ((0 < _LEN)) {
           t <- (MOVV_64 (truncateu64 t128_0));
           (buf, dELTA, _LEN) <@ RW.MM.__a_ilen_write_upto8 (buf, offset, dELTA,
           _LEN, t);
         } else {
-          
+
         }
         if ((0 < _LEN)) {
           t256_4 <-
@@ -1223,13 +1133,13 @@ module MM = {
           (buf, dELTA, _LEN) <@ RW.MM.__a_ilen_write_upto32 (buf, offset, dELTA,
           _LEN, t256_4);
         } else {
-          
+
         }
       } else {
-        
+
       }
     } else {
-      
+
     }
     offset <- (offset + dELTA);
     return (buf, offset);
@@ -1255,7 +1165,7 @@ module MM = {
       st <@ M._keccakf1600_avx2 (st);
       (buf, offset) <@ __dumpstate_avx2 (buf, offset, lO, st);
     } else {
-      
+
     }
     return (st, buf);
   }
