@@ -17,7 +17,7 @@ from Jasmin require import JModel_x86.
 
 from JazzEC require import Keccak1600_Jazz.
 from JazzEC require import WArray200 WArray208.
-from JazzEC require import Array25 Array26.
+from JazzEC require import Array3 Array25 Array26.
 
 require import JWordList.
 from CryptoSpecs require import FIPS202_Keccakf1600.
@@ -288,6 +288,33 @@ rewrite /ststatus_at -W8u8.to_uint_zeroextu64; congr; apply W64.wordP => k Hk.
 by rewrite W64.andwE W8u8.zeroextu64_bit (: 255 = 2^8 - 1) 1:// W64.of_int_powm1 // Hb //; case: (k < 8) => C /=; smt().
 qed.
 
+
+lemma keccak_ststatus_ll: islossless M.keccak_ststatus.
+proof. islossless. qed.
+
+hoare keccak_ststatus_h _st:
+  M.keccak_ststatus
+  : st = _st
+  ==> W8.to_uint res.[0] = ststatus_r8 _st.[25]
+   /\ W8.to_uint res.[1] = ststatus_at_norm _st.[25]
+   /\ res.[2] = ststatus_trailb _st.[25].
+proof.
+proc; wp; ecall (ststatus_data_h ststatus); wp; skip => &hr -> /= r ->; rewrite ststatus_data_specE /=.
+have [Hr0 Hr1] : 0 <= ststatus_r8 _st.[25] <= 200 by rewrite /ststatus_r8 /=; smt(W64.to_uint_cmp).
+have [Ha0 Ha1] : 0 <= ststatus_at_norm _st.[25] <= 200 by rewrite /ststatus_at_norm /ststatus_r8 /ststatus_at /=; smt(W64.to_uint_cmp).
+split; first by rewrite /truncateu8 W8.of_uintK W64.of_uintK; smt(modz_small pow2_64).
+split; first by rewrite /truncateu8 W8.of_uintK W64.of_uintK; smt(modz_small pow2_64).
+by rewrite /WArray208.get8 /WArray208.init64 WArray208.initiE //= /ststatus_trailb W8u8.bits8_div // /truncateu8 W64.shr_div_le //=.
+qed.
+
+phoare keccak_ststatus_ph _st:
+  [ M.keccak_ststatus
+  : st = _st
+  ==> W8.to_uint res.[0] = ststatus_r8 _st.[25]
+   /\ W8.to_uint res.[1] = ststatus_at_norm _st.[25]
+   /\ res.[2] = ststatus_trailb _st.[25]
+  ] = 1%r.
+proof. by conseq keccak_ststatus_ll (keccak_ststatus_h _st). qed.
 
 lemma init_updstate_avx2_ll: islossless M._init_updstate_avx2.
 proof. by proc; sp; wp; while(0 <= i <= 6) (6-i); auto => /#. qed.

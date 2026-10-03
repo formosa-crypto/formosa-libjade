@@ -6490,12 +6490,12 @@ module M = {
     var r8:int;
     var at:int;
     var  _0:W64.t;
-    ststatus <- st.[25];
+    ststatus <- st.[(4 * 25)];
     ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     status.[0] <- (truncateu8 (W64.of_int r8));
     status.[1] <- (truncateu8 (W64.of_int at));
     status.[2] <-
-    (get8_direct (WArray808.init64 (fun i => st.[i])) ((8 * 25) + 2));
+    (get8_direct (WArray808.init64 (fun i => st.[i])) ((32 * 25) + 2));
     return status;
   }
   proc init_updstate_avx2x4 (st:W64.t Array101.t, r64:int, trailb:W8.t) : 

@@ -126,11 +126,11 @@ export fn ststatus_updstate_avx2x4
 {
   reg ui64 r8 at;
   reg u64 ststatus;
-  ststatus = st[25];
+  ststatus = st[:u64 4*25];
   _, r8, at = _ststatus_data_avx2x4(ststatus);
   status[0] = (8u) (64u) r8;
   status[1] = (8u) (64u) at;
-  status[2] = st.[:u8 8*25+2];
+  status[2] = st.[:u8 32*25+2];
   return status;
 }
 

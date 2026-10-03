@@ -17,7 +17,7 @@ from Jasmin require import JModel_x86.
 
 from JazzEC require import Keccak1600_Jazz.
 from JazzEC require import WArray200 WArray800 WArray808.
-from JazzEC require import Array25 Array26 Array101.
+from JazzEC require import Array3 Array25 Array26 Array101.
 
 require import JWordList.
 from CryptoSpecs require import FIPS202_Keccakf1600.
@@ -284,6 +284,34 @@ phoare finish_updstate_avx2x4_ph _st:
 proof.
 by conseq finish_updstate_avx2x4_ll (finish_updstate_avx2x4_h _st).
 qed.
+
+lemma ststatus_updstate_avx2x4_ll: islossless M.ststatus_updstate_avx2x4.
+proof. islossless. qed.
+
+hoare ststatus_updstate_avx2x4_h _st:
+  M.ststatus_updstate_avx2x4
+  : st = _st
+  ==> W8.to_uint res.[0] = ststatus_r8 _st.[100]
+   /\ W8.to_uint res.[1] = ststatus_at_norm _st.[100]
+   /\ res.[2] = ststatus_trailb _st.[100].
+proof.
+proc; inline M._ststatus_data_avx2x4; wp; skip => &hr -> /=.
+have [_ [Er Ea]] := ststatus_data_avx2x4P _st.[100]; rewrite /truncateu8 !W8.of_uintK Er Ea.
+have [Hr0 Hr1] : 0 <= ststatus_r8 _st.[100] <= 200 by rewrite /ststatus_r8 /=; smt(W64.to_uint_cmp).
+have [Ha0 Ha1] : 0 <= ststatus_at_norm _st.[100] <= 200 by rewrite /ststatus_at_norm /ststatus_r8 /ststatus_at /=; smt(W64.to_uint_cmp).
+split; first smt(pow2_8).
+split; first smt(pow2_8).
+by rewrite /WArray808.get8 /WArray808.init64 WArray808.initiE //= /ststatus_trailb W8u8.bits8_div // /truncateu8 W64.shr_div_le //=.
+qed.
+
+phoare ststatus_updstate_avx2x4_ph _st:
+  [ M.ststatus_updstate_avx2x4
+  : st = _st
+  ==> W8.to_uint res.[0] = ststatus_r8 _st.[100]
+   /\ W8.to_uint res.[1] = ststatus_at_norm _st.[100]
+   /\ res.[2] = ststatus_trailb _st.[100]
+  ] = 1%r.
+proof. by conseq ststatus_updstate_avx2x4_ll (ststatus_updstate_avx2x4_h _st). qed.
 
 
 lemma st4x_eqP (a b: state4x):
