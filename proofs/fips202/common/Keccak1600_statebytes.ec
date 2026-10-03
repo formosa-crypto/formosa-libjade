@@ -455,6 +455,17 @@ move=> i; rewrite size_take' 1:/# size_state2bytes => Hi.
 by rewrite nth_take 1..2:/# state2bytesE nth_sub /#.
 qed.
 
+lemma sub_stbytes_4lanes (st: state) k:
+ 0 <= k => k + 4 <= 25 =>
+ sub (stbytes st) (8*k) 32
+ = u64bytes st.[k] ++ u64bytes st.[k+1] ++ u64bytes st.[k+2] ++ u64bytes st.[k+3].
+proof.
+move=> H0 H1; rewrite !u64bytes_stword 1..4:/#.
+rewrite (_: 32 = 8 + 24) 1:// sub_cat // (_: 24 = 8 + 16) 1:// sub_cat //.
+rewrite (_: 16 = 8 + 8) 1:// sub_cat // !catA.
+by rewrite (_: 8*k+8+8+8 = 8*(k+3)) 1:/# (_: 8*k+8+8 = 8*(k+2)) 1:/# (_: 8*k+8 = 8*(k+1)) 1:/#.
+qed.
+
 lemma mul_divz_le (r8 len i: int):
  0 < r8 => i <= len %/ r8 => r8 * i <= len.
 proof.

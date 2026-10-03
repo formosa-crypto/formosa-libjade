@@ -1155,6 +1155,26 @@ have ->: truncateu8 w = (w `&` W64.of_int (2^8-1)) \bits8 0.
 by rewrite /u64bytes /=; circuit.
 qed.
 
+lemma trunc_unpckh (w: W128.t): truncateu64 (VPUNPCKH_2u64 w w) = w \bits64 1.
+proof.
+have ->: forall (x: W128.t), truncateu64 x = x \bits64 0 by move=> x; circuit.
+by rewrite /VPUNPCKH_2u64 /interleave_gen /get_hi_2u64 /=.
+qed.
+
+lemma u128bytes_split (w: W128.t):
+ u128bytes w = u64bytes (truncateu64 w) ++ u64bytes (truncateu64 (VPUNPCKH_2u64 w w)).
+proof. by rewrite trunc_unpckh /u128bytes /u64bytes /=; do! split; circuit. qed.
+
+lemma take8_u128bytes (w: W128.t): take 8 (u128bytes w) = u64bytes (truncateu64 w).
+proof. by rewrite u128bytes_split take_size_cat // /u64bytes size_to_list. qed.
+
+lemma u256bytes_split (w: W256.t):
+ u256bytes w = u128bytes (truncateu128 w) ++ u128bytes (VEXTRACTI128 w (W8.of_int 1)).
+proof. by rewrite /u256bytes /u128bytes /=; do! split; circuit. qed.
+
+lemma take16_u256bytes (w: W256.t): take 16 (u256bytes w) = u128bytes (truncateu128 w).
+proof. by rewrite u256bytes_split take_size_cat // /u128bytes size_to_list. qed.
+
 lemma bits8_u64_shr8 (w: W64.t) k i:
  0 <= k => 0 <= i < 8 =>
  w `>>>` 8*k \bits8 i
@@ -1501,6 +1521,66 @@ have Hle: r8 * (len %/ r8) <= len by apply mul_divz_le => /#.
 by rewrite take_oversize /#.
 qed.
 
+(* budgeted sub-writes of a prefix [sub S 0 k]: one step, a skipped step
+   (budget exhausted), and changing or truncating the budget *)
+lemma msubwrite_sub_step (S: WArray200.t) m0 m1 m2 b len k n k1 lw b1 l1 b2 l2:
+ 0 <= k => 0 <= n => k1 = k + n =>
+ msubwrite m0 m1 (sub S 0 k) b len b1 l1 =>
+ lw = sub S k n =>
+ msubwrite m1 m2 lw b1 l1 b2 l2 =>
+ msubwrite m0 m2 (sub S 0 k1) b len b2 l2.
+proof.
+move=> Hk Hn -> H1 -> H2.
+by rewrite (sub_cat S 0 k n) //=; exact (msubwrite_cat _ _ _ _ _ _ _ _ _ _ _ H1 H2).
+qed.
+
+lemma msubwrite_sub_skip (S: WArray200.t) m0 m1 b len k k' b1 l1:
+ 0 <= k <= k' => !(0 < l1) =>
+ msubwrite m0 m1 (sub S 0 k) b len b1 l1 =>
+ msubwrite m0 m1 (sub S 0 k') b len b1 l1.
+proof.
+move=> Hk Hl; rewrite /msubwrite !size_sub 1,2:/# => [[-> [-> El]]].
+case: (len <= 0) => C; first by rewrite !take_le0 //; smt().
+have Hlk: len <= k by smt().
+by rewrite !take_sub200 1,2:/#; smt().
+qed.
+
+lemma msubwrite_take_budget m0 m1 (lw: W8.t list) n b len b1 l1:
+ 0 <= n => len <= n =>
+ msubwrite m0 m1 lw b len b1 l1 =>
+ msubwrite m0 m1 (take n lw) b len b1 l1.
+proof.
+move=> Hn Hl; rewrite /msubwrite => [[-> [-> ->]]].
+rewrite take_take' size_take'; smt(size_ge0).
+qed.
+
+lemma msubwrite_untake m0 m1 (lw: W8.t list) n b len b1 l1:
+ 0 <= n => len <= n =>
+ msubwrite m0 m1 (take n lw) b len b1 l1 =>
+ msubwrite m0 m1 lw b len b1 l1.
+proof.
+move=> Hn Hl; rewrite /msubwrite => [[-> [-> ->]]].
+rewrite take_take' size_take'; smt(size_ge0).
+qed.
+
+lemma msubwrite_rebudget m0 m1 (lw: W8.t list) b len len' b1 l1 l1':
+ size lw <= len => size lw <= len' => l1' = len' - size lw =>
+ msubwrite m0 m1 lw b len b1 l1 =>
+ msubwrite m0 m1 lw b len' b1 l1'.
+proof.
+move=> H1 H2 -> ; rewrite /msubwrite => [[-> [-> _]]].
+by rewrite !take_oversize //; smt(size_ge0).
+qed.
+
+lemma msubwrite_dump_take (S: WArray200.t) m0 m1 b len k b1 l1:
+ 0 <= len <= k =>
+ msubwrite m0 m1 (sub S 0 k) b len b1 l1 =>
+ m1 = stores m0 b (sub S 0 len) /\ b1 = b + len.
+proof.
+move=> Hl; rewrite /msubwrite size_sub 1:/# => [[-> [-> _]]].
+by rewrite take_sub200 1:/#; smt().
+qed.
+
 (******************************************************************************
  *                        CORRECTNESS theorems                                *
  ******************************************************************************)
@@ -1844,7 +1924,31 @@ hoare m_ilen_write_upto16_h (_m: global_mem_t) _buf _len _w:
  ==> msubwrite _m Glob.mem (u128bytes _w) _buf _len res.`1 res.`2.
 proof.
 proc => /=.
-admitted.
+if => //=; last first.
+ by auto => /> Hlen; rewrite /msubwrite take_le0 1:/# store0; smt(size_ge0).
+if => //=.
+ by auto => /> H0 H16; apply msubwrite_storeW128 => /#.
+(* 0 < lEN < 16: an optional low u64, then the rest via __m_ilen_write_upto8 *)
+seq 1: (0 < _len < 16
+        /\ ((8 <= _len /\ msubwrite _m Glob.mem (take 8 (u128bytes _w)) _buf _len buf lEN
+             /\ w = VPUNPCKH_2u64 _w _w)
+         \/ (_len < 8 /\ Glob.mem = _m /\ buf = _buf /\ lEN = _len /\ w = _w))).
+ if => //.
+  auto => /> H0 H16 H8; split; first smt().
+  have Hm: msubwrite _m (storeW64 _m _buf (MOVV_64 (truncateu64 _w))) (take 8 (u128bytes _w))
+             _buf _len (_buf + 8) (_len - 8).
+   by rewrite take8_u128bytes /MOVV_64; apply msubwrite_storeW64 => /#.
+  by left.
+ by auto => /> /#.
+ecall (m_ilen_write_upto8_h Glob.mem buf lEN t64).
+auto => |> &m H0 H16 Hc [b2 l2] m2 /= H2.
+case: Hc => [[H8 [H Hw]]|[H8 [Hm [Hb [Hl Hw]]]]].
+ move: H2; rewrite Hw => H2.
+ have := msubwrite_cat _ _ _ _ _ _ _ _ _ _ _ H H2.
+ by rewrite take8_u128bytes -u128bytes_split.
+move: H2; rewrite Hm Hb Hl Hw -take8_u128bytes => H2.
+by apply (msubwrite_untake _ _ _ 8 _ _ _ _ _ _ H2) => /#.
+qed.
 
 phoare m_ilen_write_upto16_ph (_m: global_mem_t) _buf _len _w:
  [ M.__m_ilen_write_upto16
@@ -1862,7 +1966,32 @@ hoare m_ilen_write_upto32_h (_m: global_mem_t) _buf _len _w:
  ==> msubwrite _m Glob.mem (u256bytes _w) _buf _len res.`1 res.`2.
 proof.
 proc => /=.
-admitted.
+if => //=; last first.
+ by auto => /> Hlen; rewrite /msubwrite take_le0 1:/# store0; smt(size_ge0).
+if => //=.
+ by auto => /> H0 H32; apply msubwrite_storeW256 => /#.
+(* 0 < lEN < 32: an optional low u128, then the rest via __m_ilen_write_upto16 *)
+seq 2: (0 < _len < 32
+        /\ ((16 <= _len /\ msubwrite _m Glob.mem (take 16 (u256bytes _w)) _buf _len buf lEN
+             /\ t128 = VEXTRACTI128 _w (W8.of_int 1))
+         \/ (_len < 16 /\ Glob.mem = _m /\ buf = _buf /\ lEN = _len /\ t128 = truncateu128 _w))).
+ seq 1: (#pre /\ t128 = truncateu128 w); first by auto.
+ if => //.
+  auto => /> H0 H32 H16; split; first smt().
+  have Hm: msubwrite _m (storeW128 _m _buf (truncateu128 _w)) (take 16 (u256bytes _w))
+             _buf _len (_buf + 16) (_len - 16).
+   by rewrite take16_u256bytes; apply msubwrite_storeW128 => /#.
+  by left.
+ by auto => /> /#.
+ecall (m_ilen_write_upto16_h Glob.mem buf lEN t128).
+auto => |> &m H0 H32 Hc [b2 l2] m2 /= H2.
+case: Hc => [[H16 [H Ht]]|[H16 [Hm [Hb [Hl Ht]]]]].
+ move: H2; rewrite Ht => H2.
+ have := msubwrite_cat _ _ _ _ _ _ _ _ _ _ _ H H2.
+ by rewrite take16_u256bytes -u256bytes_split.
+move: H2; rewrite Hm Hb Hl Ht -take16_u256bytes => H2.
+by apply (msubwrite_untake _ _ _ 16 _ _ _ _ _ _ H2) => /#.
+qed.
 
 phoare m_ilen_write_upto32_ph (_m: global_mem_t) _buf _len _w:
  [ M.__m_ilen_write_upto32
@@ -2612,6 +2741,74 @@ proof.
 move=> Hr C; rewrite (SQUEEZE1600_split r8 _ASIZE st) // 1:_ASIZE_ge0 ifF // cats0.
 apply asubwrite_to_list.
 by rewrite size_squeezeblocks //; smt(divz_ge0 _ASIZE_ge0).
+qed.
+
+(* budgeted sub-writes of a prefix (array) [sub S 0 k]: one step, a skipped step
+   (budget exhausted), and changing or truncating the budget *)
+lemma asubwrite_sub_step (S: WArray200.t) a0 a1 a2 off len k n k1 lw d1 l1 d2 l2:
+ 0 <= k => 0 <= n => k1 = k + n =>
+ asubwrite a0 a1 off (sub S 0 k) 0 len d1 l1 =>
+ lw = sub S k n =>
+ asubwrite a1 a2 off lw d1 l1 d2 l2 =>
+ asubwrite a0 a2 off (sub S 0 k1) 0 len d2 l2.
+proof.
+move=> Hk Hn -> H1 -> H2.
+by rewrite (sub_cat S 0 k n) //=; exact (asubwrite_cat _ _ _ _ _ _ _ _ _ _ _ _ H1 H2).
+qed.
+
+lemma asubwrite_sub_skip (S: WArray200.t) a0 a1 off len k k' d1 l1:
+ 0 <= k <= k' => !(0 < l1) =>
+ asubwrite a0 a1 off (sub S 0 k) 0 len d1 l1 =>
+ asubwrite a0 a1 off (sub S 0 k') 0 len d1 l1.
+proof.
+move=> Hk Hl; rewrite /asubwrite !size_sub 1,2:/# => [[-> [-> El]]].
+have ->: min k' (max 0 len) = min k (max 0 len) by smt().
+split; last smt().
+rewrite tP => i Hi; rewrite !filliE //=.
+case: (0 + 0 <= i - off < min k (max 0 len)) => C; last by smt().
+by rewrite !nth_sub /#.
+qed.
+
+lemma asubwrite_take_budget a0 a1 off (lw: W8.t list) n dlt len d1 l1:
+ 0 <= n => len <= n =>
+ asubwrite a0 a1 off lw dlt len d1 l1 =>
+ asubwrite a0 a1 off (take n lw) dlt len d1 l1.
+proof.
+move=> Hn Hl; rewrite /asubwrite size_take' // => [[-> [-> ->]]].
+have ->: min (if n <= size lw then n else size lw) (max 0 len) = min (size lw) (max 0 len) by smt().
+split; last done.
+rewrite tP => i Hi; rewrite !filliE //=.
+by case: (off + dlt <= i < off + dlt + min (size lw) (max 0 len)) => C //; rewrite nth_take /#.
+qed.
+
+lemma asubwrite_untake a0 a1 off (lw: W8.t list) n dlt len d1 l1:
+ 0 <= n => len <= n =>
+ asubwrite a0 a1 off (take n lw) dlt len d1 l1 =>
+ asubwrite a0 a1 off lw dlt len d1 l1.
+proof.
+move=> Hn Hl; rewrite /asubwrite size_take' // => [[-> [-> ->]]].
+have ->: min (if n <= size lw then n else size lw) (max 0 len) = min (size lw) (max 0 len) by smt().
+split; last done.
+rewrite tP => i Hi; rewrite !filliE //=.
+by case: (off + dlt <= i < off + dlt + min (size lw) (max 0 len)) => C //; rewrite nth_take /#.
+qed.
+
+lemma asubwrite_rebudget a0 a1 off (lw: W8.t list) dlt len len' d1 l1 l1':
+ size lw <= len => size lw <= len' => l1' = len' - size lw =>
+ asubwrite a0 a1 off lw dlt len d1 l1 =>
+ asubwrite a0 a1 off lw dlt len' d1 l1'.
+proof.
+move=> H1 H2 ->; rewrite /asubwrite => [[-> [-> _]]].
+by rewrite (_: min (size lw) (max 0 len) = size lw) 1:/# (_: min (size lw) (max 0 len') = size lw) 1:/#.
+qed.
+
+lemma asubwrite_dump_take (S: WArray200.t) a0 a1 off len k d1 l1:
+ 0 <= len <= k =>
+ asubwrite a0 a1 off (sub S 0 k) 0 len d1 l1 =>
+ a1 = A.fill (fun i => S.[i - off]) off len a0 /\ d1 = len.
+proof.
+move=> Hl; rewrite /asubwrite size_sub 1:/# => [[-> [-> _]]].
+by rewrite (_: min k (max 0 len) = len) 1:/# /= (fill_stbytes_sub S a0 off len k) /#.
 qed.
 
 module MM = {
@@ -3380,8 +3577,31 @@ hoare a_ilen_write_upto16_h _buf _off _dlt _len _w:
 proof.
 proc; simplify.
 if => //=; last first.
- auto => /> Hlen.
-admitted.
+ auto => /> Hlen; rewrite /asubwrite ler_maxl 1:/# ler_minr; first smt(size_ge0).
+ by rewrite tP => i Hi; rewrite filliE // /#.
+if => //=.
+ by auto => /> H0 H16; apply asubwrite_set128 => /#.
+(* 0 < lEN < 16: an optional low u64, then the rest via __a_ilen_write_upto8 *)
+seq 1: (0 < _len < 16 /\ offset = _off
+        /\ ((8 <= _len /\ asubwrite _buf buf _off (take 8 (u128bytes _w)) _dlt _len dELTA lEN
+             /\ w = VPUNPCKH_2u64 _w _w)
+         \/ (_len < 8 /\ buf = _buf /\ dELTA = _dlt /\ lEN = _len /\ w = _w))).
+ if => //.
+  auto => /> H0 H16 H8; split; first smt().
+  have Hm: asubwrite _buf (A.init (WA.get8 (WA.set64_direct (WA.init8 ("_.[_]" _buf)) (_off + _dlt) (MOVV_64 (truncateu64 _w)))))
+             _off (take 8 (u128bytes _w)) _dlt _len (_dlt + 8) (_len - 8).
+   by rewrite take8_u128bytes /MOVV_64; apply asubwrite_set64 => /#.
+  by left.
+ by auto => /> /#.
+ecall (a_ilen_write_upto8_h buf offset dELTA lEN t64).
+auto => |> &m H0 H16 Hc [b2 d2 l2] /= H2.
+case: Hc => [[H8 [H Hw]]|[H8 [Hb [Hd [Hl Hw]]]]].
+ move: H2; rewrite Hw /MOVV_64 => H2.
+ have := asubwrite_cat _ _ _ _ _ _ _ _ _ _ _ _ H H2.
+ by rewrite take8_u128bytes -u128bytes_split.
+move: H2; rewrite Hb Hd Hl Hw /MOVV_64 -take8_u128bytes => H2.
+by apply (asubwrite_untake _ _ _ _ 8 _ _ _ _ _ _ H2) => /#.
+qed.
 
 phoare a_ilen_write_upto16_ph _buf _off _dlt _len _w:
  [ MM.__a_ilen_write_upto16
@@ -3400,8 +3620,32 @@ hoare a_ilen_write_upto32_h _buf _off _dlt _len _w:
 proof.
 proc; simplify.
 if => //=; last first.
- auto => /> Hlen.
-admitted.
+ auto => /> Hlen; rewrite /asubwrite ler_maxl 1:/# ler_minr; first smt(size_ge0).
+ by rewrite tP => i Hi; rewrite filliE // /#.
+if => //=.
+ by auto => /> H0 H32; apply asubwrite_set256 => /#.
+(* 0 < lEN < 32: an optional low u128, then the rest via __a_ilen_write_upto16 *)
+seq 2: (0 < _len < 32 /\ offset = _off
+        /\ ((16 <= _len /\ asubwrite _buf buf _off (take 16 (u256bytes _w)) _dlt _len dELTA lEN
+             /\ t128 = VEXTRACTI128 _w (W8.of_int 1))
+         \/ (_len < 16 /\ buf = _buf /\ dELTA = _dlt /\ lEN = _len /\ t128 = truncateu128 _w))).
+ seq 1: (#pre /\ t128 = truncateu128 w); first by auto.
+ if => //.
+  auto => /> H0 H32 H16; split; first smt().
+  have Hm: asubwrite _buf (A.init (WA.get8 (WA.set128_direct (WA.init8 ("_.[_]" _buf)) (_off + _dlt) (truncateu128 _w))))
+             _off (take 16 (u256bytes _w)) _dlt _len (_dlt + 16) (_len - 16).
+   by rewrite take16_u256bytes; apply asubwrite_set128 => /#.
+  by left.
+ by auto => /> /#.
+ecall (a_ilen_write_upto16_h buf offset dELTA lEN t128).
+auto => |> &m H0 H32 Hc [b2 d2 l2] /= H2.
+case: Hc => [[H16 [H Ht]]|[H16 [Hb [Hd [Hl Ht]]]]].
+ move: H2; rewrite Ht => H2.
+ have := asubwrite_cat _ _ _ _ _ _ _ _ _ _ _ _ H H2.
+ by rewrite take16_u256bytes -u256bytes_split.
+move: H2; rewrite Hb Hd Hl Ht -take16_u256bytes => H2.
+by apply (asubwrite_untake _ _ _ _ 16 _ _ _ _ _ _ H2) => /#.
+qed.
 
 phoare a_ilen_write_upto32_ph _buf _off _dlt _len _w:
  [ MM.__a_ilen_write_upto32
