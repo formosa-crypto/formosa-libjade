@@ -195,6 +195,77 @@ rewrite -iotaredE /=.
 by circuit.
 qed.
 
+(* ------------------------------------------------------------------------ *)
+(* Lane view of the stores the 4-way code performs on its state, through the *)
+(* WArray800 byte encoding (64-bit word q is lane q%%4 of 256-bit word q%/4) *)
+(* ------------------------------------------------------------------------ *)
+
+lemma st4x_ext (a b: state4x):
+ (forall k, 0 <= k < 4 => st4x_get a k = st4x_get b k) => a = b.
+proof.
+move=> H; rewrite -(st4x_unpackK a) -(st4x_unpackK b) /st4x_unpack.
+by rewrite (H 0) // (H 1) // (H 2) // (H 3).
+qed.
+
+lemma st4x_get_set (st: state4x) j w k:
+ 0 <= k < 4 =>
+ st4x_get st.[j <- w] k = (st4x_get st k).[j <- w \bits64 k].
+proof.
+move=> Hk; rewrite tP => i Hi.
+rewrite st4x_getiE // !get_set_if.
+by case: (0 <= j < 25 /\ i = j) => C //; rewrite st4x_getiE.
+qed.
+
+lemma get64_init256 (st: state4x) q:
+ 0 <= q < 100 =>
+ get64_direct (WArray800.init256 ("_.[_]" st)) (8*q) = st.[q %/ 4] \bits64 (q %% 4).
+proof.
+move=> Hq; apply W64.wordP => b Hb.
+rewrite get64E pack8wE // initiE 1:/# /= initiE 1:/# /= bits8iE 1:/# bits64iE //.
+by congr; smt().
+qed.
+
+lemma get256_init256 (st: state4x) j:
+ 0 <= j < 25 =>
+ get256_direct (WArray800.init256 ("_.[_]" st)) (32*j) = st.[j].
+proof.
+move=> Hj; apply W256.wordP => b Hb.
+rewrite get256E pack32wE // initiE 1:/# /= initiE 1:/# /= bits8iE 1:/#.
+by congr; smt().
+qed.
+
+lemma init256_set256 (st: state4x) j w:
+ 0 <= j < 25 =>
+ Array25.init (WArray800.get256 (WArray800.set256_direct (WArray800.init256 ("_.[_]" st)) (32*j) w))
+ = st.[j <- w].
+proof.
+move=> Hj; rewrite tP => i Hi; rewrite initiE //= get_setE //.
+apply W256.wordP => b Hb.
+rewrite get256E pack32wE // initiE 1:/# /= set256E initiE 1:/# /=.
+case: (i = j) => C.
+ by rewrite ifT 1:/# bits8iE 1:/#; congr; smt().
+by rewrite ifF 1:/# initiE 1:/# /= bits8iE 1:/#; congr; smt().
+qed.
+
+lemma st4x_get_set64 (st: state4x) q v k:
+ 0 <= q < 100 => 0 <= k < 4 =>
+ st4x_get (Array25.init (WArray800.get256 (WArray800.set64_direct (WArray800.init256 ("_.[_]" st)) (8*q) v))) k
+ = if q %% 4 = k then (st4x_get st k).[q %/ 4 <- v] else st4x_get st k.
+proof.
+move=> Hq Hk; rewrite tP => i Hi.
+rewrite st4x_getiE // initiE //=.
+have ->: (if q %% 4 = k then (st4x_get st k).[q %/ 4 <- v] else st4x_get st k).[i]
+         = if q %% 4 = k /\ i = q %/ 4 then v else st.[i] \bits64 k.
+ case: (q %% 4 = k) => C1 /=; last by rewrite st4x_getiE.
+ by rewrite get_setE 1:/#; case: (i = q %/ 4) => C2 //; rewrite st4x_getiE.
+apply W64.wordP => b Hb.
+rewrite bits64iE // get256E pack32wE 1:/# initiE 1:/# /= set64E initiE 1:/# /=.
+case: (q %% 4 = k /\ i = q %/ 4) => C.
+ by rewrite ifT 1:/# bits8iE 1:/#; congr; smt().
+rewrite ifF 1:/# initiE 1:/# /= bits8iE 1:/# bits64iE //.
+by congr; smt().
+qed.
+
 lemma st4x_keccak_iotaE rc st4x:
  st4x_keccak_iota rc st4x
  = st4x_map (fun st=>st.[0 <- st.[0] `^` rc]) st4x.
@@ -233,6 +304,15 @@ import BitEncoding BitChunking.
 
 op keccak_f1600_x4 = st4x_map keccak_f1600_op.
 
+lemma st4x_get_iter (st: state4x) n k:
+ 0 <= n => 0 <= k < 4 =>
+ st4x_get (iter n keccak_f1600_x4 st) k = st_i (st4x_get st k) n.
+proof.
+move=> Hn Hk; elim/natind: n Hn => [n Hn _|n Hn IH _].
+ by rewrite !iter0 // /st_i iter0.
+by rewrite iterS // /keccak_f1600_x4 st4x_get_map // IH // /st_i iterS.
+qed.
+
 op st4x0 = Array25.create W256.zero.
 
 lemma st4x0E: st4x_match st4x0 (st0,st0,st0,st0).
@@ -264,7 +344,10 @@ lemma pabsorb_spec_avx2x4_nil r8:
  0 < r8 <= 200 =>
  pabsorb_spec_avx2x4 r8 [] [] [] [] st4x0.
 proof.
-admitted.
+move=> Hr; rewrite /pabsorb_spec_avx2x4 Hr /=.
+rewrite chunk0 1:/# /stateabsorb_iblocks /= /chunkremains /= bytes2state0 addstate_st0.
+exact st4x0E.
+qed.
 
 (******************************************************************************
    
@@ -315,3 +398,44 @@ proof. by conseq state_init_avx2x4_ll (state_init_avx2x4_h _r8). qed.
 lemma addratebit_avx2x4_ll: islossless M.__addratebit_avx2x4
  by islossless.
 
+(* the rate bit as a XOR with a power of two (one bit of one word) *)
+lemma u64_xorbit_ofint (w: W64.t) b:
+ 0 <= b < 64 => u64_xorbit b w = w `^` W64.of_int (1 `<<` b).
+proof.
+move=> Hb; have: b \in iota_ 0 64 by smt(mem_iota).
+move: {Hb} b; apply/List.allP.
+by rewrite -iotaredE /=; circuit.
+qed.
+
+hoare addratebit_avx2x4_h _r8 _st:
+ M.__addratebit_avx2x4
+ : st = _st /\ rATE8 = _r8 /\ 0 < _r8 <= 200
+ ==> res = st4x_map (addratebit _r8) _st.
+proof.
+proc; auto => /> Hr0 Hr1.
+apply st4x_ext => k Hk.
+rewrite st4x_get_map // st4x_get_set // xorb64E VPBROADCAST_4u64_bits64 //.
+rewrite /addratebit -addratebitE 1:/#.
+congr; rewrite u64_xorbit_ofint 1:/# -st4x_getiE 1,2:/#.
+by rewrite xorwC.
+qed.
+
+phoare addratebit_avx2x4_ph _r8 _st:
+ [ M.__addratebit_avx2x4
+ : st = _st /\ rATE8 = _r8 /\ 0 < _r8 <= 200
+ ==> res = st4x_map (addratebit _r8) _st
+ ] = 1%r.
+proof. by conseq addratebit_avx2x4_ll (addratebit_avx2x4_h _r8 _st). qed.
+
+(* the 4x4 transposition used by the 4-way dump: output k packs lane k of the
+   four inputs *)
+hoare u64x4_u256x4_h _y0 _y1 _y2 _y3:
+ M.__4u64x4_u256x4
+ : y0 = _y0 /\ y1 = _y1 /\ y2 = _y2 /\ y3 = _y3
+ ==> res.`1 = u256_pack4 (_y0 \bits64 0) (_y1 \bits64 0) (_y2 \bits64 0) (_y3 \bits64 0)
+  /\ res.`2 = u256_pack4 (_y0 \bits64 1) (_y1 \bits64 1) (_y2 \bits64 1) (_y3 \bits64 1)
+  /\ res.`3 = u256_pack4 (_y0 \bits64 2) (_y1 \bits64 2) (_y2 \bits64 2) (_y3 \bits64 2)
+  /\ res.`4 = u256_pack4 (_y0 \bits64 3) (_y1 \bits64 3) (_y2 \bits64 3) (_y3 \bits64 3).
+proof. by proc; auto => />; circuit. qed.
+
+lemma u64x4_u256x4_ll: islossless M.__4u64x4_u256x4 by islossless.

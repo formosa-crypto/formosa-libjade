@@ -6009,7 +6009,7 @@ module M = {
   }
   proc __addstate_m_bcast_avx2x4 (st:W256.t Array25.t, aT:int, buf:int,
                                   _LEN:int, _TRAILB:int) : W256.t Array25.t *
-                                                           int = {
+                                                           int * int = {
     var aT8:int;
     var w:W256.t;
     var at:int;
@@ -6048,7 +6048,7 @@ module M = {
     } else {
       
     }
-    return (st, aT);
+    return (st, aT, buf);
   }
   proc __absorb_m_bcast_avx2x4 (st:W256.t Array25.t, aT:int, buf:int,
                                 _LEN:int, _TRAILB:int, _RATE8:int) : 
@@ -6057,15 +6057,17 @@ module M = {
     var i:int;
     var  _0:int;
     var  _1:int;
+    var  _2:int;
     if ((_RATE8 <= (aT + _LEN))) {
-      (st,  _0) <@ __addstate_m_bcast_avx2x4 (st, aT, buf, (_RATE8 - aT), 0);
+      (st,  _0, buf) <@ __addstate_m_bcast_avx2x4 (st, aT, buf,
+      (_RATE8 - aT), 0);
       _LEN <- (_LEN - (_RATE8 - aT));
       aT <- 0;
       st <@ _keccakf1600_avx2x4 (st);
       iTERS <- (_LEN %/ _RATE8);
       i <- 0;
       while ((i < iTERS)) {
-        (st,  _1) <@ __addstate_m_bcast_avx2x4 (st, 0, buf, _RATE8, 0);
+        (st,  _1, buf) <@ __addstate_m_bcast_avx2x4 (st, 0, buf, _RATE8, 0);
         st <@ _keccakf1600_avx2x4 (st);
         i <- (i + 1);
       }
@@ -6073,7 +6075,7 @@ module M = {
     } else {
       
     }
-    (st, aT) <@ __addstate_m_bcast_avx2x4 (st, aT, buf, _LEN, _TRAILB);
+    (st, aT,  _2) <@ __addstate_m_bcast_avx2x4 (st, aT, buf, _LEN, _TRAILB);
     if ((_TRAILB <> 0)) {
       st <@ __addratebit_avx2x4 (st, _RATE8);
     } else {
@@ -6304,25 +6306,25 @@ module M = {
       t0 <-
       (get64_direct (WArray800.init256 (fun i_0 => st.[i_0]))
       ((4 * i) + (0 * 8)));
-      Glob.mem <- (storeW64 Glob.mem (buf0 + i) t0);
+      Glob.mem <- (storeW64 Glob.mem buf0 t0);
       t1 <-
       (get64_direct (WArray800.init256 (fun i_0 => st.[i_0]))
       ((4 * i) + (1 * 8)));
-      Glob.mem <- (storeW64 Glob.mem (buf1 + i) t1);
+      Glob.mem <- (storeW64 Glob.mem buf1 t1);
       t2 <-
       (get64_direct (WArray800.init256 (fun i_0 => st.[i_0]))
       ((4 * i) + (2 * 8)));
-      Glob.mem <- (storeW64 Glob.mem (buf2 + i) t2);
+      Glob.mem <- (storeW64 Glob.mem buf2 t2);
       t3 <-
       (get64_direct (WArray800.init256 (fun i_0 => st.[i_0]))
       ((4 * i) + (3 * 8)));
-      Glob.mem <- (storeW64 Glob.mem (buf3 + i) t3);
+      Glob.mem <- (storeW64 Glob.mem buf3 t3);
       i <- (i + 8);
+      buf0 <- (buf0 + 8);
+      buf1 <- (buf1 + 8);
+      buf2 <- (buf2 + 8);
+      buf3 <- (buf3 + 8);
     }
-    buf0 <- (buf0 + i);
-    buf1 <- (buf1 + i);
-    buf2 <- (buf2 + i);
-    buf3 <- (buf3 + i);
     if ((0 < (_LEN %% 8))) {
       t0 <-
       (get64_direct (WArray800.init256 (fun i_0 => st.[i_0]))

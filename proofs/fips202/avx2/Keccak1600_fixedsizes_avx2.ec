@@ -95,10 +95,6 @@ qed.
 (* restored by the blends).                                                  *)
 (* ------------------------------------------------------------------------ *)
 
-lemma u256bytes_pack4 (a b c d: W64.t):
- u256bytes (u256_pack4 a b c d) = u64bytes a ++ u64bytes b ++ u64bytes c ++ u64bytes d.
-proof. by rewrite u256_pack4E /u256bytes /u64bytes /=; do! split; circuit. qed.
-
 abbrev dlane (st: W256.t Array7.t) k = (stavx2_to_st25 st).[k].
 
 (* a stored u256 holding lanes k..k+3 / a stored u64 holding lane k *)
@@ -106,7 +102,7 @@ lemma dump_avx2_lanes4 (st: W256.t Array7.t) k o w:
  0 <= k => k + 4 <= 25 => o = 8*k =>
  w = u256_pack4 (dlane st k) (dlane st (k+1)) (dlane st (k+2)) (dlane st (k+3)) =>
  u256bytes w = sub (stbytes (stavx2_to_st25 st)) o 32.
-proof. by move=> ?? -> ->; rewrite u256bytes_pack4 sub_stbytes_4lanes. qed.
+proof. by move=> ?? -> ->; rewrite sub_stbytes_4lanes // /u256bytes /u64bytes u256_pack4_to_list. qed.
 
 lemma dump_avx2_lane (st: W256.t Array7.t) k o w:
  0 <= k < 25 => o = 8*k => w = dlane st k =>

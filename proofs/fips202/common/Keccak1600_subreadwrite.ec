@@ -1844,6 +1844,36 @@ conseq (: ={Glob.mem,buf,aT,cUR,lEN,tRAIL} ==> ={w,aT,cUR,buf,lEN,tRAIL}) => //.
 by sim.
 qed.
 
+(* reads leave the memory unchanged *)
+hoare m_ilen_read_upto8_at_mem _m:
+ M.__m_ilen_read_upto8_at : Glob.mem = _m ==> Glob.mem = _m.
+proof. by proc; inline *; auto. qed.
+
+hoare m_ilen_read_bcast_upto8_at_mem _m:
+ M.__m_ilen_read_bcast_upto8_at : Glob.mem = _m ==> Glob.mem = _m.
+proof. by proc; inline *; auto. qed.
+
+(* the broadcast read: the same word on the four lanes *)
+hoare m_ilen_read_bcast_upto8_at_h _buf _len _tb _cur _at:
+ M.__m_ilen_read_bcast_upto8_at
+ : buf=_buf /\ lEN=_len /\ tRAIL=_tb /\ cUR=_cur /\ aT=_at
+ ==> exists w, res.`5 = VPBROADCAST_4u64 w
+     /\ msubread Glob.mem (u64bytes w) _cur _at _buf _len _tb res.`4 res.`1 res.`2 res.`3.
+proof.
+exlim Glob.mem => _m.
+conseq (m_ilen_read_bcast_upto8_at_mem _m)
+       (_: Glob.mem = _m /\ buf=_buf /\ lEN=_len /\ tRAIL=_tb /\ cUR=_cur /\ aT=_at
+           ==> exists w, res.`5 = VPBROADCAST_4u64 w
+               /\ msubread _m (u64bytes w) _cur _at _buf _len _tb res.`4 res.`1 res.`2 res.`3) => //.
+conseq m_ilen_read_bcast_upto8_at_eq
+       (_: Glob.mem = _m /\ buf=_buf /\ lEN=_len /\ tRAIL=_tb /\ cUR=_cur /\ aT=_at
+           ==> msubread _m (u64bytes res.`5) _cur _at _buf _len _tb res.`4 res.`1 res.`2 res.`3).
++ by move=> &1 />; exists Glob.mem{1} arg{1}.
++ move=> &1 &2 /= [E1 [E2 [E3 [E4 E5]]]] H.
+  by exists (truncateu64 (VMOV_64 res{2}.`5)); rewrite E1 E2 E3 E4 E5 trunc_VMOV_64.
+by conseq (m_ilen_read_upto8_at_mem _m) (m_ilen_read_upto8_at_h _buf _len _tb _cur _at).
+qed.
+
 lemma m_rlen_read_upto8_ll: islossless M.__m_rlen_read_upto8
 by islossless.
 
@@ -3510,6 +3540,18 @@ conseq (: ={buf,offset,dELTA,aT,cUR,lEN,tRAIL} ==> ={w,aT,cUR,buf,offset,dELTA,l
 by sim.
 qed.
 
+(* the broadcast read is the plain read, broadcast to the four lanes *)
+hoare a_ilen_read_bcast_upto8_at_h _buf _off _dlt _len _tb _cur _at:
+ MM.__a_ilen_read_bcast_upto8_at
+ : buf=_buf /\ offset=_off /\ dELTA=_dlt /\ lEN=_len /\ tRAIL=_tb /\ cUR=_cur /\ aT=_at
+ ==> exists w, res.`5 = VPBROADCAST_4u64 w
+     /\ asubread _buf _off (u64bytes w) _cur _at _dlt _len _tb res.`4 res.`1 res.`2 res.`3.
+proof.
+conseq a_ilen_read_bcast_upto8_at_eq (a_ilen_read_upto8_at_h _buf _off _dlt _len _tb _cur _at).
+ by move=> &1 />; exists arg{1}.
+move=> &1 &2 /= [E1 [E2 [E3 [E4 E5]]]] H.
+by exists res{2}.`5; rewrite E1 E2 E3 E4 E5 trunc_VMOV_64.
+qed.
 
 lemma a_ilen_write_upto8_ll: islossless MM.__a_ilen_write_upto8
 by islossless.
