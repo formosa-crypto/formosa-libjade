@@ -113,3 +113,12 @@ ML-KEM = NIST ACVP v1.1.0.41). Regenerate with `bench/tools/import_kat.py`.
   `13218ad` (plus WIP `Keccak1600_fixedsizes_ref.ec` from `352b416`, the
   repaired `7204cd0`); the dependent mlkem/mldsa models re-extracted together.
   Details and rationale: `proofs/fips202/notes/merge-with-formosa-keccak.md`.
+- 2026-10-07: `type keccak_updstate` and `fn _ststatus_data` moved into the
+  new `src/fips202/common/keccak1600_updstate_generic.jinc`, required by the
+  ref and AVX2 updstate files, so the ref updstate procedures are now
+  extracted. The `(64ui)at` -> `at8` fix of the two `_ASIZE` absorb files and
+  the 4-way status-export fix are applied. All updstate proofs are complete
+  and the fips202 and ML-DSA models were re-extracted. `origin/ci-mldsa-sct`
+  deletes `src/fips202/ref/keccak1600_updstate*.jinc` and carries other
+  updstate proofs, so merging it will conflict on those files. Details:
+  `proofs/fips202/notes/updstate.md`.
