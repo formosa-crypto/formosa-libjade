@@ -271,7 +271,7 @@ lemma barret_red16x_corr _a:
           (forall k, 0 <= k < 16 => vx16.[k] = jvx16.[k]) ==>
           forall k, 0 <= k < 16 => W16.to_sint res.[k] = BREDC _a.[k] 26] = 1%r.
 proof.
-bypr => &m [#] /= H H0 H1.
+bypr => &m; split => //; move=> [#] /= H H0 H1.
 have -> : 1%r = 
 Pr[MLKEM_avx2_encdec.__red_x16(r{m}) @ &m :
    forall (k : int), 0 <= k && k < 16 => to_sint res.[k] = BREDC (_a.[k]) 26]; last first. 
@@ -342,7 +342,7 @@ lemma barret_red16x_corr_hh _a:
           (forall k, 0 <= k < 16 => vx16.[k] = jvx16.[k]) ==>
           forall k, 0 <= k < 16 => W16.to_sint res.[k] = BREDC _a.[k] 26].
 hoare.
-bypr => &m; rewrite Pr[ mu_not] => [#] ???. 
+bypr => &m; split => //; rewrite Pr[ mu_not] => [#] ???.
 have -> : Pr[MprevecT0.red16x(r{m}, qx16{m}, vx16{m}) @ &m :
    forall (k : int), 0 <= k && k < 16 => to_sint res.[k] = BREDC _a.[k] 26] = 1%r.
 + byphoare (_: _a = lift_array16 r /\
@@ -643,7 +643,7 @@ lemma fqmulx16_corr _a _b:
           (forall k, 0 <= k < 16 => qinvx16.[k] = W16.of_int (-3327)) ==>
           forall k, 0 <= k < 16 => to_sint res.[k] = SREDC (_a.[k] * _b.[k])] = 1%r.
 proof.
-bypr => &m [#] /= H H0 H1 H2.
+bypr => &m; split => //; move=> [#] /= H H0 H1 H2.
 have -> : 1%r = 
 Pr[MLKEM_avx2_encdec.__fqmul_x16(a{m}, b{m}) @ &m :
    forall (k : int), 0 <= k && k < 16 => to_sint res.[k] = SREDC (_a.[k] * _b.[k])]; last by  byequiv fqmulx16_corr_h => //=. 
@@ -713,7 +713,7 @@ lemma fqmulx16_corr_hh _a _b:
           (forall k, 0 <= k < 16 => qinvx16.[k] = W16.of_int (-3327)) ==>
           forall k, 0 <= k < 16 => to_sint res.[k] = SREDC (_a.[k] * _b.[k])].
 hoare.
-bypr => &m; rewrite Pr[ mu_not] => [#] ???H. 
+bypr => &m; split => //; rewrite Pr[ mu_not] => [#] ???H.
 have -> : Pr[MprevecT0.fqmulx16(a{m}, b{m}, qx16{m}, qinvx16{m}) @ &m :
    forall (k : int), 0 <= k && k < 16 => to_sint res.[k] = SREDC (_a.[k] * _b.[k])] = 1%r.
 + byphoare (_: _a = lift_array16 a /\

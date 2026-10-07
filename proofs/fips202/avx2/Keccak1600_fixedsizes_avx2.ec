@@ -392,7 +392,7 @@ hoare addstate_m_avx2_h _mem _st _buf _len _tb _at:
      /\ res.`2 = _at + _len + b2i (_tb<>0)
      /\ res.`3 = _buf + _len.
 proof.
-bypr => &m'.
+bypr => &m'; split => //.
 move=> [Hmem] |> *.
 have ->:
  Pr[M.__addstate_m_avx2(st{m'}, aT{m'}, buf{m'}, _LEN{m'},

@@ -1509,7 +1509,7 @@ proof.
     + rnd; skip => /> &1 _ _ _; case: (sk{1}) => pk sk hsk.
       by apply (gs_ok pk sk m{1} c{1} hsk).
     conseq (: _ ==> false : = 0%r) => />; 2: by auto.
-    by move=> &1 _ _ _ _; apply (ge0_gamma_spread gamma_spread gs_ok).
+    by move=> &1; split => [|_ _ _ _]; apply (ge0_gamma_spread gamma_spread gs_ok).
   move=> c; proc; if; auto => /> /#.
 qed.
 

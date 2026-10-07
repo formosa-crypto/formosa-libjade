@@ -723,7 +723,7 @@ phoare aux_poly_getnoise_ph _seed _nonce :
     lift_array256 res = samplePolyCBD (SHAKE256_33_128 _seed _nonce) /\
     forall k, 0 <= k < 256 => -5 < to_sint res.[k] < 5] = 1%r.
 proof.
-bypr => &m [-> ->].
+bypr => &m; split => //; move=> [-> ->].
 have <-: Pr[SamplePolyCBD.sample(SHAKE256_33_128 _seed _nonce) @ &m :
             res = samplePolyCBD (SHAKE256_33_128 _seed _nonce)] = 1%r
   by byphoare (cbd2sample_ph (SHAKE256_33_128 _seed _nonce)).
@@ -817,7 +817,7 @@ phoare jkem_getnoise_4x_ph _seed _nonce :
     (forall k, 0 <= k < 256 => -5 < to_sint res.`3.[k] < 5) /\
     (forall k, 0 <= k < 256 => -5 < to_sint res.`4.[k] < 5)] = 1%r.
 proof.
-bypr => &m [-> ->].
+bypr => &m; split => //; move=> [-> ->].
 have <-: Pr[AuxMLKEMAvx2.__poly_getnoise_eta1_4x
               (r0{m}, r1{m}, r2{m}, r3{m}, _seed, _nonce) @ &m :
             lift_array256 res.`1 = samplePolyCBD (SHAKE256_33_128 _seed _nonce) /\
