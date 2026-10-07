@@ -680,8 +680,7 @@ case: (outlen <= 0) => Hout.
  rewrite /keccak1600_squeeze_op take_le0 1:/# //.
  rewrite SQUEEZE1600_iblocks_last 1:/# iota0 /=.
   by rewrite (:0=0%/r8) 1:/#; apply leq_div2r => /#.
- rewrite /squeezestate take_le0.
-  smt(@IntOrder). 
+ rewrite /squeezestate take_le0 1:/#.
  by rewrite bytes_to_bits_nil.
 rewrite /keccak1600_squeeze_op /SQUEEZE1600.
 rewrite bytes_to_bits_take -Ho8; congr.

@@ -350,7 +350,8 @@ pose B := take (r8 - (size l + k) %% r8) (drop k M).
 rewrite (chunk_cat' L) 1:/# (chunk_size _ (chunkremains r8 L ++ B)) 1:/#.
  by rewrite size_cat size_chunkremains HsL HsB; smt().
 rewrite (chunkremains_nil r8 (L ++ B)) 1:/#.
- rewrite size_cat HsL HsB; apply dvdzP; exists ((size l + k) %/ r8 + 1); smt(divz_eq).
+ rewrite size_cat HsL HsB; apply dvdzP; exists ((size l + k) %/ r8 + 1).
+  have E:= (divz_eq (size l+k) r8); rewrite mulrSl /#.
 rewrite (cats1 (chunk r8 L)) stateabsorb_iblocks_rcons bytes2state0 (addstateC _ st0) addstate_st0 /stateabsorb Est.
 congr; rewrite -addstateA; congr; first by rewrite /L.
 by rewrite /L -nseq1 bytes2state_zext (bytes2state_cat (chunkremains r8 (l ++ take k M))) size_chunkremains HsL.
@@ -466,6 +467,16 @@ rewrite (_: 16 = 8 + 8) 1:// sub_cat // !catA.
 by rewrite (_: 8*k+8+8+8 = 8*(k+3)) 1:/# (_: 8*k+8+8 = 8*(k+2)) 1:/# (_: 8*k+8 = 8*(k+1)) 1:/#.
 qed.
 
+(* Absorbing from [s] bytes: completing the current block and [i] more full
+   blocks reaches a block boundary. Used by every fixed-size absorb proof. *)
+lemma modz_fill_blocks (s r8 i: int):
+ (s + (r8 - s %% r8 + i * r8)) %% r8 = 0.
+proof.
+rewrite {1}(divz_eq s r8).
+have ->: s %/ r8 * r8 + s %% r8 + (r8 - s %% r8 + i * r8) = (s %/ r8 + i + 1) * r8 by ring.
+by rewrite modzMl.
+qed.
+
 lemma mul_divz_le (r8 len i: int):
  0 < r8 => i <= len %/ r8 => r8 * i <= len.
 proof.
@@ -476,11 +487,21 @@ qed.
 (* number of squeezed blocks: [(len-1)%/r8 + 1] = [len%/r8 + b2i (0 < len%%r8)] *)
 lemma divz_pred_pos (r8 len: int):
  0 < r8 => 0 < len %% r8 => (len - 1) %/ r8 = len %/ r8.
-proof. smt(). qed.
+proof.
+move=> Hr Hm; have Hlt := ltz_pmod len r8 Hr.
+have ->: len - 1 = len %/ r8 * r8 + (len %% r8 - 1).
+ by rewrite {1}(divz_eq len r8); ring.
+by rewrite divzMDl 1:/# (divz_small (len %% r8 - 1) r8) /#.
+qed.
 
 lemma divz_pred_zero (r8 len: int):
  0 < r8 => !(0 < len %% r8) => (len - 1) %/ r8 + 1 = len %/ r8.
-proof. smt(). qed.
+proof.
+move=> Hr Hm; have Hz: len %% r8 = 0 by have := modz_ge0 len r8 _; smt().
+have ->: len - 1 = (len %/ r8 - 1) * r8 + (r8 - 1).
+ by rewrite {1}(divz_eq len r8) Hz; ring.
+by rewrite divzMDl 1:/# (divz_small (r8 - 1) r8) /#.
+qed.
 
 lemma squeezeblocks_step r8 st i:
  0 < r8 <= 200 => 0 <= i =>
@@ -505,7 +526,7 @@ case: (0 < len %% r8) => C.
  rewrite divz_pred_pos 1,2:/#.
  rewrite squeezeblocks_step 1:/# 1:divz_ge0 1:/# 1:/#.
  rewrite take_cat size_squeezeblocks 1:/# 1:divz_ge0 1:/# 1:/#.
- rewrite ifF 1:/# take_sub200 /#.
+ by rewrite ifF 1:/# take_sub200 1:/#; congr; congr; smt().
 rewrite cats0 divz_pred_zero 1,2:/#.
 rewrite take_oversize // size_squeezeblocks 1:/#; first smt(divz_ge0).
 smt().

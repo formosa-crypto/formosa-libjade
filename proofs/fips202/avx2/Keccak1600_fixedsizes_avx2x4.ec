@@ -713,7 +713,7 @@ seq 1: (Glob.mem = _mem /\ _RATE8 = _r8 /\ _TRAILB = _tb /\ 0 <= _tb < 256 /\ 0 
     split; first smt().
     do 4! (split; first smt()).
     have Ha0: (size _l0 + (_r8 - size _l0 %% _r8 + i{m} * _r8)) %% _r8 = 0.
-     by rewrite (_: size _l0 + (_r8 - size _l0 %% _r8 + i{m} * _r8) = (size _l0 %/ _r8 + i{m} + 1) * _r8) 1:/# modzMl.
+     by apply modz_fill_blocks.
     rewrite (_: _r8 - size _l0 %% _r8 + (i{m} + 1) * _r8 = _r8 - size _l0 %% _r8 + i{m} * _r8 + _r8) 1:/#.
     by apply (pabsorb4_fill _r8 (size _l0) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hs IH (addstate_res4m_lanes _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hr)); rewrite ?size_memread //; smt().
   wp; ecall (keccakf1600_avx2x4_h st); wp; ecall (addstate_m_avx2x4_h Glob.mem st aT buf0 buf1 buf2 buf3 (_RATE8 - aT) 0); auto => |>.
@@ -825,7 +825,7 @@ seq 1: (Glob.mem = _mem /\ _RATE8 = _r8 /\ _TRAILB = _tb /\ 0 <= _tb < 256 /\ 0 
     split; first smt().
     split; first smt().
     have Ha0: (size _l0 + (_r8 - size _l0 %% _r8 + i{m} * _r8)) %% _r8 = 0.
-     by rewrite (_: size _l0 + (_r8 - size _l0 %% _r8 + i{m} * _r8) = (size _l0 %/ _r8 + i{m} + 1) * _r8) 1:/# modzMl.
+     by apply modz_fill_blocks.
     rewrite (_: _r8 - size _l0 %% _r8 + (i{m} + 1) * _r8 = _r8 - size _l0 %% _r8 + i{m} * _r8 + _r8) 1:/#.
     by apply (pabsorb4_fill _r8 (size _l0) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hs IH (addstate_res4m_lanes _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hr)); rewrite ?size_memread //; smt().
   wp; ecall (keccakf1600_avx2x4_h st); wp; ecall (addstate_m_bcast_avx2x4_h Glob.mem st aT buf (_RATE8 - aT) 0); auto => |>.
@@ -2379,7 +2379,7 @@ seq 3: (buf = _buf
     split; first smt().
     split; first smt().
     have Ha0: (size _l0 + (_r8 - size _l0 %% _r8 + i{m} * _r8)) %% _r8 = 0.
-     by rewrite (_: size _l0 + (_r8 - size _l0 %% _r8 + i{m} * _r8) = (size _l0 %/ _r8 + i{m} + 1) * _r8) 1:/# modzMl.
+     by apply modz_fill_blocks.
     have HH: pabsorb4 _r8 [_l0; _l1; _l2; _l3] [to_list _buf; to_list _buf; to_list _buf; to_list _buf]
                (_r8 - size _l0 %% _r8 + i{m} * _r8 + _r8) (st4x_map keccak_f1600_op r.`1).
      apply (pabsorb4_fill _r8 (size _l0) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hs IH
@@ -2544,7 +2544,7 @@ seq 3: (buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
     split; first smt().
     split; first smt().
     have Ha0: (size _l0 + (_r8 - size _l0 %% _r8 + i{m} * _r8)) %% _r8 = 0.
-     by rewrite (_: size _l0 + (_r8 - size _l0 %% _r8 + i{m} * _r8) = (size _l0 %/ _r8 + i{m} + 1) * _r8) 1:/# modzMl.
+     by apply modz_fill_blocks.
     have HH: pabsorb4 _r8 [_l0; _l1; _l2; _l3] [to_list _buf0; to_list _buf1; to_list _buf2; to_list _buf3]
                (_r8 - size _l0 %% _r8 + i{m} * _r8 + _r8) (st4x_map keccak_f1600_op r.`1).
      apply (pabsorb4_fill _r8 (size _l0) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hs IH

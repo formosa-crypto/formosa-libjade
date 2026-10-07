@@ -247,6 +247,16 @@ case: (i = j) => C.
 by rewrite ifF 1:/# initiE 1:/# /= bits8iE 1:/#; congr; smt().
 qed.
 
+(* [init256_set256] at a byte offset (the shape of [__state_init_avx2x4]'s loop) *)
+lemma init256_set256_direct (st: state4x) o w:
+ 0 <= o < 800 => o %% 32 = 0 =>
+ Array25.init (WArray800.get256 (WArray800.set256_direct (WArray800.init256 ("_.[_]" st)) o w))
+ = st.[o %/ 32 <- w].
+proof.
+move=> Ho Hm; have {1}->: o = 32 * (o %/ 32) by smt().
+by apply init256_set256; smt().
+qed.
+
 lemma st4x_get_set64 (st: state4x) q v k:
  0 <= q < 100 => 0 <= k < 4 =>
  st4x_get (Array25.init (WArray800.get256 (WArray800.set64_direct (WArray800.init256 ("_.[_]" st)) (8*q) v))) k
@@ -368,7 +378,14 @@ hoare state_init_avx2x4_h':
  ==> res = st4x0.
 proof.
 proc.
-admitted (* BDEP? *).
+while (0 <= i <= 32*25 /\ i %% 32 = 0 /\ z256 = W256.zero /\
+       forall k, 0 <= k < i %/ 32 => st.[k] = W256.zero).
+ auto => /> &m Hi0 _ Hm IH Hi.
+ rewrite init256_set256_direct 1,2:/#; do! split; 1..3:smt().
+ by move=> k Hk1 Hk2; rewrite get_setE 1:/#; case: (k = i{m} %/ 32) => C //; apply IH => /#.
+auto => /> &hr; split => [/# | i0 st0 Hlt Hi1 Hi2 _ H].
+by rewrite tP /st4x0 => k Hk; rewrite createiE // H /#.
+qed.
 
 
 phoare state_init_avx2x4_ph':
@@ -376,7 +393,7 @@ phoare state_init_avx2x4_ph':
  : true
  ==> res = st4x0
  ] = 1%r.
-admitted.
+proof. by conseq state_init_avx2x4_ll state_init_avx2x4_h'. qed.
 
 hoare state_init_avx2x4_h _r8:
  M.__state_init_avx2x4

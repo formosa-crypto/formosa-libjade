@@ -269,6 +269,14 @@ op stavx2_pos n =
            ;(2,0);(4,0);(6,1);(5,2);(3,3);(2,3);(3,0);(5,1);(6,2);(4,3)
            ;(2,1);(5,0);(4,1);(3,2);(6,3) ] n.
 
+lemma stavx2_pos_bnd n:
+ 0 <= n < 25 =>
+ 0 <= (stavx2_pos n).`1 < 7 /\ 0 <= (stavx2_pos n).`2 < 4.
+proof.
+move=> Hn; have: n \in iota_ 0 25 by smt(mem_iota).
+by move: {Hn} n; rewrite -List.allP -iotaredE /stavx2_pos /=.
+qed.
+
 hoare stavx2_pos_avx2_h _n:
  M.__stavx2_pos_avx2
  : pOS=_n ==> res = stavx2_pos _n.
@@ -339,32 +347,23 @@ seq 1: (#pre /\ (r,l) = stavx2_pos ((rATE_8 - 1) %/ 8)).
  by ecall (stavx2_pos_avx2_h ((rATE_8 - 1) %/ 8)); auto => /> /#.
 case: (r=0).
  rcondt 1; first by auto.
- auto => |> &m  ??Hinv H.
+ auto => |> &m ??Hinv H.
  have := stavx2_pos0 ((_r8 - 1) %/ 8) _; first smt().
  rewrite -H /= => {H} H.
- rewrite (stavx2_pos0' _ (stavx2_to_st25 _stavx2)).
-  admit.
- pose x:= (W64.one `<<` W8.of_int ((8 * _r8 - 1) %% 64)).
- congr.
- move: (Top.stavx2_to_st25 _stavx2) => _s.
- rewrite /addratebit /addratebit8 -stbytesK.
- apply stbytes_inj; rewrite !stwordsK tP => i Hi.
- rewrite initiE 1:/# /= initiE 1:/# get_setE // get_setE 1:/# /=.
- case: (i%/8=0) => C1.
-  case: (i=_r8-1) => C2.
-   rewrite -C2 C1 xorb8E; congr.
-   admit.
-  rewrite xorb8E initiE //= C1. 
-   have ->: (x \bits8 i %% 8) = W8.zero. admit.
-   smt().
- case: (i=_r8-1) => ?; first smt().
- by rewrite initiE //=. 
+ rewrite (stavx2_pos0' _ (stavx2_to_st25 _stavx2)); first by rewrite stavx2_to_st25K.
+ rewrite /addratebit -addratebitE 1:/# H /=.
+ by congr; rewrite u64_xorbitE /#.
 rcondf 1; first by auto.
-wp; ecall (u64_to_u256_h l t64); auto => |> &m ??Hinv H ?.
-split.
- admit.
+wp; ecall (u64_to_u256_h l t64); auto => |> &m ??Hinv H Hr.
+have Hn: 0 < (_r8 - 1) %/ 8 < 25.
+ case: ((_r8 - 1) %/ 8 = 0) => [E|]; last smt().
+ by move: H Hr; rewrite E /stavx2_pos /= /#.
+have Hl: 0 <= l{m} < 4.
+ have := stavx2_pos_bnd ((_r8 - 1) %/ 8) _; first smt().
+ by rewrite -H /#.
+split; first smt().
 move=> ??.
-rewrite (stavx2_posP _stavx2 ((_r8 - 1) %/ 8) r{m} l{m} _ Hinv _ H). admit.
+rewrite (stavx2_posP _stavx2 ((_r8 - 1) %/ 8) r{m} l{m} _ Hinv Hn H).
 rewrite /addratebit -addratebitE 1:/#.
 congr.
 move: H; rewrite u64_xorbitE /#.

@@ -292,7 +292,7 @@ seq 1: (Glob.mem = _mem /\ _RATE8 = _r8 /\ _TRAILB = _tb /\ 0 <= _tb < 256 /\ 0 
     split; first smt().
     have Ed: size _l = size _l %/ _r8 * _r8 + size _l %% _r8 by exact divz_eq.
     have Ha0: (size _l + (_r8 - size _l %% _r8 + i{m} * _r8)) %% _r8 = 0.
-     by rewrite (_: size _l + (_r8 - size _l %% _r8 + i{m} * _r8) = (size _l %/ _r8 + i{m} + 1) * _r8) 1:/# modzMl.
+     by apply modz_fill_blocks.
     have Hf := pabsorb_fill _r8 _l (memread _mem _buf _len) (_r8 - size _l %% _r8 + i{m} * _r8) st{m}.
     move: Hf; rewrite Ha0 /= => Hf.
     rewrite (_: _r8 - size _l %% _r8 + (i{m} + 1) * _r8 = _r8 - size _l %% _r8 + i{m} * _r8 + _r8) 1:/#.
@@ -1084,7 +1084,7 @@ seq 3: (buf = _buf /\ _RATE8 = _r8 /\ _TRAILB = _tb /\ 0 <= _tb < 256 /\ 0 < _r8
     split; first smt().
     have Ed: size _l = size _l %/ _r8 * _r8 + size _l %% _r8 by exact divz_eq.
     have Ha0: (size _l + (_r8 - size _l %% _r8 + i{m} * _r8)) %% _r8 = 0.
-     by rewrite (_: size _l + (_r8 - size _l %% _r8 + i{m} * _r8) = (size _l %/ _r8 + i{m} + 1) * _r8) 1:/# modzMl.
+     by apply modz_fill_blocks.
     have Hf := pabsorb_fill _r8 _l (to_list _buf) (_r8 - size _l %% _r8 + i{m} * _r8) st{m}.
     move: Hf; rewrite Ha0 /= => Hf.
     rewrite Eoff Est -(slice_to_list _buf (_r8 - size _l %% _r8 + i{m} * _r8) _r8) 1..3:/#.
