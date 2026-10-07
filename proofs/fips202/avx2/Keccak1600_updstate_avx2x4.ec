@@ -424,7 +424,7 @@ module MM = {
       at <- (at `|>>` 3);
       at <- (at `<<` 3);
       (off2, t64) <@ RW.MM.__a_rlen_read_upto8 (buf, off, len);
-      len <- (len + at);
+      len <- (len + (W64.to_uint at8));
       sh <- (truncateu8 at8);
       sh <- (sh `<<` (W8.of_int 3));
       t64 <- (t64 `<<` (sh `&` (W8.of_int 63)));

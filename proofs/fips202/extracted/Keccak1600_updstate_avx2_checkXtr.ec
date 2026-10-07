@@ -6,6 +6,7 @@ from Jasmin require import JModel.
  used for correctness proofs are in sync. with the Jasmin source code *)
 
 from JazzEC require import Keccak1600_Jazz_ASIZE.
+from JazzEC require Keccak1600_Jazz.
 from JazzEC require import Array999 WArray999.
 
 require import Keccak1600_updstate_avx2.
@@ -16,8 +17,9 @@ clone import KeccakUpdstateAvx2 as A999updstateavx2
       theory WA <- WArray999
       proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
 
+(* MM calls the (size-independent) decoder of the memory model *)
 equiv a999_ststatus_data_eq:
- M._ststatus_data ~ MM._ststatus_data
+ M._ststatus_data ~ Keccak1600_Jazz.M._ststatus_data
  : ={arg} ==> ={res}
 by sim.
 
@@ -38,5 +40,15 @@ by sim.
 
 equiv a999_squeeze_updstate_avx2_eq:
  M._squeeze_updstate_avx2 ~ MM._squeeze_updstate_avx2
+ : ={arg} ==> ={res}
+by sim.
+
+equiv a999_absorb_updstate_avx2_eq:
+ M.absorb_updstate_avx2 ~ MM.absorb_updstate_avx2
+ : ={arg} ==> ={res}
+by sim.
+
+equiv a999_squeeze_updstate_avx2_export_eq:
+ M.squeeze_updstate_avx2 ~ MM.squeeze_updstate_avx2
  : ={arg} ==> ={res}
 by sim.

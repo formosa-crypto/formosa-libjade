@@ -531,3 +531,25 @@ rewrite cats0 divz_pred_zero 1,2:/#.
 rewrite take_oversize // size_squeezeblocks 1:/#; first smt(divz_ge0).
 smt().
 qed.
+
+(* The i-th output byte is byte (i mod r8) of the state after i/r8+1 permutations. *)
+lemma nth_SQUEEZE1600 r8 len st i:
+ 0 < r8 <= 200 =>
+ 0 <= i < len =>
+ (SQUEEZE1600 r8 len st).[i]
+ = (stbytes (st_i st (i %/ r8 + 1))).[i %% r8].
+proof.
+move=> Hr8 Hi; rewrite /SQUEEZE1600 nth_take 1..2:/# /squeezeblocks.
+rewrite (BitEncoding.BitChunking.nth_flatten W8.zero r8).
+ apply/List.allP => x /mapP [y [Hy ->]] /=.
+ by rewrite size_squeezestate_i /#.
+rewrite (nth_map 0).
+ rewrite size_iota; split; first smt().
+ move=> _; rewrite ltzE lez_maxr 1:/#.
+ rewrite StdOrder.IntOrder.ler_add2r.
+ smt(leq_div2r).
+rewrite /squeezestate_i /squeezestate nth_take 1..2:/#
+ state2bytesE; congr; congr; congr; congr.
+rewrite nth_iota; split; first smt().
+move=> _; rewrite ltzE; smt(leq_div2r).
+qed.

@@ -5565,31 +5565,6 @@ module M = {
     st.[((rATE8 - 1) %/ 8)] <- t256;
     return st;
   }
-  proc _init_updstate_avx2 (st:W64.t Array26.t, r64:int, trailb:W8.t) : 
-  W64.t Array26.t = {
-    var r256:W256.t;
-    var i:int;
-    var status:W64.t;
-    var t:W64.t;
-    r256 <- (set0_256);
-    i <- 0;
-    while ((i < 6)) {
-      st <-
-      (Array26.init
-      (WArray208.get64
-      (WArray208.set256 (WArray208.init64 (fun i_0 => st.[i_0])) i r256)));
-      i <- (i + 1);
-    }
-    st.[24] <- (W64.of_int 0);
-    status <- (zeroextu64 trailb);
-    status <- (status `<<` (W8.of_int 8));
-    r64 <- (W8.to_uint ((W8.of_int r64) - (W8.of_int 1)));
-    t <- (zeroextu64 (W8.of_int r64));
-    status <- (status + t);
-    status <- (status `<<` (W8.of_int 8));
-    st.[25] <- status;
-    return st;
-  }
   proc _ststatus_data (ststatus:W64.t) : W8.t * int * int = {
     var trailb:W8.t;
     var at:W64.t;
@@ -5614,6 +5589,31 @@ module M = {
     r8_ui <- (W64.to_uint r8);
     at_ui <- (W64.to_uint at);
     return (trailb, r8_ui, at_ui);
+  }
+  proc _init_updstate_avx2 (st:W64.t Array26.t, r64:int, trailb:W8.t) : 
+  W64.t Array26.t = {
+    var r256:W256.t;
+    var i:int;
+    var status:W64.t;
+    var t:W64.t;
+    r256 <- (set0_256);
+    i <- 0;
+    while ((i < 6)) {
+      st <-
+      (Array26.init
+      (WArray208.get64
+      (WArray208.set256 (WArray208.init64 (fun i_0 => st.[i_0])) i r256)));
+      i <- (i + 1);
+    }
+    st.[24] <- (W64.of_int 0);
+    status <- (zeroextu64 trailb);
+    status <- (status `<<` (W8.of_int 8));
+    r64 <- (W8.to_uint ((W8.of_int r64) - (W8.of_int 1)));
+    t <- (zeroextu64 (W8.of_int r64));
+    status <- (status + t);
+    status <- (status `<<` (W8.of_int 8));
+    st.[25] <- status;
+    return st;
   }
   proc _finish_updstate_avx2 (st:W64.t Array26.t) : W64.t Array26.t = {
     var ststatus:W64.t;
@@ -7501,7 +7501,7 @@ module M = {
       at <- (at `|>>` 3);
       at <- (at `<<` 3);
       (off2, t64) <@ a66____a_rlen_read_upto8 (buf, off, len);
-      len <- (len + at);
+      len <- (len + (W64.to_uint at8));
       sh <- (truncateu8 at8);
       sh <- (sh `<<` (W8.of_int 3));
       t64 <- (t64 `<<` (sh `&` (W8.of_int 63)));
