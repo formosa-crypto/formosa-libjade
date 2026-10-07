@@ -122,3 +122,11 @@ ML-KEM = NIST ACVP v1.1.0.41). Regenerate with `bench/tools/import_kat.py`.
   deletes `src/fips202/ref/keccak1600_updstate*.jinc` and carries other
   updstate proofs, so merging it will conflict on those files. Details:
   `proofs/fips202/notes/updstate.md`.
+- 2026-10-07 (later): the AVX2 single-lane updstate
+  (`src/fips202/avx2/keccak1600_updstate{,_ASIZE}.jinc`) and its proof were
+  removed; it was the ref updstate with the AVX2 permutation hard-wired.
+  ML-DSA's `hashing.jinc` now calls the ref procedures, keeping its default
+  permutation choice (`KECCAK_F1600_OPT`). The 4-way updstate add/dump now
+  return results in the fixed-size order. Models re-extracted. This widens the
+  future conflict with `origin/ci-mldsa-sct`, which keeps the AVX2 files (with
+  SCT annotations) and deletes the ref ones.

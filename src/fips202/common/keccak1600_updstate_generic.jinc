@@ -1,7 +1,9 @@
 /**
- Shared by the ref and avx2 "updstate" (streaming init/update/finish) code:
- the state type and the status-word decoder. Hoisted here so that both
- variants can be compiled (and extracted) into one program.
+ The state type and the status-word decoder of the single-lane "updstate"
+ (streaming init/update/finish) code, ref/keccak1600_updstate{,_ASIZE}.jinc.
+ The single-lane code is the same for every permutation choice
+ (KECCAK_PERMUTATION); the 4-way code has its own state type
+ (avx2/keccak1600x4_updstate.jinc).
 */
 
 type keccak_updstate = u64[26];

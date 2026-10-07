@@ -6,7 +6,7 @@ Measured 2026-10-05/06 on branch `formosa-keccak-proof-merge`, commit `6e98b395`
 
 **Update 2026-10-07.** `easycrypt.project` now sets `timeout = 5`. The `smt` calls that stalled or ran close to that limit were rewritten, and no `smt` call passes an `@T` theory hint any more. The full `fips202` check (`make -C proofs fips202`, 10 parallel jobs) passes 37/37 in 6m15s wall-clock; earlier runs of the same check took about 12 minutes. The per-file tables below are still the `timeout = 30` measurements.
 
-**Update 2026-10-07 (updstate).** The `updstate` (streaming) procedures are now proved for ref, AVX2 and 4-way AVX2, with no admitted lemma left in fips202. Four files are new: `common/Keccak1600_updstate.ec`, `common/Keccak1600_updstate_finish.ec`, `ref/Keccak1600_updstate_ref.ec` and `extracted/Keccak1600_updstate_ref_checkXtr.ec`. The two AVX2 `updstate` files were rewritten. The design, the source fixes and an experiment with EasyCrypt's LLM mode are in [updstate.md](updstate.md). Timings for these files are in [updstate files](#updstate-files-2026-10-07); the rows of the table below predate the rewrite. The full `fips202` check (10 parallel jobs) passes 41/41 in 6m30s.
+**Update 2026-10-07 (updstate).** The `updstate` (streaming) procedures are now proved for ref, AVX2 and 4-way AVX2, with no admitted lemma left in fips202. Four files are new: `common/Keccak1600_updstate.ec`, `common/Keccak1600_updstate_finish.ec`, `ref/Keccak1600_updstate_ref.ec` and `extracted/Keccak1600_updstate_ref_checkXtr.ec`. The two AVX2 `updstate` files were rewritten. Later the same day the AVX2 single-lane `updstate` sources and proofs were removed, because they duplicated the ref ones with the AVX2 permutation selected. ML-DSA now uses the ref procedures. The design, the source fixes, the consolidation and an experiment with EasyCrypt's LLM mode are in [updstate.md](updstate.md). Timings for these files are in [updstate files](#updstate-files-2026-10-07); the rows of the table below predate the rewrite. The full `fips202` check (10 parallel jobs) passes 39/39 in 6m39s.
 
 **Setup.**
 - 10-core Mac (Darwin 27, 32 GiB), otherwise idle.
@@ -44,7 +44,7 @@ Measured 2026-10-05/06 on branch `formosa-keccak-proof-merge`, commit `6e98b395`
 | `ref/Keccakf1600_opt.ec` | 3m19s | 3m17s | 2.3 GiB | - | 3m13s | - | 3m50s (1) |
 | `avx2/Keccakf1600_avx2x4_alt.ec` | 2m39s | 2m37s | 3.2 GiB | - | 2m24s | - | 2m36s (0) |
 | `common/Keccak1600_subreadwrite.ec` | 2m34s | 1m55s | 1.9 GiB | 1 | 1.1s | 4 | 2m02s (0) |
-| `avx2/Keccak1600_updstate_avx2.ec` | 57.5s | 47.0s | 0.8 GiB | - | - | 15 | 53.9s (0) |
+| `avx2/Keccak1600_updstate_avx2.ec` (removed 2026-10-07) | 57.5s | 47.0s | 0.8 GiB | - | - | 15 | 53.9s (0) |
 | `common/Keccak1600_statebytes.ec` | 40.8s | 6.4s | 0.4 GiB | 1 | - | - | 10.5s (0) |
 | `avx2/kck_bindings.ec` | 35.2s | 29.2s | 0.6 GiB | - | - | - | 36.1s (0) |
 | `spec/properties/FIPS202_SHA3_Spec.ec` | 34.7s | 4.0s | 0.3 GiB | 1 | - | - | 4.6s (0) |
@@ -62,7 +62,7 @@ Measured 2026-10-05/06 on branch `formosa-keccak-proof-merge`, commit `6e98b395`
 | `avx2/Keccak1600_avx2.ec` | 7.2s | 6.5s | 1.0 GiB | - | - | - | 6.9s (0) |
 | `extracted/Keccak1600_updstate_avx2x4_checkXtr.ec` | 7.2s | 7.0s | 0.6 GiB | - | - | - | 7.1s (0) |
 | `extracted/Keccak1600_fixedsizes_ref_checkXtr.ec` | 6.6s | 6.4s | 0.6 GiB | - | - | - | 6.9s (0) |
-| `extracted/Keccak1600_updstate_avx2_checkXtr.ec` | 5.0s | 4.8s | 0.6 GiB | - | - | - | 5.0s (0) |
+| `extracted/Keccak1600_updstate_avx2_checkXtr.ec` (removed 2026-10-07) | 5.0s | 4.8s | 0.6 GiB | - | - | - | 5.0s (0) |
 | `avx2/Keccak1600_updstate_avx2x4.ec` | 4.1s | 4.0s | 0.5 GiB | - | - | 23 | 4.2s (0) |
 | `avx2/Keccakf1600_avx2x4.ec` | 4.0s | 3.8s | 0.6 GiB | - | - | - | 4.0s (0) |
 | `ref/Keccakf1600.ec` | 4.0s | 3.9s | 0.6 GiB | - | - | - | 4.1s (0) |
@@ -170,7 +170,7 @@ Elsewhere `circuit` is cheap. `Keccak1600_fixedsizes_avx2.ec` makes 22 calls in 
 None. Resolved on 2026-10-07:
 
 - **The four `*_rlen_*_upto8_h` contracts** in `common/Keccak1600_subreadwrite.ec` are proved by `conseq` from the proved `ilen` contracts, through equivalences between the two procedure families. Their statements were also fixed: the reads now give the advanced cursor, and the array write fills `min 8 (max 0 len)` bytes instead of `len`.
-- **The 15 admitted lemmas of `avx2/Keccak1600_updstate_avx2.ec`** and **the 23 of `avx2/Keccak1600_updstate_avx2x4.ec`** are replaced by proved contracts stated with the predicates `absorbing_spec` and `squeezing_spec`. Some of the old statements were false; for example the AVX2 squeeze contract lacked an `at = 0` premise. `mldsa/x86-64/avx2/ml_dsa_65/hashing.ec` was adapted to the new statements.
+- **The 15 admitted lemmas of `avx2/Keccak1600_updstate_avx2.ec`** and **the 23 of `avx2/Keccak1600_updstate_avx2x4.ec`** are replaced by proved contracts stated with the predicates `absorbing_spec` and `squeezing_spec`. Some of the old statements were false; for example the AVX2 squeeze contract lacked an `at = 0` premise. `mldsa/x86-64/avx2/ml_dsa_65/hashing.ec` was adapted to the new statements. The AVX2 single-lane file was later removed in favour of the ref one.
 - **The ref `updstate` procedures** are proved in the new `ref/Keccak1600_updstate_ref.ec`. They were not extracted before; see [updstate.md](updstate.md).
 
 Resolved on 2026-10-06:
@@ -184,8 +184,8 @@ Statements are unchanged, so the users of these lemmas in `mlkem-correctness` an
 
 ### Axioms
 
-- **Abstract-theory parameters.** `_ASIZE_ge0` and `_ASIZE_u64` in `ReadWriteArray`, `KeccakArrayRef`, `KeccakArrayAvx2`, `KeccakArrayAvx2x4`, `KeccakUpdstateRef`, `KeccakUpdstateAvx2` and `KeccakUpdstateAvx2x4`. These are expected. Clones are meant to discharge them.
-- **checkXtr clones.** Resolved on 2026-10-06. The `extracted/*_checkXtr.ec` clones, seven since 2026-10-07, now discharge both `_ASIZE_ge0` and `_ASIZE_u64` (`999 < W64.modulus`) `by done`. `print axiom.` lists no axiom left in them.
+- **Abstract-theory parameters.** `_ASIZE_ge0` and `_ASIZE_u64` in `ReadWriteArray`, `KeccakArrayRef`, `KeccakArrayAvx2`, `KeccakArrayAvx2x4`, `KeccakUpdstateRef` and `KeccakUpdstateAvx2x4`. These are expected. Clones are meant to discharge them.
+- **checkXtr clones.** Resolved on 2026-10-06. The `extracted/*_checkXtr.ec` clones, six since 2026-10-07, now discharge both `_ASIZE_ge0` and `_ASIZE_u64` (`999 < W64.modulus`) `by done`. `print axiom.` lists no axiom left in them.
 - **`avx2/kck_abs_bindings.ec`.** The clones `W17` (`BitWordSH` at size 17), `JC17` and `JC2` (`JCircuits2` with `sizeS = sizeB = 17`) leave obligations unproved. These are `JC2.le_size` (`0 <= 17 <= 17`), `JC2.W2.gt0_r`, `JC2.W2.sizeBrS`, plus the definitional axioms of `BitWordSH` and `JC2.W2.Pack`. Nothing outside the file uses these clones; they look like test instantiations.
 - **`avx2/kck_bindings.ec`.** The word clones `W4`, `W5`, `W10`, `W11` and `W12`, and the renamed `SHIFT` copies in `JC4` and `JC5`, keep the definitional `BitWordSH` axioms (`addE`, `andE`, …). This is the same pattern as Jasmin's `JWord.W8`–`W256`.
 - **Opaque operators.** None since 2026-10-07. The opaque operators of the old `updstate` files, which only admitted lemmas constrained, were removed with them.
@@ -211,7 +211,7 @@ Times are wall-clock with the repository configuration. "Loading" is the time sp
 ### extracted/
 
 - **`Keccak1600_Jazz.ec` and `Keccak1600_Jazz_ASIZE.ec`** take 2.1 s each. They are generated models with no proofs.
-- **The seven `*_checkXtr.ec` files** take 3–9 s each. Nothing admitted. Each proves `by sim` equivalences between the hand-written `MM` modules at `_ASIZE = 999` and the extracted model. Loading the proof theory is 2–4 s of that. Each clone discharges both `_ASIZE` parameters.
+- **The six `*_checkXtr.ec` files** take 3–9 s each. Nothing admitted. Each proves `by sim` equivalences between the hand-written `MM` modules at `_ASIZE = 999` and the extracted model. Loading the proof theory is 2–4 s of that. Each clone discharges both `_ASIZE` parameters.
 
 ### common/
 
@@ -262,7 +262,7 @@ Times are wall-clock with the repository configuration. "Loading" is the time sp
   - Twelve stalls account for 6m02s. Each of the four absorb lemmas has two, so it takes about 72 s instead of about 12 s.
   - Without the stalls, the costliest lemmas are `addstate_m_avx2x4_h` (14 s), `addstate_avx2x4_h` (13 s) and the four absorbs (11–12 s each).
   - With Z3 first it takes 5m45s, with 5 new stalls.
-- **`Keccak1600_updstate_avx2.ec`** was rewritten on 2026-10-07. Nothing admitted. It proves the memory and array procedures; `finish` comes from `common/Keccak1600_updstate_finish.ec` by `sim`. See [updstate files](#updstate-files-2026-10-07).
+- **`Keccak1600_updstate_avx2.ec`** was rewritten and then removed on 2026-10-07, together with the AVX2 single-lane `updstate` sources. `ref/Keccak1600_updstate_ref.ec` covers the same code for every permutation choice.
 - **`Keccak1600_updstate_avx2x4.ec`** was rewritten on 2026-10-07. Nothing admitted. Its array theory clones the fixed-size `KeccakArrayAvx2x4` to reuse the lane lemmas. See [updstate files](#updstate-files-2026-10-07).
 
 ### updstate files (2026-10-07)
@@ -273,11 +273,9 @@ Measured on 2026-10-07 with `easycrypt compile -no-eco`, one file at a time, Eas
 |---|---:|---|
 | `common/Keccak1600_updstate.ec` | 13 s | Status word, predicates, shared absorb and squeeze lemmas. |
 | `common/Keccak1600_updstate_finish.ec` | 49 s | `finish` and status export, shared by ref and AVX2. The `finish` proof is kept apart because one of its `smt` calls times out with the whole substrate in scope. |
-| `ref/Keccak1600_updstate_ref.ec` | 87 s | Memory and array procedures, both branches of the `HAS_AVX2` dispatch. |
-| `avx2/Keccak1600_updstate_avx2.ec` | 70 s | Memory and array procedures. Used by ML-DSA. |
-| `avx2/Keccak1600_updstate_avx2x4.ec` | 93 s | Array procedures, 4-buffer and broadcast. |
+| `ref/Keccak1600_updstate_ref.ec` | 87 s | Memory and array procedures, both branches of the `HAS_AVX2` dispatch, every permutation choice. Used by ML-DSA. |
+| `avx2/Keccak1600_updstate_avx2x4.ec` | 94 s | Array procedures, 4-buffer and broadcast. |
 | `extracted/Keccak1600_updstate_ref_checkXtr.ec` | 7 s | New. |
-| `extracted/Keccak1600_updstate_avx2_checkXtr.ec` | 6 s | |
 | `extracted/Keccak1600_updstate_avx2x4_checkXtr.ec` | 7 s | |
 
 ## Reproducing

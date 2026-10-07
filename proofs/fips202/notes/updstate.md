@@ -1,10 +1,15 @@
 # Keccak1600 `updstate` proofs
 
-The `updstate` procedures are the streaming interface of the Keccak code: `init`, then any number of `absorb` calls, then `finish`, then any number of `squeeze` calls. They exist in three variants (ref, AVX2, 4-way AVX2), each with memory and array buffers where the source provides them. As of 2026-10-07 all of them are proved, with no admitted lemma.
+The `updstate` procedures are the streaming interface of the Keccak code: `init`, then any number of `absorb` calls, then `finish`, then any number of `squeeze` calls. They exist in two variants, each with memory and array buffers where the source provides them:
+
+- **Single lane**, `src/fips202/ref/keccak1600_updstate{,_ASIZE}.jinc`. The permutation is chosen at build time through `KECCAK_PERMUTATION`, and the proofs hold for every choice.
+- **4-way AVX2**, `src/fips202/avx2/keccak1600x4_updstate{,_ASIZE}.jinc`.
+
+As of 2026-10-07 both are proved, with no admitted lemma. Until then there was also an AVX2 single-lane copy. It was the ref code with the AVX2 permutation hard-wired, and it was removed (see [Consolidation](#consolidation-2026-10-07)).
 
 ## What is proved
 
-The state carries one extra 64-bit status word after the Keccak lanes: word 25 for ref and AVX2, word 100 for the 4-way state. Byte 0 is the cursor `at`, byte 1 is `r64 - 1` (so the rate in bytes is `r8 = 8 * r64`), byte 2 is the trail byte.
+The state carries one extra 64-bit status word after the Keccak lanes: word 25 for the single-lane state, word 100 for the 4-way state. Byte 0 is the cursor `at`, byte 1 is `r64 - 1` (so the rate in bytes is `r8 = 8 * r64`), byte 2 is the trail byte.
 
 Every contract is stated with two predicates from `common/Keccak1600_updstate.ec`:
 
@@ -31,22 +36,23 @@ Two behaviours of the code show up in the contracts:
 
 | Scenario | Files | Wall |
 |---|---:|---:|
-| `fips202` | 41/41 | 6m30s |
-| `mldsa` | 72/72 | 4m35s |
-| `mlkem-avx2-768` | 22/22 | 10m27s |
-| `mlkem-avx2-1024` | 22/22 | 10m10s |
+| `fips202` | 39/39 | 6m39s |
+| `mldsa` | 72/72 | 12m04s |
+| `mlkem-avx2-768` | 22/22 | 23m07s |
+| `mlkem-avx2-1024` | 22/22 | 22m46s |
+
+These runs are after the consolidation below. The ML-DSA and ML-KEM wall times are inflated by other jobs on the machine; before the consolidation the same scenarios took 4m35s, 10m27s and 10m10s.
 
 ## Files
 
 | File | Content |
 |---|---|
 | `common/Keccak1600_updstate.ec` | Status-word encoding and decoder contracts, the predicates, and the pure lemmas shared by all variants (block arithmetic, absorb steps, squeeze stream slicing). |
-| `common/Keccak1600_updstate_finish.ec` | The `finish` and status-export proofs, shared by ref and AVX2. It is a separate file because one `smt` call in the `finish` proof times out when the whole substrate is in scope. |
+| `common/Keccak1600_updstate_finish.ec` | The single-lane `finish` and status-export proofs. It is a separate file because one `smt` call in the `finish` proof times out when the whole substrate is in scope. |
 | `common/Keccak1600_subreadwrite.ec` | The `*_rlen_*_upto8` read/write contracts, now proved, and their bridges to the fixed-size `msubread`/`asubread` steps. |
-| `ref/Keccak1600_updstate_ref.ec` | Memory and array procedures, ref variant. Covers both branches of the `HAS_AVX2` dispatch in the add and dump helpers. |
-| `avx2/Keccak1600_updstate_avx2.ec` | Memory and array procedures, AVX2 variant. Used by ML-DSA. |
+| `ref/Keccak1600_updstate_ref.ec` | Memory and array procedures, single lane. Covers both branches of the `HAS_AVX2` dispatch in the add and dump helpers, and every permutation choice. Used by ML-DSA. |
 | `avx2/Keccak1600_updstate_avx2x4.ec` | Array procedures of the 4-way variant. The source has no 4-way memory absorb or squeeze. |
-| `extracted/Keccak1600_updstate_{ref,avx2,avx2x4}_checkXtr.ec` | `by sim` checks that each hand-written `MM` module equals the extracted code at `_ASIZE = 999`, wrappers included. |
+| `extracted/Keccak1600_updstate_{ref,avx2x4}_checkXtr.ec` | `by sim` checks that each hand-written `MM` module equals the extracted code at `_ASIZE = 999`, wrappers included. |
 
 ## Design
 
@@ -57,6 +63,8 @@ The proofs share as much as possible with the fixed-size material:
 - **Add and dump.** The add helpers are proved with the fixed-size `addstate_spec` invariant and its step lemmas (`addstate_spec_init`, `_fullword`, `_finish`, `_done`). The only new pieces are the bridges from the runtime-length `rlen` reads to `msubread`/`asubread` steps (`msubread_rlen`, `asubread_rlen`). The dump helpers use an overwrite lemma (`stores_overwrite`, `afill_overwrite`) to absorb the junk bytes that a partial first word writes.
 - **Absorb.** The loop invariant is `pabsorb_spec` from `Keccak1600_statebytes.ec`, stepped by `pabsorb_fill_at` and `pabsorb_last_at`.
 - **4-way variant.** The theory clones the fixed-size `KeccakArrayAvx2x4` and reuses its lane layer: `addstate_spec4` with its step lemmas, `addstate_res4`, `pabsorb4_fill` and `pabsorb4_last`. The `updstate` code addresses lanes by byte offsets (`4*at + 8*k`) instead of word indices, which two lemmas bridge (`st4x_get_xor64x4_at`, `st4x_get64_at`).
+- **Every permutation choice at once.** The single-lane code calls the permutation through the dispatcher `_keccakf1600`. Its contract `keccakf1600_h` (`ref/Keccakf1600.ec`) is proved for all four branches, so the single-lane proofs do not depend on `KECCAK_PERMUTATION`.
+- **Argument order.** All helpers follow the fixed-size convention: each procedure returns the values it modifies, in the order they appear among its arguments. Add returns `(st, at, cursor)` and dump returns `(buffers…, cursor, at)`.
 - **Proof reuse across variants.** Hypothesis names are the same in all variants, so the array scripts are the memory scripts with the adapters swapped. Several array and broadcast proofs passed on their first assembled run.
 
 The previous AVX2 and 4-way files held 38 admitted lemmas and several opaque operators constrained only by them. Some of those statements were false, for example the AVX2 squeeze contract without an `at = 0` premise. They are all replaced.
@@ -66,10 +74,19 @@ The previous AVX2 and 4-way files held 38 admitted lemmas and several opaque ope
 The proofs required these source changes, all in `src/fips202`. The fips202 and ML-DSA models were re-extracted with the pinned Jasmin 2026.03.1.
 
 - **Hoisted shared definitions.** `type keccak_updstate` and `fn _ststatus_data` moved to the new `common/keccak1600_updstate_generic.jinc`. Before, the ref and AVX2 files both defined them, so `jasminc` rejected a program that required both, and the ref variant was never extracted.
-- **Lost bytes on a misaligned absorb.** `len = len + (64ui)at;` became `len = len + (64ui)at8;` in `avx2/keccak1600_updstate_ASIZE.jinc` and `avx2/keccak1600x4_updstate_ASIZE.jinc`. With an unaligned cursor the array absorb dropped data. The same fix is on `origin/ci-mldsa-sct`.
+- **Lost bytes on a misaligned absorb.** `len = len + (64ui)at;` became `len = len + (64ui)at8;` in the AVX2 single-lane and 4-way array absorbs. With an unaligned cursor the array absorb dropped data. The same fix is on `origin/ci-mldsa-sct`.
 - **Wrong status word in the 4-way export.** `ststatus_updstate_avx2x4` read the status at word 25 instead of word 100. Comments that said `r64 = 8*r8` were also corrected.
 
-`origin/ci-mldsa-sct` deletes the ref `updstate` sources and has its own AVX2 and 4-way proofs. Merging it will conflict on those files; keep the versions on this branch.
+## Consolidation (2026-10-07)
+
+The AVX2 single-lane files `avx2/keccak1600_updstate{,_ASIZE}.jinc` computed exactly what the ref files compute with `KECCAK_F1600_AVX2` selected. The differences were the hard-wired permutation, narrower add/dump loops, extra register spills in ref, and names and argument orders. They and their proof `avx2/Keccak1600_updstate_avx2.ec` were removed:
+
+- **Sources.** The AVX2 single-lane files are deleted. `common/keccak1600_updstate_generic.jinc` keeps the state type and decoder of the single-lane code.
+- **Argument order.** The 4-way add and dump now return their results in the fixed-size order, `(st, at, off)` and `(buf0, …, buf3, off, at)`. The commented-out 4-way memory block was reordered the same way. The ref files already followed that order.
+- **ML-DSA.** `src/mldsa/avx2/common/hashing.jinc` calls the ref procedures (`_init_updstate`, `A66::_absorb_updstate`, `_absorb_m_updstate`, `_finish_updstate`, `A64::_squeeze_updstate`). ML-DSA keeps its default permutation choice, `KECCAK_F1600_OPT`, the one its other single-lane code uses. `proofs/mldsa/x86-64/avx2/ml_dsa_65/hashing.ec` clones `KeccakUpdstateRef` and uses the ref lemmas; its bridges to the fips202 model stay `by sim`, because both models select the same permutation.
+- **Models.** `Keccak1600_Jazz{,_ASIZE}.ec` and `ml_dsa_65_avx2.ec` were re-extracted. The ML-KEM models and `proofs/arrays` are unchanged.
+
+`origin/ci-mldsa-sct` went the other way: it deletes the ref `updstate` sources and adds constant-time annotations to the AVX2 and 4-way files. Merging it will conflict on those files. Its annotations would need porting to the ref files.
 
 ## Experiment: EasyCrypt LLM mode against batch compilation
 

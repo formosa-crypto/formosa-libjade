@@ -47,12 +47,12 @@ jobs:
       - name: Versions
         run: $CTDEV jasminc -version
 
-      # ML-KEM only. ML-DSA is not checked here yet: `_absorb_m_updstate_avx2`
-      # unpacks its loop bound from the status word st[25], which shares an
-      # array with the secret Keccak lanes, so the checker requires the whole
-      # state to be public. Fixing it means splitting keccak_updstate's
-      # metadata from its lanes -- deferred; add ct-mldsa/sct-mldsa here once
-      # that lands.
+      # ML-KEM only. ML-DSA is not checked here yet: `_absorb_m_updstate`
+      # (src/fips202/ref/keccak1600_updstate.jinc) unpacks its loop bound from
+      # the status word st[25], which shares an array with the secret Keccak
+      # lanes, so the checker requires the whole state to be public. Fixing it
+      # means splitting keccak_updstate's metadata from its lanes -- deferred;
+      # add ct-mldsa/sct-mldsa here once that lands.
       - name: ML-KEM constant-time
         run: $CTDEV make -C src ct-mlkem
 

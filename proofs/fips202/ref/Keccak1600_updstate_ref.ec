@@ -1,19 +1,28 @@
 (******************************************************************************
    Keccak1600_updstate_ref.ec:
 
-   Correctness of the reference "updstate" (streaming) Keccak1600 procedures
-   (src/fips202/ref/keccak1600_updstate{,_ASIZE}.jinc), with the same
-   contracts as avx2/Keccak1600_updstate_avx2.ec (see there and
-   common/Keccak1600_updstate.ec):
+   Correctness of the single-lane "updstate" (streaming) Keccak1600
+   procedures (src/fips202/ref/keccak1600_updstate{,_ASIZE}.jinc):
+   init / absorb (memory and array buffers) / finish / squeeze (memory and
+   array buffers).
+
+   The state carries a status word (see common/Keccak1600_updstate.ec) and the
+   contracts are stated with the streaming predicates of that file:
      init      ==> absorbing_spec r8 tb [] res
      absorb    absorbing_spec r8 tb l st ==> absorbing_spec r8 tb (l ++ input) res
      finish    absorbing_spec r8 tb l st ==> squeezing_spec r8 (ABSORB1600 tb r8 l) 0 res
      squeeze   squeezing_spec r8 st0 k st ==> output = sqstream r8 st0 k len
                                             /\ squeezing_spec r8 st0 (k+len) res
-   `_finish_updstate` and `ststatus_updstate` are proved in
-   common/Keccak1600_updstate_finish.ec.  The add/dump procedures keep the
-   `HAS_AVX2` dispatch symbolic (both branches are proved), as in
-   Keccak1600_fixedsizes_ref.ec.
+   The memory-buffer procedures are proved first, against Keccak1600_Jazz.M;
+   the array-buffer ones in the abstract theory KeccakUpdstateRef (parameter
+   _ASIZE), whose module MM copies the extracted code (checked at _ASIZE = 999
+   by extracted/Keccak1600_updstate_ref_checkXtr.ec).
+   The proofs hold for every permutation choice: the permutation is called
+   through the dispatcher `_keccakf1600`, whose contract `keccakf1600_h`
+   covers all its branches.  The add/dump procedures keep the `HAS_AVX2`
+   dispatch symbolic (both branches are proved), as in
+   Keccak1600_fixedsizes_ref.ec.  `_finish_updstate` and `ststatus_updstate`
+   are proved in common/Keccak1600_updstate_finish.ec.
 ******************************************************************************)
 
 require import AllCore List Int IntDiv StdOrder.

@@ -6,7 +6,7 @@
    is W64.t Array101.t: words 0..99 hold the packed 4-way Keccak state
    (state4x, read through A101u64toA25u256) and word 100 the status word,
    with the encoding of the single-lane code (common/Keccak1600_updstate.ec).
-   The contracts lift those of avx2/Keccak1600_updstate_avx2.ec lane by lane:
+   The contracts lift those of ref/Keccak1600_updstate_ref.ec lane by lane:
      init      ==> absorbing_spec4 r8 tb [] [] [] [] res
      absorb    absorbing_spec4 r8 tb l0..l3 st ==> absorbing_spec4 r8 tb (l0 ++ in0) .. (l3 ++ in3) res
      finish    absorbing_spec4 r8 tb l0..l3 st
@@ -497,7 +497,7 @@ import RW.
 module MM = {
   proc _add_bcast_updstate_avx2x4 (st:W256.t Array25.t, at:int,
                                    buf:W8.t A.t, off:int, upto:int) : 
-  int * int * W256.t Array25.t = {
+  W256.t Array25.t * int * int = {
     var at8:W64.t;
     var t64:W64.t;
     var sh:W8.t;
@@ -576,7 +576,7 @@ module MM = {
       
     }
     at <- upto;
-    return (at, off, st);
+    return (st, at, off);
   }
 
   proc _absorb_bcast_updstate_avx2x4 (st:W64.t Array101.t,
@@ -598,13 +598,13 @@ module MM = {
     off <- 0;
     len <- (len + at);
     while ((r8 <= len)) {
-      (at, off, stk) <@ _add_bcast_updstate_avx2x4 (stk, at, buf, off, r8);
+      (stk, at, off) <@ _add_bcast_updstate_avx2x4 (stk, at, buf, off, r8);
       stk <@ M._keccakf1600_avx2x4 (stk);
       len <- (len - r8);
       at <- 0;
     }
     len <- len;
-    (at,  _1, stk) <@ _add_bcast_updstate_avx2x4 (stk, at, buf, off, len);
+    (stk, at,  _1) <@ _add_bcast_updstate_avx2x4 (stk, at, buf, off, len);
     st <-
     (Array101.init
     (WArray808.get64
@@ -626,8 +626,8 @@ module MM = {
   proc _add_updstate_avx2x4 (st:W256.t Array25.t, at:int,
                              buf0:W8.t A.t, buf1:W8.t A.t,
                              buf2:W8.t A.t, buf3:W8.t A.t,
-                             off:int, upto:int) : int * int *
-                                                  W256.t Array25.t = {
+                             off:int, upto:int) : W256.t Array25.t * int *
+                                                  int = {
     var at8:W64.t;
     var shval:W8.t;
     var t64:W64.t;
@@ -781,7 +781,7 @@ module MM = {
       
     }
     at <- upto;
-    return (at, off, st);
+    return (st, at, off);
   }
 
   proc _absorb_updstate_avx2x4 (st:W64.t Array101.t, buf0:W8.t A.t,
@@ -805,7 +805,7 @@ module MM = {
     len <- (len + at);
     while ((r8 <= len)) {
       (* Erased call to spill *)
-      (at, off, stk) <@ _add_updstate_avx2x4 (stk, at, buf0, buf1, buf2,
+      (stk, at, off) <@ _add_updstate_avx2x4 (stk, at, buf0, buf1, buf2,
       buf3, off, r8);
       (* Erased call to unspill *)
       stk <@ M._keccakf1600_avx2x4 (stk);
@@ -813,7 +813,7 @@ module MM = {
       at <- 0;
     }
     len <- len;
-    (at,  _1, stk) <@ _add_updstate_avx2x4 (stk, at, buf0, buf1, buf2, 
+    (stk, at,  _1) <@ _add_updstate_avx2x4 (stk, at, buf0, buf1, buf2, 
     buf3, off, len);
     (* Erased call to unspill *)
     st <-
@@ -837,8 +837,8 @@ module MM = {
   proc _dump_updstate_avx2x4 (buf0:W8.t A.t, buf1:W8.t A.t,
                               buf2:W8.t A.t, buf3:W8.t A.t,
                               off:int, st:W256.t Array25.t, at:int, upto:int) : 
-  int * int * W8.t A.t * W8.t A.t * W8.t A.t *
-  W8.t A.t = {
+  W8.t A.t * W8.t A.t * W8.t A.t * W8.t A.t *
+  int * int = {
     var at8:W64.t;
     var sh:W8.t;
     var t64:W64.t;
@@ -947,7 +947,7 @@ module MM = {
       
     }
     at <- upto;
-    return (at, off, buf0, buf1, buf2, buf3);
+    return (buf0, buf1, buf2, buf3, off, at);
   }
 
   proc _squeeze_updstate_avx2x4 (st:W64.t Array101.t, buf0:W8.t A.t,
@@ -978,14 +978,14 @@ module MM = {
     off <- 0;
     len <- (len + at);
     while ((r8 < len)) {
-      (at, off, buf0, buf1, buf2, buf3) <@ _dump_updstate_avx2x4 (buf0, 
+      (buf0, buf1, buf2, buf3, off, at) <@ _dump_updstate_avx2x4 (buf0, 
       buf1, buf2, buf3, off, stk, at, r8);
       stk <@ M._keccakf1600_avx2x4 (stk);
       len <- (len - r8);
       at <- 0;
     }
     len <- len;
-    (at,  _1, buf0, buf1, buf2, buf3) <@ _dump_updstate_avx2x4 (buf0, 
+    (buf0, buf1, buf2, buf3,  _1, at) <@ _dump_updstate_avx2x4 (buf0, 
     buf1, buf2, buf3, off, stk, at, len);
     st <-
     (Array101.init
@@ -1137,7 +1137,7 @@ hoare add_updstate_avx2x4_h _st _at _buf0 _buf1 _buf2 _buf3 _off _upto:
  : st = _st /\ at = _at /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
    /\ off = _off /\ upto = _upto
    /\ 0 <= _at <= _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE
- ==> addstate_res4 _st _at [_buf0; _buf1; _buf2; _buf3] _off (_upto - _at) 0 res.`3 res.`1 res.`2.
+ ==> addstate_res4 _st _at [_buf0; _buf1; _buf2; _buf3] _off (_upto - _at) 0 res.`1 res.`2 res.`3.
 proof.
 proc => /=; pose n := _upto - _at.
 seq 2 : (#pre /\ W64.to_uint at8 = _at %% 8).
@@ -1241,7 +1241,7 @@ phoare add_updstate_avx2x4_ph _st _at _buf0 _buf1 _buf2 _buf3 _off _upto:
  : st = _st /\ at = _at /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
    /\ off = _off /\ upto = _upto
    /\ 0 <= _at <= _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE
- ==> addstate_res4 _st _at [_buf0; _buf1; _buf2; _buf3] _off (_upto - _at) 0 res.`3 res.`1 res.`2
+ ==> addstate_res4 _st _at [_buf0; _buf1; _buf2; _buf3] _off (_upto - _at) 0 res.`1 res.`2 res.`3
  ] = 1%r.
 proof. by conseq add_updstate_avx2x4_ll (add_updstate_avx2x4_h _st _at _buf0 _buf1 _buf2 _buf3 _off _upto). qed.
 
@@ -1256,7 +1256,7 @@ hoare add_bcast_updstate_avx2x4_h _st _at _buf _off _upto:
  MM._add_bcast_updstate_avx2x4
  : st = _st /\ at = _at /\ buf = _buf /\ off = _off /\ upto = _upto
    /\ 0 <= _at <= _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE
- ==> addstate_res4 _st _at [_buf; _buf; _buf; _buf] _off (_upto - _at) 0 res.`3 res.`1 res.`2.
+ ==> addstate_res4 _st _at [_buf; _buf; _buf; _buf] _off (_upto - _at) 0 res.`1 res.`2 res.`3.
 proof.
 proc => /=; pose n := _upto - _at.
 seq 2 : (#pre /\ W64.to_uint at8 = _at %% 8).
@@ -1349,7 +1349,7 @@ phoare add_bcast_updstate_avx2x4_ph _st _at _buf _off _upto:
  [ MM._add_bcast_updstate_avx2x4
  : st = _st /\ at = _at /\ buf = _buf /\ off = _off /\ upto = _upto
    /\ 0 <= _at <= _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE
- ==> addstate_res4 _st _at [_buf; _buf; _buf; _buf] _off (_upto - _at) 0 res.`3 res.`1 res.`2
+ ==> addstate_res4 _st _at [_buf; _buf; _buf; _buf] _off (_upto - _at) 0 res.`1 res.`2 res.`3
  ] = 1%r.
 proof. by conseq add_bcast_updstate_avx2x4_ll (add_bcast_updstate_avx2x4_h _st _at _buf _off _upto). qed.
 
@@ -1400,7 +1400,7 @@ seq 1 : (st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len <=
     pose a := (size _l0 + k) %% _r8.
     have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
     split; first smt().
-    move=> _ [at1 c1 stc] /= Hres r -> /=.
+    move=> _ [stc at1 c1] /= Hres r -> /=.
     have Hs := absorbing_spec4_sizes _ _ _ _ _ _ _ Habs.
     have Hl := addstate_res4_sub stk{hr} stc a _buf0 _buf1 _buf2 _buf3 _len k (_r8 - a) at1 c1 _ _ _ _ Hres; 1..4: smt().
     have Hf := pabsorb4_fill _r8 (size _l0) [_l0; _l1; _l2; _l3] (sub _buf0 0 _len) (sub _buf1 0 _len) (sub _buf2 0 _len) (sub _buf3 0 _len) k (_r8 - a) a stk{hr} stc _ _ _ _ _ _ _ Hs Hp Hl; 1..7: smt(A.size_sub).
@@ -1417,7 +1417,7 @@ seq 1 : (st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len <=
   by apply pabsorb4_init.
 wp; ecall (add_updstate_avx2x4_h stk at buf0 buf1 buf2 buf3 off len); wp; skip => &hr [#] -> Habs H0 H1 -> -> -> -> -> Hb0 Hb1 -> -> Hc Hp /=.
 split; first smt().
-move=> _ [at1 c1 stc] /= Hres.
+move=> _ [stc at1 c1] /= Hres.
 rewrite A25u256toA101u64E A101_set800.
 have Hr8 := pabsorb4_r8 _ _ _ _ _ Hp.
 pose k := off{hr}.
@@ -1497,7 +1497,7 @@ seq 1 : (st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len <=
     pose a := (size _l0 + k) %% _r8.
     have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
     split; first smt().
-    move=> _ [at1 c1 stc] /= Hres r -> /=.
+    move=> _ [stc at1 c1] /= Hres r -> /=.
     have Hs := absorbing_spec4_sizes _ _ _ _ _ _ _ Habs.
     have Hl := addstate_res4_sub stk{hr} stc a _buf _buf _buf _buf _len k (_r8 - a) at1 c1 _ _ _ _ Hres; 1..4: smt().
     have Hf := pabsorb4_fill _r8 (size _l0) [_l0; _l1; _l2; _l3] (sub _buf 0 _len) (sub _buf 0 _len) (sub _buf 0 _len) (sub _buf 0 _len) k (_r8 - a) a stk{hr} stc _ _ _ _ _ _ _ Hs Hp Hl; 1..7: smt(A.size_sub).
@@ -1514,7 +1514,7 @@ seq 1 : (st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len <=
   by apply pabsorb4_init.
 wp; ecall (add_bcast_updstate_avx2x4_h stk at buf off len); wp; skip => &hr [#] -> Habs H0 H1 -> -> Hb0 Hb1 -> -> Hc Hp /=.
 split; first smt().
-move=> _ [at1 c1 stc] /= Hres.
+move=> _ [stc at1 c1] /= Hres.
 rewrite A25u256toA101u64E A101_set800.
 have Hr8 := pabsorb4_r8 _ _ _ _ _ Hp.
 pose k := off{hr}.
@@ -1565,11 +1565,11 @@ hoare dump_updstate_avx2x4_h _buf0 _buf1 _buf2 _buf3 _off _st _at _upto:
  : buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
    /\ off = _off /\ st = _st /\ at = _at /\ upto = _upto
    /\ 0 <= _at <= _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE
- ==> res.`1 = _upto /\ res.`2 = _off + (_upto - _at)
-   /\ res.`3 = afill _buf0 _off (sub (stbytes (st4x_get _st 0)) _at (_upto - _at))
-   /\ res.`4 = afill _buf1 _off (sub (stbytes (st4x_get _st 1)) _at (_upto - _at))
-   /\ res.`5 = afill _buf2 _off (sub (stbytes (st4x_get _st 2)) _at (_upto - _at))
-   /\ res.`6 = afill _buf3 _off (sub (stbytes (st4x_get _st 3)) _at (_upto - _at)).
+ ==> res.`1 = afill _buf0 _off (sub (stbytes (st4x_get _st 0)) _at (_upto - _at))
+   /\ res.`2 = afill _buf1 _off (sub (stbytes (st4x_get _st 1)) _at (_upto - _at))
+   /\ res.`3 = afill _buf2 _off (sub (stbytes (st4x_get _st 2)) _at (_upto - _at))
+   /\ res.`4 = afill _buf3 _off (sub (stbytes (st4x_get _st 3)) _at (_upto - _at))
+   /\ res.`5 = _off + (_upto - _at) /\ res.`6 = _upto.
 proof.
 proc => /=.
 seq 2 : (#pre /\ W64.to_uint at8 = _at %% 8).
@@ -1666,11 +1666,11 @@ phoare dump_updstate_avx2x4_ph _buf0 _buf1 _buf2 _buf3 _off _st _at _upto:
  : buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
    /\ off = _off /\ st = _st /\ at = _at /\ upto = _upto
    /\ 0 <= _at <= _upto <= 200 /\ 0 <= _off /\ _off + (_upto - _at) <= _ASIZE
- ==> res.`1 = _upto /\ res.`2 = _off + (_upto - _at)
-   /\ res.`3 = afill _buf0 _off (sub (stbytes (st4x_get _st 0)) _at (_upto - _at))
-   /\ res.`4 = afill _buf1 _off (sub (stbytes (st4x_get _st 1)) _at (_upto - _at))
-   /\ res.`5 = afill _buf2 _off (sub (stbytes (st4x_get _st 2)) _at (_upto - _at))
-   /\ res.`6 = afill _buf3 _off (sub (stbytes (st4x_get _st 3)) _at (_upto - _at))
+ ==> res.`1 = afill _buf0 _off (sub (stbytes (st4x_get _st 0)) _at (_upto - _at))
+   /\ res.`2 = afill _buf1 _off (sub (stbytes (st4x_get _st 1)) _at (_upto - _at))
+   /\ res.`3 = afill _buf2 _off (sub (stbytes (st4x_get _st 2)) _at (_upto - _at))
+   /\ res.`4 = afill _buf3 _off (sub (stbytes (st4x_get _st 3)) _at (_upto - _at))
+   /\ res.`5 = _off + (_upto - _at) /\ res.`6 = _upto
  ] = 1%r.
 proof. by conseq dump_updstate_avx2x4_ll (dump_updstate_avx2x4_h _buf0 _buf1 _buf2 _buf3 _off _st _at _upto). qed.
 
@@ -1742,7 +1742,7 @@ seq 1 : (buf0 = afill _buf0 0 (sqstream _r8 (st4x_get _s0 0) _k off)
     have [Hr [Hk _]] := Hsq.
     have Ha : 0 <= (_k + off{hr}) %% _r8 < _r8 by smt(modz_ge0 ltz_pmod).
     split; first smt().
-    move=> _ [at1 off1 b0 b1 b2 b3] /= [_ [-> [-> [-> [-> ->]]]]] r -> /=.
+    move=> _ [b0 b1 b2 b3 off1 at1] /= [-> [-> [-> [-> [-> _]]]]] r -> /=.
     have G : forall j, 0 <= j < 4 => st4x_get (iter ((_k + off{hr}) %/ _r8 + 1) keccak_f1600_x4 _s0) j = st_i (st4x_get _s0 j) ((_k + off{hr}) %/ _r8 + 1).
     + by move=> j Hj; apply st4x_get_iter => //; smt(divz_ge0).
     rewrite (G 0) // (G 1) // (G 2) // (G 3) //.
@@ -1766,7 +1766,7 @@ wp; ecall (dump_updstate_avx2x4_h buf0 buf1 buf2 buf3 off stk at len); wp; skip 
 have [Hr [Hk _]] := Hsq.
 have Ha : 0 <= (_k + off{hr}) %% _r8 < _r8 by smt(modz_ge0 ltz_pmod).
 split; first smt().
-move=> _ [at1 off1 b0 b1 b2 b3] /= [-> [_ [-> [-> [-> ->]]]]].
+move=> _ [b0 b1 b2 b3 off1 at1] /= [-> [-> [-> [-> [_ ->]]]]].
 rewrite A25u256toA101u64E A101_set800.
 rewrite (: (_k + off{hr}) %% _r8 + (_len - off{hr}) - (_k + off{hr}) %% _r8 = _len - off{hr}) 1:/#.
 have G : forall j, 0 <= j < 4 => st4x_get (iter ((_k + off{hr}) %/ _r8 + 1) keccak_f1600_x4 _s0) j = st_i (st4x_get _s0 j) ((_k + off{hr}) %/ _r8 + 1).

@@ -1,12 +1,11 @@
 (******************************************************************************
    Keccak1600_updstate_finish.ec:
 
-   Contracts of the procedures that the ref and avx2 updstate code share
-   verbatim: `_finish_updstate` (= `_finish_updstate_avx2`) and the status
-   export `ststatus_updstate` (= `keccak_ststatus`).  The avx2 contracts are
-   derived from the ref ones by `sim`.
-   (Kept apart from Keccak1600_updstate.ec: the low-level finish script is
-   sensitive to the lemmas in scope.)
+   Contracts of the single-lane `_finish_updstate` and of the status export
+   `ststatus_updstate` (src/fips202/ref/keccak1600_updstate.jinc), used by
+   ref/Keccak1600_updstate_ref.ec.
+   (Kept apart from Keccak1600_updstate.ec and from the ref file: the
+   low-level finish script is sensitive to the lemmas in scope.)
 ******************************************************************************)
 
 require import AllCore List Int IntDiv StdOrder.
@@ -298,10 +297,6 @@ phoare finish_updstate_ph _r8 _tb _l:
  ] = 1%r.
 proof. by conseq finish_updstate_ll (finish_updstate_h _r8 _tb _l). qed.
 
-equiv finish_updstate_avx2_eq:
- M._finish_updstate_avx2 ~ M._finish_updstate : ={arg} ==> ={res}.
-proof. by sim. qed.
-
 (* ------------------------------------------------------------------------- *)
 (* the status export                                                         *)
 (* ------------------------------------------------------------------------- *)
@@ -332,7 +327,3 @@ phoare ststatus_updstate_ph _st:
   /\ res.[2] = ststatus_trailb _st.[25]
  ] = 1%r.
 proof. by conseq ststatus_updstate_ll (ststatus_updstate_h _st). qed.
-
-equiv keccak_ststatus_eq:
- M.keccak_ststatus ~ M.ststatus_updstate : ={arg} ==> ={res}.
-proof. by sim. qed.

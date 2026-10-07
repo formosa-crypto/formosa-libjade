@@ -2,12 +2,12 @@
    Keccak1600_updstate.ec:
 
    Shared substrate for the "updstate" (streaming init/absorb/finish/squeeze)
-   Keccak1600 proofs (ref, avx2 and avx2x4 variants; memory and array
-   buffers). It mirrors the role Keccak1600_statebytes.ec plays for the
+   Keccak1600 proofs (single-lane ref and 4-way avx2x4 variants; memory and
+   array buffers). It mirrors the role Keccak1600_statebytes.ec plays for the
    fixed-size proofs:
    - the status word that the updstate code appends to the state
      (byte 0 = cursor `at`, byte 1 = r64-1, byte 2 = trail byte), its decoder
-     `_ststatus_data` (shared by ref and avx2) and the stores to it;
+     `_ststatus_data` (single-lane code) and the stores to it;
    - the streaming predicates `absorbing_spec` / `squeezing_spec` used by
      every updstate contract, and the output window `sqstream`;
    - the pure "driver" lemmas that the absorb/finish/squeeze loops of all
@@ -180,7 +180,7 @@ qed.
 
 
 (* ========================================================================= *)
-(* B. The decoder _ststatus_data (shared by the ref and avx2 updstate code)  *)
+(* B. The decoder _ststatus_data of the single-lane updstate code           *)
 (* ========================================================================= *)
 
 op ststatus_data_spec (s : W64.t) : W8.t * int * int =

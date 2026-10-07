@@ -140,28 +140,28 @@ fn __derive_message_representative(
     // Initialize SHAKE256 streaming state: rate = 136 = 17*8 bytes, trail byte = 0x1f.
     rate64 = 17;
     trailb = SHAKE;
-    state = _init_updstate_avx2(state, rate64, trailb);
+    state = _init_updstate(state, rate64, trailb);
 
     // One-shot absorb of the fixed-size prefix.
     len = 66;
-    state = A66::_update_updstate_avx2(state, prefix, len);
+    state = A66::_absorb_updstate(state, prefix, len);
 
     // Absorb context (variable-length, accessed via memory pointer).
     () = #unspill(context_pointer, context_size);
     buf = context_pointer;
     len = context_size;
-    state = _absorb_m_updstate_avx2(state, buf, len);
+    state = _absorb_m_updstate(state, buf, len);
 
     // Absorb message (variable-length, accessed via memory pointer).
     () = #unspill(message_pointer, message_size);
     buf = message_pointer;
     len = message_size;
-    state = _absorb_m_updstate_avx2(state, buf, len);
+    state = _absorb_m_updstate(state, buf, len);
 
     // Finalize the SHAKE256 stream, then permute and squeeze MESSAGE_REPRESENTATIVE_SIZE = 64 bytes.
-    state = _finish_updstate_avx2(state);
+    state = _finish_updstate(state);
     len = 64;
-    state, message_representative = A64::_squeeze_updstate_avx2(state, message_representative, len);
+    state, message_representative = A64::_squeeze_updstate(state, message_representative, len);
 
     return message_representative;
 }
