@@ -2469,77 +2469,6 @@ module M = {
     }
     return (buf, lEN, tRAIL, aT, w);
   }
-  proc __m_ilen_read_upto8_at2 (buf:int, lEN:int, tRAIL:int, cUR:int, aT:int) : 
-  int * int * int * int * W64.t = {
-    var w:W64.t;
-    var aT8:int;
-    var t16:W64.t;
-    var t8:W64.t;
-    if (((((lEN < 0) \/ (aT < cUR)) \/ ((cUR + 8) <= aT)) \/
-        ((lEN = 0) /\ (tRAIL = 0)))) {
-      w <- (W64.of_int 0);
-    } else {
-      aT8 <- (aT - cUR);
-      if ((8 <= lEN)) {
-        w <- (loadW64 Glob.mem buf);
-        w <@ __SHLQ (w, aT8);
-        buf <- (buf + (8 - aT8));
-        lEN <- (lEN - (8 - aT8));
-        aT8 <- 8;
-      } else {
-        if ((4 <= lEN)) {
-          w <- (zeroextu64 (loadW32 Glob.mem buf));
-          w <@ __SHLQ (w, aT8);
-          buf <- (buf + ((8 <= (4 + aT8)) ? (8 - aT8) : 4));
-          lEN <- (lEN - ((8 <= (4 + aT8)) ? (8 - aT8) : 4));
-          aT8 <- ((8 <= (4 + aT8)) ? 8 : (4 + aT8));
-        } else {
-          w <- (W64.of_int 0);
-        }
-        if (((aT8 < 8) /\ (2 <= lEN))) {
-          t16 <- (zeroextu64 (loadW16 Glob.mem buf));
-          buf <- (buf + ((8 <= (2 + aT8)) ? (8 - aT8) : 2));
-          lEN <- (lEN - ((8 <= (2 + aT8)) ? (8 - aT8) : 2));
-          t16 <@ __SHLQ (t16, aT8);
-          w <- (w `|` t16);
-          aT8 <- ((8 <= (2 + aT8)) ? 8 : (2 + aT8));
-        } else {
-          
-        }
-        if ((aT8 < 8)) {
-          if ((1 <= lEN)) {
-            t8 <- (zeroextu64 (loadW8 Glob.mem buf));
-            t8 <- (t8 `|` (W64.of_int (256 * (tRAIL %% 256))));
-            buf <- (buf + 1);
-            lEN <- (lEN - 1);
-            t8 <@ __SHLQ (t8, aT8);
-            w <- (w `|` t8);
-            aT8 <- (aT8 + 1);
-            if (((aT8 < 8) /\ ((tRAIL %% 256) <> 0))) {
-              aT8 <- (aT8 + 1);
-              tRAIL <- 0;
-            } else {
-              
-            }
-          } else {
-            if (((tRAIL %% 256) <> 0)) {
-              t8 <- (W64.of_int (tRAIL %% 256));
-              t8 <@ __SHLQ (t8, aT8);
-              w <- (w `|` t8);
-              tRAIL <- 0;
-              aT8 <- (aT8 + 1);
-            } else {
-              
-            }
-          }
-        } else {
-          
-        }
-      }
-      aT <- (cUR + aT8);
-    }
-    return (buf, lEN, tRAIL, aT, w);
-  }
   proc __m_ilen_read_upto16_at (buf:int, lEN:int, tRAIL:int, cUR:int, aT:int) : 
   int * int * int * int * W128.t = {
     var w:W128.t;
@@ -2682,7 +2611,7 @@ module M = {
         } else {
           
         }
-        t64 <- (truncateu64 w);
+        t64 <- (MOVV_64 (truncateu64 w));
         (buf, lEN) <@ __m_ilen_write_upto8 (buf, lEN, t64);
       }
     } else {

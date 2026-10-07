@@ -33,16 +33,14 @@ Two behaviours of the code show up in the contracts:
 - **The cursor is stored lazily after a squeeze.** It can equal `r8`. The predicates use the normalised cursor `ststatus_at_norm`, which maps `r8` to 0, exactly as the code's decoder does.
 - **The four output buffers of the 4-way memory squeeze must not overlap.** The code writes the lanes word by word, interleaved. The memory dump and squeeze therefore require `disj4` over the output length, and state the output as `stores4`, the four lanes' stores in sequence.
 
-**Checked on 2026-10-07** with `make -C proofs <scenario> JOBS=10`:
+**Checked on 2026-10-07**, after the consolidation, the 4-way memory variant and the source cleanup, with `make -C proofs <scenario> JOBS=10`:
 
 | Scenario | Files | Wall |
 |---|---:|---:|
-| `fips202` | 39/39 | 6m39s |
-| `mldsa` | 72/72 | 12m04s |
-| `mlkem-avx2-768` | 22/22 | 23m07s |
-| `mlkem-avx2-1024` | 22/22 | 22m46s |
-
-These runs are after the consolidation below. The ML-DSA and ML-KEM wall times are inflated by other jobs on the machine; before the consolidation the same scenarios took 4m35s, 10m27s and 10m10s.
+| `fips202` | 39/39 | 5m34s |
+| `mldsa` | 72/72 | 4m35s |
+| `mlkem-avx2-768` | 22/22 | 10m41s |
+| `mlkem-avx2-1024` | 22/22 | 10m49s |
 
 ## Files
 
@@ -98,12 +96,12 @@ Before the revival, every existing memory/array pair was compared after normalis
 - **Offset bookkeeping.** The fixed-size array helpers accumulate a compile-time `DELTA` and add it to the offset at the end; the memory helpers advance the pointer directly.
 - **Lengths.** The fixed-size array absorb and squeeze consume the whole `_ASIZE` array; the memory ones take an explicit length.
 
-Small divergences remain, none of them semantic:
+Small divergences were found, none of them semantic. The last three were resolved the same day:
 
-- **Ref fixed-size scalar add loop.** The memory version indexes the state by byte (`st.[:u64 at]`, step 8), the array version by word (`st[at]`, step 1). The squeeze loop counter is also incremented at a different point.
-- **16-byte write.** `__m_ilen_write_upto16` takes the low word with a cast, `(64u) w`; `__a_ilen_write_upto16` uses `#MOVV_64(w)`.
-- **Dead helpers.** `__m_ilen_read_upto8_at2` (memory only) and `__a_rlen_read_upto8_noninline` (array only) are defined but never called.
-- **Dead files.** `src/fips202/avx2/keccak1600_fixedsizes_ref{,_ASIZE}.jinc` are required by nothing. The array one requires `ref/keccakf1600_loop_straightline.jinc`, which does not exist.
+- **Ref fixed-size scalar add loop (kept).** The memory version indexes the state by byte (`st.[:u64 at]`, step 8), the array version by word (`st[at]`, step 1). The squeeze loop counter is also incremented at a different point. Both forms cost the same: the scaled index is free in x86 addressing. The scalar branch is not compiled at all in the AVX2 builds.
+- **16-byte write (aligned).** `__m_ilen_write_upto16` took the low word with a cast, `(64u) w`; `__a_ilen_write_upto16` used `#MOVV_64(w)`. Both compile to the same `movq`; the memory version now uses `#MOVV_64`, the form used elsewhere in the sources.
+- **Dead helpers (removed).** `__m_ilen_read_upto8_at2` (memory only) and `__a_rlen_read_upto8_noninline` (array only) were never called.
+- **Dead files (removed).** `src/fips202/avx2/keccak1600_fixedsizes_ref{,_ASIZE}.jinc` were required by nothing, and superseded by `ref/keccak1600_fixedsizes{,_ASIZE}.jinc`. The array one required a file that does not exist.
 
 ## Experiment: EasyCrypt LLM mode against batch compilation
 

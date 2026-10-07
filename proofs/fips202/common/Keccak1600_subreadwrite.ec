@@ -2070,10 +2070,10 @@ seq 1: (0 < _len < 16
 ecall (m_ilen_write_upto8_h Glob.mem buf lEN t64).
 auto => |> &m H0 H16 Hc [b2 l2] m2 /= H2.
 case: Hc => [[H8 [H Hw]]|[H8 [Hm [Hb [Hl Hw]]]]].
- move: H2; rewrite Hw => H2.
+ move: H2; rewrite Hw /MOVV_64 => H2.
  have := msubwrite_cat _ _ _ _ _ _ _ _ _ _ _ H H2.
  by rewrite take8_u128bytes -u128bytes_split.
-move: H2; rewrite Hm Hb Hl Hw -take8_u128bytes => H2.
+move: H2; rewrite Hm Hb Hl Hw /MOVV_64 -take8_u128bytes => H2.
 by apply (msubwrite_untake _ _ _ 8 _ _ _ _ _ _ H2) => /#.
 qed.
 
@@ -3389,68 +3389,6 @@ module MM = {
       }
     }
     return (off, w);
-  }
-  proc __a_rlen_read_upto8_noninline (a:W8.t A.t, off_:int, len_:int) : 
-  int * W64.t = {
-    var w:W64.t;
-    var zf:bool;
-    var sh:W8.t;
-    var x:W64.t;
-    var off:int;
-    var len:int;
-    var  _0:bool;
-    var  _1:bool;
-    var  _2:bool;
-    var  _3:bool;
-    var  _4:bool;
-    var  _5:bool;
-    var  _6:bool;
-    var  _7:bool;
-    var  _8:bool;
-    var  _9:bool;
-    var  _10:bool;
-    var  _11:bool;
-    off <- off_;
-    len <- len_;
-    if ((8 <= len)) {
-      w <- (get64_direct (WA.init8 (fun i => a.[i])) off);
-      off <- (off + 8);
-    } else {
-      ( _0,  _1,  _2,  _3, zf) <- (TEST_64 (W64.of_int len) (W64.of_int 4));
-      if ((! zf)) {
-        w <-
-        (zeroextu64 (get32_direct (WA.init8 (fun i => a.[i])) off));
-        off <- (off + 4);
-        sh <- (W8.of_int 32);
-      } else {
-        w <- (W64.of_int 0);
-        sh <- (W8.of_int 0);
-      }
-      ( _4,  _5,  _6,  _7, zf) <- (TEST_64 (W64.of_int len) (W64.of_int 2));
-      if ((! zf)) {
-        x <-
-        (zeroextu64 (get16_direct (WA.init8 (fun i => a.[i])) off));
-        x <- (x `<<` (sh `&` (W8.of_int 63)));
-        w <- (w + x);
-        off <- (off + 2);
-        sh <- (sh + (W8.of_int 16));
-      } else {
-        
-      }
-      ( _8,  _9,  _10,  _11, zf) <-
-      (TEST_64 (W64.of_int len) (W64.of_int 1));
-      if ((! zf)) {
-        x <-
-        (zeroextu64 (get8_direct (WA.init8 (fun i => a.[i])) off));
-        x <- (x `<<` (sh `&` (W8.of_int 63)));
-        w <- (w + x);
-        off <- (off + 1);
-      } else {
-        
-      }
-    }
-    off_ <- off;
-    return (off_, w);
   }
   proc __a_rlen_write_upto8 (buf:W8.t A.t, off:int, data:W64.t,
                              len:int) : W8.t A.t * int = {
