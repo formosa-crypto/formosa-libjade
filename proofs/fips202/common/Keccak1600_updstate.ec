@@ -97,18 +97,15 @@ have Er8 : ststatus_r8 s = 8 * r64 by rewrite /ststatus_r8 /= R8; smt().
 by rewrite /status_spec Er8 /ststatus_at_norm /ststatus_at /= AT Er8 /ststatus_trailb TB /#.
 qed.
 
-(* the init packing, as extracted (shared by the three init procedures) *)
+(* the init packing (shared by the three init procedures; the extracted
+   `W8.to_uint (W8.of_int r64 - W8.of_int 1)` simplifies to `(r64 - 1) %% 256`) *)
 lemma init_status r64 (tb: W8.t):
  0 < r64 <= 25 =>
- (zeroextu64 tb `<<` W8.of_int 8)
- + zeroextu64 (W8.of_int (W8.to_uint (W8.of_int r64 - W8.of_int 1))) `<<` W8.of_int 8
+ (zeroextu64 tb `<<` W8.of_int 8) + zeroextu64 (W8.of_int (r64 - 1)) `<<` W8.of_int 8
  = encode_ststatus 0 (r64 - 1) (W8.to_uint tb).
 proof.
 move=> Hr; have Ht : 0 <= to_uint tb < 256 by smt(W8.to_uint_cmp pow2_8).
-have E1 : W8.to_uint (W8.of_int r64 - W8.of_int 1) = r64 - 1.
-+ rewrite (: W8.of_int r64 - W8.of_int 1 = W8.of_int (r64 - 1)); first by ring.
-  by rewrite W8.of_uintK pmod_small /#.
-rewrite E1 /zeroextu64 /encode_ststatus W8.of_uintK pmod_small 1:/#.
+rewrite /zeroextu64 /encode_ststatus W8.of_uintK pmod_small 1:/#.
 rewrite !W64.shl_shlw // !W64.shlMP //=.
 rewrite W64.shlMP //=.
 rewrite -W64.of_intM'.

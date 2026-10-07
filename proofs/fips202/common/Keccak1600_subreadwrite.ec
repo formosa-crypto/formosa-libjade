@@ -2807,6 +2807,10 @@ lemma a_set256_afill (buf: W8.t A.t) q (x: W256.t):
  A.init (WA.get8 (WA.set256_direct (WA.init8 ("_.[_]" buf)) q x)) = afill buf q (u256bytes x).
 proof. by rewrite a_set256_fill /afill /u256bytes size_to_list. qed.
 
+lemma a_set128_afill (buf: W8.t A.t) q (x: W128.t):
+ A.init (WA.get8 (WA.set128_direct (WA.init8 ("_.[_]" buf)) q x)) = afill buf q (u128bytes x).
+proof. by rewrite a_set128_fill /afill /u128bytes size_to_list. qed.
+
 lemma afill_rlen (a: W8.t A.t) p (w: W64.t) n:
  0 <= n =>
  A.fill (fun i => (u64bytes w).[i - p]) p (min 8 (max 0 n)) a = afill a p (take n (u64bytes w)).
