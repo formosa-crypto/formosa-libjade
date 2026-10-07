@@ -130,3 +130,8 @@ ML-KEM = NIST ACVP v1.1.0.41). Regenerate with `bench/tools/import_kat.py`.
   return results in the fixed-size order. Models re-extracted. This widens the
   future conflict with `origin/ci-mldsa-sct`, which keeps the AVX2 files (with
   SCT annotations) and deletes the ref ones.
+- 2026-10-07 (later still): the 4-way memory updstate procedures in
+  `src/fips202/avx2/keccak1600x4_updstate.jinc` (until then a commented-out
+  draft) are implemented and proved, so every updstate variant now has both
+  memory and array versions. Models re-extracted; the ML-DSA and ML-KEM
+  models are unchanged.

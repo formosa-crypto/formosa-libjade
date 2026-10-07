@@ -13,7 +13,10 @@
                ==> squeezing_spec4 r8 (st4x_pack (ABSORB1600 tb r8 l0, ..)) 0 res
      squeeze   squeezing_spec4 r8 s0 k st ==> out_i = sqstream r8 (st4x_get s0 i) k len
                                             /\ squeezing_spec4 r8 s0 (k+len) res
-   Only array buffers: the source has no 4-way memory absorb/squeeze.
+   Memory buffers are proved at top level against Keccak1600_Jazz.M, array
+   buffers in the abstract theory KeccakUpdstateAvx2x4; the two share the
+   lane lemmas of Keccak1600_fixedsizes_avx2x4.ec (addstate_spec4 /
+   addstate_spec4m, pabsorb4, stores4) and the helpers below.
    The lane steps reuse the 4-way layer of Keccak1600_fixedsizes_avx2x4.ec
    (addstate_spec4, addstate_lanes, pabsorb4_fill/_last, st4x_get_xor64x4).
    The init/finish/status proofs are those of the ci-mldsa-sct branch.
@@ -379,7 +382,7 @@ proof. by proc; ecall (finish_updstate_avx2x4_h _r8 _tb _l0 _l1 _l2 _l3); auto. 
 
 
 (* ========================================================================= *)
-(* Helpers for the array-buffer procedures                                   *)
+(* Helpers shared by the memory and array procedures                         *)
 (* ========================================================================= *)
 
 (* the status decoder *)
@@ -461,6 +464,819 @@ move=> Ha Hm Hk ->; rewrite (get64_init256_at st (4 * a + 8 * k) a k) //.
 apply W64.wordP => b Hb; rewrite /WArray200.get64_direct pack8E initiE 1:/# /= W8u8.Pack.initiE 1:/# /= stbytes_st4x 1,2:/# W8u8.bits8iE 1:/#.
 congr; smt().
 qed.
+
+
+(* ========================================================================= *)
+(* Memory-buffer absorb and squeeze                                          *)
+(* ========================================================================= *)
+
+(* ---- lane helpers (memory twins of the array ones in the theory below) ---- *)
+
+(* the first (misaligned) dumped word of a lane, as a byte list: shared by the
+   memory dump (stores) and the array dump (afill) *)
+lemma dump_first_take (S: WArray200.t) at n:
+ 0 <= at => at %% 8 <> 0 => 0 <= n => at + n <= 200 =>
+ take n (u64bytes (get64_direct S (8 * (at %/ 8)) `>>` W8.of_int (8 * (at %% 8))))
+ = sub S at (min n (8 - at %% 8)) ++ u8zeros (min (n - min n (8 - at %% 8)) (at %% 8)).
+proof.
+move=> H0 Hm Hn Hfit.
+rewrite (u64bytes_get64_shr S (8 * (at %/ 8)) (at %% 8)) 1:/# (: 8 * (at %/ 8) + at %% 8 = at) 1:/#.
+rewrite take_cat size_sub 1:/#.
+case: (n < 8 - at %% 8) => C.
++ by rewrite take_sub200 1:/# (: min n (8 - at %% 8) = n) 1:/# (: min (n - n) (at %% 8) = 0) 1:/# nseq0 cats0.
+by rewrite (: min n (8 - at %% 8) = 8 - at %% 8) 1:/# take_nseq.
+qed.
+
+(* the four lanes write past their prefixes, over at most q junk bytes *)
+lemma stores4_overwrite m b0 b1 b2 b3 (L0 L1 L2 L3 Z0 Z1 Z2 Z3 W0 W1 W2 W3: W8.t list) n q:
+ size L0 = n => size L1 = n => size L2 = n => size L3 = n =>
+ size Z0 <= q => size Z1 <= q => size Z2 <= q => size Z3 <= q =>
+ size W0 = q => size W1 = q => size W2 = q => size W3 = q =>
+ 0 <= n => disj4 b0 b1 b2 b3 (n + q) =>
+ stores (stores (stores (stores (stores4 m b0 b1 b2 b3 (L0 ++ Z0) (L1 ++ Z1) (L2 ++ Z2) (L3 ++ Z3))
+   (b0 + n) W0) (b1 + n) W1) (b2 + n) W2) (b3 + n) W3
+ = stores4 m b0 b1 b2 b3 (L0 ++ W0) (L1 ++ W1) (L2 ++ W2) (L3 ++ W3).
+proof.
+rewrite /stores4 /disj4 => S0 S1 S2 S3 HZ0 HZ1 HZ2 HZ3 T0 T1 T2 T3 Hn D.
+apply mem_eq_ext => j; rewrite !get_storesE !size_cat S0 S1 S2 S3 T0 T1 T2 T3.
+smt(nth_cat size_ge0).
+qed.
+
+(* squeeze: one dumped chunk extends the output streams of the four lanes *)
+lemma stores4_sqstream_step m r8 (s0 s1 s2 s3: state) k w n b0 b1 b2 b3:
+ 0 < r8 <= 200 => 0 <= k => 0 <= w => 0 <= n => (k + w) %% r8 + n <= r8 => disj4 b0 b1 b2 b3 (w + n) =>
+ stores4 (stores4 m b0 b1 b2 b3 (sqstream r8 s0 k w) (sqstream r8 s1 k w) (sqstream r8 s2 k w) (sqstream r8 s3 k w))
+   (b0 + w) (b1 + w) (b2 + w) (b3 + w)
+   (sub (stbytes (st_i s0 ((k + w) %/ r8 + 1))) ((k + w) %% r8) n)
+   (sub (stbytes (st_i s1 ((k + w) %/ r8 + 1))) ((k + w) %% r8) n)
+   (sub (stbytes (st_i s2 ((k + w) %/ r8 + 1))) ((k + w) %% r8) n)
+   (sub (stbytes (st_i s3 ((k + w) %/ r8 + 1))) ((k + w) %% r8) n)
+ = stores4 m b0 b1 b2 b3 (sqstream r8 s0 k (w + n)) (sqstream r8 s1 k (w + n))
+                         (sqstream r8 s2 k (w + n)) (sqstream r8 s3 k (w + n)).
+proof.
+move=> Hr Hk Hw Hn Hfit D.
+rewrite -(sqstream_block r8 s0 (k + w) n) 1..4:/# -(sqstream_block r8 s1 (k + w) n) 1..4:/#.
+rewrite -(sqstream_block r8 s2 (k + w) n) 1..4:/# -(sqstream_block r8 s3 (k + w) n) 1..4:/#.
+have H := stores4_cat m b0 b1 b2 b3 (sqstream r8 s0 k w) (sqstream r8 s1 k w) (sqstream r8 s2 k w) (sqstream r8 s3 k w) (sqstream r8 s0 (k + w) n) (sqstream r8 s1 (k + w) n) (sqstream r8 s2 (k + w) n) (sqstream r8 s3 (k + w) n) w n _ _ _ _ _ _ _ _ D; 1..8: by rewrite size_sqstream /#.
+rewrite H -(sqstream_cat r8 s0 k w n) 1..4:/# -(sqstream_cat r8 s1 k w n) 1..4:/#.
+by rewrite -(sqstream_cat r8 s2 k w n) 1..4:/# -(sqstream_cat r8 s3 k w n) 1..4:/#.
+qed.
+
+
+(* ---- add ---- *)
+
+lemma add_m_bcast_updstate_avx2x4_ll: islossless M._add_m_bcast_updstate_avx2x4.
+proof.
+proc; seq 5: true => //; first by islossless.
+seq 1: true => //; last by islossless.
+by while true (upto + 8 - newat) => [z|]; auto => /#.
+qed.
+
+hoare add_m_bcast_updstate_avx2x4_h _mem _st _at _buf _upto:
+ M._add_m_bcast_updstate_avx2x4
+ : Glob.mem = _mem /\ st = _st /\ at = _at /\ buf = _buf /\ upto = _upto
+   /\ 0 <= _at <= _upto <= 200
+ ==> Glob.mem = _mem
+   /\ addstate_res4m _st _at _mem _buf _buf _buf _buf (_upto - _at) 0 res.`1 res.`2 res.`3 res.`3 res.`3 res.`3.
+proof.
+proc => /=; pose n := _upto - _at.
+seq 2 : (#pre /\ W64.to_uint at8 = _at %% 8).
++ by auto => /> H0 H1 H2; rewrite and7_mod8 /#.
+seq 1 : (Glob.mem = _mem /\ upto = _upto /\ 0 <= _at <= _upto <= 200
+         /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ exists sz, _at <= sz /\ addstate_spec4m _st _at _mem [_buf; _buf; _buf; _buf] n 0 sz [buf; buf; buf; buf] st at (_upto - at) 0).
++ if; last first.
+  + auto => /> H0 H1 H2 Hk; split; first smt().
+    by exists _at; split => //; apply addstate_spec4m_init => /#.
+  wp; ecall (m_rlen_read_upto8_h buf len).
+  wp; skip => /> &hr H0 H1 H2 Hk Hnz.
+have Ea8 : at8{hr} = W64.of_int (_at %% 8) by rewrite -Hk W64.to_uintK.
+have Hk0 : _at %% 8 <> 0 by move: Hnz; rewrite Ea8; apply contra => ->.
+rewrite Hk shr3_shl3 Ea8 trunc_shl3_and63 1:/#; split; first smt().
+move=> _ [o0 t0] /= Hs0 ->.
+have Esh : forall (w: W64.t), w `<<` W8.of_int (8 * (_at %% 8)) = w `<<<` 8 * (_at %% 8) by move=> w; rewrite W64.shl_shlw /#.
+rewrite Esh truncateu64_VMOV_64.
+pose base := 8 * (_at %/ 8).
+have Hb : _at - base = _at %% 8 by smt().
+have M0 := msubread_rlen _mem t0 base _at _buf n _ _ Hs0; 1,2: smt().
+move: M0; rewrite Hb => M0.
+have S0 : addstate_spec4m _st _at _mem [_buf; _buf; _buf; _buf] n 0 base [_buf; _buf; _buf; _buf] _st _at n 0.
++ by apply addstate_spec4m_init => /#.
+split => Hc.
++ have Emin : min n (base + 8 - _at) = base + 8 - _at by smt().
+  move: M0; rewrite Emin (: _at + (base + 8 - _at) = base + 8) 1:/# (: n - (base + 8 - _at) = _upto - (base + 8)) 1:/# (: base + 8 - _at = 8 - _at %% 8) 1:/# => M0.
+  do 2!(split; first smt()).
+  exists (base + 8); split; first smt().
+  rewrite (: _buf + 8 - _at %% 8 = _buf + (8 - _at %% 8)) 1:/#.
+  apply (addstate_spec4m_msubread _mem [_buf; _buf; _buf; _buf] [t0 `<<<` 8 * (_at %% 8); t0 `<<<` 8 * (_at %% 8); t0 `<<<` 8 * (_at %% 8); t0 `<<<` 8 * (_at %% 8)] base _st _at n 0 _st _ _at [_buf; _buf; _buf; _buf] n 0 (base + 8) (base + 8) [_buf + (8 - _at %% 8); _buf + (8 - _at %% 8); _buf + (8 - _at %% 8); _buf + (8 - _at %% 8)] (_upto - (base + 8)) 0) => //.
+  + smt().
+  + smt().
+  + by move=> k Hk'; rewrite nth4_const // (st4x_get_xorbcast256 _st _ (_at %/ 8)) 1..3:/#.
+  + by move=> k Hk'; rewrite !nth4_const.
+have Emin : min n (base + 8 - _at) = n by smt().
+move: M0; rewrite Emin (: _at + n = _upto) 1:/# (: n - n = 0) 1:/# => M0.
+rewrite (: min 8 (max 0 (_upto - _at)) = n) 1:/#.
+exists (base + 8); split; first smt().
+apply (addstate_spec4m_msubread _mem [_buf; _buf; _buf; _buf] [t0 `<<<` 8 * (_at %% 8); t0 `<<<` 8 * (_at %% 8); t0 `<<<` 8 * (_at %% 8); t0 `<<<` 8 * (_at %% 8)] base _st _at n 0 _st _ _at [_buf; _buf; _buf; _buf] n 0 (base + 8) _upto [_buf + n; _buf + n; _buf + n; _buf + n] 0 0) => //.
++ smt().
++ smt().
++ by move=> k Hk'; rewrite nth4_const // (st4x_get_xorbcast256 _st _ (_at %/ 8)) 1..3:/#.
+by move=> k Hk'; rewrite !nth4_const.
+seq 3 : (Glob.mem = _mem /\ upto = _upto /\ 0 <= _at <= _upto <= 200
+         /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto) /\ _upto < at + 8
+         /\ exists sz, _at <= sz /\ addstate_spec4m _st _at _mem [_buf; _buf; _buf; _buf] n 0 sz [buf; buf; buf; buf] st at (_upto - at) 0).
++ while (Glob.mem = _mem /\ upto = _upto /\ 0 <= _at <= _upto <= 200 /\ newat = at + 8
+         /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ exists sz, _at <= sz /\ addstate_spec4m _st _at _mem [_buf; _buf; _buf; _buf] n 0 sz [buf; buf; buf; buf] st at (_upto - at) 0); last by auto => /#.
+  auto => &hr [#] -> -> H0 H1 H2 -> Ha0 Ha1 Ha8 [sz [Hsz IH]] Hc /=.
+  have Hal : at{hr} %% 8 = 0 by smt().
+  do 3!(split; first smt()).
+  exists (sz + 8); split; first smt().
+  rewrite (: _upto - (at{hr} + 8) = _upto - at{hr} - 8) 1:/#.
+  apply (addstate_spec4m_fullword _mem [_buf; _buf; _buf; _buf] sz _st _at n 0 st{hr} _ buf{hr} buf{hr} buf{hr} buf{hr} at{hr} (_upto - at{hr}) 0) => //.
+  + smt().
+  + smt().
+  by move=> k Hk'; rewrite nth4_const // (st4x_get_xorbcast256 st{hr} _ (at{hr} %/ 8)) 1..3:/# (: 8 * (at{hr} %/ 8) = at{hr}) 1:/#.
+if; last first.
++ auto => &hr [#] -> -> H0 H1 H2 Ha0 Ha1 Ha8 Hlt [sz [Hsz IH]] Hc /=.
+  have Ea : at{hr} = _upto by smt().
+  move: IH; rewrite Ea /= => IH.
+  by apply (addstate_spec4m_done _mem _buf _buf _buf _buf sz _st _at n 0 st{hr} buf{hr} buf{hr} buf{hr} buf{hr} _upto 0) => //; smt().
+wp; ecall (m_rlen_read_upto8_h buf (W64.to_uint upto8)).
+wp; skip => &hr [#] -> -> H0 H1 H2 Ha0 Ha1 Ha8 Hlt [sz [Hsz IH]] Hc /=.
+have Hal : at{hr} %% 8 = 0 by smt().
+have Eu : W64.to_uint (W64.of_int _upto `&` W64.of_int 7) = _upto - at{hr} by rewrite and7_mod8; smt().
+rewrite Eu.
+split; first smt(). move=> _ [o0 t0] /= [Hs0 ->].
+rewrite truncateu64_VMOV_64.
+have M0 := msubread_rlen _mem t0 at{hr} at{hr} buf{hr} (_upto - at{hr}) _ _ Hs0; 1,2: smt().
+move: M0; rewrite (: 8 * (at{hr} - at{hr}) = 0) 1:/# u64_shl0 (: min (_upto - at{hr}) (at{hr} + 8 - at{hr}) = min 8 (max 0 (_upto - at{hr}))) 1:/# (: at{hr} + min 8 (max 0 (_upto - at{hr})) = _upto) 1:/# (: _upto - at{hr} - min 8 (max 0 (_upto - at{hr})) = 0) 1:/# => M0.
+apply (addstate_spec4m_finish _mem _buf _buf _buf _buf [t0; t0; t0; t0] sz _st _at n 0 st{hr} _ buf{hr} buf{hr} buf{hr} buf{hr} at{hr} (_upto - at{hr}) 0 _upto (buf{hr} + min 8 (max 0 (_upto - at{hr}))) (buf{hr} + min 8 (max 0 (_upto - at{hr}))) (buf{hr} + min 8 (max 0 (_upto - at{hr}))) (buf{hr} + min 8 (max 0 (_upto - at{hr}))) 0 0) => //.
++ smt().
++ smt().
++ smt().
++ by move=> k Hk'; rewrite nth4_const // (st4x_get_xorbcast256 st{hr} _ (at{hr} %/ 8)) 1..3:/# (: 8 * (at{hr} %/ 8) = at{hr}) 1:/#.
+by move=> k Hk'; rewrite !nth4_const.
+qed.
+
+phoare add_m_bcast_updstate_avx2x4_ph _mem _st _at _buf _upto:
+ [ M._add_m_bcast_updstate_avx2x4
+ : Glob.mem = _mem /\ st = _st /\ at = _at /\ buf = _buf /\ upto = _upto
+   /\ 0 <= _at <= _upto <= 200
+ ==> Glob.mem = _mem
+   /\ addstate_res4m _st _at _mem _buf _buf _buf _buf (_upto - _at) 0 res.`1 res.`2 res.`3 res.`3 res.`3 res.`3
+ ] = 1%r.
+proof. by conseq add_m_bcast_updstate_avx2x4_ll (add_m_bcast_updstate_avx2x4_h _mem _st _at _buf _upto). qed.
+
+lemma add_m_updstate_avx2x4_ll: islossless M._add_m_updstate_avx2x4.
+proof.
+proc; seq 5: true => //; first by islossless.
+seq 1: true => //; last by islossless.
+by while true (upto + 8 - newat) => [z|]; auto => /#.
+qed.
+
+hoare add_m_updstate_avx2x4_h _mem _st _at _buf0 _buf1 _buf2 _buf3 _upto:
+ M._add_m_updstate_avx2x4
+ : Glob.mem = _mem /\ st = _st /\ at = _at /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
+   /\ upto = _upto /\ 0 <= _at <= _upto <= 200
+ ==> Glob.mem = _mem
+   /\ addstate_res4m _st _at _mem _buf0 _buf1 _buf2 _buf3 (_upto - _at) 0 res.`1 res.`2 res.`3 res.`4 res.`5 res.`6.
+proof.
+proc => /=; pose n := _upto - _at.
+seq 2 : (#pre /\ W64.to_uint at8 = _at %% 8).
++ by auto => /> H0 H1 H2; rewrite and7_mod8 /#.
+seq 1 : (Glob.mem = _mem /\ upto = _upto /\ 0 <= _at <= _upto <= 200
+         /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ exists sz, _at <= sz /\ addstate_spec4m _st _at _mem [_buf0; _buf1; _buf2; _buf3] n 0 sz [buf0; buf1; buf2; buf3] st at (_upto - at) 0).
++ if; last first.
+  + auto => /> H0 H1 H2 Hk; split; first smt().
+    by exists _at; split => //; apply addstate_spec4m_init => /#.
+  wp; ecall (m_rlen_read_upto8_h buf3 len); wp; ecall (m_rlen_read_upto8_h buf2 len).
+  wp; ecall (m_rlen_read_upto8_h buf1 len); wp; ecall (m_rlen_read_upto8_h buf0 len).
+  wp; skip => /> &hr H0 H1 H2 Hk Hnz.
+have Ea8 : at8{hr} = W64.of_int (_at %% 8) by rewrite -Hk W64.to_uintK.
+have Hk0 : _at %% 8 <> 0 by move: Hnz; rewrite Ea8; apply contra => ->.
+rewrite Hk shr3_shl3 Ea8 trunc_shl3_and63 1:/#; split; first smt().
+move=> _ [o0 t0] /= Hs0 _ [o1 t1] /= Hs1 _ [o2 t2] /= Hs2 _ [o3 t3] /= Hs3 _.
+have Esh : forall (w: W64.t), w `<<` W8.of_int (8 * (_at %% 8)) = w `<<<` 8 * (_at %% 8) by move=> w; rewrite W64.shl_shlw /#.
+rewrite !Esh.
+pose base := 8 * (_at %/ 8).
+have Hb : _at - base = _at %% 8 by smt().
+have M0 := msubread_rlen _mem t0 base _at _buf0 n _ _ Hs0; 1,2: smt().
+have M1 := msubread_rlen _mem t1 base _at _buf1 n _ _ Hs1; 1,2: smt().
+have M2 := msubread_rlen _mem t2 base _at _buf2 n _ _ Hs2; 1,2: smt().
+have M3 := msubread_rlen _mem t3 base _at _buf3 n _ _ Hs3; 1,2: smt().
+move: M0 M1 M2 M3; rewrite Hb => M0 M1 M2 M3.
+have S0 : addstate_spec4m _st _at _mem [_buf0; _buf1; _buf2; _buf3] n 0 base [_buf0; _buf1; _buf2; _buf3] _st _at n 0.
++ by apply addstate_spec4m_init => /#.
+split => Hc.
++ have Emin : min n (base + 8 - _at) = base + 8 - _at by smt().
+  move: M0 M1 M2 M3; rewrite Emin (: _at + (base + 8 - _at) = base + 8) 1:/# (: n - (base + 8 - _at) = _upto - (base + 8)) 1:/# (: base + 8 - _at = 8 - _at %% 8) 1:/# => M0 M1 M2 M3.
+  do 2!(split; first smt()).
+  exists (base + 8); split; first smt().
+  apply (addstate_spec4m_msubread _mem [_buf0; _buf1; _buf2; _buf3] [t0 `<<<` 8 * (_at %% 8); t1 `<<<` 8 * (_at %% 8); t2 `<<<` 8 * (_at %% 8); t3 `<<<` 8 * (_at %% 8)] base _st _at n 0 _st _ _at [_buf0; _buf1; _buf2; _buf3] n 0 (base + 8) (base + 8) [_buf0 + (8 - _at %% 8); _buf1 + (8 - _at %% 8); _buf2 + (8 - _at %% 8); _buf3 + (8 - _at %% 8)] (_upto - (base + 8)) 0) => //.
+  + smt().
+  + smt().
+  + move=> k Hk'; rewrite (st4x_get_xor64x4_at _st base) //; smt().
+  + by rewrite forall4 /=.
+have Emin : min n (base + 8 - _at) = n by smt().
+move: M0 M1 M2 M3; rewrite Emin (: _at + n = _upto) 1:/# (: n - n = 0) 1:/# => M0 M1 M2 M3.
+rewrite (: _upto - _at + _at %% 8 - _at %% 8 = n) 1:/#.
+exists (base + 8); split; first smt().
+apply (addstate_spec4m_msubread _mem [_buf0; _buf1; _buf2; _buf3] [t0 `<<<` 8 * (_at %% 8); t1 `<<<` 8 * (_at %% 8); t2 `<<<` 8 * (_at %% 8); t3 `<<<` 8 * (_at %% 8)] base _st _at n 0 _st _ _at [_buf0; _buf1; _buf2; _buf3] n 0 (base + 8) _upto [_buf0 + n; _buf1 + n; _buf2 + n; _buf3 + n] 0 0) => //.
++ smt().
++ smt().
++ move=> k Hk'; rewrite (st4x_get_xor64x4_at _st base) //; smt().
+by rewrite forall4 /=.
+seq 3 : (Glob.mem = _mem /\ upto = _upto /\ 0 <= _at <= _upto <= 200
+         /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto) /\ _upto < at + 8
+         /\ exists sz, _at <= sz /\ addstate_spec4m _st _at _mem [_buf0; _buf1; _buf2; _buf3] n 0 sz [buf0; buf1; buf2; buf3] st at (_upto - at) 0).
++ while (Glob.mem = _mem /\ upto = _upto /\ 0 <= _at <= _upto <= 200 /\ newat = at + 8
+         /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ exists sz, _at <= sz /\ addstate_spec4m _st _at _mem [_buf0; _buf1; _buf2; _buf3] n 0 sz [buf0; buf1; buf2; buf3] st at (_upto - at) 0); last by auto => /#.
+  auto => &hr [#] -> -> H0 H1 H2 -> Ha0 Ha1 Ha8 [sz [Hsz IH]] Hc /=.
+  have Hal : at{hr} %% 8 = 0 by smt().
+  do 3!(split; first smt()).
+  exists (sz + 8); split; first smt().
+  rewrite (: _upto - (at{hr} + 8) = _upto - at{hr} - 8) 1:/#.
+  apply (addstate_spec4m_fullword _mem [_buf0; _buf1; _buf2; _buf3] sz _st _at n 0 st{hr} _ buf0{hr} buf1{hr} buf2{hr} buf3{hr} at{hr} (_upto - at{hr}) 0) => //.
+  + smt().
+  + smt().
+  move=> k Hk'; rewrite (st4x_get_xor64x4_at st{hr} at{hr}) //; smt().
+if; last first.
++ auto => &hr [#] -> -> H0 H1 H2 Ha0 Ha1 Ha8 Hlt [sz [Hsz IH]] Hc /=.
+  have Ea : at{hr} = _upto by smt().
+  move: IH; rewrite Ea /= => IH.
+  by apply (addstate_spec4m_done _mem _buf0 _buf1 _buf2 _buf3 sz _st _at n 0 st{hr} buf0{hr} buf1{hr} buf2{hr} buf3{hr} _upto 0) => //; smt().
+wp; ecall (m_rlen_read_upto8_h buf3 (W64.to_uint upto8)); wp; ecall (m_rlen_read_upto8_h buf2 (W64.to_uint upto8)).
+wp; ecall (m_rlen_read_upto8_h buf1 (W64.to_uint upto8)); wp; ecall (m_rlen_read_upto8_h buf0 (W64.to_uint upto8)).
+wp; skip => &hr [#] -> -> H0 H1 H2 Ha0 Ha1 Ha8 Hlt [sz [Hsz IH]] Hc /=.
+have Hal : at{hr} %% 8 = 0 by smt().
+have Eu : W64.to_uint (W64.of_int _upto `&` W64.of_int 7) = _upto - at{hr} by rewrite and7_mod8; smt().
+rewrite Eu.
+split; first smt(). move=> _ [o0 t0] /= [Hs0 ->].
+split; first smt(). move=> _ [o1 t1] /= [Hs1 ->].
+split; first smt(). move=> _ [o2 t2] /= [Hs2 ->].
+split; first smt(). move=> _ [o3 t3] /= [Hs3 ->].
+have M0 := msubread_rlen _mem t0 at{hr} at{hr} buf0{hr} (_upto - at{hr}) _ _ Hs0; 1,2: smt().
+have M1 := msubread_rlen _mem t1 at{hr} at{hr} buf1{hr} (_upto - at{hr}) _ _ Hs1; 1,2: smt().
+have M2 := msubread_rlen _mem t2 at{hr} at{hr} buf2{hr} (_upto - at{hr}) _ _ Hs2; 1,2: smt().
+have M3 := msubread_rlen _mem t3 at{hr} at{hr} buf3{hr} (_upto - at{hr}) _ _ Hs3; 1,2: smt().
+move: M0 M1 M2 M3; rewrite (: 8 * (at{hr} - at{hr}) = 0) 1:/# !u64_shl0 (: min (_upto - at{hr}) (at{hr} + 8 - at{hr}) = min 8 (max 0 (_upto - at{hr}))) 1:/# (: at{hr} + min 8 (max 0 (_upto - at{hr})) = _upto) 1:/# (: _upto - at{hr} - min 8 (max 0 (_upto - at{hr})) = 0) 1:/# => M0 M1 M2 M3.
+apply (addstate_spec4m_finish _mem _buf0 _buf1 _buf2 _buf3 [t0; t1; t2; t3] sz _st _at n 0 st{hr} _ buf0{hr} buf1{hr} buf2{hr} buf3{hr} at{hr} (_upto - at{hr}) 0 _upto (buf0{hr} + min 8 (max 0 (_upto - at{hr}))) (buf1{hr} + min 8 (max 0 (_upto - at{hr}))) (buf2{hr} + min 8 (max 0 (_upto - at{hr}))) (buf3{hr} + min 8 (max 0 (_upto - at{hr}))) 0 0) => //.
++ smt().
++ smt().
++ smt().
++ move=> k Hk'; rewrite (st4x_get_xor64x4_at st{hr} at{hr}) //; smt().
+by rewrite forall4 /=.
+qed.
+
+phoare add_m_updstate_avx2x4_ph _mem _st _at _buf0 _buf1 _buf2 _buf3 _upto:
+ [ M._add_m_updstate_avx2x4
+ : Glob.mem = _mem /\ st = _st /\ at = _at /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
+   /\ upto = _upto /\ 0 <= _at <= _upto <= 200
+ ==> Glob.mem = _mem
+   /\ addstate_res4m _st _at _mem _buf0 _buf1 _buf2 _buf3 (_upto - _at) 0 res.`1 res.`2 res.`3 res.`4 res.`5 res.`6
+ ] = 1%r.
+proof. by conseq add_m_updstate_avx2x4_ll (add_m_updstate_avx2x4_h _mem _st _at _buf0 _buf1 _buf2 _buf3 _upto). qed.
+
+
+(* ---- absorb ---- *)
+
+lemma absorb_m_bcast_updstate_avx2x4_ll: islossless M._absorb_m_bcast_updstate_avx2x4.
+proof.
+proc; seq 5: (8 <= r8).
++ by wp; ecall (ststatus_data_avx2x4_bnd_h); auto.
++ by wp; call ststatus_data_avx2x4_bnd_ph; auto.
++ seq 1: true => //.
+  + while (8 <= r8) len => [z|]; last by auto => /#.
+    by wp; call keccakf1600_avx2x4_ll; call add_m_bcast_updstate_avx2x4_ll; auto => /#.
+  by wp; call add_m_bcast_updstate_avx2x4_ll; auto.
++ by hoare; wp; ecall (ststatus_data_avx2x4_bnd_h); auto.
+by [].
+qed.
+
+hoare absorb_m_bcast_updstate_avx2x4_h _mem _r8 _tb _l0 _l1 _l2 _l3 _buf _len:
+ M._absorb_m_bcast_updstate_avx2x4
+ : Glob.mem = _mem /\ buf = _buf /\ len = _len
+   /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 st /\ 0 <= _len
+ ==> Glob.mem = _mem
+   /\ absorbing_spec4 _r8 _tb (_l0 ++ memread _mem _buf _len) (_l1 ++ memread _mem _buf _len)
+                              (_l2 ++ memread _mem _buf _len) (_l3 ++ memread _mem _buf _len) res.
+proof.
+proc => /=; exlim st => _st.
+seq 5 : (Glob.mem = _mem /\ st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len
+         /\ r8 = _r8 /\ buf = _buf
+         /\ stk = A101u64toA25u256 _st /\ at = size _l0 %% _r8 /\ len = _len + at).
++ wp; ecall (ststatus_data_avx2x4_h st.[100]); auto => &hr [#] <- -> -> -> Habs H0 r [-> ->] /=.
+  have := Habs; rewrite /absorbing_spec4 /status_spec => [#] Hp Er8 Etb Hat.
+  by rewrite Hp Er8 Etb Hat /= /A101u64toA25u256.
+seq 1 : (Glob.mem = _mem /\ st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len /\ r8 = _r8
+         /\ _buf <= buf <= _buf + _len
+         /\ at = (size _l0 + (buf - _buf)) %% _r8
+         /\ len = _len - (buf - _buf) + at /\ len < r8
+         /\ pabsorb4 _r8 [_l0; _l1; _l2; _l3] [memread _mem _buf _len; memread _mem _buf _len; memread _mem _buf _len; memread _mem _buf _len] (buf - _buf) stk).
++ while (Glob.mem = _mem /\ st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len /\ r8 = _r8
+         /\ _buf <= buf <= _buf + _len
+         /\ at = (size _l0 + (buf - _buf)) %% _r8
+         /\ len = _len - (buf - _buf) + at
+         /\ pabsorb4 _r8 [_l0; _l1; _l2; _l3] [memread _mem _buf _len; memread _mem _buf _len; memread _mem _buf _len; memread _mem _buf _len] (buf - _buf) stk).
+  + wp; ecall (keccakf1600_avx2x4_h stk); ecall (add_m_bcast_updstate_avx2x4_h Glob.mem stk at buf r8).
+    auto => &hr [#] -> -> Habs H0 -> Hb0 Hb1 -> -> Hp Hc.
+    have Hr8 := pabsorb4_r8 _ _ _ _ _ Hp.
+    pose k := buf{hr} - _buf.
+    pose a := (size _l0 + k) %% _r8.
+    have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
+    split; first smt().
+    move=> _ [stc at1 c0] /= Hres r ->.
+    have Hs := absorbing_spec4_sizes _ _ _ _ _ _ _ Habs.
+    have Hl := addstate_res4m_lanes stk{hr} a _mem _buf _buf _buf _buf _len buf{hr} buf{hr} buf{hr} buf{hr} k (_r8 - a) 0 stc at1 c0 c0 c0 c0 _ _ _ _ _ _ _ Hres; 1..7: smt().
+    have Hf := pabsorb4_fill _r8 (size _l0) [_l0; _l1; _l2; _l3] (memread _mem _buf _len) (memread _mem _buf _len) (memread _mem _buf _len) (memread _mem _buf _len) k (_r8 - a) a stk{hr} stc _ _ _ _ _ _ _ Hs Hp Hl; 1..7: smt(size_memread).
+    have [_ [_ [Ec0 _]]] := Hres.
+    rewrite Ec0 /=.
+    rewrite (: buf{hr} + (_r8 - a) - _buf = k + (_r8 - a)) 1:/#.
+    do 3!(split; first smt()).
+    split; first by rewrite (absorb_block_arith (size _l0) k _r8 a) /#.
+    split; first smt().
+    exact Hf.
+  auto => &hr [#] -> -> Habs H0 -> -> -> -> -> /=.
+  have [Hp _] := Habs.
+  split; last by smt().
+  do 3!(split; first smt()).
+  by apply pabsorb4_init.
+wp; ecall (add_m_bcast_updstate_avx2x4_h Glob.mem stk at buf len); wp; skip => &hr [#] -> -> Habs H0 -> Hb0 Hb1 -> -> Hc Hp /=.
+split; first smt().
+move=> _ [stc at1 c0] /= Hres.
+rewrite A25u256toA101u64E A101_set800.
+have Hr8 := pabsorb4_r8 _ _ _ _ _ Hp.
+pose k := buf{hr} - _buf.
+pose a := (size _l0 + k) %% _r8.
+have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
+have Hs := absorbing_spec4_sizes _ _ _ _ _ _ _ Habs.
+have Hsz : forall b, size (memread _mem b _len) = _len by move=> b; rewrite size_memread /#.
+move: Hres; rewrite (: _len - k + a - a = _len - k) 1:/# => Hres.
+have Hl := addstate_res4m_lanes stk{hr} a _mem _buf _buf _buf _buf _len buf{hr} buf{hr} buf{hr} buf{hr} k (_len - k) 0 stc at1 c0 c0 c0 c0 _ _ _ _ _ _ _ Hres; 1..7: smt().
+have [_ HL] := pabsorb4_last _r8 (size _l0) [_l0; _l1; _l2; _l3] (memread _mem _buf _len) (memread _mem _buf _len) (memread _mem _buf _len) (memread _mem _buf _len) k (_len - k) a stk{hr} stc 0 _ _ _ _ _ _ _ Hs Hp Hl; 1..7: smt().
+have HL0 := HL _; first done.
+have [_ [Eat1 _]] := Hres.
+have [Hat2 [Hr2 Htb2]] := ststatus_set_atP _st.[100] at1 _; first smt().
+have := Habs; rewrite /absorbing_spec4 /status_spec => [#] Hp0 Hr0 Htb0 Hat0.
+rewrite /absorbing_spec4 A101u64toA25u256K A25u256toA101u64_100; split.
++ have := Hp0; rewrite !pabsorb_spec_avx2x4E !size_cat !Hsz => [#] S1 S2 S3 _.
+  rewrite S1 S2 S3 /=.
+  move=> j Hj; have := HL0 j Hj.
+  have: j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt().
+  by case => [->|[->|[->|->]]].
+have Hl2 := absorb_last_arith (size _l0) k _r8 a (_len - k) _ _ _ _; 1..4: smt().
+rewrite /status_spec /ststatus_at_norm Hr2 Hr0 Htb2 Htb0 Hat2 /= size_cat Hsz.
+rewrite (: size _l0 + _len = size _l0 + (k + (_len - k))) 1:/# Hl2.
+smt().
+qed.
+
+phoare absorb_m_bcast_updstate_avx2x4_ph _mem _r8 _tb _l0 _l1 _l2 _l3 _buf _len:
+ [ M._absorb_m_bcast_updstate_avx2x4
+ : Glob.mem = _mem /\ buf = _buf /\ len = _len
+   /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 st /\ 0 <= _len
+ ==> Glob.mem = _mem
+   /\ absorbing_spec4 _r8 _tb (_l0 ++ memread _mem _buf _len) (_l1 ++ memread _mem _buf _len)
+                              (_l2 ++ memread _mem _buf _len) (_l3 ++ memread _mem _buf _len) res
+ ] = 1%r.
+proof. by conseq absorb_m_bcast_updstate_avx2x4_ll (absorb_m_bcast_updstate_avx2x4_h _mem _r8 _tb _l0 _l1 _l2 _l3 _buf _len). qed.
+
+lemma absorb_m_updstate_avx2x4_ll: islossless M._absorb_m_updstate_avx2x4.
+proof.
+proc; seq 5: (8 <= r8).
++ by wp; ecall (ststatus_data_avx2x4_bnd_h); auto.
++ by wp; call ststatus_data_avx2x4_bnd_ph; auto.
++ seq 1: true => //.
+  + while (8 <= r8) len => [z|]; last by auto => /#.
+    by wp; call keccakf1600_avx2x4_ll; call add_m_updstate_avx2x4_ll; auto => /#.
+  by wp; call add_m_updstate_avx2x4_ll; auto.
++ by hoare; wp; ecall (ststatus_data_avx2x4_bnd_h); auto.
+by [].
+qed.
+
+hoare absorb_m_updstate_avx2x4_h _mem _r8 _tb _l0 _l1 _l2 _l3 _buf0 _buf1 _buf2 _buf3 _len:
+ M._absorb_m_updstate_avx2x4
+ : Glob.mem = _mem /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3 /\ len = _len
+   /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 st /\ 0 <= _len
+ ==> Glob.mem = _mem
+   /\ absorbing_spec4 _r8 _tb (_l0 ++ memread _mem _buf0 _len) (_l1 ++ memread _mem _buf1 _len)
+                              (_l2 ++ memread _mem _buf2 _len) (_l3 ++ memread _mem _buf3 _len) res.
+proof.
+proc => /=; exlim st => _st.
+seq 5 : (Glob.mem = _mem /\ st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len
+         /\ r8 = _r8 /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
+         /\ stk = A101u64toA25u256 _st /\ at = size _l0 %% _r8 /\ len = _len + at).
++ wp; ecall (ststatus_data_avx2x4_h st.[100]); auto => &hr [#] <- -> -> -> -> -> -> Habs H0 r [-> ->] /=.
+  have := Habs; rewrite /absorbing_spec4 /status_spec => [#] Hp Er8 Etb Hat.
+  by rewrite Hp Er8 Etb Hat /= /A101u64toA25u256.
+seq 1 : (Glob.mem = _mem /\ st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len /\ r8 = _r8
+         /\ _buf0 <= buf0 <= _buf0 + _len
+         /\ buf1 = _buf1 + (buf0 - _buf0) /\ buf2 = _buf2 + (buf0 - _buf0) /\ buf3 = _buf3 + (buf0 - _buf0)
+         /\ at = (size _l0 + (buf0 - _buf0)) %% _r8
+         /\ len = _len - (buf0 - _buf0) + at /\ len < r8
+         /\ pabsorb4 _r8 [_l0; _l1; _l2; _l3] [memread _mem _buf0 _len; memread _mem _buf1 _len; memread _mem _buf2 _len; memread _mem _buf3 _len] (buf0 - _buf0) stk).
++ while (Glob.mem = _mem /\ st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len /\ r8 = _r8
+         /\ _buf0 <= buf0 <= _buf0 + _len
+         /\ buf1 = _buf1 + (buf0 - _buf0) /\ buf2 = _buf2 + (buf0 - _buf0) /\ buf3 = _buf3 + (buf0 - _buf0)
+         /\ at = (size _l0 + (buf0 - _buf0)) %% _r8
+         /\ len = _len - (buf0 - _buf0) + at
+         /\ pabsorb4 _r8 [_l0; _l1; _l2; _l3] [memread _mem _buf0 _len; memread _mem _buf1 _len; memread _mem _buf2 _len; memread _mem _buf3 _len] (buf0 - _buf0) stk).
+  + wp; ecall (keccakf1600_avx2x4_h stk); ecall (add_m_updstate_avx2x4_h Glob.mem stk at buf0 buf1 buf2 buf3 r8).
+    auto => &hr [#] -> -> Habs H0 -> Hb0 Hb1 -> -> -> -> -> Hp Hc.
+    have Hr8 := pabsorb4_r8 _ _ _ _ _ Hp.
+    pose k := buf0{hr} - _buf0.
+    pose a := (size _l0 + k) %% _r8.
+    have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
+    split; first smt().
+    move=> _ [stc at1 c0 c1 c2 c3] /= Hres r ->.
+    have Hs := absorbing_spec4_sizes _ _ _ _ _ _ _ Habs.
+    have Hl := addstate_res4m_lanes stk{hr} a _mem _buf0 _buf1 _buf2 _buf3 _len buf0{hr} (_buf1 + k) (_buf2 + k) (_buf3 + k) k (_r8 - a) 0 stc at1 c0 c1 c2 c3 _ _ _ _ _ _ _ Hres; 1..7: smt().
+    have Hf := pabsorb4_fill _r8 (size _l0) [_l0; _l1; _l2; _l3] (memread _mem _buf0 _len) (memread _mem _buf1 _len) (memread _mem _buf2 _len) (memread _mem _buf3 _len) k (_r8 - a) a stk{hr} stc _ _ _ _ _ _ _ Hs Hp Hl; 1..7: smt(size_memread).
+    have [_ [_ [Ec0 [Ec1 [Ec2 Ec3]]]]] := Hres.
+    rewrite Ec0 Ec1 Ec2 Ec3 /=.
+    rewrite (: buf0{hr} + (_r8 - a) - _buf0 = k + (_r8 - a)) 1:/#.
+    do 6!(split; first smt()).
+    split; first by rewrite (absorb_block_arith (size _l0) k _r8 a) /#.
+    split; first smt().
+    exact Hf.
+  auto => &hr [#] -> -> Habs H0 -> -> -> -> -> -> -> -> /=.
+  have [Hp _] := Habs.
+  split; last by smt().
+  do 3!(split; first smt()).
+  by apply pabsorb4_init.
+wp; ecall (add_m_updstate_avx2x4_h Glob.mem stk at buf0 buf1 buf2 buf3 len); wp; skip => &hr [#] -> -> Habs H0 -> Hb0 Hb1 -> -> -> -> -> Hc Hp /=.
+split; first smt().
+move=> _ [stc at1 c0 c1 c2 c3] /= Hres.
+rewrite A25u256toA101u64E A101_set800.
+have Hr8 := pabsorb4_r8 _ _ _ _ _ Hp.
+pose k := buf0{hr} - _buf0.
+pose a := (size _l0 + k) %% _r8.
+have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
+have Hs := absorbing_spec4_sizes _ _ _ _ _ _ _ Habs.
+have Hsz : forall b, size (memread _mem b _len) = _len by move=> b; rewrite size_memread /#.
+move: Hres; rewrite (: _len - k + a - a = _len - k) 1:/# => Hres.
+have Hl := addstate_res4m_lanes stk{hr} a _mem _buf0 _buf1 _buf2 _buf3 _len buf0{hr} (_buf1 + k) (_buf2 + k) (_buf3 + k) k (_len - k) 0 stc at1 c0 c1 c2 c3 _ _ _ _ _ _ _ Hres; 1..7: smt().
+have [_ HL] := pabsorb4_last _r8 (size _l0) [_l0; _l1; _l2; _l3] (memread _mem _buf0 _len) (memread _mem _buf1 _len) (memread _mem _buf2 _len) (memread _mem _buf3 _len) k (_len - k) a stk{hr} stc 0 _ _ _ _ _ _ _ Hs Hp Hl; 1..7: smt().
+have HL0 := HL _; first done.
+have [_ [Eat1 _]] := Hres.
+have [Hat2 [Hr2 Htb2]] := ststatus_set_atP _st.[100] at1 _; first smt().
+have := Habs; rewrite /absorbing_spec4 /status_spec => [#] Hp0 Hr0 Htb0 Hat0.
+rewrite /absorbing_spec4 A101u64toA25u256K A25u256toA101u64_100; split.
++ have := Hp0; rewrite !pabsorb_spec_avx2x4E !size_cat !Hsz => [#] S1 S2 S3 _.
+  rewrite S1 S2 S3 /=.
+  move=> j Hj; have := HL0 j Hj.
+  have: j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt().
+  by case => [->|[->|[->|->]]].
+have Hl2 := absorb_last_arith (size _l0) k _r8 a (_len - k) _ _ _ _; 1..4: smt().
+rewrite /status_spec /ststatus_at_norm Hr2 Hr0 Htb2 Htb0 Hat2 /= size_cat Hsz.
+rewrite (: size _l0 + _len = size _l0 + (k + (_len - k))) 1:/# Hl2.
+smt().
+qed.
+
+phoare absorb_m_updstate_avx2x4_ph _mem _r8 _tb _l0 _l1 _l2 _l3 _buf0 _buf1 _buf2 _buf3 _len:
+ [ M._absorb_m_updstate_avx2x4
+ : Glob.mem = _mem /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3 /\ len = _len
+   /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 st /\ 0 <= _len
+ ==> Glob.mem = _mem
+   /\ absorbing_spec4 _r8 _tb (_l0 ++ memread _mem _buf0 _len) (_l1 ++ memread _mem _buf1 _len)
+                              (_l2 ++ memread _mem _buf2 _len) (_l3 ++ memread _mem _buf3 _len) res
+ ] = 1%r.
+proof. by conseq absorb_m_updstate_avx2x4_ll (absorb_m_updstate_avx2x4_h _mem _r8 _tb _l0 _l1 _l2 _l3 _buf0 _buf1 _buf2 _buf3 _len). qed.
+
+
+(* ---- dump ---- *)
+
+lemma dump_m_updstate_avx2x4_ll: islossless M._dump_m_updstate_avx2x4.
+proof.
+proc; seq 5: true => //; first by islossless.
+seq 1: true => //; last by islossless.
+by while true (upto + 8 - newat) => [z|]; auto => /#.
+qed.
+
+hoare dump_m_updstate_avx2x4_h _mem _buf0 _buf1 _buf2 _buf3 _st _at _upto:
+ M._dump_m_updstate_avx2x4
+ : Glob.mem = _mem /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
+   /\ st = _st /\ at = _at /\ upto = _upto
+   /\ 0 <= _at <= _upto <= 200 /\ disj4 _buf0 _buf1 _buf2 _buf3 (_upto - _at)
+ ==> Glob.mem = stores4 _mem _buf0 _buf1 _buf2 _buf3
+                  (sub (stbytes (st4x_get _st 0)) _at (_upto - _at)) (sub (stbytes (st4x_get _st 1)) _at (_upto - _at))
+                  (sub (stbytes (st4x_get _st 2)) _at (_upto - _at)) (sub (stbytes (st4x_get _st 3)) _at (_upto - _at))
+   /\ res = (_buf0 + (_upto - _at), _buf1 + (_upto - _at), _buf2 + (_upto - _at), _buf3 + (_upto - _at), _upto).
+proof.
+proc => /=.
+seq 2 : (#pre /\ W64.to_uint at8 = _at %% 8).
++ by auto => /> H0 H1 H2 D; rewrite and7_mod8 /#.
+seq 1 : (st = _st /\ upto = _upto /\ 0 <= _at <= _upto <= 200 /\ disj4 _buf0 _buf1 _buf2 _buf3 (_upto - _at)
+         /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ buf0 = _buf0 + (at - _at) /\ buf1 = _buf1 + (at - _at) /\ buf2 = _buf2 + (at - _at) /\ buf3 = _buf3 + (at - _at)
+         /\ exists z, 0 <= z <= 7 /\ z <= _upto - at
+            /\ Glob.mem = stores4 _mem _buf0 _buf1 _buf2 _buf3
+                 (sub (stbytes (st4x_get _st 0)) _at (at - _at) ++ u8zeros z) (sub (stbytes (st4x_get _st 1)) _at (at - _at) ++ u8zeros z)
+                 (sub (stbytes (st4x_get _st 2)) _at (at - _at) ++ u8zeros z) (sub (stbytes (st4x_get _st 3)) _at (at - _at) ++ u8zeros z)).
++ if; last first.
+  + auto => &hr [#] -> -> -> -> -> -> -> -> H0 H1 H2 D Hk Hnz /=.
+    have Hal : _at %% 8 = 0 by move: Hnz; rewrite -Hk; smt(W64.to_uint0).
+    do !(split; first smt()).
+    by exists 0; rewrite !sub200_nil nseq0 /= /stores4 !store0 /#.
+  wp; ecall (m_rlen_write_upto8_h Glob.mem buf3 t64 len); wp; ecall (m_rlen_write_upto8_h Glob.mem buf2 t64 len).
+  wp; ecall (m_rlen_write_upto8_h Glob.mem buf1 t64 len); wp; ecall (m_rlen_write_upto8_h Glob.mem buf0 t64 len).
+  wp; skip => &hr [#] -> -> -> -> -> -> -> -> H0 H1 H2 D Hk Hnz /=.
+  have Ea8 : at8{hr} = W64.of_int (_at %% 8) by rewrite -Hk W64.to_uintK.
+  have Hk0 : _at %% 8 <> 0 by move: Hnz; rewrite Ea8; apply contra => ->.
+  rewrite Hk shr3_shl3 Ea8 trunc_shl3_and63 1:/#.
+  rewrite (st4x_get64_at _st (8 * (_at %/ 8)) 0 (4 * (8 * (_at %/ 8)))) 1..4:/#.
+  rewrite (st4x_get64_at _st (8 * (_at %/ 8)) 1 (4 * (8 * (_at %/ 8)) + 8)) 1..4:/#.
+  rewrite (st4x_get64_at _st (8 * (_at %/ 8)) 2 (4 * (8 * (_at %/ 8)) + 16)) 1..4:/#.
+  rewrite (st4x_get64_at _st (8 * (_at %/ 8)) 3 (4 * (8 * (_at %/ 8)) + 24)) 1..4:/#.
+  rewrite (dump_first_take (stbytes (st4x_get _st 0)) _at (_upto - _at)) 1..4:/#.
+  rewrite (dump_first_take (stbytes (st4x_get _st 1)) _at (_upto - _at)) 1..4:/#.
+  rewrite (dump_first_take (stbytes (st4x_get _st 2)) _at (_upto - _at)) 1..4:/#.
+  rewrite (dump_first_take (stbytes (st4x_get _st 3)) _at (_upto - _at)) 1..4:/#.
+  split; first smt(). move=> _ r0 m0 [-> _].
+  split; first smt(). move=> _ r1 m1 [-> _].
+  split; first smt(). move=> _ r2 m2 [-> _].
+  split; first smt(). move=> _ r3 m3 [-> _].
+  case: (8 <= _upto - _at + _at %% 8) => Hc /=.
+  + do !(split; first smt()).
+    exists (min (_upto - _at - min (_upto - _at) (8 - _at %% 8)) (_at %% 8)).
+    rewrite /stores4 (: 8 * (_at %/ 8) + 8 - _at = min (_upto - _at) (8 - _at %% 8)) 1:/#.
+    smt().
+  do !(split; first smt()).
+  exists 0.
+  rewrite /stores4 (: min (_upto - _at) (8 - _at %% 8) = _upto - _at) 1:/# (: min (_upto - _at - (_upto - _at)) (_at %% 8) = 0) 1:/#.
+  smt().
+have UB : forall (t: WArray200.t) o, W8u8.to_list (get64_direct t o) = sub t o 8 by move=> t o; rewrite -u64bytes_get64 /u64bytes.
+seq 3 : (st = _st /\ upto = _upto /\ 0 <= _at <= _upto <= 200 /\ disj4 _buf0 _buf1 _buf2 _buf3 (_upto - _at)
+         /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto) /\ _upto < at + 8
+         /\ buf0 = _buf0 + (at - _at) /\ buf1 = _buf1 + (at - _at) /\ buf2 = _buf2 + (at - _at) /\ buf3 = _buf3 + (at - _at)
+         /\ exists z, 0 <= z <= 7 /\ z <= _upto - at
+            /\ Glob.mem = stores4 _mem _buf0 _buf1 _buf2 _buf3
+                 (sub (stbytes (st4x_get _st 0)) _at (at - _at) ++ u8zeros z) (sub (stbytes (st4x_get _st 1)) _at (at - _at) ++ u8zeros z)
+                 (sub (stbytes (st4x_get _st 2)) _at (at - _at) ++ u8zeros z) (sub (stbytes (st4x_get _st 3)) _at (at - _at) ++ u8zeros z)).
++ while (st = _st /\ upto = _upto /\ 0 <= _at <= _upto <= 200 /\ disj4 _buf0 _buf1 _buf2 _buf3 (_upto - _at) /\ newat = at + 8
+         /\ _at <= at <= _upto /\ (at %% 8 = 0 \/ at = _upto)
+         /\ buf0 = _buf0 + (at - _at) /\ buf1 = _buf1 + (at - _at) /\ buf2 = _buf2 + (at - _at) /\ buf3 = _buf3 + (at - _at)
+         /\ exists z, 0 <= z <= 7 /\ z <= _upto - at
+            /\ Glob.mem = stores4 _mem _buf0 _buf1 _buf2 _buf3
+                 (sub (stbytes (st4x_get _st 0)) _at (at - _at) ++ u8zeros z) (sub (stbytes (st4x_get _st 1)) _at (at - _at) ++ u8zeros z)
+                 (sub (stbytes (st4x_get _st 2)) _at (at - _at) ++ u8zeros z) (sub (stbytes (st4x_get _st 3)) _at (at - _at) ++ u8zeros z)); last by auto => /#.
+  auto => &hr [#] -> -> H0 H1 H2 D -> Ha0 Ha1 Ha8 -> -> -> -> [z [Hz [Hzl ->]]] Hc /=.
+  have Hal : at{hr} %% 8 = 0 by smt().
+  rewrite (st4x_get64_at _st at{hr} 0 (4 * at{hr})) 1..4:/#.
+  rewrite (st4x_get64_at _st at{hr} 1 (4 * at{hr} + 8)) 1..4:/#.
+  rewrite (st4x_get64_at _st at{hr} 2 (4 * at{hr} + 16)) 1..4:/#.
+  rewrite (st4x_get64_at _st at{hr} 3 (4 * at{hr} + 24)) 1..4:/#.
+  rewrite !storeW64E !UB.
+  do !(split; first smt()).
+  exists 0; rewrite nseq0 !cats0; do 2!(split; first smt()).
+  have SO := stores4_overwrite _mem _buf0 _buf1 _buf2 _buf3 (sub (stbytes (st4x_get _st 0)) _at (at{hr} - _at)) (sub (stbytes (st4x_get _st 1)) _at (at{hr} - _at)) (sub (stbytes (st4x_get _st 2)) _at (at{hr} - _at)) (sub (stbytes (st4x_get _st 3)) _at (at{hr} - _at)) (u8zeros z) (u8zeros z) (u8zeros z) (u8zeros z) (sub (stbytes (st4x_get _st 0)) at{hr} 8) (sub (stbytes (st4x_get _st 1)) at{hr} 8) (sub (stbytes (st4x_get _st 2)) at{hr} 8) (sub (stbytes (st4x_get _st 3)) at{hr} 8) (at{hr} - _at) 8 _ _ _ _ _ _ _ _ _ _ _ _ _ _.
+  + smt(WArray200.size_sub).
+  + smt(WArray200.size_sub).
+  + smt(WArray200.size_sub).
+  + smt(WArray200.size_sub).
+  + smt(size_nseq).
+  + smt(size_nseq).
+  + smt(size_nseq).
+  + smt(size_nseq).
+  + smt(WArray200.size_sub).
+  + smt(WArray200.size_sub).
+  + smt(WArray200.size_sub).
+  + smt(WArray200.size_sub).
+  + smt().
+  + by apply (disj4_le _ _ _ _ (_upto - _at)) => /#.
+  rewrite SO.
+  rewrite (: at{hr} + 8 - _at = (at{hr} - _at) + 8) 1:/#.
+  rewrite (sub_cat (stbytes (st4x_get _st 0)) _at (at{hr} - _at) 8) 1,2:/# (sub_cat (stbytes (st4x_get _st 1)) _at (at{hr} - _at) 8) 1,2:/#.
+  rewrite (sub_cat (stbytes (st4x_get _st 2)) _at (at{hr} - _at) 8) 1,2:/# (sub_cat (stbytes (st4x_get _st 3)) _at (at{hr} - _at) 8) 1,2:/#.
+  by rewrite (: _at + (at{hr} - _at) = at{hr}) 1:/#.
+if; last first.
++ auto => &hr [#] _ -> H0 H1 H2 D Ha0 Ha1 Ha8 Hlt -> -> -> -> [z [Hz [Hzl ->]]] Hc /=.
+  have Ea : at{hr} = _upto by smt().
+  have Ez : z = 0 by smt().
+  by rewrite Ea Ez nseq0 !cats0.
+wp; ecall (m_rlen_write_upto8_h Glob.mem buf3 t64 (W64.to_uint upto8)); wp; ecall (m_rlen_write_upto8_h Glob.mem buf2 t64 (W64.to_uint upto8)).
+wp; ecall (m_rlen_write_upto8_h Glob.mem buf1 t64 (W64.to_uint upto8)); wp; ecall (m_rlen_write_upto8_h Glob.mem buf0 t64 (W64.to_uint upto8)).
+wp; skip => &hr [#] -> -> H0 H1 H2 D Ha0 Ha1 Ha8 Hlt -> -> -> -> [z [Hz [Hzl ->]]] Hc /=.
+have Hal : at{hr} %% 8 = 0 by smt().
+have Eu : W64.to_uint (W64.of_int _upto `&` W64.of_int 7) = _upto - at{hr} by rewrite and7_mod8; smt().
+rewrite Eu.
+rewrite (st4x_get64_at _st at{hr} 0 (4 * at{hr})) 1..4:/#.
+rewrite (st4x_get64_at _st at{hr} 1 (4 * at{hr} + 8)) 1..4:/#.
+rewrite (st4x_get64_at _st at{hr} 2 (4 * at{hr} + 16)) 1..4:/#.
+rewrite (st4x_get64_at _st at{hr} 3 (4 * at{hr} + 24)) 1..4:/#.
+rewrite !u64bytes_get64.
+rewrite (take_sub200 (stbytes (st4x_get _st 0)) at{hr} (_upto - at{hr}) 8) 1:/# (take_sub200 (stbytes (st4x_get _st 1)) at{hr} (_upto - at{hr}) 8) 1:/#.
+rewrite (take_sub200 (stbytes (st4x_get _st 2)) at{hr} (_upto - at{hr}) 8) 1:/# (take_sub200 (stbytes (st4x_get _st 3)) at{hr} (_upto - at{hr}) 8) 1:/#.
+split; first smt(). move=> _ r0 m0 [-> ->].
+split; first smt(). move=> _ r1 m1 [-> ->].
+split; first smt(). move=> _ r2 m2 [-> ->].
+split; first smt(). move=> _ r3 m3 [-> ->].
+have SO := stores4_overwrite _mem _buf0 _buf1 _buf2 _buf3 (sub (stbytes (st4x_get _st 0)) _at (at{hr} - _at)) (sub (stbytes (st4x_get _st 1)) _at (at{hr} - _at)) (sub (stbytes (st4x_get _st 2)) _at (at{hr} - _at)) (sub (stbytes (st4x_get _st 3)) _at (at{hr} - _at)) (u8zeros z) (u8zeros z) (u8zeros z) (u8zeros z) (sub (stbytes (st4x_get _st 0)) at{hr} (_upto - at{hr})) (sub (stbytes (st4x_get _st 1)) at{hr} (_upto - at{hr})) (sub (stbytes (st4x_get _st 2)) at{hr} (_upto - at{hr})) (sub (stbytes (st4x_get _st 3)) at{hr} (_upto - at{hr})) (at{hr} - _at) (_upto - at{hr}) _ _ _ _ _ _ _ _ _ _ _ _ _ _.
++ smt(WArray200.size_sub).
++ smt(WArray200.size_sub).
++ smt(WArray200.size_sub).
++ smt(WArray200.size_sub).
++ smt(size_nseq).
++ smt(size_nseq).
++ smt(size_nseq).
++ smt(size_nseq).
++ smt(WArray200.size_sub).
++ smt(WArray200.size_sub).
++ smt(WArray200.size_sub).
++ smt(WArray200.size_sub).
++ smt().
++ by apply (disj4_le _ _ _ _ (_upto - _at)) => /#.
+rewrite SO.
+have SC : forall (S: WArray200.t), sub S _at (at{hr} - _at) ++ sub S at{hr} (_upto - at{hr}) = sub S _at (_upto - _at).
++ by move=> S; rewrite (: _upto - _at = (at{hr} - _at) + (_upto - at{hr})) 1:/# (sub_cat S _at (at{hr} - _at) (_upto - at{hr})) 1,2:/# (: _at + (at{hr} - _at) = at{hr}) 1:/#.
+rewrite !SC /=.
+smt().
+qed.
+
+phoare dump_m_updstate_avx2x4_ph _mem _buf0 _buf1 _buf2 _buf3 _st _at _upto:
+ [ M._dump_m_updstate_avx2x4
+ : Glob.mem = _mem /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
+   /\ st = _st /\ at = _at /\ upto = _upto
+   /\ 0 <= _at <= _upto <= 200 /\ disj4 _buf0 _buf1 _buf2 _buf3 (_upto - _at)
+ ==> Glob.mem = stores4 _mem _buf0 _buf1 _buf2 _buf3
+                  (sub (stbytes (st4x_get _st 0)) _at (_upto - _at)) (sub (stbytes (st4x_get _st 1)) _at (_upto - _at))
+                  (sub (stbytes (st4x_get _st 2)) _at (_upto - _at)) (sub (stbytes (st4x_get _st 3)) _at (_upto - _at))
+   /\ res = (_buf0 + (_upto - _at), _buf1 + (_upto - _at), _buf2 + (_upto - _at), _buf3 + (_upto - _at), _upto)
+ ] = 1%r.
+proof. by conseq dump_m_updstate_avx2x4_ll (dump_m_updstate_avx2x4_h _mem _buf0 _buf1 _buf2 _buf3 _st _at _upto). qed.
+
+
+(* ---- squeeze ---- *)
+
+lemma squeeze_m_updstate_avx2x4_ll: islossless M._squeeze_m_updstate_avx2x4.
+proof.
+proc; seq 4: (8 <= r8).
++ by wp; ecall (ststatus_data_avx2x4_bnd_h); auto.
++ by wp; call ststatus_data_avx2x4_bnd_ph; auto.
++ seq 2: (8 <= r8) => //.
+  + by wp; if; [wp; call keccakf1600_avx2x4_ll; auto | auto].
+  + seq 1: true => //.
+    + while (8 <= r8) len => [z|]; last by auto => /#.
+      by wp; call keccakf1600_avx2x4_ll; call dump_m_updstate_avx2x4_ll; auto => /#.
+    by wp; call dump_m_updstate_avx2x4_ll; auto.
+  by hoare; wp; if; [wp; ecall (keccakf1600_avx2x4_h stk); auto | auto].
++ by hoare; wp; ecall (ststatus_data_avx2x4_bnd_h); auto.
+by [].
+qed.
+
+hoare squeeze_m_updstate_avx2x4_h _mem _r8 _s0 _k _buf0 _buf1 _buf2 _buf3 _len:
+ M._squeeze_m_updstate_avx2x4
+ : Glob.mem = _mem /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3 /\ len = _len
+   /\ squeezing_spec4 _r8 _s0 _k st /\ 0 < _len /\ disj4 _buf0 _buf1 _buf2 _buf3 _len
+ ==> Glob.mem = stores4 _mem _buf0 _buf1 _buf2 _buf3
+                  (sqstream _r8 (st4x_get _s0 0) _k _len) (sqstream _r8 (st4x_get _s0 1) _k _len)
+                  (sqstream _r8 (st4x_get _s0 2) _k _len) (sqstream _r8 (st4x_get _s0 3) _k _len)
+   /\ squeezing_spec4 _r8 _s0 (_k + _len) res.
+proof.
+proc => /=; exlim st => _st.
+seq 4 : (Glob.mem = _mem /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3 /\ len = _len
+         /\ squeezing_spec4 _r8 _s0 _k _st /\ 0 < _len /\ disj4 _buf0 _buf1 _buf2 _buf3 _len
+         /\ st = _st /\ r8 = _r8 /\ at = _k %% _r8 /\ stk = iter ((_k - 1) %/ _r8 + 1) keccak_f1600_x4 _s0).
++ wp; ecall (ststatus_data_avx2x4_h st.[100]); auto => &hr [#] <- -> -> -> -> -> -> Hsq H0 D r [-> ->] /=.
+  have := Hsq; rewrite /squeezing_spec4 => [#] Hr0 Hr1 Hk Est Er8 Eat.
+  rewrite Er8 Eat /= -Est.
+  by rewrite /A101u64toA25u256 /=; smt().
+seq 2 : (Glob.mem = _mem /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
+         /\ squeezing_spec4 _r8 _s0 _k _st /\ 0 < _len /\ disj4 _buf0 _buf1 _buf2 _buf3 _len
+         /\ st = _st /\ r8 = _r8 /\ at = _k %% _r8 /\ len = _len + at /\ stk = iter (_k %/ _r8 + 1) keccak_f1600_x4 _s0).
++ wp; if.
+  + wp; ecall (keccakf1600_avx2x4_h stk); auto => &hr [#] -> -> -> -> -> -> Hsq H0 D -> -> Hat -> Hz.
+    have [Hr [Hk _]] := Hsq.
+    move=> r ->; do !(split; first smt()).
+    rewrite -(squeeze_entry0 _r8 _k) 1,2:/# (iterS ((_k - 1) %/ _r8 + 1)); first by apply (squeeze_entry_ge0 _r8 _k) => /#.
+    by rewrite /keccak_f1600_x4.
+  auto => &hr [#] -> -> -> -> -> -> Hsq H0 D -> -> Hat -> Hz.
+  have [Hr [Hk _]] := Hsq.
+  by rewrite (squeeze_entry1 _r8 _k) 1,2:/#.
+seq 1 : (Glob.mem = stores4 _mem _buf0 _buf1 _buf2 _buf3
+            (sqstream _r8 (st4x_get _s0 0) _k (buf0 - _buf0)) (sqstream _r8 (st4x_get _s0 1) _k (buf0 - _buf0))
+            (sqstream _r8 (st4x_get _s0 2) _k (buf0 - _buf0)) (sqstream _r8 (st4x_get _s0 3) _k (buf0 - _buf0))
+         /\ buf1 = _buf1 + (buf0 - _buf0) /\ buf2 = _buf2 + (buf0 - _buf0) /\ buf3 = _buf3 + (buf0 - _buf0)
+         /\ squeezing_spec4 _r8 _s0 _k _st /\ 0 < _len /\ disj4 _buf0 _buf1 _buf2 _buf3 _len /\ st = _st /\ r8 = _r8
+         /\ stk = iter ((_k + (buf0 - _buf0)) %/ _r8 + 1) keccak_f1600_x4 _s0 /\ at = (_k + (buf0 - _buf0)) %% _r8
+         /\ len = at + (_len - (buf0 - _buf0)) /\ 0 <= buf0 - _buf0 < _len /\ len <= r8).
++ while (Glob.mem = stores4 _mem _buf0 _buf1 _buf2 _buf3
+            (sqstream _r8 (st4x_get _s0 0) _k (buf0 - _buf0)) (sqstream _r8 (st4x_get _s0 1) _k (buf0 - _buf0))
+            (sqstream _r8 (st4x_get _s0 2) _k (buf0 - _buf0)) (sqstream _r8 (st4x_get _s0 3) _k (buf0 - _buf0))
+         /\ buf1 = _buf1 + (buf0 - _buf0) /\ buf2 = _buf2 + (buf0 - _buf0) /\ buf3 = _buf3 + (buf0 - _buf0)
+         /\ squeezing_spec4 _r8 _s0 _k _st /\ 0 < _len /\ disj4 _buf0 _buf1 _buf2 _buf3 _len /\ st = _st /\ r8 = _r8
+         /\ stk = iter ((_k + (buf0 - _buf0)) %/ _r8 + 1) keccak_f1600_x4 _s0 /\ at = (_k + (buf0 - _buf0)) %% _r8
+         /\ len = at + (_len - (buf0 - _buf0)) /\ 0 <= buf0 - _buf0 < _len).
+  + wp; ecall (keccakf1600_avx2x4_h stk); ecall (dump_m_updstate_avx2x4_h Glob.mem buf0 buf1 buf2 buf3 stk at r8).
+    auto => &hr [#] -> -> -> -> Hsq H0 D -> -> -> -> -> Hw0 Hw1 Hc.
+    have [Hr [Hk _]] := Hsq.
+    pose w := buf0{hr} - _buf0.
+    have Eb0 : buf0{hr} = _buf0 + w by smt().
+    have Ha : 0 <= (_k + w) %% _r8 < _r8 by smt(modz_ge0 ltz_pmod).
+    rewrite Eb0.
+    split.
+    + split; first smt().
+      by apply (disj4_shift _ _ _ _ _len) => /#.
+    move=> _ rr mem [-> ->] r -> /=.
+    have G : forall j, 0 <= j < 4 => st4x_get (iter ((_k + w) %/ _r8 + 1) keccak_f1600_x4 _s0) j = st_i (st4x_get _s0 j) ((_k + w) %/ _r8 + 1).
+    + by move=> j Hj; apply st4x_get_iter => //; smt(divz_ge0).
+    rewrite (G 0) // (G 1) // (G 2) // (G 3) //.
+    have SS := stores4_sqstream_step _mem _r8 (st4x_get _s0 0) (st4x_get _s0 1) (st4x_get _s0 2) (st4x_get _s0 3) _k w (_r8 - (_k + w) %% _r8) _buf0 _buf1 _buf2 _buf3 _ _ _ _ _ _; 1..5: smt().
+    + by apply (disj4_le _ _ _ _ _len) => /#.
+    rewrite SS (: _buf0 + w + (_r8 - (_k + w) %% _r8) - _buf0 = w + (_r8 - (_k + w) %% _r8)) 1:/#.
+    have [Hp0 Hp1] := squeeze_pos_arith _r8 (_k + w) ((_k + w) %% _r8) _ _; 1,2: smt().
+    rewrite (: _k + (w + (_r8 - (_k + w) %% _r8)) = _k + w + (_r8 - (_k + w) %% _r8)) 1:/# Hp0 Hp1.
+    split; first done.
+    do 3!(split; first smt()).
+    split; first exact Hsq.
+    split; first smt().
+    split; first exact D.
+    split; first by rewrite (iterS ((_k + w) %/ _r8 + 1)); [smt(divz_ge0) | rewrite /keccak_f1600_x4].
+    smt().
+  auto => &hr [#] -> -> -> -> -> Hsq H0 D -> -> -> -> -> /=.
+  have [Hr [Hk _]] := Hsq.
+  split; last by smt().
+  have E0 : forall j, sqstream _r8 (st4x_get _s0 j) _k 0 = [] by move=> j; rewrite -size_eq0 size_sqstream.
+  by rewrite !E0 /stores4 !store0 /#.
+wp; ecall (dump_m_updstate_avx2x4_h Glob.mem buf0 buf1 buf2 buf3 stk at len); wp; skip => &hr [#] -> -> -> -> Hsq H0 D -> -> -> -> -> Hw0 Hw1 Hle /=.
+have [Hr [Hk _]] := Hsq.
+pose w := buf0{hr} - _buf0.
+have Eb0 : buf0{hr} = _buf0 + w by smt().
+have Ha : 0 <= (_k + w) %% _r8 < _r8 by smt(modz_ge0 ltz_pmod).
+rewrite Eb0.
+split.
++ split; first smt().
+  by apply (disj4_shift _ _ _ _ _len) => /#.
+move=> _ rr mem [-> ->] /=.
+rewrite A25u256toA101u64E A101_set800.
+rewrite (: (_k + w) %% _r8 + (_len - w) - (_k + w) %% _r8 = _len - w) 1:/#.
+have G : forall j, 0 <= j < 4 => st4x_get (iter ((_k + w) %/ _r8 + 1) keccak_f1600_x4 _s0) j = st_i (st4x_get _s0 j) ((_k + w) %/ _r8 + 1).
++ by move=> j Hj; apply st4x_get_iter => //; smt(divz_ge0).
+rewrite (G 0) // (G 1) // (G 2) // (G 3) //.
+have SS := stores4_sqstream_step _mem _r8 (st4x_get _s0 0) (st4x_get _s0 1) (st4x_get _s0 2) (st4x_get _s0 3) _k w (_len - w) _buf0 _buf1 _buf2 _buf3 _ _ _ _ _ _; 1..5: smt().
++ by apply (disj4_le _ _ _ _ _len) => /#.
+rewrite SS (: w + (_len - w) = _len) 1:/#.
+have [Fq Fm] := squeeze_fin_arith _r8 (_k + w) ((_k + w) %% _r8) (_len - w) _ _ _ _; 1..4: smt().
+have [Hat2 [Hr2 _]] := ststatus_set_atP _st.[100] ((_k + w) %% _r8 + (_len - w)) _; first smt().
+have [_ [_ [_ [Hr0 _]]]] := Hsq.
+split; first done.
+rewrite /squeezing_spec4 A101u64toA25u256K A25u256toA101u64_100 /ststatus_at_norm Hr2 Hr0 Hat2.
+rewrite (: _k + _len - 1 = _k + w + (_len - w) - 1) 1:/# Fq (: _k + _len = _k + w + (_len - w)) 1:/# Fm.
+smt().
+qed.
+
+phoare squeeze_m_updstate_avx2x4_ph _mem _r8 _s0 _k _buf0 _buf1 _buf2 _buf3 _len:
+ [ M._squeeze_m_updstate_avx2x4
+ : Glob.mem = _mem /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3 /\ len = _len
+   /\ squeezing_spec4 _r8 _s0 _k st /\ 0 < _len /\ disj4 _buf0 _buf1 _buf2 _buf3 _len
+ ==> Glob.mem = stores4 _mem _buf0 _buf1 _buf2 _buf3
+                  (sqstream _r8 (st4x_get _s0 0) _k _len) (sqstream _r8 (st4x_get _s0 1) _k _len)
+                  (sqstream _r8 (st4x_get _s0 2) _k _len) (sqstream _r8 (st4x_get _s0 3) _k _len)
+   /\ squeezing_spec4 _r8 _s0 (_k + _len) res
+ ] = 1%r.
+proof. by conseq squeeze_m_updstate_avx2x4_ll (squeeze_m_updstate_avx2x4_h _mem _r8 _s0 _k _buf0 _buf1 _buf2 _buf3 _len). qed.
+
+
+(* ---- the exported wrappers ---- *)
+
+lemma absorb_m_bcast_updstate_avx2x4_export_ll: islossless M.absorb_m_bcast_updstate_avx2x4.
+proof. by proc; call absorb_m_bcast_updstate_avx2x4_ll; auto. qed.
+
+hoare absorb_m_bcast_updstate_avx2x4_export_h _mem _r8 _tb _l0 _l1 _l2 _l3 _buf _len:
+ M.absorb_m_bcast_updstate_avx2x4
+ : Glob.mem = _mem /\ buf = _buf /\ len = _len
+   /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 st /\ 0 <= _len
+ ==> Glob.mem = _mem
+   /\ absorbing_spec4 _r8 _tb (_l0 ++ memread _mem _buf _len) (_l1 ++ memread _mem _buf _len)
+                              (_l2 ++ memread _mem _buf _len) (_l3 ++ memread _mem _buf _len) res.
+proof. by proc; ecall (absorb_m_bcast_updstate_avx2x4_h _mem _r8 _tb _l0 _l1 _l2 _l3 _buf _len); auto. qed.
+
+lemma absorb_m_updstate_avx2x4_export_ll: islossless M.absorb_m_updstate_avx2x4.
+proof. by proc; call absorb_m_updstate_avx2x4_ll; auto. qed.
+
+hoare absorb_m_updstate_avx2x4_export_h _mem _r8 _tb _l0 _l1 _l2 _l3 _buf0 _buf1 _buf2 _buf3 _len:
+ M.absorb_m_updstate_avx2x4
+ : Glob.mem = _mem /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3 /\ len = _len
+   /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 st /\ 0 <= _len
+ ==> Glob.mem = _mem
+   /\ absorbing_spec4 _r8 _tb (_l0 ++ memread _mem _buf0 _len) (_l1 ++ memread _mem _buf1 _len)
+                              (_l2 ++ memread _mem _buf2 _len) (_l3 ++ memread _mem _buf3 _len) res.
+proof. by proc; ecall (absorb_m_updstate_avx2x4_h _mem _r8 _tb _l0 _l1 _l2 _l3 _buf0 _buf1 _buf2 _buf3 _len); auto. qed.
+
+lemma squeeze_m_updstate_avx2x4_export_ll: islossless M.squeeze_m_updstate_avx2x4.
+proof. by proc; call squeeze_m_updstate_avx2x4_ll; auto. qed.
+
+hoare squeeze_m_updstate_avx2x4_export_h _mem _r8 _s0 _k _buf0 _buf1 _buf2 _buf3 _len:
+ M.squeeze_m_updstate_avx2x4
+ : Glob.mem = _mem /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3 /\ len = _len
+   /\ squeezing_spec4 _r8 _s0 _k st /\ 0 < _len /\ disj4 _buf0 _buf1 _buf2 _buf3 _len
+ ==> Glob.mem = stores4 _mem _buf0 _buf1 _buf2 _buf3
+                  (sqstream _r8 (st4x_get _s0 0) _k _len) (sqstream _r8 (st4x_get _s0 1) _k _len)
+                  (sqstream _r8 (st4x_get _s0 2) _k _len) (sqstream _r8 (st4x_get _s0 3) _k _len)
+   /\ squeezing_spec4 _r8 _s0 (_k + _len) res.
+proof. by proc; ecall (squeeze_m_updstate_avx2x4_h _mem _r8 _s0 _k _buf0 _buf1 _buf2 _buf3 _len); auto. qed.
 
 
 (* ========================================================================= *)
@@ -1070,14 +1886,7 @@ lemma dump_lane_first (S: WArray200.t) (b: W8.t A.t) off at n:
  0 <= at => at %% 8 <> 0 => 0 <= n => at + n <= 200 =>
  A.fill (fun i => (u64bytes (get64_direct S (8 * (at %/ 8)) `>>` W8.of_int (8 * (at %% 8)))).[i - off]) off (min 8 (max 0 n)) b
  = afill b off (sub S at (min n (8 - at %% 8)) ++ u8zeros (min (n - min n (8 - at %% 8)) (at %% 8))).
-proof.
-move=> H0 Hm Hn Hfit.
-rewrite afill_rlen 1:/# (u64bytes_get64_shr S (8 * (at %/ 8)) (at %% 8)) 1:/# (: 8 * (at %/ 8) + at %% 8 = at) 1:/#.
-congr; rewrite take_cat size_sub 1:/#.
-case: (n < 8 - at %% 8) => C.
-+ by rewrite take_sub200 1:/# (: min n (8 - at %% 8) = n) 1:/# (: min (n - n) (at %% 8) = 0) 1:/# nseq0 cats0.
-by rewrite (: min n (8 - at %% 8) = 8 - at %% 8) 1:/# take_nseq.
-qed.
+proof. by move=> H0 Hm Hn Hfit; rewrite afill_rlen 1:/# (dump_first_take S at n). qed.
 
 (* dump: a full (aligned) word of a lane *)
 lemma dump_lane_step8 (S: WArray200.t) (b: W8.t A.t) off at0 at z:

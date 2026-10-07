@@ -6,7 +6,7 @@ Measured 2026-10-05/06 on branch `formosa-keccak-proof-merge`, commit `6e98b395`
 
 **Update 2026-10-07.** `easycrypt.project` now sets `timeout = 5`. The `smt` calls that stalled or ran close to that limit were rewritten, and no `smt` call passes an `@T` theory hint any more. The full `fips202` check (`make -C proofs fips202`, 10 parallel jobs) passes 37/37 in 6m15s wall-clock; earlier runs of the same check took about 12 minutes. The per-file tables below are still the `timeout = 30` measurements.
 
-**Update 2026-10-07 (updstate).** The `updstate` (streaming) procedures are now proved for ref, AVX2 and 4-way AVX2, with no admitted lemma left in fips202. Four files are new: `common/Keccak1600_updstate.ec`, `common/Keccak1600_updstate_finish.ec`, `ref/Keccak1600_updstate_ref.ec` and `extracted/Keccak1600_updstate_ref_checkXtr.ec`. The two AVX2 `updstate` files were rewritten. Later the same day the AVX2 single-lane `updstate` sources and proofs were removed, because they duplicated the ref ones with the AVX2 permutation selected. ML-DSA now uses the ref procedures. The design, the source fixes, the consolidation and an experiment with EasyCrypt's LLM mode are in [updstate.md](updstate.md). Timings for these files are in [updstate files](#updstate-files-2026-10-07); the rows of the table below predate the rewrite. The full `fips202` check (10 parallel jobs) passes 39/39 in 6m39s.
+**Update 2026-10-07 (updstate).** The `updstate` (streaming) procedures are now proved for ref, AVX2 and 4-way AVX2, with no admitted lemma left in fips202. Four files are new: `common/Keccak1600_updstate.ec`, `common/Keccak1600_updstate_finish.ec`, `ref/Keccak1600_updstate_ref.ec` and `extracted/Keccak1600_updstate_ref_checkXtr.ec`. The two AVX2 `updstate` files were rewritten. Later the same day the AVX2 single-lane `updstate` sources and proofs were removed, because they duplicated the ref ones with the AVX2 permutation selected. ML-DSA now uses the ref procedures. The 4-way memory procedures, previously a commented-out draft, are implemented and proved. The design, the source fixes, the consolidation and an experiment with EasyCrypt's LLM mode are in [updstate.md](updstate.md). Timings for these files are in [updstate files](#updstate-files-2026-10-07); the rows of the table below predate the rewrite. The full `fips202` check (10 parallel jobs) passes 39/39 in 6m39s.
 
 **Setup.**
 - 10-core Mac (Darwin 27, 32 GiB), otherwise idle.
@@ -263,7 +263,7 @@ Times are wall-clock with the repository configuration. "Loading" is the time sp
   - Without the stalls, the costliest lemmas are `addstate_m_avx2x4_h` (14 s), `addstate_avx2x4_h` (13 s) and the four absorbs (11–12 s each).
   - With Z3 first it takes 5m45s, with 5 new stalls.
 - **`Keccak1600_updstate_avx2.ec`** was rewritten and then removed on 2026-10-07, together with the AVX2 single-lane `updstate` sources. `ref/Keccak1600_updstate_ref.ec` covers the same code for every permutation choice.
-- **`Keccak1600_updstate_avx2x4.ec`** was rewritten on 2026-10-07. Nothing admitted. Its array theory clones the fixed-size `KeccakArrayAvx2x4` to reuse the lane lemmas. See [updstate files](#updstate-files-2026-10-07).
+- **`Keccak1600_updstate_avx2x4.ec`** was rewritten on 2026-10-07. Nothing admitted. It proves the 4-way memory procedures at top level and the array procedures in a theory that clones the fixed-size `KeccakArrayAvx2x4`; both reuse the fixed-size 4-way lane lemmas. See [updstate files](#updstate-files-2026-10-07).
 
 ### updstate files (2026-10-07)
 
@@ -274,7 +274,7 @@ Measured on 2026-10-07 with `easycrypt compile -no-eco`, one file at a time, Eas
 | `common/Keccak1600_updstate.ec` | 13 s | Status word, predicates, shared absorb and squeeze lemmas. |
 | `common/Keccak1600_updstate_finish.ec` | 49 s | `finish` and status export, shared by ref and AVX2. The `finish` proof is kept apart because one of its `smt` calls times out with the whole substrate in scope. |
 | `ref/Keccak1600_updstate_ref.ec` | 87 s | Memory and array procedures, both branches of the `HAS_AVX2` dispatch, every permutation choice. Used by ML-DSA. |
-| `avx2/Keccak1600_updstate_avx2x4.ec` | 94 s | Array procedures, 4-buffer and broadcast. |
+| `avx2/Keccak1600_updstate_avx2x4.ec` | 313 s | Memory and array procedures, 4-buffer and broadcast. |
 | `extracted/Keccak1600_updstate_ref_checkXtr.ec` | 7 s | New. |
 | `extracted/Keccak1600_updstate_avx2x4_checkXtr.ec` | 7 s | |
 

@@ -1,6 +1,6 @@
 # Keccak1600 `updstate` proofs
 
-The `updstate` procedures are the streaming interface of the Keccak code: `init`, then any number of `absorb` calls, then `finish`, then any number of `squeeze` calls. They exist in two variants, each with memory and array buffers where the source provides them:
+The `updstate` procedures are the streaming interface of the Keccak code: `init`, then any number of `absorb` calls, then `finish`, then any number of `squeeze` calls. They exist in two variants, each with memory and array buffers:
 
 - **Single lane**, `src/fips202/ref/keccak1600_updstate{,_ASIZE}.jinc`. The permutation is chosen at build time through `KECCAK_PERMUTATION`, and the proofs hold for every choice.
 - **4-way AVX2**, `src/fips202/avx2/keccak1600x4_updstate{,_ASIZE}.jinc`.
@@ -31,6 +31,7 @@ Two behaviours of the code show up in the contracts:
 
 - **A zero-length squeeze is not a no-op.** At a block boundary it permutes the state, which skips a block. The squeeze contracts therefore require `0 < len`.
 - **The cursor is stored lazily after a squeeze.** It can equal `r8`. The predicates use the normalised cursor `ststatus_at_norm`, which maps `r8` to 0, exactly as the code's decoder does.
+- **The four output buffers of the 4-way memory squeeze must not overlap.** The code writes the lanes word by word, interleaved. The memory dump and squeeze therefore require `disj4` over the output length, and state the output as `stores4`, the four lanes' stores in sequence.
 
 **Checked on 2026-10-07** with `make -C proofs <scenario> JOBS=10`:
 
@@ -51,7 +52,7 @@ These runs are after the consolidation below. The ML-DSA and ML-KEM wall times a
 | `common/Keccak1600_updstate_finish.ec` | The single-lane `finish` and status-export proofs. It is a separate file because one `smt` call in the `finish` proof times out when the whole substrate is in scope. |
 | `common/Keccak1600_subreadwrite.ec` | The `*_rlen_*_upto8` read/write contracts, now proved, and their bridges to the fixed-size `msubread`/`asubread` steps. |
 | `ref/Keccak1600_updstate_ref.ec` | Memory and array procedures, single lane. Covers both branches of the `HAS_AVX2` dispatch in the add and dump helpers, and every permutation choice. Used by ML-DSA. |
-| `avx2/Keccak1600_updstate_avx2x4.ec` | Array procedures of the 4-way variant. The source has no 4-way memory absorb or squeeze. |
+| `avx2/Keccak1600_updstate_avx2x4.ec` | Memory and array procedures of the 4-way variant, with four buffers and with one broadcast buffer. |
 | `extracted/Keccak1600_updstate_{ref,avx2x4}_checkXtr.ec` | `by sim` checks that each hand-written `MM` module equals the extracted code at `_ASIZE = 999`, wrappers included. |
 
 ## Design
@@ -62,7 +63,7 @@ The proofs share as much as possible with the fixed-size material:
 
 - **Add and dump.** The add helpers are proved with the fixed-size `addstate_spec` invariant and its step lemmas (`addstate_spec_init`, `_fullword`, `_finish`, `_done`). The only new pieces are the bridges from the runtime-length `rlen` reads to `msubread`/`asubread` steps (`msubread_rlen`, `asubread_rlen`). The dump helpers use an overwrite lemma (`stores_overwrite`, `afill_overwrite`) to absorb the junk bytes that a partial first word writes.
 - **Absorb.** The loop invariant is `pabsorb_spec` from `Keccak1600_statebytes.ec`, stepped by `pabsorb_fill_at` and `pabsorb_last_at`.
-- **4-way variant.** The theory clones the fixed-size `KeccakArrayAvx2x4` and reuses its lane layer: `addstate_spec4` with its step lemmas, `addstate_res4`, `pabsorb4_fill` and `pabsorb4_last`. The `updstate` code addresses lanes by byte offsets (`4*at + 8*k`) instead of word indices, which two lemmas bridge (`st4x_get_xor64x4_at`, `st4x_get64_at`).
+- **4-way variant.** The proofs reuse the 4-way lane layer of `Keccak1600_fixedsizes_avx2x4.ec`. The array theory clones `KeccakArrayAvx2x4` for `addstate_spec4`, its step lemmas and `addstate_res4`. The memory proofs use the top-level twins `addstate_spec4m`, `addstate_res4m`, `stores4` and `disj4`. Both use `pabsorb4_fill` and `pabsorb4_last`. The `updstate` code addresses lanes by byte offsets (`4*at + 8*k`) instead of word indices, which two lemmas bridge (`st4x_get_xor64x4_at`, `st4x_get64_at`). Three small lemmas complete the memory side: `stores4_overwrite` and `stores4_sqstream_step` are the memory twins of `afill_overwrite` and `afill_sqstream_step`, and `dump_first_take` gives the first dumped word as a byte list for both dumps.
 - **Every permutation choice at once.** The single-lane code calls the permutation through the dispatcher `_keccakf1600`. Its contract `keccakf1600_h` (`ref/Keccakf1600.ec`) is proved for all four branches, so the single-lane proofs do not depend on `KECCAK_PERMUTATION`.
 - **Argument order.** All helpers follow the fixed-size convention: each procedure returns the values it modifies, in the order they appear among its arguments. Add returns `(st, at, cursor)` and dump returns `(buffers…, cursor, at)`.
 - **Proof reuse across variants.** Hypothesis names are the same in all variants, so the array scripts are the memory scripts with the adapters swapped. Several array and broadcast proofs passed on their first assembled run.
@@ -87,6 +88,22 @@ The AVX2 single-lane files `avx2/keccak1600_updstate{,_ASIZE}.jinc` computed exa
 - **Models.** `Keccak1600_Jazz{,_ASIZE}.ec` and `ml_dsa_65_avx2.ec` were re-extracted. The ML-KEM models and `proofs/arrays` are unchanged.
 
 `origin/ci-mldsa-sct` went the other way: it deletes the ref `updstate` sources and adds constant-time annotations to the AVX2 and 4-way files. Merging it will conflict on those files. Its annotations would need porting to the ref files.
+
+## 4-way memory variant (2026-10-07)
+
+Until then `src/fips202/avx2/keccak1600x4_updstate.jinc` held the 4-way memory procedures only as a commented-out, half-ported copy of the array code. They are now implemented and proved: `_add_m[_bcast]_updstate_avx2x4`, `_absorb_m[_bcast]_updstate_avx2x4`, `_dump_m_updstate_avx2x4`, `_squeeze_m_updstate_avx2x4` and the three exports. The code mirrors the array file statement by statement, with pointers in place of the offset. One deliberate difference: after the first, misaligned word, the array code takes the new offset from lane 3's read. With four pointers, the memory code instead computes the common advance once and adds it to each pointer.
+
+Before the revival, every existing memory/array pair was compared after normalising pointer accesses against offset accesses. The ref, AVX2 and 4-way fixed-size pairs and the ref `updstate` pair follow the same code, up to two systematic differences:
+
+- **Offset bookkeeping.** The fixed-size array helpers accumulate a compile-time `DELTA` and add it to the offset at the end; the memory helpers advance the pointer directly.
+- **Lengths.** The fixed-size array absorb and squeeze consume the whole `_ASIZE` array; the memory ones take an explicit length.
+
+Small divergences remain, none of them semantic:
+
+- **Ref fixed-size scalar add loop.** The memory version indexes the state by byte (`st.[:u64 at]`, step 8), the array version by word (`st[at]`, step 1). The squeeze loop counter is also incremented at a different point.
+- **16-byte write.** `__m_ilen_write_upto16` takes the low word with a cast, `(64u) w`; `__a_ilen_write_upto16` uses `#MOVV_64(w)`.
+- **Dead helpers.** `__m_ilen_read_upto8_at2` (memory only) and `__a_rlen_read_upto8_noninline` (array only) are defined but never called.
+- **Dead files.** `src/fips202/avx2/keccak1600_fixedsizes_ref{,_ASIZE}.jinc` are required by nothing. The array one requires `ref/keccakf1600_loop_straightline.jinc`, which does not exist.
 
 ## Experiment: EasyCrypt LLM mode against batch compilation
 

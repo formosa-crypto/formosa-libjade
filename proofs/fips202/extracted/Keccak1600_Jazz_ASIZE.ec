@@ -6218,6 +6218,515 @@ module M = {
     st <@ _finish_updstate_avx2x4 (st);
     return st;
   }
+  proc _add_m_bcast_updstate_avx2x4 (st:W256.t Array25.t, at:int, buf:int,
+                                     upto:int) : W256.t Array25.t * int * int = {
+    var at8:W64.t;
+    var t64:W64.t;
+    var sh:W8.t;
+    var t128:W128.t;
+    var t256:W256.t;
+    var upto8:W64.t;
+    var len:int;
+    var buf2:int;
+    var newat:int;
+    at8 <- (W64.of_int at);
+    at8 <- (at8 `&` (W64.of_int 7));
+    if ((at8 <> (W64.of_int 0))) {
+      len <- upto;
+      len <- (len - at);
+      at <- (at `|>>` 3);
+      at <- (at `<<` 3);
+      (buf2, t64) <@ __m_rlen_read_upto8 (buf, len);
+      len <- (len + (W64.to_uint at8));
+      sh <- (truncateu8 at8);
+      sh <- (sh `<<` (W8.of_int 3));
+      t64 <- (t64 `<<` (sh `&` (W8.of_int 63)));
+      t128 <- (VMOV_64 t64);
+      t256 <- (VPBROADCAST_4u64 (truncateu64 t128));
+      t256 <-
+      (t256 `^`
+      (get256_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 0)));
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set256_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 0) t256)));
+      if ((8 <= len)) {
+        buf <- (buf + 8);
+        buf <- (buf - (W64.to_uint at8));
+        at <- (at + 8);
+      } else {
+        buf <- buf2;
+        at <- upto;
+      }
+    } else {
+      
+    }
+    newat <- at;
+    newat <- (newat + 8);
+    while ((newat <= upto)) {
+      t256 <- (VPBROADCAST_4u64 (loadW64 Glob.mem buf));
+      t256 <-
+      (t256 `^`
+      (get256_direct (WArray800.init256 (fun i => st.[i])) (4 * at)));
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set256_direct (WArray800.init256 (fun i => st.[i])) 
+      (4 * at) t256)));
+      at <- newat;
+      buf <- (buf + 8);
+      newat <- (newat + 8);
+    }
+    if ((at < upto)) {
+      upto8 <- (W64.of_int upto);
+      upto8 <- (upto8 `&` (W64.of_int 7));
+      (buf, t64) <@ __m_rlen_read_upto8 (buf, (W64.to_uint upto8));
+      t128 <- (VMOV_64 t64);
+      t256 <- (VPBROADCAST_4u64 (truncateu64 t128));
+      t256 <-
+      (t256 `^`
+      (get256_direct (WArray800.init256 (fun i => st.[i])) (4 * at)));
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set256_direct (WArray800.init256 (fun i => st.[i])) 
+      (4 * at) t256)));
+    } else {
+      
+    }
+    at <- upto;
+    return (st, at, buf);
+  }
+  proc _absorb_m_bcast_updstate_avx2x4 (st:W64.t Array101.t, buf:int, len:int) : 
+  W64.t Array101.t = {
+    var ststatus:W64.t;
+    var stk:W256.t Array25.t;
+    var r8:int;
+    var at:int;
+    var  _0:W64.t;
+    var  _1:int;
+    stk <- witness;
+    ststatus <- st.[(4 * 25)];
+    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    stk <-
+    (Array25.init
+    (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
+    len <- (len + at);
+    while ((r8 <= len)) {
+      (stk, at, buf) <@ _add_m_bcast_updstate_avx2x4 (stk, at, buf, r8);
+      stk <@ _keccakf1600_avx2x4 (stk);
+      len <- (len - r8);
+      at <- 0;
+    }
+    len <- len;
+    (stk, at,  _1) <@ _add_m_bcast_updstate_avx2x4 (stk, at, buf, len);
+    st <-
+    (Array101.init
+    (WArray808.get64
+    (WArray808.init8
+    (fun i => (if ((32 * 0) <= i < ((32 * 0) + 800)) then (WArray800.get8
+                                                          (WArray800.init256
+                                                          (fun i => stk.[i]))
+                                                          (i - (32 * 0))) else 
+              (WArray808.get8 (WArray808.init64 (fun i => st.[i])) i)))
+    )));
+    st <-
+    (Array101.init
+    (WArray808.get64
+    (WArray808.set8_direct (WArray808.init64 (fun i => st.[i])) (32 * 25)
+    (truncateu8 (W64.of_int at)))));
+    return st;
+  }
+  proc _add_m_updstate_avx2x4 (st:W256.t Array25.t, at:int, buf0:int,
+                               buf1:int, buf2:int, buf3:int, upto:int) : 
+  W256.t Array25.t * int * int * int * int * int = {
+    var at8:W64.t;
+    var shval:W8.t;
+    var t64:W64.t;
+    var sh:W8.t;
+    var upto8:W64.t;
+    var len:int;
+    var newat:int;
+    var  _0:int;
+    var  _1:int;
+    var  _2:int;
+    var  _3:int;
+    at8 <- (W64.of_int at);
+    at8 <- (at8 `&` (W64.of_int 7));
+    if ((at8 <> (W64.of_int 0))) {
+      len <- upto;
+      len <- (len - at);
+      at <- (at `|>>` 3);
+      at <- (at `<<` 3);
+      shval <- (truncateu8 at8);
+      shval <- (shval `<<` (W8.of_int 3));
+      ( _0, t64) <@ __m_rlen_read_upto8 (buf0, len);
+      sh <- shval;
+      t64 <- (t64 `<<` (sh `&` (W8.of_int 63)));
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set64_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 0)
+      ((get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 0)) `^`
+      t64))));
+      ( _1, t64) <@ __m_rlen_read_upto8 (buf1, len);
+      sh <- shval;
+      t64 <- (t64 `<<` (sh `&` (W8.of_int 63)));
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set64_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 8)
+      ((get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 8)) `^`
+      t64))));
+      ( _2, t64) <@ __m_rlen_read_upto8 (buf2, len);
+      sh <- shval;
+      t64 <- (t64 `<<` (sh `&` (W8.of_int 63)));
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set64_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 16)
+      ((get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 16)) `^`
+      t64))));
+      ( _3, t64) <@ __m_rlen_read_upto8 (buf3, len);
+      sh <- shval;
+      t64 <- (t64 `<<` (sh `&` (W8.of_int 63)));
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set64_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 24)
+      ((get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 24)) `^`
+      t64))));
+      len <- (len + (W64.to_uint at8));
+      if ((8 <= len)) {
+        len <- 8;
+        at <- (at + 8);
+      } else {
+        at <- upto;
+      }
+      len <- (len - (W64.to_uint at8));
+      buf0 <- (buf0 + len);
+      buf1 <- (buf1 + len);
+      buf2 <- (buf2 + len);
+      buf3 <- (buf3 + len);
+    } else {
+      
+    }
+    newat <- at;
+    newat <- (newat + 8);
+    while ((newat <= upto)) {
+      t64 <- (loadW64 Glob.mem buf0);
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set64_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 0)
+      ((get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 0)) `^`
+      t64))));
+      t64 <- (loadW64 Glob.mem buf1);
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set64_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 8)
+      ((get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 8)) `^`
+      t64))));
+      t64 <- (loadW64 Glob.mem buf2);
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set64_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 16)
+      ((get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 16)) `^`
+      t64))));
+      t64 <- (loadW64 Glob.mem buf3);
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set64_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 24)
+      ((get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 24)) `^`
+      t64))));
+      at <- newat;
+      buf0 <- (buf0 + 8);
+      buf1 <- (buf1 + 8);
+      buf2 <- (buf2 + 8);
+      buf3 <- (buf3 + 8);
+      newat <- (newat + 8);
+    }
+    if ((at < upto)) {
+      upto8 <- (W64.of_int upto);
+      upto8 <- (upto8 `&` (W64.of_int 7));
+      (buf0, t64) <@ __m_rlen_read_upto8 (buf0, (W64.to_uint upto8));
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set64_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 0)
+      ((get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 0)) `^`
+      t64))));
+      (buf1, t64) <@ __m_rlen_read_upto8 (buf1, (W64.to_uint upto8));
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set64_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 8)
+      ((get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 8)) `^`
+      t64))));
+      (buf2, t64) <@ __m_rlen_read_upto8 (buf2, (W64.to_uint upto8));
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set64_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 16)
+      ((get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 16)) `^`
+      t64))));
+      (buf3, t64) <@ __m_rlen_read_upto8 (buf3, (W64.to_uint upto8));
+      st <-
+      (Array25.init
+      (WArray800.get256
+      (WArray800.set64_direct (WArray800.init256 (fun i => st.[i]))
+      ((4 * at) + 24)
+      ((get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 24)) `^`
+      t64))));
+    } else {
+      
+    }
+    at <- upto;
+    return (st, at, buf0, buf1, buf2, buf3);
+  }
+  proc _absorb_m_updstate_avx2x4 (st:W64.t Array101.t, buf0:int, buf1:int,
+                                  buf2:int, buf3:int, len:int) : W64.t Array101.t = {
+    var ststatus:W64.t;
+    var stk:W256.t Array25.t;
+    var r8:int;
+    var at:int;
+    var  _0:W64.t;
+    var  _1:int;
+    var  _2:int;
+    var  _3:int;
+    var  _4:int;
+    stk <- witness;
+    ststatus <- st.[(4 * 25)];
+    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    stk <-
+    (Array25.init
+    (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
+    (* Erased call to spill *)
+    len <- (len + at);
+    while ((r8 <= len)) {
+      (* Erased call to spill *)
+      (stk, at, buf0, buf1, buf2, buf3) <@ _add_m_updstate_avx2x4 (stk, 
+      at, buf0, buf1, buf2, buf3, r8);
+      (* Erased call to unspill *)
+      stk <@ _keccakf1600_avx2x4 (stk);
+      len <- (len - r8);
+      at <- 0;
+    }
+    len <- len;
+    (stk, at,  _1,  _2,  _3,  _4) <@ _add_m_updstate_avx2x4 (stk, at, 
+    buf0, buf1, buf2, buf3, len);
+    (* Erased call to unspill *)
+    st <-
+    (Array101.init
+    (WArray808.get64
+    (WArray808.init8
+    (fun i => (if ((32 * 0) <= i < ((32 * 0) + 800)) then (WArray800.get8
+                                                          (WArray800.init256
+                                                          (fun i => stk.[i]))
+                                                          (i - (32 * 0))) else 
+              (WArray808.get8 (WArray808.init64 (fun i => st.[i])) i)))
+    )));
+    st <-
+    (Array101.init
+    (WArray808.get64
+    (WArray808.set8_direct (WArray808.init64 (fun i => st.[i])) (32 * 25)
+    (truncateu8 (W64.of_int at)))));
+    return st;
+  }
+  proc _dump_m_updstate_avx2x4 (buf0:int, buf1:int, buf2:int, buf3:int,
+                                st:W256.t Array25.t, at:int, upto:int) : 
+  int * int * int * int * int = {
+    var at8:W64.t;
+    var sh:W8.t;
+    var t64:W64.t;
+    var upto8:W64.t;
+    var len:int;
+    var newat:int;
+    var  _0:int;
+    var  _1:int;
+    var  _2:int;
+    var  _3:int;
+    at8 <- (W64.of_int at);
+    at8 <- (at8 `&` (W64.of_int 7));
+    if ((at8 <> (W64.of_int 0))) {
+      len <- upto;
+      len <- (len - at);
+      at <- (at `|>>` 3);
+      at <- (at `<<` 3);
+      sh <- (truncateu8 at8);
+      sh <- (sh `<<` (W8.of_int 3));
+      t64 <-
+      (get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 0));
+      t64 <- (t64 `>>` (sh `&` (W8.of_int 63)));
+       _0 <@ __m_rlen_write_upto8 (buf0, t64, len);
+      t64 <-
+      (get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 8));
+      t64 <- (t64 `>>` (sh `&` (W8.of_int 63)));
+       _1 <@ __m_rlen_write_upto8 (buf1, t64, len);
+      t64 <-
+      (get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 16));
+      t64 <- (t64 `>>` (sh `&` (W8.of_int 63)));
+       _2 <@ __m_rlen_write_upto8 (buf2, t64, len);
+      t64 <-
+      (get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 24));
+      t64 <- (t64 `>>` (sh `&` (W8.of_int 63)));
+       _3 <@ __m_rlen_write_upto8 (buf3, t64, len);
+      len <- (len + (W64.to_uint at8));
+      if ((8 <= len)) {
+        len <- 8;
+        at <- (at + 8);
+      } else {
+        at <- upto;
+      }
+      len <- (len - (W64.to_uint at8));
+      buf0 <- (buf0 + len);
+      buf1 <- (buf1 + len);
+      buf2 <- (buf2 + len);
+      buf3 <- (buf3 + len);
+    } else {
+      
+    }
+    newat <- at;
+    newat <- (newat + 8);
+    while ((newat <= upto)) {
+      t64 <-
+      (get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 0));
+      Glob.mem <- (storeW64 Glob.mem buf0 t64);
+      t64 <-
+      (get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 8));
+      Glob.mem <- (storeW64 Glob.mem buf1 t64);
+      t64 <-
+      (get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 16));
+      Glob.mem <- (storeW64 Glob.mem buf2 t64);
+      t64 <-
+      (get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 24));
+      Glob.mem <- (storeW64 Glob.mem buf3 t64);
+      at <- newat;
+      buf0 <- (buf0 + 8);
+      buf1 <- (buf1 + 8);
+      buf2 <- (buf2 + 8);
+      buf3 <- (buf3 + 8);
+      newat <- (newat + 8);
+    }
+    if ((at < upto)) {
+      upto8 <- (W64.of_int upto);
+      upto8 <- (upto8 `&` (W64.of_int 7));
+      t64 <-
+      (get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 0));
+      buf0 <@ __m_rlen_write_upto8 (buf0, t64, (W64.to_uint upto8));
+      t64 <-
+      (get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 8));
+      buf1 <@ __m_rlen_write_upto8 (buf1, t64, (W64.to_uint upto8));
+      t64 <-
+      (get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 16));
+      buf2 <@ __m_rlen_write_upto8 (buf2, t64, (W64.to_uint upto8));
+      t64 <-
+      (get64_direct (WArray800.init256 (fun i => st.[i])) ((4 * at) + 24));
+      buf3 <@ __m_rlen_write_upto8 (buf3, t64, (W64.to_uint upto8));
+    } else {
+      
+    }
+    at <- upto;
+    return (buf0, buf1, buf2, buf3, at);
+  }
+  proc _squeeze_m_updstate_avx2x4 (st:W64.t Array101.t, buf0:int, buf1:int,
+                                   buf2:int, buf3:int, len:int) : W64.t Array101.t = {
+    var ststatus:W64.t;
+    var stk:W256.t Array25.t;
+    var r8:int;
+    var at:int;
+    var  _0:W64.t;
+    var  _1:int;
+    var  _2:int;
+    var  _3:int;
+    var  _4:int;
+    stk <- witness;
+    ststatus <- st.[(4 * 25)];
+    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    stk <-
+    (Array25.init
+    (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
+    if ((at = 0)) {
+      stk <@ _keccakf1600_avx2x4 (stk);
+    } else {
+      
+    }
+    len <- (len + at);
+    while ((r8 < len)) {
+      (buf0, buf1, buf2, buf3, at) <@ _dump_m_updstate_avx2x4 (buf0, 
+      buf1, buf2, buf3, stk, at, r8);
+      stk <@ _keccakf1600_avx2x4 (stk);
+      len <- (len - r8);
+      at <- 0;
+    }
+    len <- len;
+    ( _1,  _2,  _3,  _4, at) <@ _dump_m_updstate_avx2x4 (buf0, buf1, 
+    buf2, buf3, stk, at, len);
+    st <-
+    (Array101.init
+    (WArray808.get64
+    (WArray808.init8
+    (fun i => (if ((32 * 0) <= i < ((32 * 0) + 800)) then (WArray800.get8
+                                                          (WArray800.init256
+                                                          (fun i => stk.[i]))
+                                                          (i - (32 * 0))) else 
+              (WArray808.get8 (WArray808.init64 (fun i => st.[i])) i)))
+    )));
+    st <-
+    (Array101.init
+    (WArray808.get64
+    (WArray808.set8_direct (WArray808.init64 (fun i => st.[i])) (32 * 25)
+    (truncateu8 (W64.of_int at)))));
+    return st;
+  }
+  proc absorb_m_bcast_updstate_avx2x4 (st:W64.t Array101.t, buf:int, len:int) : 
+  W64.t Array101.t = {
+    
+    st <- st;
+    buf <- buf;
+    len <- len;
+    st <@ _absorb_m_bcast_updstate_avx2x4 (st, buf, len);
+    return st;
+  }
+  proc absorb_m_updstate_avx2x4 (st:W64.t Array101.t, buf0:int, buf1:int,
+                                 buf2:int, buf3:int, len:int) : W64.t Array101.t = {
+    
+    st <- st;
+    buf0 <- buf0;
+    buf1 <- buf1;
+    buf2 <- buf2;
+    buf3 <- buf3;
+    len <- len;
+    st <@ _absorb_m_updstate_avx2x4 (st, buf0, buf1, buf2, buf3, len);
+    return st;
+  }
+  proc squeeze_m_updstate_avx2x4 (st:W64.t Array101.t, buf0:int, buf1:int,
+                                  buf2:int, buf3:int, len:int) : W64.t Array101.t = {
+    
+    st <- st;
+    buf0 <- buf0;
+    buf1 <- buf1;
+    buf2 <- buf2;
+    buf3 <- buf3;
+    len <- len;
+    st <@ _squeeze_m_updstate_avx2x4 (st, buf0, buf1, buf2, buf3, len);
+    return st;
+  }
   proc __a_ilen_read_upto8_at (buf:W8.t Array999.t, offset:int, dELTA:int,
                                lEN:int, tRAIL:int, cUR:int, aT:int) : 
   int * int * int * int * W64.t = {
