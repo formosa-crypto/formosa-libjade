@@ -319,42 +319,6 @@ fn _squeeze_updstate
   return st, buf;
 }
 
-fn _absorb_state
-( reg mut ptr keccak_state st
-, #[spill_to_mmx] reg ui64 r8  // 0 < r8 < 200; r8 |% 8
-, #[spill_to_mmx] reg ui64 at  // 0 <= at < r8
-, #[spill_to_mmx] reg const ptr u8[_ASIZE] buf
-, #[spill_to_mmx] reg ui64 len
-) -> reg ptr keccak_state /* st */
-   , reg ui64             /* at */
-{
-  inline int KECCAK_F;
-  inline bool SPILL;
-  #[spill_to_mmx] reg ui64 off;
-
-  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
-  SPILL = KECCAK_F != KECCAK_F1600_AVX2;
-
-  off = 0;
-  len += at;
-  while (r8 <= len) {
-    st, at, off = _add_updstate(st, at, buf, off, r8);
-    if (SPILL) {
-      () = #spill(r8, at, len, off, buf);
-      st = _keccakf1600(st);
-      () = #unspill(r8, at, len, off, buf);
-    } else {
-      st = _keccakf1600(st);
-    }
-    len -= r8;
-    at = 0;
-  }
-  len = len;
-  st, at, _ = _add_updstate(st, at, buf, off, len);
-
-  return st, at;
-}
-
 fn _squeeze_state
 ( reg mut ptr keccak_state st
 , #[spill_to_mmx] reg ui64 r8  // 0 < r8 < 200; r8 |% 8

@@ -1190,7 +1190,7 @@ seq > ^buf3<- : (
 - auto=> &hr |> hk h hxf hblk; split; first by smt().
   move: (hblk 0) (hblk 1) (hblk 2) (hblk 3) => /= 4?.
   by with hint +listred (rewrite /sblocks_ok; apply/allP_range => /=; rewrite !trunc_inject).
-
+  sp 1.
 
   (* lane 0 *)
   exlim buf0 => b0_.

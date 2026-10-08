@@ -30,7 +30,7 @@ hoare finish_updstate_spec_h _st:
  M._finish_updstate : st = _st ==> res = finish_updstate_spec _st.
 proof.
 proc. inline.
-seq 18: (st = _st /\ 
+seq 19: (st = _st /\
          (trailb, r8, at) = ststatus_data_spec st.[25]). 
 + auto => />; rewrite /ststatus_data_spec /=; do split. 
   + rewrite /truncateu8 !to_uint_shr ..2:/# of_uintK pmod_small 1:/# of_int_mod /#.
@@ -296,6 +296,26 @@ phoare finish_updstate_ph _r8 _tb _l:
  ==> squeezing_spec _r8 (ABSORB1600 _tb _r8 _l) 0 res
  ] = 1%r.
 proof. by conseq finish_updstate_ll (finish_updstate_h _r8 _tb _l). qed.
+
+lemma finish_state_ll: islossless M._finish_state by islossless.
+
+hoare finish_state_h _r8 _tb _l:
+ M._finish_state
+ : r8 = _r8 /\ at = size _l %% _r8 /\ trailb = _tb /\ pabsorb_spec _r8 _l st
+ ==> res = ABSORB1600 _tb _r8 _l.
+proof.
+proc; auto => &hr [#] -> -> -> Hp; have [Hr _] := Hp.
+rewrite -(finish_lanes_absorbing _r8 _tb _l st{hr} Hp).
+rewrite (xor_byte_at_st25E st{hr}); first smt(modz_ge0 ltz_pmod).
+by rewrite xor_byte_at_st25E 1:/#.
+qed.
+
+phoare finish_state_ph _r8 _tb _l:
+ [ M._finish_state
+ : r8 = _r8 /\ at = size _l %% _r8 /\ trailb = _tb /\ pabsorb_spec _r8 _l st
+ ==> res = ABSORB1600 _tb _r8 _l
+ ] = 1%r.
+proof. by conseq finish_state_ll (finish_state_h _r8 _tb _l). qed.
 
 (* ------------------------------------------------------------------------- *)
 (* the status export                                                         *)

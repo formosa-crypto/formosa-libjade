@@ -1317,11 +1317,15 @@ lemma sample____matrix_A_P (rho_ : rho) : hoare[M.sample____matrix_A :
 ].
 proof.
 proc.
-seq  4 : #pre  ; first by auto.
+seq  5 : #pre  ; first by auto.
+seq  2 : (rho = rho_ /\ seed = rho).
+- auto => &hr |>; apply Array32.tP => i hi; rewrite initiE //= hi /=.
+  rewrite WArray32.WArray32.get256E pack32bE 1:/# W32u8.Pack.initiE 1:/# /=.
+  by rewrite /init8 WArray32.WArray32.initiE 1:/#.
 seq -2 : # post; last  by auto.
 cfold 1; kill -1; [by auto | sp].
 
-seq 1 : (rho = rho_ /\ A_valid_up_to rho matrix_A 28).
+seq 1 : (rho = rho_ /\ seed = rho /\ A_valid_up_to rho matrix_A 28).
 - while (#{/~{matrix_A, chunk}}pre
     /\ 0 <= chunk <= 7
     /\ A_valid_up_to rho matrix_A (4 * chunk)

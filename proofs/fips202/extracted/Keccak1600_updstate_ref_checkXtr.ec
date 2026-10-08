@@ -37,6 +37,11 @@ equiv a999_squeeze_updstate_eq:
  : ={arg} ==> ={res}
 by sim.
 
+equiv a999_squeeze_state_eq:
+ M._squeeze_state ~ MM._squeeze_state
+ : ={arg} ==> ={res}
+by sim.
+
 equiv a999_absorb_updstate_export_eq:
  M.absorb_updstate ~ MM.absorb_updstate
  : ={arg} ==> ={res}

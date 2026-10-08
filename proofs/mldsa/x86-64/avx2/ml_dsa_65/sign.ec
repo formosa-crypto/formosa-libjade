@@ -278,6 +278,7 @@ sp;seq 1 1 : (#pre /\
    Spec: mu <- H_mu tr m
    Jasmin: nothing (message representative computed next) *)
 sp 1 0.
+seq 0 2 : #pre; 1: by auto => />; rewrite /SLH64.protect_ptr.
 
 (* ── Step 5: derive_message_representative (Jasmin) ─────────────────────
    Spec: (mu already assigned above)
@@ -302,6 +303,7 @@ seq 0 1 : (#pre /\
 (* ── Step 6: rhopp = H_rhopp _K coins mu (spec simple) ─────────────────
    Spec: rhopp <- H_rhopp _K coins mu *)
 sp 1 0.
+seq 0 3 : #pre; 1: by auto => />; rewrite /SLH64.protect_ptr.
 
 (* ── Step 7: derive_seed_for_mask (Jasmin) ──────────────────────────────
    Spec: (rhopp already assigned above)
@@ -321,7 +323,7 @@ seq 0 1 : (#pre /\
   + congr;apply (eq_from_nth witness); 1: by rewrite size_to_list // size_take // size_drop // size_to_list /#.
     move => i; rewrite size_to_list /= => ib; rewrite nth_take 1,2:/# initiE 1:/# /= nth_drop /#.
     by rewrite of_listK ?Keccak1600_Spec.size_SHAKE256 //.
-
+seq 0 2 : #pre; 1: by auto => />; rewrite /SLH64.protect_ptr.
 
 (* ── Step 9: Decode s1 (Jasmin) ─────────────────────────────────────────
    Jasmin: s1 <@ s1____decode(signing_key[128:768])

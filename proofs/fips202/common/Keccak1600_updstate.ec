@@ -359,28 +359,37 @@ op finish_updstate_spec (st : W64.t Array26.t) : W64.t Array26.t =
  let stk2 = xor_byte_at_st25 stk1 (r8 - 1) (W8.of_int 128) in
  Array26.init (fun i => if i < 25 then stk2.[i] else clear_at_trailb st.[25]).
 
-lemma finish_spec_absorbing r8 tb l st:
- absorbing_spec r8 tb l st =>
- squeezing_spec r8 (ABSORB1600 tb r8 l) 0 (finish_updstate_spec st).
+(* finish on the lanes: XOR the trail byte at the cursor and 0x80 at r8-1 *)
+lemma finish_lanes_absorbing r8 tb l stk:
+ pabsorb_spec r8 l stk =>
+ xor_byte_at_st25 (xor_byte_at_st25 stk (size l %% r8) tb) (r8 - 1) (W8.of_int 128) = ABSORB1600 tb r8 l.
 proof.
-move=> Habs; have [_ [Hr8 [Hat Hat2]]] := absorbing_spec_r8 _ _ _ _ Habs.
-move: Habs; rewrite /absorbing_spec /status_spec => [#] [_ Est] Er8 Etb _.
-rewrite /squeezing_spec /= (: (-1) %/ r8 + 1 = 0) 1:/# /st_i iter0 //.
-rewrite /finish_updstate_spec ststatus_data_specE /= clear_at_trailb_r8 clear_at_trailb_at Er8 Etb Hat /=.
-split; first smt().
+move=> [Hr Est].
 pose I := stateabsorb_iblocks (BitEncoding.BitChunking.chunk r8 l) st0; pose CR := chunkremains r8 l.
 pose at := size l %% r8.
+have Hat2 : 0 <= at < r8 by smt(modz_ge0 ltz_pmod).
 have Hsz : size CR = at by rewrite /CR size_chunkremains.
-have E : xor_byte_at_st25 (xor_byte_at_st25 (ust_state st) at tb) (r8 - 1) (W8.of_int 128) = ABSORB1600 tb r8 l; last first.
-+ by apply Array25.tP => i Hi; rewrite Array25.initiE // Array26.initiE 1:/# /= ifT 1:/# E.
 rewrite xor_byte_at_st25E 1:/# xor_byte_at_st25E 1:/# stwordsK /ABSORB1600 /stateabsorb_last /addratebit /addratebit8 /stateabsorb.
-have K : (stbytes (ust_state st)).[at <- (stbytes (ust_state st)).[at] `^` tb] = stbytes (addstate I (bytes2state (rcons CR tb))); last by rewrite K.
+have K : (stbytes stk).[at <- (stbytes stk).[at] `^` tb] = stbytes (addstate I (bytes2state (rcons CR tb))); last by rewrite K.
 rewrite Est; apply WArray200.tP => i Hi; rewrite WArray200.get_setE 1:/# !stbytes_addstate /addstbytes !WArray200.map2iE //.
 + smt().
 rewrite -(bytes2stbytesP (chunkremains r8 l)) -(bytes2stbytesP (rcons CR tb)) !stwordsK.
 rewrite !WArray200.get_of_list 1..3:/# nth_rcons -/CR -/I Hsz; case: (i = at) => C.
 + by rewrite C /= (nth_out _ CR) 1:/# W8.xorw0.
 by case: (i < at) => C2 //; rewrite (nth_out _ CR) 1:/#.
+qed.
+
+lemma finish_spec_absorbing r8 tb l st:
+ absorbing_spec r8 tb l st =>
+ squeezing_spec r8 (ABSORB1600 tb r8 l) 0 (finish_updstate_spec st).
+proof.
+move=> Habs; have [_ [Hr8 [Hat Hat2]]] := absorbing_spec_r8 _ _ _ _ Habs.
+move: Habs; rewrite /absorbing_spec /status_spec => [#] Hpab Er8 Etb _.
+rewrite /squeezing_spec /= (: (-1) %/ r8 + 1 = 0) 1:/# /st_i iter0 //.
+rewrite /finish_updstate_spec ststatus_data_specE /= clear_at_trailb_r8 clear_at_trailb_at Er8 Etb Hat /=.
+split; first smt().
+have E := finish_lanes_absorbing r8 tb l (ust_state st) Hpab.
+by apply Array25.tP => i Hi; rewrite Array25.initiE // Array26.initiE 1:/# /= ifT 1:/# E.
 qed.
 
 

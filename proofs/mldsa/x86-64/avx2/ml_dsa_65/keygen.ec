@@ -258,12 +258,12 @@ seq 1 1 : (#pre
   ecall{2} (error_vectors_correct seed_for_error_vectors{2}).
   by auto => />  ?? rr -> ?->?; split;congr;congr;rewrite Bytes64.tP => k kb;rewrite Bytes64.get_of_list 1:/# get_to_list get_of_list /#.
 
-proc change {2} [10..11] : [s1p : W32.t Array1280.t] {
+proc change {2} [13..14] : [s1p : W32.t Array1280.t] {
    s1p <@ M.row_vector__ntt(s1);
    (t1, t0) <@ M.__compute_t0_t1(matrix_A, s1p, s2);
-}; 1:  by sim.  
+}; 1:  by sim.
 
-swap {2} [10..11] -9.
+swap {2} [13..14] -12.
 
 seq 2 2 : (#pre
       /\ lifts_wpolykvec (kvec_unflatten256 t0{2}) = t0{1}
@@ -282,6 +282,7 @@ seq 2 2 : (#pre
   wp; ecall {1} (pkEncode_corr rho{1} t1{1}).
 
   auto => |> &1 &2 ?????? rr1 Hrr1 _ rr2 Hrr2 _ rr3 Hrr3  rr4 Hrr4.
+  rewrite /SLH64.protect_ptr /SLH64.protect_ptr /SLH64.protect_ptr /SLH64.protect_ptr /=.
   split;congr.
   + apply (eq_from_nth witness); 1: by rewrite size_cat Bytes32.size_to_list size_kflatten_SimpleBitPack 1:/# size_to_list /#.
     move => k;rewrite size_cat Bytes32.size_to_list size_kflatten_SimpleBitPack 1:/# /= => Hk.

@@ -3001,7 +3001,10 @@ module M = {
     var trailb:W8.t;
     var r8:int;
     var at:int;
+    var  _0:W64.t;
     ststatus <- st.[25];
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
     (trailb, r8, at) <@ _ststatus_data (ststatus);
     st <-
     (Array26.init
@@ -3020,34 +3023,6 @@ module M = {
     (WArray208.set32_direct (WArray208.init64 (fun i => st.[i])) (8 * 25)
     ((get32_direct (WArray208.init64 (fun i => st.[i])) (8 * 25)) `&`
     (W32.of_int 4278255360)))));
-    return st;
-  }
-  proc ststatus_updstate (status:W8.t Array3.t, st:W64.t Array26.t) : 
-  W8.t Array3.t = {
-    var ststatus:W64.t;
-    var r8:int;
-    var at:int;
-    var  _0:W8.t;
-    ststatus <- st.[25];
-    ( _0, r8, at) <@ _ststatus_data (ststatus);
-    status.[0] <- (truncateu8 (W64.of_int r8));
-    status.[1] <- (truncateu8 (W64.of_int at));
-    status.[2] <-
-    (get8_direct (WArray208.init64 (fun i => st.[i])) ((8 * 25) + 2));
-    return status;
-  }
-  proc init_updstate (st:W64.t Array26.t, r64:int, trailb:W8.t) : W64.t Array26.t = {
-    
-    st <- st;
-    r64 <- r64;
-    trailb <- trailb;
-    st <@ _init_updstate (st, r64, trailb);
-    return st;
-  }
-  proc finish_updstate (st:W64.t Array26.t) : W64.t Array26.t = {
-    
-    st <- st;
-    st <@ _finish_updstate (st);
     return st;
   }
   proc _add_m_updstate (st:W64.t Array25.t, at:int, buf:int, upto:int) : 
@@ -3168,29 +3143,40 @@ module M = {
     return (st, at, buf);
   }
   proc _absorb_m_updstate (st:W64.t Array26.t, buf:int, len:int) : W64.t Array26.t = {
+    var kECCAK_F:int;
+    var sPILL:bool;
     var ststatus:W64.t;
     var stk:W64.t Array25.t;
     var r8:int;
     var at:int;
-    var  _0:W8.t;
-    var  _1:int;
+    var  _0:W64.t;
+    var  _1:W8.t;
+    var  _2:int;
     stk <- witness;
+    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    sPILL <- (kECCAK_F <> 3);
     ststatus <- st.[25];
-    ( _0, r8, at) <@ _ststatus_data (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data (ststatus);
     stk <- (Array25.init (fun i => st.[(0 + i)]));
     (* Erased call to spill *)
     len <- (len + at);
     while ((r8 <= len)) {
       (stk, at, buf) <@ _add_m_updstate (stk, at, buf, r8);
-      (* Erased call to spill *)
-      stk <@ _keccakf1600 (stk);
-      (* Erased call to unspill *)
+      if (sPILL) {
+        (* Erased call to spill *)
+        stk <@ _keccakf1600 (stk);
+        (* Erased call to unspill *)
+      } else {
+        stk <@ _keccakf1600 (stk);
+      }
       len <- (len - r8);
       at <- 0;
     }
     len <- len;
     (* Erased call to unspill *)
-    (stk, at,  _1) <@ _add_m_updstate (stk, at, buf, len);
+    (stk, at,  _2) <@ _add_m_updstate (stk, at, buf, len);
     st <-
     (Array26.init
     (fun i => (if (0 <= i < (0 + 25)) then stk.[(i - 0)] else st.[i])));
@@ -3289,20 +3275,31 @@ module M = {
     return (buf, at);
   }
   proc _squeeze_m_updstate (st:W64.t Array26.t, buf:int, len:int) : W64.t Array26.t = {
+    var kECCAK_F:int;
+    var sPILL:bool;
     var ststatus:W64.t;
     var stk:W64.t Array25.t;
     var r8:int;
     var at:int;
-    var  _0:W8.t;
+    var  _0:W64.t;
+    var  _1:W8.t;
     stk <- witness;
+    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    sPILL <- (kECCAK_F <> 3);
     ststatus <- st.[25];
-    ( _0, r8, at) <@ _ststatus_data (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data (ststatus);
     stk <- (Array25.init (fun i => st.[(0 + i)]));
     (* Erased call to spill *)
     if ((at = 0)) {
-      (* Erased call to spill *)
-      stk <@ _keccakf1600 (stk);
-      (* Erased call to unspill *)
+      if (sPILL) {
+        (* Erased call to spill *)
+        stk <@ _keccakf1600 (stk);
+        (* Erased call to unspill *)
+      } else {
+        stk <@ _keccakf1600 (stk);
+      }
       at <- 0;
     } else {
       
@@ -3310,9 +3307,13 @@ module M = {
     len <- (len + at);
     while ((r8 < len)) {
       (buf, at) <@ _dump_m_updstate (buf, stk, at, r8);
-      (* Erased call to spill *)
-      stk <@ _keccakf1600 (stk);
-      (* Erased call to unspill *)
+      if (sPILL) {
+        (* Erased call to spill *)
+        stk <@ _keccakf1600 (stk);
+        (* Erased call to unspill *)
+      } else {
+        stk <@ _keccakf1600 (stk);
+      }
       len <- (len - r8);
       at <- 0;
     }
@@ -3327,6 +3328,74 @@ module M = {
     (WArray208.get64
     (WArray208.set8_direct (WArray208.init64 (fun i => st.[i])) (8 * 25)
     (truncateu8 (W64.of_int at)))));
+    return st;
+  }
+  proc _absorb_m_state (st:W64.t Array25.t, r8:int, at:int, buf:int, len:int) : 
+  W64.t Array25.t * int = {
+    var kECCAK_F:int;
+    var sPILL:bool;
+    var  _0:int;
+    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    sPILL <- (kECCAK_F <> 3);
+    len <- (len + at);
+    while ((r8 <= len)) {
+      (st, at, buf) <@ _add_m_updstate (st, at, buf, r8);
+      if (sPILL) {
+        (* Erased call to spill *)
+        st <@ _keccakf1600 (st);
+        (* Erased call to unspill *)
+      } else {
+        st <@ _keccakf1600 (st);
+      }
+      len <- (len - r8);
+      at <- 0;
+    }
+    len <- len;
+    (st, at,  _0) <@ _add_m_updstate (st, at, buf, len);
+    return (st, at);
+  }
+  proc _finish_state (st:W64.t Array25.t, r8:int, at:int, trailb:W8.t) : 
+  W64.t Array25.t = {
+    
+    st <-
+    (Array25.init
+    (WArray200.get64
+    (WArray200.set8_direct (WArray200.init64 (fun i => st.[i])) at
+    ((get8_direct (WArray200.init64 (fun i => st.[i])) at) `^` trailb))));
+    st <-
+    (Array25.init
+    (WArray200.get64
+    (WArray200.set8_direct (WArray200.init64 (fun i => st.[i])) (r8 - 1)
+    ((get8_direct (WArray200.init64 (fun i => st.[i])) (r8 - 1)) `^`
+    (W8.of_int 128)))));
+    return st;
+  }
+  proc ststatus_updstate (status:W8.t Array3.t, st:W64.t Array26.t) : 
+  W8.t Array3.t = {
+    var ststatus:W64.t;
+    var r8:int;
+    var at:int;
+    var  _0:W8.t;
+    ststatus <- st.[25];
+    ( _0, r8, at) <@ _ststatus_data (ststatus);
+    status.[0] <- (truncateu8 (W64.of_int r8));
+    status.[1] <- (truncateu8 (W64.of_int at));
+    status.[2] <-
+    (get8_direct (WArray208.init64 (fun i => st.[i])) ((8 * 25) + 2));
+    return status;
+  }
+  proc init_updstate (st:W64.t Array26.t, r64:int, trailb:W8.t) : W64.t Array26.t = {
+    
+    st <- st;
+    r64 <- r64;
+    trailb <- trailb;
+    st <@ _init_updstate (st, r64, trailb);
+    return st;
+  }
+  proc finish_updstate (st:W64.t Array26.t) : W64.t Array26.t = {
+    
+    st <- st;
+    st <@ _finish_updstate (st);
     return st;
   }
   proc absorb_m_updstate (st:W64.t Array26.t, buf:int, len:int) : W64.t Array26.t = {
@@ -7432,31 +7501,42 @@ module M = {
   }
   proc _absorb_updstate (st:W64.t Array26.t, buf:W8.t Array999.t, len:int) : 
   W64.t Array26.t = {
+    var kECCAK_F:int;
+    var sPILL:bool;
     var ststatus:W64.t;
     var stk:W64.t Array25.t;
     var r8:int;
     var at:int;
     var off:int;
-    var  _0:W8.t;
-    var  _1:int;
+    var  _0:W64.t;
+    var  _1:W8.t;
+    var  _2:int;
     stk <- witness;
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
+    sPILL <- (kECCAK_F <> 3);
     ststatus <- st.[25];
-    ( _0, r8, at) <@ _ststatus_data (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data (ststatus);
     stk <- (Array25.init (fun i => st.[(0 + i)]));
     (* Erased call to spill *)
     off <- 0;
     len <- (len + at);
     while ((r8 <= len)) {
       (stk, at, off) <@ _add_updstate (stk, at, buf, off, r8);
-      (* Erased call to spill *)
-      stk <@ _keccakf1600 (stk);
-      (* Erased call to unspill *)
+      if (sPILL) {
+        (* Erased call to spill *)
+        stk <@ _keccakf1600 (stk);
+        (* Erased call to unspill *)
+      } else {
+        stk <@ _keccakf1600 (stk);
+      }
       len <- (len - r8);
       at <- 0;
     }
     len <- len;
     (* Erased call to unspill *)
-    (stk, at,  _1) <@ _add_updstate (stk, at, buf, off, len);
+    (stk, at,  _2) <@ _add_updstate (stk, at, buf, off, len);
     st <-
     (Array26.init
     (fun i => (if (0 <= i < (0 + 25)) then stk.[(i - 0)] else st.[i])));
@@ -7573,22 +7653,33 @@ module M = {
   }
   proc _squeeze_updstate (st:W64.t Array26.t, buf:W8.t Array999.t, len:int) : 
   W64.t Array26.t * W8.t Array999.t = {
+    var kECCAK_F:int;
+    var sPILL:bool;
     var ststatus:W64.t;
     var stk:W64.t Array25.t;
     var r8:int;
     var at:int;
     var off:int;
-    var  _0:W8.t;
-    var  _1:int;
+    var  _0:W64.t;
+    var  _1:W8.t;
+    var  _2:int;
     stk <- witness;
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
+    sPILL <- (kECCAK_F <> 3);
     ststatus <- st.[25];
-    ( _0, r8, at) <@ _ststatus_data (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data (ststatus);
     stk <- (Array25.init (fun i => st.[(0 + i)]));
     (* Erased call to spill *)
     if ((at = 0)) {
-      (* Erased call to spill *)
-      stk <@ _keccakf1600 (stk);
-      (* Erased call to unspill *)
+      if (sPILL) {
+        (* Erased call to spill *)
+        stk <@ _keccakf1600 (stk);
+        (* Erased call to unspill *)
+      } else {
+        stk <@ _keccakf1600 (stk);
+      }
       at <- 0;
     } else {
       
@@ -7597,14 +7688,18 @@ module M = {
     len <- (len + at);
     while ((r8 < len)) {
       (buf, off, at) <@ _dump_updstate (buf, off, stk, at, r8);
-      (* Erased call to spill *)
-      stk <@ _keccakf1600 (stk);
-      (* Erased call to unspill *)
+      if (sPILL) {
+        (* Erased call to spill *)
+        stk <@ _keccakf1600 (stk);
+        (* Erased call to unspill *)
+      } else {
+        stk <@ _keccakf1600 (stk);
+      }
       len <- (len - r8);
       at <- 0;
     }
     len <- len;
-    (buf,  _1, at) <@ _dump_updstate (buf, off, stk, at, len);
+    (buf,  _2, at) <@ _dump_updstate (buf, off, stk, at, len);
     (* Erased call to unspill *)
     st <-
     (Array26.init
@@ -7615,6 +7710,45 @@ module M = {
     (WArray208.set8_direct (WArray208.init64 (fun i => st.[i])) (8 * 25)
     (truncateu8 (W64.of_int at)))));
     return (st, buf);
+  }
+  proc _squeeze_state (st:W64.t Array25.t, r8:int, at:int,
+                       buf:W8.t Array999.t, len:int) : W64.t Array25.t *
+                                                       W8.t Array999.t * int = {
+    var kECCAK_F:int;
+    var sPILL:bool;
+    var off:int;
+    var  _0:int;
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
+    sPILL <- (kECCAK_F <> 3);
+    if ((at = 0)) {
+      if (sPILL) {
+        (* Erased call to spill *)
+        st <@ _keccakf1600 (st);
+        (* Erased call to unspill *)
+      } else {
+        st <@ _keccakf1600 (st);
+      }
+      at <- 0;
+    } else {
+      
+    }
+    off <- 0;
+    len <- (len + at);
+    while ((r8 < len)) {
+      (buf, off, at) <@ _dump_updstate (buf, off, st, at, r8);
+      if (sPILL) {
+        (* Erased call to spill *)
+        st <@ _keccakf1600 (st);
+        (* Erased call to unspill *)
+      } else {
+        st <@ _keccakf1600 (st);
+      }
+      len <- (len - r8);
+      at <- 0;
+    }
+    len <- len;
+    (buf,  _0, at) <@ _dump_updstate (buf, off, st, at, len);
+    return (st, buf, at);
   }
   proc absorb_updstate (st:W64.t Array26.t, buf:W8.t Array999.t, len:int) : 
   W64.t Array26.t = {

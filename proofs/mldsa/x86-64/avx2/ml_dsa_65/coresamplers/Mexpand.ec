@@ -493,14 +493,6 @@ by have [->|[->|[->|->]]] /= : i = 0 \/ i = 1 \/ i = 2 \/ i = 3 by smt().
 qed.
 
 (* -------------------------------------------------------------------- *)
-(* the single-lane sponge setup: absorb rho' and the domain separator   *)
-lemma setup_state_to_generate_maskP (rho_ : rho') (ds_ : W16.t) :
-hoare[ M.__setup_state_to_generate_mask :
-    rho_prime = rho_ /\ domain_separator = ds_
-  ==> res \sha3one mk_read 136 (to_list rho_ ++ W2u8.to_list ds_) ].
-proof. by proc; wp; call (shake256_absorb_66P rho_ ds_); auto. qed.
-
-(* -------------------------------------------------------------------- *)
 (* the fifth lane: the single-lane sponge squeezes five blocks and the  *)
 (* decoder reads the first 640 bytes                                    *)
 lemma sample_mask_polynomial_1xP (rho_ : rho') (ds_ : W16.t) :
@@ -511,23 +503,20 @@ proof.
 proc.
 pose n := to_list rho_ ++ W2u8.to_list ds_.
 (* absorb, and set up the block counter *)
-seq 5 : (state \sha3one mk_read 136 n /\ inc = 5 /\ i = 0).
-- by wp; call (setup_state_to_generate_maskP rho_ ds_); auto.
-(* the loop squeezes block i into its 136-byte window, then permutes *)
+seq 5 : (load_state state \sha3one mk_read 0 n /\ inc = 5 /\ i = 0).
+- by wp; ecall (shake256_absorb_66P rho_ ds_); auto.
+(* the loop permutes, then squeezes block i into its 136-byte window *)
 seq 1 : (Array680.sub mask_encoded 0 680 = shake256_slice n 0 680).
 - while (inc = 5 /\ 0 <= i <= 5
-      /\ state \sha3one mk_read (136 * (i + 1)) n
+      /\ load_state state \sha3one mk_read (136 * i) n
       /\ Array680.sub mask_encoded 0 (136 * i)
          = shake256_slice n 0 (136 * i)).
   + exlim i => i_.
-    wp; ecall (shake256_permuteP n (i_ + 1)).
-    wp; ecall (shake256_squeeze_blockP n i_).
-    skip => &hr |> hi0 _ hst hsub hlt aux haux.
-    do! split; ~-1: smt().
-    move=> _ result0 hres0.
+    wp; ecall (shake256_squeezeblockP n i_).
+    skip => &hr |> hi0 _ hst hsub hlt [aux aux0] /= _ haux.
     split; 1: smt().
     by rewrite sub_window_catE 1:/# hsub
-       (shake256_slice_cat_block n i{hr} aux hi0 haux).
+       (shake256_slice_cat_block n i{hr} aux0 hi0 haux).
   (* entry: nothing squeezed yet; exit: five windows cover 680 bytes *)
   skip => &hr |> hst; split; 1: by smt(size_shake256_slice size_eq0).
   move=> i0 me0 st0 hge5 hi0 hi5 hst0 hsub.
@@ -535,7 +524,7 @@ seq 1 : (Array680.sub mask_encoded 0 680 = shake256_slice n 0 680).
 (* the decoder reads the first 640 bytes of the stream *)
 ecall (gamma1____decode_to_polynomialP
          (Array640.init (fun j => mask_encoded.[0 + j]))).
-skip => &hr |> hsub.
+wp; skip => &hr |> hsub.
 by rewrite (mdecode_lane _ n rho_ ds_) 1:hsub.
 qed.
 

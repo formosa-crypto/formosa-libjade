@@ -30,8 +30,12 @@ equiv state_init_avx2x4_eq:
 
 equiv keccakf1600_avx2x4_eq:
  M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4
- : ={arg} ==> ={res}
- by sim.
+ : ={arg} ==> ={res}.
+proof.
+proc; inline{1} M.__KECCAK_Fx4; inline{2} Keccak1600_Jazz.M.__KECCAK_Fx4.
+seq 3 3 : (={a, kECCAK_F}); last by sim.
+by auto => />; congr; circuit.
+qed.
 
 clone KeccakArrayAvx2x4 as A2avx2x4
  with op _ASIZE <- 2,
@@ -74,18 +78,27 @@ clone KeccakArrayAvx2x4 as A168avx2x4
 
 equiv a2__absorb_avx2x4_eq:
  M.a2____absorb_avx2x4 ~ A2avx2x4.MM.__absorb_avx2x4
- : ={arg} ==> ={res}
- by sim.
+ : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : true).
+by conseq keccakf1600_avx2x4_eq.
+qed.
 
 equiv a32__absorb_bcast_avx2x4_eq:
  M.a32____absorb_bcast_avx2x4 ~ A32avx2x4.MM.__absorb_bcast_avx2x4
- : ={arg} ==> ={res}
- by sim.
+ : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : true).
+by conseq keccakf1600_avx2x4_eq.
+qed.
 
 equiv a64__absorb_bcast_avx2x4_eq:
  M.a64____absorb_bcast_avx2x4 ~ A64avx2x4.MM.__absorb_bcast_avx2x4
- : ={arg} ==> ={res}
- by sim.
+ : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : true).
+by conseq keccakf1600_avx2x4_eq.
+qed.
 
 equiv a136__dumpstate_avx2x4_eq:
  M.a136____dumpstate_avx2x4 ~ A136avx2x4.MM.__dumpstate_avx2x4
@@ -215,23 +228,35 @@ module K = {
 
 equiv shake128_absorb_34_4x_eq:
  M.shake128_absorb_34_4x ~ K.shake128_absorb_34_4x
- : ={arg} ==> ={res}
- by sim.
+ : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : true).
+by conseq keccakf1600_avx2x4_eq.
+qed.
 
 equiv shake256_absorb_66_4x_eq:
  M.shake256_absorb_66_4x ~ K.shake256_absorb_66_4x
- : ={arg} ==> ={res}
- by sim.
+ : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : true).
+by conseq keccakf1600_avx2x4_eq.
+qed.
 
 equiv shake128_squeezeblock4x_eq:
  M.shake128_squeezeblock4x ~ K.shake128_squeezeblock4x
- : ={arg} ==> ={res}
- by sim.
+ : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : true).
+by conseq keccakf1600_avx2x4_eq.
+qed.
 
 equiv shake256_squeezeblock4x_eq:
  M.shake256_squeezeblock4x ~ K.shake256_squeezeblock4x
- : ={arg} ==> ={res}
- by sim.
+ : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : true).
+by conseq keccakf1600_avx2x4_eq.
+qed.
 
 (****************************************************************************)
 (* Correctness lemmas (absorbed-state characterization)                     *)

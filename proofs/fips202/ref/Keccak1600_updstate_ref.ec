@@ -327,14 +327,16 @@ proof. by conseq dump_m_updstate_ll (dump_m_updstate_h _mem _st _at _buf _upto).
 
 lemma absorb_m_updstate_ll: islossless M._absorb_m_updstate.
 proof.
-proc; seq 5: (8 <= r8).
+proc; inline M.__KECCAK_F; sp 5.
+seq 5: (8 <= r8 /\ sPILL).
 + by wp; ecall (ststatus_data_bnd_h); auto => /#.
-+ by wp; call ststatus_data_bnd_ph; auto => /#.
++ wp; call ststatus_data_bnd_ph; auto => />.
+  by move=> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
 + seq 1: true => //.
-  + while (8 <= r8) len => [z|]; last by auto => /#.
-    by wp; call keccakf1600_ll; call add_m_updstate_ll; auto => /#.
+  + while (8 <= r8 /\ sPILL) len => [z|]; last by auto => /#.
+    by rcondt 2; [call (: true ==> true) => // | wp; call keccakf1600_ll; call add_m_updstate_ll; auto => /#].
   by wp; call add_m_updstate_ll; auto.
-+ by hoare; wp; ecall (ststatus_data_bnd_h); auto => /#.
++ by hoare; wp; ecall (ststatus_data_bnd_h); auto => /> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
 by [].
 qed.
 
@@ -343,23 +345,28 @@ hoare absorb_m_updstate_h _mem _r8 _tb _l _buf _len:
  : Glob.mem = _mem /\ buf = _buf /\ len = _len /\ absorbing_spec _r8 _tb _l st /\ 0 <= _len
  ==> Glob.mem = _mem /\ absorbing_spec _r8 _tb (_l ++ memread _mem _buf _len) res.
 proof.
-proc => /=; exlim st => _st.
+proc => /=; exlim st => _st; inline M.__KECCAK_F; sp 5.
 pose M := memread _mem _buf _len.
+conseq (: Glob.mem = _mem /\ buf = _buf /\ len = _len /\ absorbing_spec _r8 _tb _l st /\ 0 <= _len
+          /\ st = _st /\ sPILL ==> _).
++ by move=> &hr /> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
 seq 5 : (Glob.mem = _mem /\ st = _st /\ absorbing_spec _r8 _tb _l _st /\ 0 <= _len
-         /\ r8 = _r8 /\ buf = _buf /\ stk = ust_state _st /\ at = size _l %% _r8 /\ len = _len + at).
-+ wp; ecall (ststatus_data_h st.[25]); auto => &hr [#] -> -> -> -> Habs H0 r ->.
-  rewrite ststatus_data_specE /=.
+         /\ r8 = _r8 /\ buf = _buf /\ stk = ust_state _st /\ at = size _l %% _r8 /\ len = _len + at
+         /\ sPILL).
++ wp; ecall (ststatus_data_h st.[25]); auto => &hr [#] -> -> -> Habs H0 Est Hsp r ->.
+  move: Habs; rewrite Est => Habs; rewrite ststatus_data_specE /=.
   by have := Habs; rewrite /absorbing_spec /status_spec => /> *.
 seq 1 : (Glob.mem = _mem /\ st = _st /\ absorbing_spec _r8 _tb _l _st /\ 0 <= _len /\ r8 = _r8
          /\ _buf <= buf <= _buf + _len /\ at = (size _l + (buf - _buf)) %% _r8
          /\ len = _len - (buf - _buf) + at /\ len < r8
-         /\ pabsorb_spec _r8 (_l ++ take (buf - _buf) M) stk).
+         /\ pabsorb_spec _r8 (_l ++ take (buf - _buf) M) stk /\ sPILL).
 + while (Glob.mem = _mem /\ st = _st /\ absorbing_spec _r8 _tb _l _st /\ 0 <= _len /\ r8 = _r8
          /\ _buf <= buf <= _buf + _len /\ at = (size _l + (buf - _buf)) %% _r8
          /\ len = _len - (buf - _buf) + at
-         /\ pabsorb_spec _r8 (_l ++ take (buf - _buf) M) stk).
-  + wp; ecall (keccakf1600_h stk); ecall (add_m_updstate_h Glob.mem stk at buf r8).
-    auto => &hr [#] -> -> Habs H0 -> Hb0 Hb1 -> -> Hp Hc.
+         /\ pabsorb_spec _r8 (_l ++ take (buf - _buf) M) stk /\ sPILL).
+  + rcondt 2; first by call (: true ==> true) => //.
+    wp; ecall (keccakf1600_h stk); ecall (add_m_updstate_h Glob.mem stk at buf r8).
+    auto => &hr [#] -> -> Habs H0 -> Hb0 Hb1 -> -> Hp Hsp Hc.
     have [Hr8 _] := Hp.
     pose k := buf{hr} - _buf.
     pose a := (size _l + k) %% _r8.
@@ -373,13 +380,13 @@ seq 1 : (Glob.mem = _mem /\ st = _st /\ absorbing_spec _r8 _tb _l _st /\ 0 <= _l
     have Hblk := absorb_block_arith (size _l) k _r8 a _ _; 1,2: smt().
     do 2!(split; first done); split; first smt().
     split; first by rewrite (: buf{hr} + (_r8 - a) - _buf = k + (_r8 - a)) 1:/# Hblk.
-    by split; [smt() | exact Hfill].
-  auto => &hr [#] -> -> Habs H0 -> -> -> -> -> /=.
+    by split; [smt() | split; [exact Hfill | exact Hsp]].
+  auto => &hr [#] -> -> Habs H0 -> -> -> -> -> Hsp /=.
   have [Hp _] := Habs.
   split; last by smt().
   do 3!(split; first smt()).
-  by rewrite take0 cats0; exact Hp.
-wp; ecall (add_m_updstate_h Glob.mem stk at buf len); wp; skip => &hr [#] -> -> Habs H0 -> Hb0 Hb1 -> -> Hc Hp /=.
+  by rewrite take0 cats0; split; [exact Hp | exact Hsp].
+wp; ecall (add_m_updstate_h Glob.mem stk at buf len); wp; skip => &hr [#] -> -> Habs H0 -> Hb0 Hb1 -> -> Hc Hp Hsp /=.
 split; first smt().
 move=> _ r Er.
 change (absorbing_spec _r8 _tb (_l ++ memread _mem _buf _len) (st26_store r.`1 _st r.`2)).
@@ -410,17 +417,19 @@ proof. by conseq absorb_m_updstate_ll (absorb_m_updstate_h _mem _r8 _tb _l _buf 
 
 lemma squeeze_m_updstate_ll: islossless M._squeeze_m_updstate.
 proof.
-proc; seq 4: (8 <= r8).
+proc; inline M.__KECCAK_F; sp 5.
+seq 4: (8 <= r8 /\ sPILL).
 + by wp; ecall (ststatus_data_bnd_h); auto => /#.
-+ by wp; call ststatus_data_bnd_ph; auto => /#.
-+ seq 2: (8 <= r8) => //.
-  + by wp; if; [wp; call keccakf1600_ll; auto | auto].
++ wp; call ststatus_data_bnd_ph; auto => />.
+  by move=> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
++ seq 2: (8 <= r8 /\ sPILL) => //.
+  + by wp; if; [rcondt 1; [auto | wp; call keccakf1600_ll; auto] | auto].
   + seq 1: true => //.
-    + while (8 <= r8) len => [z|]; last by auto => /#.
-      by wp; call keccakf1600_ll; call dump_m_updstate_ll; auto => /#.
+    + while (8 <= r8 /\ sPILL) len => [z|]; last by auto => /#.
+      by rcondt 2; [call (: true ==> true) => // | wp; call keccakf1600_ll; call dump_m_updstate_ll; auto => /#].
     by wp; call dump_m_updstate_ll; auto.
-  by hoare; wp; if; [wp; ecall (keccakf1600_h stk); auto | auto].
-+ by hoare; wp; ecall (ststatus_data_bnd_h); auto => /#.
+  by hoare; wp; if; [rcondt 1; [auto | wp; ecall (keccakf1600_h stk); auto] | auto].
++ by hoare; wp; ecall (ststatus_data_bnd_h); auto => /> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
 by [].
 qed.
 
@@ -430,34 +439,41 @@ hoare squeeze_m_updstate_h _mem _r8 _st0 _k _buf _len:
  ==> Glob.mem = stores _mem _buf (sqstream _r8 _st0 _k _len)
    /\ squeezing_spec _r8 _st0 (_k + _len) res.
 proof.
-proc => /=; exlim st => _st.
+proc => /=; exlim st => _st; inline M.__KECCAK_F; sp 5.
+conseq (: Glob.mem = _mem /\ buf = _buf /\ len = _len /\ squeezing_spec _r8 _st0 _k st /\ 0 < _len
+          /\ st = _st /\ sPILL ==> _).
++ by move=> &hr /> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
 seq 4 : (Glob.mem = _mem /\ buf = _buf /\ len = _len /\ squeezing_spec _r8 _st0 _k _st /\ 0 < _len
-         /\ st = _st /\ r8 = _r8 /\ at = _k %% _r8 /\ stk = st_i _st0 ((_k - 1) %/ _r8 + 1)).
-+ wp; ecall (ststatus_data_h st.[25]); auto => &hr [#] -> -> -> -> Hsq H0 r ->.
-  rewrite ststatus_data_specE /=.
+         /\ st = _st /\ r8 = _r8 /\ at = _k %% _r8 /\ stk = st_i _st0 ((_k - 1) %/ _r8 + 1) /\ sPILL).
++ wp; ecall (ststatus_data_h st.[25]); auto => &hr [#] -> -> -> Hsq H0 Est Hsp r ->.
+  move: Hsq; rewrite Est => Hsq; rewrite ststatus_data_specE /=.
   by have := Hsq; rewrite /squeezing_spec => /> *.
 seq 2 : (Glob.mem = _mem /\ buf = _buf /\ squeezing_spec _r8 _st0 _k _st /\ 0 < _len
-         /\ st = _st /\ r8 = _r8 /\ at = _k %% _r8 /\ len = _len + at /\ stk = st_i _st0 (_k %/ _r8 + 1)).
+         /\ st = _st /\ r8 = _r8 /\ at = _k %% _r8 /\ len = _len + at /\ stk = st_i _st0 (_k %/ _r8 + 1)
+         /\ sPILL).
 + wp; if.
-  + wp; ecall (keccakf1600_h stk); auto => &hr [#] -> -> -> Hsq H0 -> -> Hat -> Hz.
+  + rcondt 1; first by auto.
+    wp; ecall (keccakf1600_h stk); auto => &hr [#] -> -> -> Hsq H0 -> -> Hat -> Hsp Hz.
     have [Hr [Hk _]] := Hsq.
     move=> r ->; do 6!(split; first done); split; first smt().
     split; first done.
+    split; last by exact Hsp.
     rewrite -(squeeze_entry0 _r8 _k) 1,2:/# /st_i (iterS ((_k - 1) %/ _r8 + 1)) //.
     by apply (squeeze_entry_ge0 _r8 _k) => /#.
-  auto => &hr [#] -> -> -> Hsq H0 -> -> Hat -> Hz.
+  auto => &hr [#] -> -> -> Hsq H0 -> -> Hat -> Hsp Hz.
   have [Hr [Hk _]] := Hsq.
   by rewrite (squeeze_entry1 _r8 _k) 1,2:/#.
 seq 1 : (Glob.mem = stores _mem _buf (sqstream _r8 _st0 _k (buf - _buf))
          /\ squeezing_spec _r8 _st0 _k _st /\ 0 < _len /\ st = _st /\ r8 = _r8
          /\ stk = st_i _st0 ((_k + (buf - _buf)) %/ _r8 + 1) /\ at = (_k + (buf - _buf)) %% _r8
-         /\ len = at + (_len - (buf - _buf)) /\ 0 <= buf - _buf < _len /\ len <= r8).
+         /\ len = at + (_len - (buf - _buf)) /\ 0 <= buf - _buf < _len /\ len <= r8 /\ sPILL).
 + while (Glob.mem = stores _mem _buf (sqstream _r8 _st0 _k (buf - _buf))
          /\ squeezing_spec _r8 _st0 _k _st /\ 0 < _len /\ st = _st /\ r8 = _r8
          /\ stk = st_i _st0 ((_k + (buf - _buf)) %/ _r8 + 1) /\ at = (_k + (buf - _buf)) %% _r8
-         /\ len = at + (_len - (buf - _buf)) /\ 0 <= buf - _buf < _len).
-  + wp; ecall (keccakf1600_h stk); ecall (dump_m_updstate_h Glob.mem stk at buf r8).
-    auto => &hr [#] -> Hsq H0 -> -> -> -> -> Hw0 Hw1 Hc.
+         /\ len = at + (_len - (buf - _buf)) /\ 0 <= buf - _buf < _len /\ sPILL).
+  + rcondt 2; first by call (: true ==> true) => //.
+    wp; ecall (keccakf1600_h stk); ecall (dump_m_updstate_h Glob.mem stk at buf r8).
+    auto => &hr [#] -> Hsq H0 -> -> -> -> -> Hw0 Hw1 Hsp Hc.
     have [Hr [Hk _]] := Hsq.
     pose w := buf{hr} - _buf; pose p := _k + w; pose a := p %% _r8.
     have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
@@ -474,12 +490,12 @@ seq 1 : (Glob.mem = stores _mem _buf (sqstream _r8 _st0 _k (buf - _buf))
       by rewrite (: _k + (w + (_r8 - a)) = p + (_r8 - a)) 1:/# Hp1.
     split; first by rewrite (: _k + (w + (_r8 - a)) = p + (_r8 - a)) 1:/# Hp0.
     smt().
-  auto => &hr [#] -> -> Hsq H0 -> -> -> -> -> /=.
+  auto => &hr [#] -> -> Hsq H0 -> -> -> -> -> Hsp /=.
   have [Hr [Hk _]] := Hsq.
   split; last by smt().
   have -> : sqstream _r8 _st0 _k 0 = [] by rewrite -size_eq0 size_sqstream.
   by rewrite store0 /#.
-wp; ecall (dump_m_updstate_h Glob.mem stk at buf len); wp; skip => &hr [#] -> Hsq H0 -> -> -> -> -> Hw0 Hw1 Hle /=.
+wp; ecall (dump_m_updstate_h Glob.mem stk at buf len); wp; skip => &hr [#] -> Hsq H0 -> -> -> -> -> Hw0 Hw1 Hle Hsp /=.
 have [Hr [Hk _]] := Hsq.
 pose w := buf{hr} - _buf; pose p := _k + w; pose a := p %% _r8.
 have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
@@ -507,6 +523,90 @@ phoare squeeze_m_updstate_ph _mem _r8 _st0 _k _buf _len:
    /\ squeezing_spec _r8 _st0 (_k + _len) res
  ] = 1%r.
 proof. by conseq squeeze_m_updstate_ll (squeeze_m_updstate_h _mem _r8 _st0 _k _buf _len). qed.
+
+
+(* ------------------------------------------------------------------------- *)
+(* The 25-lane absorb: rate and cursor passed and returned explicitly        *)
+(* ------------------------------------------------------------------------- *)
+
+lemma absorb_m_state_ll: phoare [M._absorb_m_state : 0 < r8 ==> true] = 1%r.
+proof.
+proc; inline M.__KECCAK_F; sp 5.
+conseq (: 0 < r8 /\ sPILL ==> _); first by move=> &hr /> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
+seq 1: true => //.
++ while (0 < r8 /\ sPILL) len => [z|]; last by auto => /#.
+  by rcondt 2; [call (: true ==> true) => // | wp; call keccakf1600_ll; call add_m_updstate_ll; auto => /#].
+by wp; call add_m_updstate_ll; auto.
+qed.
+
+hoare absorb_m_state_h _mem _r8 _l _buf _len:
+ M._absorb_m_state
+ : Glob.mem = _mem /\ r8 = _r8 /\ at = size _l %% _r8 /\ buf = _buf /\ len = _len /\ 0 <= _len
+   /\ pabsorb_spec _r8 _l st
+ ==> Glob.mem = _mem /\ pabsorb_spec _r8 (_l ++ memread _mem _buf _len) res.`1
+   /\ res.`2 = size (_l ++ memread _mem _buf _len) %% _r8.
+proof.
+proc => /=; inline M.__KECCAK_F; sp 5.
+pose M := memread _mem _buf _len.
+conseq (: Glob.mem = _mem /\ r8 = _r8 /\ buf = _buf /\ 0 <= _len /\ pabsorb_spec _r8 _l st
+          /\ at = size _l %% _r8 /\ len = _len + at /\ sPILL ==> _).
++ by move=> &hr /> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
+seq 1 : (Glob.mem = _mem /\ 0 <= _len /\ r8 = _r8
+         /\ _buf <= buf <= _buf + _len /\ at = (size _l + (buf - _buf)) %% _r8
+         /\ len = _len - (buf - _buf) + at /\ len < r8
+         /\ pabsorb_spec _r8 (_l ++ take (buf - _buf) M) st /\ sPILL).
++ while (Glob.mem = _mem /\ 0 <= _len /\ r8 = _r8
+         /\ _buf <= buf <= _buf + _len /\ at = (size _l + (buf - _buf)) %% _r8
+         /\ len = _len - (buf - _buf) + at
+         /\ pabsorb_spec _r8 (_l ++ take (buf - _buf) M) st /\ sPILL).
+  + rcondt 2; first by call (: true ==> true) => //.
+    wp; ecall (keccakf1600_h st); ecall (add_m_updstate_h Glob.mem st at buf r8).
+    auto => &hr [#] -> H0 -> Hb0 Hb1 -> -> Hp Hsp Hc.
+    have [Hr8 _] := Hp.
+    pose k := buf{hr} - _buf.
+    pose a := (size _l + k) %% _r8.
+    have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
+    split; first smt().
+    move=> _ r -> _ -> /=.
+    have Es : take (_r8 - a) (drop k M) = memread _mem buf{hr} (_r8 - a).
+    + by rewrite /M slice_memread 1..3:/#; congr; smt().
+    have Hfill := pabsorb_fill_at _r8 _l M k st{hr} a _ _ _ Hp; 1..3: smt(size_memread).
+    move: Hfill; rewrite Es (: k + (_r8 - a) = buf{hr} + (_r8 - a) - _buf) 1:/# => Hfill.
+    have Hblk := absorb_block_arith (size _l) k _r8 a _ _; 1,2: smt().
+    split; first done.
+    split; first smt().
+    split; first by rewrite (: buf{hr} + (_r8 - a) - _buf = k + (_r8 - a)) 1:/# Hblk.
+    by split; [smt() | split; [exact Hfill | exact Hsp]].
+  auto => &hr [#] -> -> -> H0 Hp -> -> Hsp /=.
+  split; last by smt().
+  do 2!(split; first smt()).
+  by rewrite take0 cats0; split; [exact Hp | exact Hsp].
+wp; ecall (add_m_updstate_h Glob.mem st at buf len); wp; skip => &hr [#] -> H0 -> Hb0 Hb1 -> -> Hc Hp Hsp /=.
+have [Hr8 _] := Hp.
+split; first smt(modz_ge0 ltz_pmod).
+move=> _ r Er.
+pose k := buf{hr} - _buf.
+pose a := (size _l + k) %% _r8.
+have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
+have Ed : drop k M = memread _mem buf{hr} (_len - k) by rewrite /M (drop_memread_cur _mem _buf _len buf{hr}) 1:/#.
+have Hlast := pabsorb_last_at _r8 _l M k st{hr} a _ _ _ Hp; 1..3: smt(size_memread).
+move: Hlast; rewrite Ed => Hlast.
+rewrite Er /=; split.
++ by rewrite (: _len - k + a - a = _len - k) 1:/#.
+have Hl := absorb_last_arith (size _l) k _r8 a (_len - k) _ _ _ _; 1..4: smt().
+by rewrite size_cat size_memread 1:/# (: size _l + _len = size _l + (k + (_len - k))) 1:/# Hl /#.
+qed.
+
+phoare absorb_m_state_ph _mem _r8 _l _buf _len:
+ [ M._absorb_m_state
+ : Glob.mem = _mem /\ r8 = _r8 /\ at = size _l %% _r8 /\ buf = _buf /\ len = _len /\ 0 <= _len
+   /\ pabsorb_spec _r8 _l st
+ ==> Glob.mem = _mem /\ pabsorb_spec _r8 (_l ++ memread _mem _buf _len) res.`1
+   /\ res.`2 = size (_l ++ memread _mem _buf _len) %% _r8
+ ] = 1%r.
+proof.
+conseq absorb_m_state_ll (absorb_m_state_h _mem _r8 _l _buf _len) => // &hr [#] _ -> _ _ _ _ [Hr _] /#.
+qed.
 
 
 (* ------------------------------------------------------------------------- *)
@@ -697,33 +797,44 @@ module MM = {
     return (st, at, off);
   }
 
-  proc _absorb_updstate (st:W64.t Array26.t, buf:W8.t A.t, len:int) : 
+  proc _absorb_updstate (st:W64.t Array26.t, buf:W8.t A.t, len:int) :
   W64.t Array26.t = {
+    var kECCAK_F:int;
+    var sPILL:bool;
     var ststatus:W64.t;
     var stk:W64.t Array25.t;
     var r8:int;
     var at:int;
     var off:int;
-    var  _0:W8.t;
-    var  _1:int;
+    var  _0:W64.t;
+    var  _1:W8.t;
+    var  _2:int;
     stk <- witness;
+    kECCAK_F <@ M.__KECCAK_F ((3 + 512));
+    sPILL <- (kECCAK_F <> 3);
     ststatus <- st.[25];
-    ( _0, r8, at) <@ M._ststatus_data (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (SLH64.init_msf);
+    ( _1, r8, at) <@ M._ststatus_data (ststatus);
     stk <- (Array25.init (fun i => st.[(0 + i)]));
     (* Erased call to spill *)
     off <- 0;
     len <- (len + at);
     while ((r8 <= len)) {
       (stk, at, off) <@ _add_updstate (stk, at, buf, off, r8);
-      (* Erased call to spill *)
-      stk <@ M._keccakf1600 (stk);
-      (* Erased call to unspill *)
+      if (sPILL) {
+        (* Erased call to spill *)
+        stk <@ M._keccakf1600 (stk);
+        (* Erased call to unspill *)
+      } else {
+        stk <@ M._keccakf1600 (stk);
+      }
       len <- (len - r8);
       at <- 0;
     }
     len <- len;
     (* Erased call to unspill *)
-    (stk, at,  _1) <@ _add_updstate (stk, at, buf, off, len);
+    (stk, at,  _2) <@ _add_updstate (stk, at, buf, off, len);
     st <-
     (Array26.init
     (fun i => (if (0 <= i < (0 + 25)) then stk.[(i - 0)] else st.[i])));
@@ -842,38 +953,53 @@ module MM = {
 
   proc _squeeze_updstate (st:W64.t Array26.t, buf:W8.t A.t, len:int) : 
   W64.t Array26.t * W8.t A.t = {
+    var kECCAK_F:int;
+    var sPILL:bool;
     var ststatus:W64.t;
     var stk:W64.t Array25.t;
     var r8:int;
     var at:int;
     var off:int;
-    var  _0:W8.t;
-    var  _1:int;
+    var  _0:W64.t;
+    var  _1:W8.t;
+    var  _2:int;
     stk <- witness;
+    kECCAK_F <@ M.__KECCAK_F ((3 + 512));
+    sPILL <- (kECCAK_F <> 3);
     ststatus <- st.[25];
-    ( _0, r8, at) <@ M._ststatus_data (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (SLH64.init_msf);
+    ( _1, r8, at) <@ M._ststatus_data (ststatus);
     stk <- (Array25.init (fun i => st.[(0 + i)]));
     (* Erased call to spill *)
     if ((at = 0)) {
-      (* Erased call to spill *)
-      stk <@ M._keccakf1600 (stk);
-      (* Erased call to unspill *)
+      if (sPILL) {
+        (* Erased call to spill *)
+        stk <@ M._keccakf1600 (stk);
+        (* Erased call to unspill *)
+      } else {
+        stk <@ M._keccakf1600 (stk);
+      }
       at <- 0;
     } else {
-      
+
     }
     off <- 0;
     len <- (len + at);
     while ((r8 < len)) {
       (buf, off, at) <@ _dump_updstate (buf, off, stk, at, r8);
-      (* Erased call to spill *)
-      stk <@ M._keccakf1600 (stk);
-      (* Erased call to unspill *)
+      if (sPILL) {
+        (* Erased call to spill *)
+        stk <@ M._keccakf1600 (stk);
+        (* Erased call to unspill *)
+      } else {
+        stk <@ M._keccakf1600 (stk);
+      }
       len <- (len - r8);
       at <- 0;
     }
     len <- len;
-    (buf,  _1, at) <@ _dump_updstate (buf, off, stk, at, len);
+    (buf,  _2, at) <@ _dump_updstate (buf, off, stk, at, len);
     (* Erased call to unspill *)
     st <-
     (Array26.init
@@ -896,14 +1022,53 @@ module MM = {
     return st;
   }
 
-  proc squeeze_updstate (st:W64.t Array26.t, buf:W8.t A.t, len:int) : 
+  proc squeeze_updstate (st:W64.t Array26.t, buf:W8.t A.t, len:int) :
   W64.t Array26.t * W8.t A.t = {
-    
+
     st <- st;
     buf <- buf;
     len <- len;
     (st, buf) <@ _squeeze_updstate (st, buf, len);
     return (st, buf);
+  }
+  proc _squeeze_state (st:W64.t Array25.t, r8:int, at:int,
+                       buf:W8.t A.t, len:int) : W64.t Array25.t *
+                                                W8.t A.t * int = {
+    var kECCAK_F:int;
+    var sPILL:bool;
+    var off:int;
+    var  _0:int;
+    kECCAK_F <@ M.__KECCAK_F ((3 + 512));
+    sPILL <- (kECCAK_F <> 3);
+    if ((at = 0)) {
+      if (sPILL) {
+        (* Erased call to spill *)
+        st <@ M._keccakf1600 (st);
+        (* Erased call to unspill *)
+      } else {
+        st <@ M._keccakf1600 (st);
+      }
+      at <- 0;
+    } else {
+
+    }
+    off <- 0;
+    len <- (len + at);
+    while ((r8 < len)) {
+      (buf, off, at) <@ _dump_updstate (buf, off, st, at, r8);
+      if (sPILL) {
+        (* Erased call to spill *)
+        st <@ M._keccakf1600 (st);
+        (* Erased call to unspill *)
+      } else {
+        st <@ M._keccakf1600 (st);
+      }
+      len <- (len - r8);
+      at <- 0;
+    }
+    len <- len;
+    (buf,  _0, at) <@ _dump_updstate (buf, off, st, at, len);
+    return (st, buf, at);
   }
 }.
 
@@ -1160,14 +1325,16 @@ proof. by conseq dump_updstate_ll (dump_updstate_h _buf _off _st _at _upto). qed
 
 lemma absorb_updstate_ll: islossless MM._absorb_updstate.
 proof.
-proc; seq 6: (8 <= r8).
+proc; inline M.__KECCAK_F; sp 5.
+seq 6: (8 <= r8 /\ !sPILL).
 + by wp; ecall (ststatus_data_bnd_h); auto => /#.
-+ by wp; call ststatus_data_bnd_ph; auto => /#.
++ wp; call ststatus_data_bnd_ph; auto => />.
+  by move=> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
 + seq 1: true => //.
-  + while (8 <= r8) len => [z|]; last by auto => /#.
-    by wp; call keccakf1600_ll; call add_updstate_ll; auto => /#.
+  + while (8 <= r8 /\ !sPILL) len => [z|]; last by auto => /#.
+    by rcondf 2; [call (: true ==> true) => // | wp; call keccakf1600_ll; call add_updstate_ll; auto => /#].
   by wp; call add_updstate_ll; auto.
-+ by hoare; wp; ecall (ststatus_data_bnd_h); auto => /#.
++ by hoare; wp; ecall (ststatus_data_bnd_h); auto => /> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
 by [].
 qed.
 
@@ -1176,23 +1343,28 @@ hoare absorb_updstate_h _r8 _tb _l _buf _len:
  : buf = _buf /\ len = _len /\ absorbing_spec _r8 _tb _l st /\ 0 <= _len <= _ASIZE
  ==> absorbing_spec _r8 _tb (_l ++ sub _buf 0 _len) res.
 proof.
-proc => /=; exlim st => _st.
+proc => /=; exlim st => _st; inline M.__KECCAK_F; sp 5.
 pose M := sub _buf 0 _len.
+conseq (: buf = _buf /\ len = _len /\ absorbing_spec _r8 _tb _l st /\ 0 <= _len <= _ASIZE
+          /\ st = _st /\ !sPILL ==> _).
++ by move=> &hr /> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
 seq 6 : (st = _st /\ absorbing_spec _r8 _tb _l _st /\ 0 <= _len <= _ASIZE
-         /\ r8 = _r8 /\ buf = _buf /\ off = 0 /\ stk = ust_state _st /\ at = size _l %% _r8 /\ len = _len + at).
-+ wp; ecall (ststatus_data_h st.[25]); auto => &hr [#] -> -> -> Habs H0 H1 r ->.
-  rewrite ststatus_data_specE /=.
+         /\ r8 = _r8 /\ buf = _buf /\ off = 0 /\ stk = ust_state _st /\ at = size _l %% _r8 /\ len = _len + at
+         /\ !sPILL).
++ wp; ecall (ststatus_data_h st.[25]); auto => &hr [#] -> -> Habs H0 H1 Est Hsp r ->.
+  move: Habs; rewrite Est => Habs; rewrite ststatus_data_specE /=.
   by have := Habs; rewrite /absorbing_spec /status_spec => /> *.
 seq 1 : (st = _st /\ absorbing_spec _r8 _tb _l _st /\ 0 <= _len <= _ASIZE /\ r8 = _r8 /\ buf = _buf
          /\ 0 <= off <= _len /\ at = (size _l + off) %% _r8
          /\ len = _len - off + at /\ len < r8
-         /\ pabsorb_spec _r8 (_l ++ take off M) stk).
+         /\ pabsorb_spec _r8 (_l ++ take off M) stk /\ !sPILL).
 + while (st = _st /\ absorbing_spec _r8 _tb _l _st /\ 0 <= _len <= _ASIZE /\ r8 = _r8 /\ buf = _buf
          /\ 0 <= off <= _len /\ at = (size _l + off) %% _r8
          /\ len = _len - off + at
-         /\ pabsorb_spec _r8 (_l ++ take off M) stk).
-  + wp; ecall (keccakf1600_h stk); ecall (add_updstate_h stk at buf off r8).
-    auto => &hr [#] -> Habs H0 H1 -> -> Hb0 Hb1 -> -> Hp Hc.
+         /\ pabsorb_spec _r8 (_l ++ take off M) stk /\ !sPILL).
+  + rcondf 2; first by call (: true ==> true) => //.
+    wp; ecall (keccakf1600_h stk); ecall (add_updstate_h stk at buf off r8).
+    auto => &hr [#] -> Habs H0 H1 -> -> Hb0 Hb1 -> -> Hp Hsp Hc.
     have [Hr8 _] := Hp.
     pose k := off{hr}.
     pose a := (size _l + k) %% _r8.
@@ -1206,13 +1378,13 @@ seq 1 : (st = _st /\ absorbing_spec _r8 _tb _l _st /\ 0 <= _len <= _ASIZE /\ r8 
     have Hblk := absorb_block_arith (size _l) k _r8 a _ _; 1,2: smt().
     do 2!(split; first done); split; first smt().
     split; first by rewrite Hblk.
-    by split; [smt() | exact Hfill].
-  auto => &hr [#] -> Habs H0 H1 -> -> -> -> -> -> /=.
+    by split; [smt() | split; [exact Hfill | exact Hsp]].
+  auto => &hr [#] -> Habs H0 H1 -> -> -> -> -> -> Hsp /=.
   have [Hp _] := Habs.
   split; last by smt().
   do 3!(split; first smt()).
-  by rewrite take0 cats0; exact Hp.
-wp; ecall (add_updstate_h stk at buf off len); wp; skip => &hr [#] -> Habs H0 H1 -> -> Hb0 Hb1 -> -> Hc Hp /=.
+  by rewrite take0 cats0; split; [exact Hp | exact Hsp].
+wp; ecall (add_updstate_h stk at buf off len); wp; skip => &hr [#] -> Habs H0 H1 -> -> Hb0 Hb1 -> -> Hc Hp Hsp /=.
 split; first smt().
 move=> _ r Er.
 change (absorbing_spec _r8 _tb (_l ++ sub _buf 0 _len) (st26_store r.`1 _st r.`2)).
@@ -1243,17 +1415,19 @@ proof. by conseq absorb_updstate_ll (absorb_updstate_h _r8 _tb _l _buf _len). qe
 
 lemma squeeze_updstate_ll: islossless MM._squeeze_updstate.
 proof.
-proc; seq 4: (8 <= r8).
+proc; inline M.__KECCAK_F; sp 5.
+seq 4: (8 <= r8 /\ !sPILL).
 + by wp; ecall (ststatus_data_bnd_h); auto => /#.
-+ by wp; call ststatus_data_bnd_ph; auto => /#.
-+ seq 3: (8 <= r8) => //.
-  + by wp; if; [wp; call keccakf1600_ll; auto | auto].
++ wp; call ststatus_data_bnd_ph; auto => />.
+  by move=> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
++ seq 3: (8 <= r8 /\ !sPILL) => //.
+  + by wp; if; [rcondf 1; [auto | wp; call keccakf1600_ll; auto] | auto].
   + seq 1: true => //.
-    + while (8 <= r8) len => [z|]; last by auto => /#.
-      by wp; call keccakf1600_ll; call dump_updstate_ll; auto => /#.
+    + while (8 <= r8 /\ !sPILL) len => [z|]; last by auto => /#.
+      by rcondf 2; [call (: true ==> true) => // | wp; call keccakf1600_ll; call dump_updstate_ll; auto => /#].
     by wp; call dump_updstate_ll; auto.
-  by hoare; wp; if; [wp; ecall (keccakf1600_h stk); auto | auto].
-+ by hoare; wp; ecall (ststatus_data_bnd_h); auto => /#.
+  by hoare; wp; if; [rcondf 1; [auto | wp; ecall (keccakf1600_h stk); auto] | auto].
++ by hoare; wp; ecall (ststatus_data_bnd_h); auto => /> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
 by [].
 qed.
 
@@ -1263,33 +1437,40 @@ hoare squeeze_updstate_h _r8 _st0 _k _buf _len:
  ==> res.`2 = A.fill (fun i => (sqstream _r8 _st0 _k _len).[i]) 0 _len _buf
    /\ squeezing_spec _r8 _st0 (_k + _len) res.`1.
 proof.
-proc => /=; exlim st => _st.
+proc => /=; exlim st => _st; inline M.__KECCAK_F; sp 5.
+conseq (: buf = _buf /\ len = _len /\ squeezing_spec _r8 _st0 _k st /\ 0 < _len <= _ASIZE
+          /\ st = _st /\ !sPILL ==> _).
++ by move=> &hr /> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
 seq 4 : (buf = _buf /\ len = _len /\ squeezing_spec _r8 _st0 _k _st /\ 0 < _len <= _ASIZE
-         /\ st = _st /\ r8 = _r8 /\ at = _k %% _r8 /\ stk = st_i _st0 ((_k - 1) %/ _r8 + 1)).
-+ wp; ecall (ststatus_data_h st.[25]); auto => &hr [#] -> -> -> Hsq H0 H1 r ->.
-  rewrite ststatus_data_specE /=.
+         /\ st = _st /\ r8 = _r8 /\ at = _k %% _r8 /\ stk = st_i _st0 ((_k - 1) %/ _r8 + 1) /\ !sPILL).
++ wp; ecall (ststatus_data_h st.[25]); auto => &hr [#] -> -> Hsq H0 H1 Est Hsp r ->.
+  move: Hsq; rewrite Est => Hsq; rewrite ststatus_data_specE /=.
   by have := Hsq; rewrite /squeezing_spec => /> *.
 seq 3 : (buf = _buf /\ squeezing_spec _r8 _st0 _k _st /\ 0 < _len <= _ASIZE
-         /\ st = _st /\ r8 = _r8 /\ at = _k %% _r8 /\ off = 0 /\ len = _len + at /\ stk = st_i _st0 (_k %/ _r8 + 1)).
+         /\ st = _st /\ r8 = _r8 /\ at = _k %% _r8 /\ off = 0 /\ len = _len + at /\ stk = st_i _st0 (_k %/ _r8 + 1)
+         /\ !sPILL).
 + wp; if.
-  + wp; ecall (keccakf1600_h stk); auto => &hr [#] -> -> Hsq H0 H1 -> -> Hat -> Hz.
+  + rcondf 1; first by auto.
+    wp; ecall (keccakf1600_h stk); auto => &hr [#] -> -> Hsq H0 H1 -> -> Hat -> Hsp Hz.
     have [Hr [Hk _]] := Hsq.
-    move=> r ->; do !(split; first smt()).
+    move=> r ->; do 7!(split; first smt()).
+    split; last by exact Hsp.
     rewrite -(squeeze_entry0 _r8 _k) 1,2:/# /st_i (iterS ((_k - 1) %/ _r8 + 1)) //.
     by apply (squeeze_entry_ge0 _r8 _k) => /#.
-  auto => &hr [#] -> -> Hsq H0 H1 -> -> Hat -> Hz.
+  auto => &hr [#] -> -> Hsq H0 H1 -> -> Hat -> Hsp Hz.
   have [Hr [Hk _]] := Hsq.
   by rewrite (squeeze_entry1 _r8 _k) 1,2:/#.
 seq 1 : (buf = afill _buf 0 (sqstream _r8 _st0 _k off)
          /\ squeezing_spec _r8 _st0 _k _st /\ 0 < _len <= _ASIZE /\ st = _st /\ r8 = _r8
          /\ stk = st_i _st0 ((_k + off) %/ _r8 + 1) /\ at = (_k + off) %% _r8
-         /\ len = at + (_len - off) /\ 0 <= off < _len /\ len <= r8).
+         /\ len = at + (_len - off) /\ 0 <= off < _len /\ len <= r8 /\ !sPILL).
 + while (buf = afill _buf 0 (sqstream _r8 _st0 _k off)
          /\ squeezing_spec _r8 _st0 _k _st /\ 0 < _len <= _ASIZE /\ st = _st /\ r8 = _r8
          /\ stk = st_i _st0 ((_k + off) %/ _r8 + 1) /\ at = (_k + off) %% _r8
-         /\ len = at + (_len - off) /\ 0 <= off < _len).
-  + wp; ecall (keccakf1600_h stk); ecall (dump_updstate_h buf off stk at r8).
-    auto => &hr [#] -> Hsq H0 H1 -> -> -> -> -> Hw0 Hw1 Hc.
+         /\ len = at + (_len - off) /\ 0 <= off < _len /\ !sPILL).
+  + rcondf 2; first by call (: true ==> true) => //.
+    wp; ecall (keccakf1600_h stk); ecall (dump_updstate_h buf off stk at r8).
+    auto => &hr [#] -> Hsq H0 H1 -> -> -> -> -> Hw0 Hw1 Hsp Hc.
     have [Hr [Hk _]] := Hsq.
     pose w := off{hr}; pose p := _k + w; pose a := p %% _r8.
     have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
@@ -1307,12 +1488,12 @@ seq 1 : (buf = afill _buf 0 (sqstream _r8 _st0 _k off)
       by rewrite (: _k + (w + (_r8 - a)) = p + (_r8 - a)) 1:/# Hp1.
     split; first by rewrite (: _k + (w + (_r8 - a)) = p + (_r8 - a)) 1:/# Hp0.
     smt().
-  auto => &hr [#] -> Hsq H0 H1 -> -> -> -> -> -> /=.
+  auto => &hr [#] -> Hsq H0 H1 -> -> -> -> -> -> Hsp /=.
   have [Hr [Hk _]] := Hsq.
   split; last by smt().
   have -> : sqstream _r8 _st0 _k 0 = [] by rewrite -size_eq0 size_sqstream.
   by rewrite afill_nil /#.
-wp; ecall (dump_updstate_h buf off stk at len); wp; skip => &hr [#] -> Hsq H0 H1 -> -> -> -> -> Hw0 Hw1 Hle /=.
+wp; ecall (dump_updstate_h buf off stk at len); wp; skip => &hr [#] -> Hsq H0 H1 -> -> -> -> -> Hw0 Hw1 Hle Hsp /=.
 have [Hr [Hk _]] := Hsq.
 pose w := off{hr}; pose p := _k + w; pose a := p %% _r8.
 have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
@@ -1345,6 +1526,105 @@ phoare squeeze_updstate_ph _r8 _st0 _k _buf _len:
    /\ squeezing_spec _r8 _st0 (_k + _len) res.`1
  ] = 1%r.
 proof. by conseq squeeze_updstate_ll (squeeze_updstate_h _r8 _st0 _k _buf _len). qed.
+
+(* the 25-lane squeeze: rate and cursor passed and returned explicitly *)
+lemma squeeze_state_ll: phoare [MM._squeeze_state : 0 < r8 ==> true] = 1%r.
+proof.
+proc; inline M.__KECCAK_F; sp 4.
+conseq (: 0 < r8 /\ !sPILL ==> _); first by move=> &hr /> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
+seq 3: (0 < r8 /\ !sPILL) => //.
++ by wp; if; [rcondf 1; [auto | wp; call keccakf1600_ll; auto] | auto].
++ seq 1: true => //.
+  + while (0 < r8 /\ !sPILL) len => [z|]; last by auto => /#.
+    by rcondf 2; [call (: true ==> true) => // | wp; call keccakf1600_ll; call dump_updstate_ll; auto => /#].
+  by wp; call dump_updstate_ll; auto.
+by hoare; wp; if; [rcondf 1; [auto | wp; ecall (keccakf1600_h st); auto] | auto].
+qed.
+
+hoare squeeze_state_h _r8 _st0 _k _buf _len:
+ MM._squeeze_state
+ : r8 = _r8 /\ buf = _buf /\ len = _len /\ 0 < _r8 <= 200 /\ 0 <= _k /\ 0 < _len <= _ASIZE
+   /\ at = _k %% _r8 /\ st = st_i _st0 ((_k - 1) %/ _r8 + 1)
+ ==> res.`2 = A.fill (fun i => (sqstream _r8 _st0 _k _len).[i]) 0 _len _buf
+   /\ res.`1 = st_i _st0 ((_k + _len - 1) %/ _r8 + 1)
+   /\ (_k + _len) %% _r8 = (if _r8 <= res.`3 then 0 else res.`3).
+proof.
+proc => /=; inline M.__KECCAK_F; sp 4.
+conseq (: r8 = _r8 /\ buf = _buf /\ len = _len /\ 0 < _r8 <= 200 /\ 0 <= _k /\ 0 < _len <= _ASIZE
+          /\ at = _k %% _r8 /\ st = st_i _st0 ((_k - 1) %/ _r8 + 1) /\ !sPILL ==> _).
++ by move=> &hr /> *; rewrite (: 255 = 2^8 - 1) // W256.and_mod //=.
+seq 3 : (buf = _buf /\ 0 < _r8 <= 200 /\ 0 <= _k /\ 0 < _len <= _ASIZE /\ r8 = _r8
+         /\ at = _k %% _r8 /\ off = 0 /\ len = _len + at /\ st = st_i _st0 (_k %/ _r8 + 1) /\ !sPILL).
++ wp; if.
+  + rcondf 1; first by auto.
+    wp; ecall (keccakf1600_h st); auto => &hr [#] -> -> -> Hr0 Hr1 Hk H0 H1 Hat -> Hsp Hz.
+    move=> r ->; do 7!(split; first smt()).
+    split; last by exact Hsp.
+    rewrite -(squeeze_entry0 _r8 _k) 1,2:/# /st_i (iterS ((_k - 1) %/ _r8 + 1)) //.
+    by apply (squeeze_entry_ge0 _r8 _k) => /#.
+  auto => &hr [#] -> -> -> Hr0 Hr1 Hk H0 H1 Hat -> Hsp Hz.
+  by rewrite (squeeze_entry1 _r8 _k) 1,2:/#.
+seq 1 : (buf = afill _buf 0 (sqstream _r8 _st0 _k off)
+         /\ 0 < _r8 <= 200 /\ 0 <= _k /\ 0 < _len <= _ASIZE /\ r8 = _r8
+         /\ st = st_i _st0 ((_k + off) %/ _r8 + 1) /\ at = (_k + off) %% _r8
+         /\ len = at + (_len - off) /\ 0 <= off < _len /\ len <= r8 /\ !sPILL).
++ while (buf = afill _buf 0 (sqstream _r8 _st0 _k off)
+         /\ 0 < _r8 <= 200 /\ 0 <= _k /\ 0 < _len <= _ASIZE /\ r8 = _r8
+         /\ st = st_i _st0 ((_k + off) %/ _r8 + 1) /\ at = (_k + off) %% _r8
+         /\ len = at + (_len - off) /\ 0 <= off < _len /\ !sPILL).
+  + rcondf 2; first by call (: true ==> true) => //.
+    wp; ecall (keccakf1600_h st); ecall (dump_updstate_h buf off st at r8).
+    auto => &hr [#] -> Hr0 Hr1 Hk H0 H1 -> -> -> -> Hw0 Hw1 Hsp Hc.
+    pose w := off{hr}; pose p := _k + w; pose a := p %% _r8.
+    have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
+    split; first smt().
+    move=> _ r -> r0 -> /=.
+    have [Hp0 Hp1] := squeeze_pos_arith _r8 p a _ _; 1,2: smt().
+    split.
+    + rewrite -(sqstream_block _r8 _st0 p (_r8 - a)) 1..4:/# (sqstream_cat _r8 _st0 _k w (_r8 - a)) 1..4:/#.
+      have E := afill_overwrite _buf 0 (sqstream _r8 _st0 _k w) [] (sqstream _r8 _st0 p (_r8 - a)) _; first by rewrite size_ge0.
+      move: E; rewrite cats0 size_sqstream 1..3:/# /= => <-.
+      by rewrite /afill size_sqstream 1..3:/# (size_sqstream _r8 _st0 p (_r8 - a)) 1..3:/#.
+    do 3!(split; first smt()).
+    split.
+    + rewrite /st_i -iterS; first smt(divz_ge0).
+      by rewrite (: _k + (w + (_r8 - a)) = p + (_r8 - a)) 1:/# Hp1.
+    split; first by rewrite (: _k + (w + (_r8 - a)) = p + (_r8 - a)) 1:/# Hp0.
+    smt().
+  auto => &hr [#] -> Hr0 Hr1 Hk H0 H1 -> -> -> -> -> Hsp /=.
+  split; last by smt().
+  have -> : sqstream _r8 _st0 _k 0 = [] by rewrite -size_eq0 size_sqstream.
+  by rewrite afill_nil /#.
+wp; ecall (dump_updstate_h buf off st at len); wp; skip => &hr [#] -> Hr0 Hr1 Hk H0 H1 -> -> -> -> Hw0 Hw1 Hle Hsp /=.
+pose w := off{hr}; pose p := _k + w; pose a := p %% _r8.
+have Ha : 0 <= a < _r8 by smt(modz_ge0 ltz_pmod).
+split; first smt().
+move=> _ r -> /=.
+rewrite (: a + (_len - w) - a = _len - w) 1:/#.
+split.
++ have Ecat : sqstream _r8 _st0 _k _len = sqstream _r8 _st0 _k w ++ sqstream _r8 _st0 p (_len - w).
+  + by rewrite -(sqstream_cat _r8 _st0 _k w (_len - w)) 1..4:/#; congr; ring.
+  have E := afill_overwrite _buf 0 (sqstream _r8 _st0 _k w) [] (sqstream _r8 _st0 p (_len - w)) _; first by rewrite size_ge0.
+  move: E; rewrite cats0 (size_sqstream _r8 _st0 _k w) 1..3:/# /= => E.
+  rewrite -(sqstream_block _r8 _st0 p (_len - w)) 1..4:/#.
+  have F : A.fill (fun (i : int) => (sqstream _r8 _st0 p (_len - w)).[i - w]) w (_len - w) (afill _buf 0 (sqstream _r8 _st0 _k w)) = afill (afill _buf 0 (sqstream _r8 _st0 _k w)) w (sqstream _r8 _st0 p (_len - w)).
+  + by rewrite {2}/afill (size_sqstream _r8 _st0 p (_len - w)) 1..3:/#.
+  rewrite F E -Ecat /afill (size_sqstream _r8 _st0 _k _len) 1..3:/#.
+  by congr; apply fun_ext => i /=.
+have [Fq Fm] := squeeze_fin_arith _r8 p a (_len - w) _ _ _ _; 1..4: smt().
+split; first by rewrite (: _k + _len - 1 = p + (_len - w) - 1) 1:/# Fq.
+by rewrite (: _k + _len = p + (_len - w)) 1:/# Fm.
+qed.
+
+phoare squeeze_state_ph _r8 _st0 _k _buf _len:
+ [ MM._squeeze_state
+ : r8 = _r8 /\ buf = _buf /\ len = _len /\ 0 < _r8 <= 200 /\ 0 <= _k /\ 0 < _len <= _ASIZE
+   /\ at = _k %% _r8 /\ st = st_i _st0 ((_k - 1) %/ _r8 + 1)
+ ==> res.`2 = A.fill (fun i => (sqstream _r8 _st0 _k _len).[i]) 0 _len _buf
+   /\ res.`1 = st_i _st0 ((_k + _len - 1) %/ _r8 + 1)
+   /\ (_k + _len) %% _r8 = (if _r8 <= res.`3 then 0 else res.`3)
+ ] = 1%r.
+proof. by conseq squeeze_state_ll (squeeze_state_h _r8 _st0 _k _buf _len) => // &hr /#. qed.
 
 (* the exported wrappers *)
 lemma absorb_updstate_export_ll: islossless MM.absorb_updstate.

@@ -455,18 +455,18 @@ seq 1 1 : (#pre /\
     by rewrite BytesPK.get_of_list 1:/# get_to_list.
 
 (* anticipate hashing *)
-swap {2} [8..9] -7.
+swap {2} [8..11] -7.
 
 (* verification key hash. *)
-sp 1 0.
+sp 1 1.
 seq 0 1 : (#pre /\
       verification_key_hash{2} =
         Array64.of_list witness (Bytes64.to_list (H_tr pk{1}))).
   + ecall{2} (hash_verification_key_correct verification_key{2}).
     by auto.
 
-(* message representative *)    
-sp 1 0.
+(* message representative *)
+sp 1 1.
 seq 0 1 : (#pre /\
       message_representative{2} =
         Array64.of_list witness (Bytes64.to_list mu{1})).
@@ -485,7 +485,7 @@ seq 0 1 : (#pre /\
     + by rewrite size_memread; smt(W64.to_uint_cmp).
    
 (* anticipate sib *)
-swap {2} [3..4] -2.
+swap {2} [4..5] -3.
   seq 1 1 : (#pre /\ lifts_wpoly challenge{2} = c{1} /\ wpoly_srng 1 1 challenge{2}).
   + call sample_challenge_correct.
     wp; skip => /> &1 &2 *.
@@ -501,7 +501,7 @@ exlim signer_response{2} => _sr_pre.
 exlim challenge{2} => _ch_pre.
 
 (* jump over algebra *)
-seq 2 5 :
+seq 2 6 :
   (#{/~signer_response{2}}{/~challenge{2}}pre /\
     lifts_wpolylvec (lvec_unflatten256 _sr_pre) = z{1} /\
     wpolylvec_srng (lvec_unflatten256 _sr_pre) (gamma1 - 1) gamma1 /\
@@ -512,7 +512,7 @@ seq 2 5 :
     BytesW1.of_list (to_list reconstructed_signer_commitment{2}) = w1Encode w1{1}); last first.
 
 (* recompute hash *)
-sp 1 1.
+sp 1 0.
 seq 0 1 : (#pre /\
       expected_commitment_hash{2} =
         Array48.of_list witness (BytesCT.to_list (H_ct mu{1} (w1Encode w1{1})))).
