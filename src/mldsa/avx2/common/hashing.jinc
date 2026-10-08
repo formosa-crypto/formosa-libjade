@@ -1,4 +1,4 @@
-type shake256_state = u256[7];
+type shake256_state = u64[28];
 
 inline
 fn __load_shake256_state(reg const ptr shake256_state st) -> reg u256[7]
@@ -6,7 +6,7 @@ fn __load_shake256_state(reg const ptr shake256_state st) -> reg u256[7]
     inline int i;
     reg u256[7] state;
     for i = 0 to 7 {
-        state[i] = st[i];
+        state[i] = st.[:u256 32 * i];
     }
     return state;
 }
@@ -16,7 +16,7 @@ fn __store_shake256_state(reg mut ptr shake256_state st, reg u256[7] state) -> r
 {
     inline int i;
     for i = 0 to 7 {
-        st[i] = state[i];
+        st.[:u256 32 * i] = state[i];
     }
     return st;
 }
@@ -28,13 +28,25 @@ fn shake256_absorb_66(
     reg u16 domain_separator
 ) -> reg ptr shake256_state
 {
+    inline int KECCAK_F;
     stack u8[2] ds;
     reg u256[7] state;
-    state = __state_init_avx2();
-    state, _ = A64::__absorb_avx2(state, 0, rho_prime, UNFINISHED, SHAKE256_RATE);
+    reg ptr u64[25] lanes;
+
+    KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
     ds[:u16 0] = domain_separator;
-    state, _ = A2::__absorb_avx2(state, 64, ds, SHAKE, SHAKE256_RATE);
-    st = __store_shake256_state(st, state);
+    if (KECCAK_F == KECCAK_F1600_AVX2) {
+        state = __state_init_avx2();
+        state, _ = A64::__absorb_avx2(state, 0, rho_prime, UNFINISHED, SHAKE256_RATE);
+        state, _ = A2::__absorb_avx2(state, 64, ds, SHAKE, SHAKE256_RATE);
+        st = __store_shake256_state(st, state);
+    } else {
+        lanes = st[0:25];
+        lanes = __state_init(lanes);
+        lanes, _ = A64::__absorb(lanes, 0, rho_prime, UNFINISHED, SHAKE256_RATE);
+        lanes, _ = A2::__absorb(lanes, 64, ds, SHAKE, SHAKE256_RATE);
+        st[0:25] = lanes;
+    }
     return st;
 }
 
@@ -43,26 +55,51 @@ fn shake256_absorb_commitment_hash(
     reg const ptr u8[COMMITMENT_HASH_SIZE] commitment_hash
 ) -> reg ptr shake256_state
 {
+    inline int KECCAK_F;
     reg u256[7] state;
-    state = __state_init_avx2();
-    state, _ = A_COMMITMENT_HASH::__absorb_avx2(state, 0, commitment_hash, SHAKE, SHAKE256_RATE);
-    st = __store_shake256_state(st, state);
+    reg ptr u64[25] lanes;
+
+    KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+    if (KECCAK_F == KECCAK_F1600_AVX2) {
+        state = __state_init_avx2();
+        state, _ = A_COMMITMENT_HASH::__absorb_avx2(state, 0, commitment_hash, SHAKE, SHAKE256_RATE);
+        st = __store_shake256_state(st, state);
+    } else {
+        lanes = st[0:25];
+        lanes = __state_init(lanes);
+        lanes, _ = A_COMMITMENT_HASH::__absorb(lanes, 0, commitment_hash, SHAKE, SHAKE256_RATE);
+        st[0:25] = lanes;
+    }
     return st;
 }
 
 // Permutes the state, then squeezes one SHAKE256 block.
 fn shake256_squeezeblock(
-    reg mut ptr shake256_state st,
-    reg mut ptr u8[SHAKE256_RATE] block
+    #[spill_to_mmx] reg mut ptr shake256_state st,
+    #[spill_to_mmx] reg mut ptr u8[SHAKE256_RATE] block
 ) -> reg ptr shake256_state, reg ptr u8[SHAKE256_RATE]
 {
+    inline int KECCAK_F;
     reg u256[7] state;
+    reg ptr u64[25] lanes;
     reg ui64 offset;
-    state = __load_shake256_state(st);
-    state = _keccakf1600_avx2(state);
-    st = __store_shake256_state(st, state);
-    offset = 0;
-    block, _ = A136::__dumpstate_avx2(block, offset, SHAKE256_RATE, state);
+
+    KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+    if (KECCAK_F == KECCAK_F1600_AVX2) {
+        state = __load_shake256_state(st);
+        state = _keccakf1600_avx2(state);
+        st = __store_shake256_state(st, state);
+        offset = 0;
+        block, _ = A136::__dumpstate_avx2(block, offset, SHAKE256_RATE, state);
+    } else {
+        lanes = st[0:25];
+        () = #spill(st, block);
+        lanes = _keccakf1600(lanes);
+        () = #unspill(st, block);
+        st[0:25] = lanes;
+        offset = 0;
+        block, _ = A136::__dumpstate(block, offset, SHAKE256_RATE, st[0:25]);
+    }
     return st, block;
 }
 
@@ -74,14 +111,25 @@ fn _shake256_A128__A32_A2(
     reg const ptr u8[2] extra
 ) -> reg ptr u8[128]
 {
+    inline int KECCAK_F;
     reg u256[7] state;
+    stack u64[25] lanes;
     reg ui64 offset;
-    state = __state_init_avx2();
-    state, _ = A32::__absorb_avx2(state, 0, seed, UNFINISHED, SHAKE256_RATE);
-    state, _ = A2::__absorb_avx2(state, 32, extra, SHAKE, SHAKE256_RATE);
-    state = _keccakf1600_avx2(state);
-    offset = 0;
-    out, _ = A128::__dumpstate_avx2(out, offset, 128, state);
+
+    KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+    if (KECCAK_F == KECCAK_F1600_AVX2) {
+        state = __state_init_avx2();
+        state, _ = A32::__absorb_avx2(state, 0, seed, UNFINISHED, SHAKE256_RATE);
+        state, _ = A2::__absorb_avx2(state, 32, extra, SHAKE, SHAKE256_RATE);
+        state = _keccakf1600_avx2(state);
+        offset = 0;
+        out, _ = A128::__dumpstate_avx2(out, offset, 128, state);
+    } else {
+        lanes = __state_init(lanes);
+        lanes, _ = A32::__absorb(lanes, 0, seed, UNFINISHED, SHAKE256_RATE);
+        lanes, _ = A2::__absorb(lanes, 32, extra, SHAKE, SHAKE256_RATE);
+        _, out = A128::__squeeze(lanes, out, SHAKE256_RATE);
+    }
     return out;
 }
 
@@ -91,13 +139,23 @@ fn _shake256_A64__A128(
     reg const ptr u8[128] in
 ) -> reg ptr u8[64]
 {
+    inline int KECCAK_F;
     reg u256[7] state;
+    stack u64[25] lanes;
     reg ui64 offset;
-    state = __state_init_avx2();
-    state, _ = A128::__absorb_avx2(state, 0, in, SHAKE, SHAKE256_RATE);
-    state = _keccakf1600_avx2(state);
-    offset = 0;
-    out, _ = A64::__dumpstate_avx2(out, offset, 64, state);
+
+    KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+    if (KECCAK_F == KECCAK_F1600_AVX2) {
+        state = __state_init_avx2();
+        state, _ = A128::__absorb_avx2(state, 0, in, SHAKE, SHAKE256_RATE);
+        state = _keccakf1600_avx2(state);
+        offset = 0;
+        out, _ = A64::__dumpstate_avx2(out, offset, 64, state);
+    } else {
+        lanes = __state_init(lanes);
+        lanes, _ = A128::__absorb(lanes, 0, in, SHAKE, SHAKE256_RATE);
+        _, out = A64::__squeeze(lanes, out, SHAKE256_RATE);
+    }
     return out;
 }
 
@@ -129,13 +187,10 @@ fn __derive_message_representative(
     () = #spill(message_representative, context_pointer, context_size, message_pointer, message_size);
 
     // SHAKE256 streaming state: rate = 136 bytes; the cursor at stays in a register.
+    // The 66-byte prefix is shorter than the rate, so it is absorbed without a permutation.
     state = __state_init(state);
-    r8 = SHAKE256_RATE;
-    at = 0;
-
-    // One-shot absorb of the fixed-size prefix.
-    len = 66;
-    state, at = A66::_absorb_state(state, r8, at, prefix, len);
+    state, _ = A66::__absorb(state, 0, prefix, UNFINISHED, SHAKE256_RATE);
+    at = 66;
 
     // Absorb context (variable-length, accessed via memory pointer).
     () = #unspill(context_pointer, context_size);
@@ -164,33 +219,58 @@ fn __derive_message_representative(
 }
 
 fn hash_verification_key(
-    reg mut ptr u8[VERIFICATION_KEY_HASH_SIZE] verification_key_hash,
+    #[spill_to_mmx] reg mut ptr u8[VERIFICATION_KEY_HASH_SIZE] verification_key_hash,
     reg const ptr u8[VERIFICATION_KEY_SIZE] verification_key
 ) -> reg ptr u8[VERIFICATION_KEY_HASH_SIZE]
 {
+    inline int KECCAK_F;
     reg u256[7] state;
+    stack u64[25] lanes;
     reg ui64 offset;
-    state = __state_init_avx2();
-    state, _ = A_VERIFICATION_KEY::__absorb_avx2(state, 0, verification_key, SHAKE, SHAKE256_RATE);
-    state = _keccakf1600_avx2(state);
-    offset = 0;
-    verification_key_hash, _ = A64::__dumpstate_avx2(verification_key_hash, offset, 64, state);
+
+    KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+    if (KECCAK_F == KECCAK_F1600_AVX2) {
+        state = __state_init_avx2();
+        state, _ = A_VERIFICATION_KEY::__absorb_avx2(state, 0, verification_key, SHAKE, SHAKE256_RATE);
+        state = _keccakf1600_avx2(state);
+        offset = 0;
+        verification_key_hash, _ = A64::__dumpstate_avx2(verification_key_hash, offset, 64, state);
+    } else {
+        () = #spill(verification_key_hash);
+        lanes = __state_init(lanes);
+        lanes, _ = A_VERIFICATION_KEY::__absorb(lanes, 0, verification_key, SHAKE, SHAKE256_RATE);
+        () = #unspill(verification_key_hash);
+        _, verification_key_hash = A64::__squeeze(lanes, verification_key_hash, SHAKE256_RATE);
+    }
     return verification_key_hash;
 }
 
 fn __derive_commitment_hash(
-    reg mut ptr u8[COMMITMENT_HASH_SIZE] commitment_hash,
+    #[spill_to_mmx] reg mut ptr u8[COMMITMENT_HASH_SIZE] commitment_hash,
     reg const ptr u8[64] message_representative,
     reg const ptr u8[ENCODED_COMMITMENT_SIZE] encoded_commitment
 ) -> reg ptr u8[COMMITMENT_HASH_SIZE]
 {
+    inline int KECCAK_F;
     reg u256[7] state;
+    stack u64[25] lanes;
     reg ui64 offset;
-    state = __state_init_avx2();
-    state, _ = A64::__absorb_avx2(state, 0, message_representative, UNFINISHED, SHAKE256_RATE);
-    state, _ = A_ENCODED_COMMITMENT::__absorb_avx2(state, 64, encoded_commitment, SHAKE, SHAKE256_RATE);
-    state = _keccakf1600_avx2(state);
-    offset = 0;
-    commitment_hash, _ = A_COMMITMENT_HASH::__dumpstate_avx2(commitment_hash, offset, COMMITMENT_HASH_SIZE, state);
+
+    KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+    if (KECCAK_F == KECCAK_F1600_AVX2) {
+        state = __state_init_avx2();
+        state, _ = A64::__absorb_avx2(state, 0, message_representative, UNFINISHED, SHAKE256_RATE);
+        state, _ = A_ENCODED_COMMITMENT::__absorb_avx2(state, 64, encoded_commitment, SHAKE, SHAKE256_RATE);
+        state = _keccakf1600_avx2(state);
+        offset = 0;
+        commitment_hash, _ = A_COMMITMENT_HASH::__dumpstate_avx2(commitment_hash, offset, COMMITMENT_HASH_SIZE, state);
+    } else {
+        () = #spill(commitment_hash);
+        lanes = __state_init(lanes);
+        lanes, _ = A64::__absorb(lanes, 0, message_representative, UNFINISHED, SHAKE256_RATE);
+        lanes, _ = A_ENCODED_COMMITMENT::__absorb(lanes, 64, encoded_commitment, SHAKE, SHAKE256_RATE);
+        () = #unspill(commitment_hash);
+        _, commitment_hash = A_COMMITMENT_HASH::__squeeze(lanes, commitment_hash, SHAKE256_RATE);
+    }
     return commitment_hash;
 }
