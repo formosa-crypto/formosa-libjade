@@ -177,7 +177,7 @@ qed.
 lemma cbd2prfsem _k _N :
    phoare [ CBD2_PRF(NPRF.PRF).sample : NPRF.PRF.k = _k /\ arg = _N ==>
         res = samplePolyCBD (SHAKE256_33_128 _k (W8.of_int _N)) ] = 1%r.
-bypr => &m0 [#] kv ->.
+bypr => &m0; split => //; move=> [#] kv ->.
 have /=  <- := samplePolyCBD_opsem &m0 (samplePolyCBD (SHAKE256_33_128 _k (W8.of_int _N))) (SHAKE256_33_128 _k (W8.of_int _N)).
 by  byequiv (cbd_correct) => /#.
 qed.

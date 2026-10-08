@@ -39,7 +39,8 @@ equiv keccakf1600_st25_avx2_eq:
 (****************************************************************************)
 
 from Keccak require import Keccak1600_fixedsizes_avx2.
-from Keccak require import Keccak1600_updstate_avx2.
+require import Keccak1600_updstate_finish.
+from Keccak require import Keccak1600_updstate_ref.
 
 clone KeccakArrayAvx2 as A2avx2
  with op _ASIZE <- 2,
@@ -97,14 +98,14 @@ clone KeccakArrayAvx2 as A1952avx2
       proof _ASIZE_ge0 by done
       proof _ASIZE_u64 by done.
 
-clone KeccakUpdstateAvx2 as A64updstate
+clone KeccakUpdstateRef as A64updstate
  with op _ASIZE <- 64,
       theory A <- Array64,
       theory WA <- WArray64
       proof _ASIZE_ge0 by done
       proof _ASIZE_u64 by done.
 
-clone KeccakUpdstateAvx2 as A66updstate
+clone KeccakUpdstateRef as A66updstate
  with op _ASIZE <- 66,
       theory A <- Array66,
       theory WA <- WArray66
@@ -174,28 +175,28 @@ proc.
 by  sim; auto => />.
 qed.
 
-equiv init_updstate_avx2_eq:
- M._init_updstate_avx2 ~ Keccak1600_Jazz.M._init_updstate_avx2
+equiv init_updstate_eq:
+ M._init_updstate ~ Keccak1600_Jazz.M._init_updstate
  : ={arg} ==> ={res}
  by sim.
 
-equiv finish_updstate_avx2_eq:
- M._finish_updstate_avx2 ~ Keccak1600_Jazz.M._finish_updstate_avx2
+equiv finish_updstate_eq:
+ M._finish_updstate ~ Keccak1600_Jazz.M._finish_updstate
  : ={arg} ==> ={res}
  by sim.
 
-equiv absorb_m_updstate_avx2_eq:
- M._absorb_m_updstate_avx2 ~ Keccak1600_Jazz.M._absorb_m_updstate_avx2
+equiv absorb_m_updstate_eq:
+ M._absorb_m_updstate ~ Keccak1600_Jazz.M._absorb_m_updstate
  : ={arg, Glob.mem} ==> ={res, Glob.mem}
  by sim.
 
-equiv a64_squeeze_updstate_avx2_eq:
- M.a64___squeeze_updstate_avx2 ~ A64updstate.MM._squeeze_updstate_avx2
+equiv a64_squeeze_updstate_eq:
+ M.a64___squeeze_updstate ~ A64updstate.MM._squeeze_updstate
  : ={arg} ==> ={res}
  by sim.
 
-equiv a66_update_updstate_avx2_eq:
- M.a66___update_updstate_avx2 ~ A66updstate.MM._update_updstate_avx2
+equiv a66_absorb_updstate_eq:
+ M.a66___absorb_updstate ~ A66updstate.MM._absorb_updstate
  : ={arg} ==> ={res}
  by sim.
 
@@ -390,18 +391,18 @@ module K = {
     prefix.[65] <- (truncateu8 (W64.of_int context_size));
     rate64 <- 17;
     trailb <- (W8.of_int 31);
-    state <@ Keccak1600_Jazz.M._init_updstate_avx2 (state, rate64, trailb);
+    state <@ Keccak1600_Jazz.M._init_updstate (state, rate64, trailb);
     len <- 66;
-    state <@ A66updstate.MM._update_updstate_avx2 (state, prefix, len);
+    state <@ A66updstate.MM._absorb_updstate (state, prefix, len);
     buf <- context_pointer;
     len <- context_size;
-    state <@ Keccak1600_Jazz.M._absorb_m_updstate_avx2 (state, buf, len);
+    state <@ Keccak1600_Jazz.M._absorb_m_updstate (state, buf, len);
     buf <- message_pointer;
     len <- message_size;
-    state <@ Keccak1600_Jazz.M._absorb_m_updstate_avx2 (state, buf, len);
-    state <@ Keccak1600_Jazz.M._finish_updstate_avx2 (state);
+    state <@ Keccak1600_Jazz.M._absorb_m_updstate (state, buf, len);
+    state <@ Keccak1600_Jazz.M._finish_updstate (state);
     len <- 64;
-    (state, message_representative) <@ A64updstate.MM._squeeze_updstate_avx2 (state,
+    (state, message_representative) <@ A64updstate.MM._squeeze_updstate (state,
     message_representative, len);
     return message_representative;
   }
@@ -950,12 +951,12 @@ qed.
 lemma K_derive_message_representative_ll : islossless K.__derive_message_representative.
 proof.
 proc.
-call A64updstate.squeeze_updstate_avx2_ll.
-wp;call finish_updstate_avx2_ll.
-call absorb_m_updstate_avx2_ll.
-wp;call absorb_m_updstate_avx2_ll.
-wp;call A66updstate.update_updstate_avx2_ll.
-wp;call init_updstate_avx2_ll.
+call A64updstate.squeeze_updstate_ll.
+wp;call finish_updstate_ll.
+call absorb_m_updstate_ll.
+wp;call absorb_m_updstate_ll.
+wp;call A66updstate.absorb_updstate_ll.
+wp;call init_updstate_ll.
 by auto.
 qed.
 
@@ -974,15 +975,14 @@ hoare K_derive_message_representative_h' _vk_hash _ctx _msg :
        ++ _ctx ++ _msg) 64).
 proof.
 proc.
-(* Ecall chain in reverse program order. The strengthened update_h gives us
-   rate/trailb invariance, which we need to track ststatus_r8 = 136 through
-   to the squeeze precondition. *)
-ecall (A64updstate.squeeze_updstate_avx2_h message_representative state 136 len).
-wp; ecall (finish_updstate_avx2_h state).
-wp; ecall (absorb_m_updstate_avx2_h (sub prefix 0 66 ++ memread Glob.mem context_pointer context_size) Glob.mem state buf len).
-wp; ecall (absorb_m_updstate_avx2_h (sub prefix 0 66) Glob.mem state buf len).
-wp; ecall (A66updstate.update_updstate_avx2_h [] prefix len state).
-wp; ecall (init_updstate_avx2_h state rate64 trailb).
+(* Ecall chain in reverse program order: the streaming predicates of the
+   updstate contracts (absorbing_spec / squeezing_spec) chain syntactically. *)
+ecall (A64updstate.squeeze_updstate_h 136 (ABSORB1600 (W8.of_int 31) 136 (sub prefix 0 66 ++ memread Glob.mem context_pointer context_size ++ memread Glob.mem message_pointer message_size)) 0 message_representative len).
+wp; ecall (finish_updstate_h 136 (W8.of_int 31) (sub prefix 0 66 ++ memread Glob.mem context_pointer context_size ++ memread Glob.mem message_pointer message_size)).
+wp; ecall (absorb_m_updstate_h Glob.mem 136 (W8.of_int 31) (sub prefix 0 66 ++ memread Glob.mem context_pointer context_size) buf len).
+wp; ecall (absorb_m_updstate_h Glob.mem 136 (W8.of_int 31) (sub prefix 0 66) buf len).
+wp; ecall (A66updstate.absorb_updstate_h 136 (W8.of_int 31) [] prefix len).
+wp; ecall (init_updstate_h rate64 trailb).
 wp; skip => />.
 move=> &hr Hctx Hmsg Hctx_bnd Hmsg_bnd.
 pose prefix_built := (Array66.init (get8 (set256_direct (WArray66.init8 ("_.[_]" (Array66.init (get8 (set256_direct (WArray66.init8 ("_.[_]" witness<:W8.t Array66.t>)) 0 (get256_direct (WArray64.init8 ("_.[_]" _vk_hash)) 0)))))) 32 (get256_direct (WArray64.init8 ("_.[_]" _vk_hash)) 32)))).[64 <- zero].[65 <- truncateu8 (W64.of_int (size _ctx))].
@@ -1011,59 +1011,15 @@ have prefix_msg :
     = to_list _vk_hash ++ [W8.zero; truncateu8 (W64.of_int (size _ctx))]
   by rewrite prefix_sub66 prefix_first66.
 
-(* Initial predicate facts from init_pabsorb. *)
-have [Hi_p [Hi_r8 Hi_tb]] :=
-  init_pabsorb (witness<:W64.t Array26.t>) 17 (W8.of_int 31) _; first smt().
-
-(* Goal at this point: (A) /\ (B), where
-   A = pabsorb_spec_updstate_avx2 [] (init_spec witness 17 31) — unfolded
-       into the r8/at/pabsorb_spec_ref conjuncts.
-   B = implication chain through update post → absorb_m × 2 → finish → squeeze
-       → SHAKE256.
-*)
-split.
-
-(* === A === *)
-+ (* pabsorb_spec_updstate_avx2 [] (init_spec witness 17 31) — unfolded. *)
-  move: Hi_p; rewrite /pabsorb_spec_updstate_avx2
-                     /Keccak1600_ref.pabsorb_spec_ref /=; smt().
-
-(* === B === *)
-(* Intro the LHS of the update_h pre (unfolded predicate parts + len bound),
-   then forall result0 (= state after update), then the unfolded
-   update_h post hypotheses for result0 (predicate parts + Ho_r8_inv +
-   Ho_tb_inv giving rate/trailb preservation). *)
-move=> _ _ _ _ _ _
-       result0 Ho1 Ho2 Ho3 Ho4 Ho5 Ho6 Ho_r8_inv Ho_tb_inv.
-
-(* Chain through absorb_m × 2 (their posts give the pabsorb facts), then
-   finish via the bridge. *)
-split; first smt(size_ge0).
-move=> _ result1 Ha1 Ha2 Ha3 Ha4 Ha5 Ha6 Hac_r8 Hac_tb.
-split; first smt(size_ge0).
-move=> _ result2 Hm1 Hm2 Hm3 Hm4 Hm5 Hm6 Ham_r8 Ham_tb.
-have Ham_p :
-  pabsorb_spec_updstate_avx2
-    ((sub prefix_built 0 66
-      ++ memread Glob.mem{hr} context_pointer{hr} (size _ctx))
-      ++ memread Glob.mem{hr} message_pointer{hr} (size _msg)) result2.
-+ rewrite /pabsorb_spec_updstate_avx2 /Keccak1600_ref.pabsorb_spec_ref /=.
-  smt().
-
-have [Hf_eq Hf_r8] := finish_absorb result2 _ Ham_p.
-
-(* Goal now: (r8 of post-finish = 136 /\ at of post-finish = 0) /\ (... => forall result4, ...). *)
-split; first by split; [rewrite Hf_r8 Ham_r8 Hac_r8 Ho_r8_inv Hi_r8 | exact (finish_at0 result2)].
-move=> _ _ result4 Hres4_2 _ _ _ _.
-
-(* Close: substitute squeeze post, apply finish bridge, unfold SHAKE256. *)
-rewrite Hres4_2.
+(* The chained predicates are discharged by `/>`; what remains are the
+   length side conditions and the squeeze output against SHAKE256. *)
+move=> r0 _ _ _ _ r1 _ _ _ _.
+split; [smt(size_ge0) | move=> _ r2 _ _ _ _].
+split; [smt(size_ge0) | move=> _ r3 _ _ _ _ r4 _ _ _ [r5 m] /= -> _ _ _].
+rewrite Keccak1600_updstate.sqstream0 prefix_msg Hctx Hmsg -!catA.
 apply Array64.tP => i Hi.
-rewrite Array64.filliE // ifT 1:/# /=.
-rewrite Hf_eq Ham_r8 Hac_r8 Ho_r8_inv Hi_r8
-        Ham_tb Hac_tb Ho_tb_inv Hi_tb.
-rewrite prefix_msg Hctx Hmsg -!catA.
-rewrite /SHAKE256 /KECCAK1600 /SHAKE_DS_BYTE /c512_r8 get_of_list //.
+rewrite Array64.filliE // ifT 1:/# /= Array64.get_of_list //.
+rewrite /SHAKE256 /KECCAK1600 /SHAKE_DS_BYTE /c512_r8.
 by rewrite (nth_change_dfl witness); smt(size_SQUEEZE1600).
 qed.
 

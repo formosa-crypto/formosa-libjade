@@ -1,12 +1,23 @@
+/** IMPORTANT!
+  this file shoould be in sync with its array counterpart (keccak1600_updstate_ASIZE.jinc)
+*/
 /**************************************************************************** 
 
    DEPENDENCIES:
    =============
 
-  The loading of this file depends on the following context:
+param int KECCAK_FEATURES
+param int KECCAK_PERMUTATION
 
- 1) "keccak1600_updstate.jinc"
- 2) param int _ASIZE
+require "keccakf1600.jinc"
+require "keccak1600.jinc"
+
+
+(e.g.
+param int KECCAK_FEATURES
+ = KECCAK_FEATURE_AVX2 | KECCAK_FEATURE_BMI | KECCAK_FEATURE_BMI2;
+param int KECCAK_PERMUTATION = KECCAK_F1600_OPT;
+)
 
 OBS: the generated code is independent of the parameter _ASIZE, but the
  instance cannot be avoided due to typechecking!!! :-(
@@ -15,20 +26,24 @@ OBS: the generated code is independent of the parameter _ASIZE, but the
 
 from Keccak require "common/subreadwrite_ASIZE.jinc"
 
-fn _add_updstate_avx2
+fn _add_updstate
 ( reg mut ptr keccak_state st
 , reg ui64 at               // 0 <= at < 200
 , reg const ptr u8[_ASIZE] buf // at+_ASIZE <= 200 (in fact, r8...)
 , reg ui64 off    // off + upto - at <= _ASIZE
 , reg ui64 upto    // at <= upto <= 200 (in fact, r8...)
-) -> reg ui64                 /* at */
-   , reg ui64                 /* off */
-   , reg ptr keccak_state /* st */
+) -> reg ptr keccak_state /* st */
+   , reg ui64             /* at */
+   , reg ui64             /* off */
 {
+  inline bool HAS_AVX2;
   reg u8 sh;
-  reg u64 t64, at8 upto8;
-  reg u256 r256, t256;
+  reg u64 t64, at8, upto8;
   reg ui64 off2, newat, len;
+  reg u256 t256;
+  reg u128 t128;
+
+  HAS_AVX2 = __HAS_FEATURE(KECCAK_FEATURE_AVX2, KECCAK_FEATURES);
 
   at8 = (64u) at;
   at8 &= 0x07; // byte position in stword
@@ -55,28 +70,44 @@ fn _add_updstate_avx2
 
   // now: at%8==0 || at==upto
   newat = at;
-  while
-    { newat += 32; }
-  ( newat <= upto )
-    {
-      r256 = st.[:u256 at]; 
-      t256 = buf.[:u256 off];
-      r256 ^= t256;
-      st.[:u256 at] = r256;
+  if ( HAS_AVX2 ) {
+    while
+      { newat += 32; }
+    ( newat <= upto )
+      {
+        t256 = buf.[:u256 off];
+        off += 32;
+        t256 ^= st.[:u256 at];
+        st.[:u256 at] = t256;
+        at = newat;
+      }
+    newat -= 16;
+    if ( newat <= upto ) {
+      t128 = buf.[:u128 off];
+      off += 16;
+      t128 ^= st.[:u128 at];
+      st.[:u128 at] = t128;
       at = newat;
-      off += 32;
     }
-
-  newat = at;
-  while
-    { newat += 8; }
-  ( newat <= upto )
-    {
+    newat = at;
+    newat += 8;
+    if ( newat <= upto ) {
       t64 = buf.[:u64 off];
-      st.[at] ^= t64;
-      at = newat;
       off += 8;
+      st.[:u64 at] ^= t64;
+      at = newat;
     }
+  } else {
+    while
+      { newat += 8; }
+    ( newat <= upto )
+      {
+        t64 = buf.[:u64 off];
+        st.[:u64 at] ^= t64;
+        at = newat;
+        off += 8;
+      }
+  }
 
   // leftovers...
   if (at < upto) {
@@ -87,18 +118,23 @@ fn _add_updstate_avx2
   }
   
   at = upto;
-  return at, off, st;
+  return st, at, off;
 }
 
-fn _update_updstate_avx2
+fn _absorb_updstate
 ( #[spill_to_mmx] reg mut ptr keccak_updstate st
-, reg const ptr u8[_ASIZE] buf
-, reg ui64 len
+, #[spill_to_mmx] reg const ptr u8[_ASIZE] buf
+, #[spill_to_mmx] reg ui64 len
 ) -> reg ptr keccak_updstate /* st */
 {
+  inline int KECCAK_F;
+  inline bool SPILL;
   reg u64 ststatus;
-  reg ui64 off, r8, at;
+  #[spill_to_mmx] reg ui64 off, r8, at;
   reg ptr keccak_state stk;
+
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  SPILL = KECCAK_F != KECCAK_F1600_AVX2;
 
   ststatus = st[25];
   () = #declassify(ststatus);
@@ -110,35 +146,44 @@ fn _update_updstate_avx2
   off = 0;
   len += at;
   while (r8 <= len) {
-    at, off, stk = _add_updstate_avx2(stk, at, buf, off, r8);
-    stk = _keccakf1600_st25_avx2(stk);
+    stk, at, off = _add_updstate(stk, at, buf, off, r8);
+    if (SPILL) {
+      () = #spill(r8, at, len, off, buf);
+      stk = _keccakf1600(stk);
+      () = #unspill(r8, at, len, off, buf);
+    } else {
+      stk = _keccakf1600(stk);
+    }
     len -= r8;
     at = 0;
   }
   len = len;
   () = #unspill(st);
-  at, _, stk = _add_updstate_avx2(stk, at, buf, off, len);
+  stk, at, _ = _add_updstate(stk, at, buf, off, len);
   st[0:25] = stk;
   st.[:u8 8*25] = (8u) (64u) at;
 
   return st;
 }
 
-fn _dump_updstate_avx2
+fn _dump_updstate
 ( reg mut ptr u8[_ASIZE] buf
 , reg ui64 off    // off + upto - at <= _ASIZE
 , reg const ptr keccak_state st
 , reg ui64 at     // at+_ASIZE <= r8
 , reg ui64 upto   // at <= upto <= r8
-) -> reg ui64        /* at */
-   , reg ui64        /* off */
-   , reg ptr u8[_ASIZE] /* buf */
+) -> reg ptr u8[_ASIZE] /* buf */
+   , reg ui64          /* off */
+   , reg ui64          /* at */
 {
+  inline bool HAS_AVX2;
   reg ui64 newat, off2, len;
-  reg u256 t256;
   reg u64 t64, at8, upto8;
   reg u8 sh;
+  reg u256 t256;
+  reg u128 t128;
 
+  HAS_AVX2 = __HAS_FEATURE(KECCAK_FEATURE_AVX2, KECCAK_FEATURES);
   at8 = (64u) at;
   at8 &= 0x07; // byte position in stword
 
@@ -164,26 +209,42 @@ fn _dump_updstate_avx2
 
   // now: at%8==0 || at==upto
   newat = at;
-  while
-    { newat += 32; }
-  ( newat <= upto )
-    {
-      t256 = st.[:u256 at];
-      buf.[:u256 off] = t256;
+  if ( HAS_AVX2 ) {
+    while
+      { newat += 32; }
+    ( newat <= upto )
+      {
+        t256 = st.[:u256 at];
+        buf.[:u256 off] = t256;
+        off += 32;
+        at = newat;
+      }
+    newat -= 16;
+    if ( newat <= upto ) {
+      t128 = st.[:u128 at];
+      buf.[:u128 off] = t128;
       at = newat;
-      off += 32;
+      off += 16;
     }
-
-  newat = at;
-  while
-    { newat += 8; }
-  ( newat <= upto )
-    {
+    newat = at;
+    newat += 8;
+    if ( newat <= upto ) {
       t64 = st.[:u64 at];
       buf.[:u64 off] = t64;
-      at = newat;
       off += 8;
+      at = newat;
     }
+  } else {
+    while
+      { newat += 8; }
+    ( newat <= upto )
+      {
+        t64 = st.[:u64 at];
+        buf.[:u64 off] = t64;
+        at = newat;
+        off += 8;
+      }
+  }
 
   // leftovers...
   if (at < upto) {
@@ -194,19 +255,24 @@ fn _dump_updstate_avx2
   }
 
   at = upto;
-  return at, off, buf;
+  return buf, off, at;
 }
 
-fn _squeeze_updstate_avx2
+fn _squeeze_updstate
 ( #[spill_to_mmx] reg mut ptr keccak_updstate st
-, reg mut ptr u8[_ASIZE] buf
-, reg ui64 len
-) -> reg ptr keccak_updstate /* st */
-   , reg ptr u8[_ASIZE]      /* buf */
+, #[spill_to_mmx] reg mut ptr u8[_ASIZE] buf
+, #[spill_to_mmx] reg ui64 len
+) -> reg ptr keccak_updstate   /* st */
+   , reg ptr u8[_ASIZE]        /* buf */
 {
+  inline int KECCAK_F;
+  inline bool SPILL;
   reg u64 ststatus;
-  reg ui64 off, r8, at;
+  #[spill_to_mmx] reg ui64 off, r8, at;
   reg ptr keccak_state stk;
+
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  SPILL = KECCAK_F != KECCAK_F1600_AVX2;
 
   ststatus = st[25];
   () = #declassify(ststatus);
@@ -216,7 +282,13 @@ fn _squeeze_updstate_avx2
   () = #spill(st);
 
   if ( at == 0 ) {
-    stk = _keccakf1600_st25_avx2(stk);
+    if (SPILL) {
+      () = #spill(buf,len,r8);
+      stk = _keccakf1600(stk);
+      () = #unspill(buf,len,r8);
+    } else {
+      stk = _keccakf1600(stk);
+    }
     at = 0; // obs: no need to spill/unspill(at)!
   }
 
@@ -224,14 +296,20 @@ fn _squeeze_updstate_avx2
   len += at;
 
   while (r8 < len) {
-    at, off, buf = _dump_updstate_avx2(buf, off, stk, at, r8);
-    stk = _keccakf1600_st25_avx2(stk);
+    buf, off, at = _dump_updstate(buf, off, stk, at, r8);
+    if (SPILL) {
+      () = #spill(r8, at, len, off, buf);
+      stk = _keccakf1600(stk);
+      () = #unspill(r8, at, len, off, buf);
+    } else {
+      stk = _keccakf1600(stk);
+    }
     len -= r8;
     at = 0;
   }
 
   len = len;
-  at, _, buf = _dump_updstate_avx2(buf, off, stk, at, len);
+  buf, _, at = _dump_updstate(buf, off, stk, at, len);
 
   () = #unspill(st);
   st[0:25] = stk;
@@ -240,43 +318,3 @@ fn _squeeze_updstate_avx2
 
   return st, buf;
 }
-
-/*
-export fn init_updstate_avx2
-( reg mut ptr keccak_updstate st
-, reg ui8 r64
-, reg u8 trailb
-) -> reg ptr keccak_updstate
-{
-  reg ui64 i;
-  reg u64 t, status;
-
-  status = (64u) trailb;
-  status <<= 8;
-  r64 = (8ui) ((8u)r64 - 1);
-  t = (64u) (8u) r64;
-  status += t;
-  status <<= 8;
-  i = 0;
-  while (i < 25) { st[i] = 0; i += 1; }
-  st[25] = status;
-
-  return st;
-}
-
-export fn finish_updstate_avx2
-( reg mut ptr keccak_updstate st
-) -> reg ptr keccak_updstate /* st */
-{
-  reg u64 ststatus;
-  reg ui64 at, r8;
-  reg u8 trailb;
-  ststatus = st[25];
-  trailb, r8, at = _ststatus_data(ststatus);
-  st.[:u8 at] ^= trailb;
-  st.[:u8 r8-1] ^= 0x80;
-  st.[:u32 8*25] &= 0xFF00FF00; // clear trail-byte and at-position
-  
-  return st;
-}
-*/

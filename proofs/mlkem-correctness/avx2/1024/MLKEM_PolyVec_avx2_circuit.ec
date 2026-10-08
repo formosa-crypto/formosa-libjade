@@ -317,7 +317,7 @@ lemma polyvec_compress_avx2_corr (_aw : W16.t Array1024.t):
              a = _aw /\
              pos_bound1024_cxq a 0 1024 2 ==> 
       Array1408.init (fun i => res.[i])  = encode11_vec (compress_polyvec 11 (lift_polyvec _aw))] = 1%r.
-bypr => &m [->?].
+bypr => &m; split => //; move=> [->?].
 have <- : Pr[ AuxCompress11.__i_polyvec_compress(rp{m}, _aw) @ &m :
    Array1408.init (fun (i : int) => res.[i]) = encode11_vec (compress_polyvec 11 (lift_polyvec _aw))] = 1%r
    by byphoare (auxcompress11_corr _aw)  =>/=;1:smt().
@@ -749,7 +749,7 @@ lemma polyvec_tobytes_corr (_aw : W16.t Array1024.t):
              pos_bound1024_cxq a 0 1024 2 /\ a = _aw ==> 
     res = Array1536.of_list W8.zero (ByteEncode 12 (to_list (map asint (lift_array1024 (nttpackv _aw)))))] = 1%r.
 proof.
-bypr => &m [??].
+bypr => &m; split => //; move=> [??].
 have <- : Pr[AuxToBytes.__i_polyvec_tobytes(r{m}, _aw) @ &m : res = Array1536.of_list W8.zero (ByteEncode 12 (to_list (map asint (lift_array1024 (nttpackv _aw)))))] = 1%r
  by byphoare (auxtobytes_corr _aw)  =>/=; 1:smt().
 byequiv (: ={arg} /\ a{1} = _aw /\

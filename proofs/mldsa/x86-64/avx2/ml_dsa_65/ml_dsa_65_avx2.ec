@@ -10,11 +10,11 @@ Array25 Array26 Array32 Array48 Array61 Array64 Array66 Array128 Array136
 Array168 Array256 Array272 Array320 Array416 Array640 Array680 Array768
 Array848 Array1280 Array1536 Array1920 Array1952 Array2048 Array2496
 Array3200 Array3309 Array4032 Array7680 WArray2 WArray8 WArray16 WArray32
-WArray48 WArray61 WArray64 WArray66 WArray96 WArray128 WArray136 WArray160
-WArray168 WArray192 WArray200 WArray208 WArray224 WArray256 WArray272
-WArray320 WArray416 WArray512 WArray640 WArray680 WArray768 WArray800
-WArray848 WArray1024 WArray1920 WArray1952 WArray2048 WArray2496 WArray3200
-WArray3309 WArray4032 WArray5120 WArray6144 WArray30720.
+WArray40 WArray48 WArray61 WArray64 WArray66 WArray96 WArray128 WArray136
+WArray160 WArray168 WArray192 WArray200 WArray208 WArray224 WArray256
+WArray272 WArray320 WArray416 WArray512 WArray640 WArray680 WArray768
+WArray800 WArray848 WArray1024 WArray1920 WArray1952 WArray2048 WArray2496
+WArray3200 WArray3309 WArray4032 WArray5120 WArray6144 WArray30720.
 
 abbrev commitment__ENCODING_SHUFFLES =
 (W256.of_int
@@ -1216,7 +1216,6 @@ module M = {
     (WArray16.get8
     (WArray16.set128_direct
     (WArray16.init8 (fun i_0 => final_output_block.[i_0])) 0 upper)));
-    (* Erased call to declassify *)
     i <- 0;
     while ((i < 10)) {
       output.[(output_offset + i)] <- final_output_block.[i];
@@ -1453,7 +1452,7 @@ module M = {
       hint_block <-
       (VPOR_256 low_out_of_bounds low_equals_minus_gamma2_and_high_is_nonzero
       );
-      (* Erased call to declassify *)
+      hint_block <- hint_block;
       num_hints <- (zeroextu64 (MOVEMASK_8u32 hint_block));
       ( _0,  _1,  _2,  _3,  _4, num_hints) <- (POPCNT_64 num_hints);
       hint_block <- (VPSRL_8u32 hint_block (W128.of_int 31));
@@ -1462,8 +1461,8 @@ module M = {
       (WArray1024.get32
       (WArray1024.set256_direct (WArray1024.init32 (fun i => hints.[i]))
       offset hint_block)));
-      weight <- (weight + (W64.to_uint num_hints));
       offset <- (offset + 32);
+      weight <- (weight + (W64.to_uint num_hints));
     }
     return (hints, weight);
   }
@@ -2350,6 +2349,12 @@ module M = {
     }
     return polynomial;
   }
+  proc __HAS_FEATURE (sELECTION:int, fEATURES:int) : bool = {
+    var b:bool;
+    b <-
+    (((W256.of_int fEATURES) `&` (W256.of_int sELECTION)) <> (W256.of_int 0));
+    return b;
+  }
   proc __SHLQ (x:W64.t, shbytes:int) : W64.t = {
     
     if ((shbytes <> 0)) {
@@ -2377,11 +2382,51 @@ module M = {
     }
     return x;
   }
+  proc __KECCAK_F (pERMUTATION:int) : int = {
+    var perm:int;
+    perm <- (W256.to_uint ((W256.of_int pERMUTATION) `&` (W256.of_int 255)));
+    return perm;
+  }
   proc __KECCAK_Fx4 (pERMUTATION:int) : int = {
     var perm:int;
     perm <-
     (W256.to_uint ((W256.of_int pERMUTATION) `&` (W256.of_int 65280)));
     return perm;
+  }
+  proc keccakf1600_index (x:int, y:int) : int = {
+    var r:int;
+    r <- ((x %% 5) + (5 * (y %% 5)));
+    return r;
+  }
+  proc keccakf1600_rho_offsets (i:int) : int = {
+    var r:int;
+    var x:int;
+    var y:int;
+    var t:int;
+    var z:int;
+    r <- 0;
+    x <- 1;
+    y <- 0;
+    t <- 0;
+    while ((t < 24)) {
+      if ((i = (x + (5 * y)))) {
+        r <- ((((t + 1) * (t + 2)) %/ 2) %% 64);
+      } else {
+        
+      }
+      z <- (((2 * x) + (3 * y)) %% 5);
+      x <- y;
+      y <- z;
+      t <- (t + 1);
+    }
+    return r;
+  }
+  proc keccakf1600_rhotates (x:int, y:int) : int = {
+    var r:int;
+    var i:int;
+    i <@ keccakf1600_index (x, y);
+    r <@ keccakf1600_rho_offsets (i);
+    return r;
   }
   proc __keccakf1600_pround_avx2 (state:W256.t Array7.t) : W256.t Array7.t = {
     var c00:W256.t;
@@ -3756,6 +3801,1231 @@ module M = {
       t256 <@ __u64_to_u256 (t64, l);
     }
     st.[r] <- (st.[r] `^` t256);
+    return st;
+  }
+  proc __andn_u64_ref (a:W64.t, b:W64.t) : W64.t = {
+    var t:W64.t;
+    var hAS_BMI:bool;
+    hAS_BMI <@ __HAS_FEATURE (1, ((1 + 2) + 4));
+    if (hAS_BMI) {
+      t <- ((invw a) `&` b);
+    } else {
+      t <- a;
+      t <- (invw t);
+      t <- (t `&` b);
+    }
+    return t;
+  }
+  proc __rol_u64_ref (x:W64.t, i:int) : W64.t = {
+    var t:W64.t;
+    var hAS_BMI2:bool;
+    var  _0:bool;
+    var  _1:bool;
+    hAS_BMI2 <@ __HAS_FEATURE (2, ((1 + 2) + 4));
+    if (hAS_BMI2) {
+      if ((i <> 0)) {
+        t <- (RORX_64 x (W8.of_int ((64 - i) %% 64)));
+      } else {
+        t <- x;
+      }
+    } else {
+      if ((i <> 0)) {
+        ( _0,  _1, t) <- (ROL_64 x (W8.of_int i));
+      } else {
+        t <- x;
+      }
+    }
+    return t;
+  }
+  proc __theta_sum_ref (a:W64.t Array25.t) : W64.t Array5.t = {
+    var c:W64.t Array5.t;
+    var x:int;
+    var y:int;
+    c <- witness;
+    x <- 0;
+    while ((x < 5)) {
+      c.[x] <- a.[(x + 0)];
+      x <- (x + 1);
+    }
+    y <- 1;
+    while ((y < 5)) {
+      x <- 0;
+      while ((x < 5)) {
+        c.[x] <- (c.[x] `^` a.[(x + (y * 5))]);
+        x <- (x + 1);
+      }
+      y <- (y + 1);
+    }
+    return c;
+  }
+  proc __theta_rol_ref (c:W64.t Array5.t) : W64.t Array5.t = {
+    var aux:W64.t;
+    var d:W64.t Array5.t;
+    var x:int;
+    d <- witness;
+    x <- 0;
+    while ((x < 5)) {
+      d.[x] <- c.[((x + 1) %% 5)];
+      aux <@ __rol_u64_ref (d.[x], 1);
+      d.[x] <- aux;
+      d.[x] <- (d.[x] `^` c.[(((x - 1) + 5) %% 5)]);
+      x <- (x + 1);
+    }
+    return d;
+  }
+  proc __rol_sum_ref (a:W64.t Array25.t, d:W64.t Array5.t, y:int) : W64.t Array5.t = {
+    var aux:W64.t;
+    var b:W64.t Array5.t;
+    var x:int;
+    var x_:int;
+    var y_:int;
+    var r:int;
+    b <- witness;
+    x <- 0;
+    while ((x < 5)) {
+      x_ <- ((x + (3 * y)) %% 5);
+      y_ <- x;
+      r <@ keccakf1600_rhotates (x_, y_);
+      b.[x] <- a.[(x_ + (y_ * 5))];
+      b.[x] <- (b.[x] `^` d.[x_]);
+      aux <@ __rol_u64_ref (b.[x], r);
+      b.[x] <- aux;
+      x <- (x + 1);
+    }
+    return b;
+  }
+  proc __set_row_ref (e:W64.t Array25.t, b:W64.t Array5.t, y:int) : W64.t Array25.t = {
+    var x:int;
+    var x1:int;
+    var x2:int;
+    var t:W64.t;
+    x <- 0;
+    while ((x < 5)) {
+      x1 <- ((x + 1) %% 5);
+      x2 <- ((x + 2) %% 5);
+      t <@ __andn_u64_ref (b.[x1], b.[x2]);
+      t <- (t `^` b.[x]);
+      e.[(x + (y * 5))] <- t;
+      x <- (x + 1);
+    }
+    return e;
+  }
+  proc _pround_ref (e:W64.t Array25.t, a:W64.t Array25.t) : W64.t Array25.t = {
+    var c:W64.t Array5.t;
+    var d:W64.t Array5.t;
+    var y:int;
+    var b:W64.t Array5.t;
+    b <- witness;
+    c <- witness;
+    d <- witness;
+    c <@ __theta_sum_ref (a);
+    d <@ __theta_rol_ref (c);
+    y <- 0;
+    while ((y < 5)) {
+      b <@ __rol_sum_ref (a, d, y);
+      e <@ __set_row_ref (e, b, y);
+      y <- (y + 1);
+    }
+    return e;
+  }
+  proc __keccakf1600_ref (a:W64.t Array25.t) : W64.t Array25.t = {
+    var s_e:W64.t Array25.t;
+    var e:W64.t Array25.t;
+    var rC:W64.t Array24.t;
+    var rc:W64.t;
+    var c:int;
+    rC <- witness;
+    e <- witness;
+    s_e <- witness;
+    e <- s_e;
+    c <- 0;
+    (* Erased call to spill *)
+    e <@ _pround_ref (e, a);
+    (a, e) <- (swap_ e a);
+    rC <- kECCAK1600_RC;
+    rc <- rC.[c];
+    e.[0] <- (e.[0] `^` rc);
+    a <@ _pround_ref (a, e);
+    (a, e) <- (swap_ e a);
+    rC <- kECCAK1600_RC;
+    rc <- rC.[(c + 1)];
+    a.[0] <- (a.[0] `^` rc);
+    (* Erased call to unspill *)
+    c <- (c + 2);
+    while ((c < (24 - 1))) {
+      (* Erased call to spill *)
+      e <@ _pround_ref (e, a);
+      (a, e) <- (swap_ e a);
+      rC <- kECCAK1600_RC;
+      rc <- rC.[c];
+      e.[0] <- (e.[0] `^` rc);
+      a <@ _pround_ref (a, e);
+      (a, e) <- (swap_ e a);
+      rC <- kECCAK1600_RC;
+      rc <- rC.[(c + 1)];
+      a.[0] <- (a.[0] `^` rc);
+      (* Erased call to unspill *)
+      c <- (c + 2);
+    }
+    return a;
+  }
+  proc _keccakf1600_ref (a:W64.t Array25.t) : W64.t Array25.t = {
+    
+    a <@ __keccakf1600_ref (a);
+    return a;
+  }
+  proc __pround_basic_inlined (e:W64.t Array25.t, a:W64.t Array25.t) : 
+  W64.t Array25.t = {
+    var c679:W64.t Array5.t;
+    var x682:W64.t;
+    var t684:W64.t;
+    var t685:W64.t;
+    var d762:W64.t Array5.t;
+    var x687:W64.t;
+    var t689:W64.t;
+    var t690:W64.t;
+    var x692:W64.t;
+    var t694:W64.t;
+    var t695:W64.t;
+    var x697:W64.t;
+    var t699:W64.t;
+    var t700:W64.t;
+    var x702:W64.t;
+    var t704:W64.t;
+    var t705:W64.t;
+    var t708:W64.t;
+    var b0712:W64.t;
+    var t715:W64.t;
+    var x717:W64.t;
+    var b1720:W64.t;
+    var t723:W64.t;
+    var x725:W64.t;
+    var b2728:W64.t;
+    var t731:W64.t;
+    var x733:W64.t;
+    var b3736:W64.t;
+    var t739:W64.t;
+    var x741:W64.t;
+    var b4744:W64.t;
+    var t745:W64.t;
+    var t746:W64.t;
+    var t747:W64.t;
+    var t748:W64.t;
+    var t749:W64.t;
+    var t750:W64.t;
+    var t751:W64.t;
+    var t752:W64.t;
+    var t753:W64.t;
+    var t754:W64.t;
+    var t755:W64.t;
+    var t756:W64.t;
+    var t757:W64.t;
+    var t758:W64.t;
+    var t759:W64.t;
+    var t760:W64.t;
+    var t763:W64.t;
+    var x765:W64.t;
+    var t767:W64.t;
+    var t771:W64.t;
+    var x773:W64.t;
+    var b1776:W64.t;
+    var t779:W64.t;
+    var x781:W64.t;
+    var b2784:W64.t;
+    var t787:W64.t;
+    var x789:W64.t;
+    var b3792:W64.t;
+    var t795:W64.t;
+    var x797:W64.t;
+    var b4800:W64.t;
+    var t801:W64.t;
+    var t802:W64.t;
+    var t803:W64.t;
+    var t804:W64.t;
+    var t805:W64.t;
+    var t806:W64.t;
+    var t807:W64.t;
+    var t808:W64.t;
+    var t809:W64.t;
+    var t810:W64.t;
+    var t811:W64.t;
+    var t812:W64.t;
+    var t813:W64.t;
+    var t814:W64.t;
+    var t815:W64.t;
+    var t816:W64.t;
+    var t819:W64.t;
+    var x821:W64.t;
+    var b0824:W64.t;
+    var t827:W64.t;
+    var x829:W64.t;
+    var b1832:W64.t;
+    var t835:W64.t;
+    var x837:W64.t;
+    var b2840:W64.t;
+    var t843:W64.t;
+    var x845:W64.t;
+    var b3848:W64.t;
+    var t851:W64.t;
+    var x853:W64.t;
+    var b4856:W64.t;
+    var t857:W64.t;
+    var t858:W64.t;
+    var t859:W64.t;
+    var t860:W64.t;
+    var t861:W64.t;
+    var t862:W64.t;
+    var t863:W64.t;
+    var t864:W64.t;
+    var t865:W64.t;
+    var t866:W64.t;
+    var u867:W64.t;
+    var u868:W64.t;
+    var t869:W64.t;
+    var t870:W64.t;
+    var t871:W64.t;
+    var t872:W64.t;
+    var t873:W64.t;
+    var t874:W64.t;
+    var t877:W64.t;
+    var x879:W64.t;
+    var b0882:W64.t;
+    var t885:W64.t;
+    var x887:W64.t;
+    var b1890:W64.t;
+    var t893:W64.t;
+    var x895:W64.t;
+    var b2898:W64.t;
+    var t901:W64.t;
+    var x903:W64.t;
+    var b3906:W64.t;
+    var t909:W64.t;
+    var x911:W64.t;
+    var b4914:W64.t;
+    var t915:W64.t;
+    var t916:W64.t;
+    var t917:W64.t;
+    var t918:W64.t;
+    var t919:W64.t;
+    var t920:W64.t;
+    var t921:W64.t;
+    var t922:W64.t;
+    var t923:W64.t;
+    var t924:W64.t;
+    var u925:W64.t;
+    var u926:W64.t;
+    var t927:W64.t;
+    var t928:W64.t;
+    var t929:W64.t;
+    var t930:W64.t;
+    var t931:W64.t;
+    var t932:W64.t;
+    var t935:W64.t;
+    var x937:W64.t;
+    var b0940:W64.t;
+    var t943:W64.t;
+    var x945:W64.t;
+    var b1948:W64.t;
+    var t951:W64.t;
+    var x953:W64.t;
+    var b2956:W64.t;
+    var t959:W64.t;
+    var x961:W64.t;
+    var b3964:W64.t;
+    var t967:W64.t;
+    var x969:W64.t;
+    var b4972:W64.t;
+    var t973:W64.t;
+    var t974:W64.t;
+    var t975:W64.t;
+    var t976:W64.t;
+    var u977:W64.t;
+    var u978:W64.t;
+    var t979:W64.t;
+    var t980:W64.t;
+    var t981:W64.t;
+    var t982:W64.t;
+    var t983:W64.t;
+    var t984:W64.t;
+    var t985:W64.t;
+    var t986:W64.t;
+    var t987:W64.t;
+    var t988:W64.t;
+    var t989:W64.t;
+    var t990:W64.t;
+    var  _0:bool;
+    var  _1:bool;
+    var  _2:bool;
+    var  _3:bool;
+    var  _4:bool;
+    var  _5:bool;
+    var  _6:bool;
+    var  _7:bool;
+    var  _8:bool;
+    var  _9:bool;
+    var  _10:bool;
+    var  _11:bool;
+    var  _12:bool;
+    var  _13:bool;
+    var  _14:bool;
+    var  _15:bool;
+    var  _16:bool;
+    var  _17:bool;
+    var  _18:bool;
+    var  _19:bool;
+    var  _20:bool;
+    var  _21:bool;
+    var  _22:bool;
+    var  _23:bool;
+    var  _24:bool;
+    var  _25:bool;
+    var  _26:bool;
+    var  _27:bool;
+    var  _28:bool;
+    var  _29:bool;
+    var  _30:bool;
+    var  _31:bool;
+    var  _32:bool;
+    var  _33:bool;
+    var  _34:bool;
+    var  _35:bool;
+    var  _36:bool;
+    var  _37:bool;
+    var  _38:bool;
+    var  _39:bool;
+    var  _40:bool;
+    var  _41:bool;
+    var  _42:bool;
+    var  _43:bool;
+    var  _44:bool;
+    var  _45:bool;
+    var  _46:bool;
+    var  _47:bool;
+    var  _48:bool;
+    var  _49:bool;
+    var  _50:bool;
+    var  _51:bool;
+    var  _52:bool;
+    var  _53:bool;
+    var  _54:bool;
+    var  _55:bool;
+    var  _56:bool;
+    var  _57:bool;
+    c679 <- witness;
+    d762 <- witness;
+    c679.[0] <- a.[0];
+    c679.[1] <- a.[1];
+    c679.[2] <- a.[2];
+    c679.[3] <- a.[3];
+    c679.[4] <- a.[4];
+    c679.[0] <- (c679.[0] `^` a.[5]);
+    c679.[1] <- (c679.[1] `^` a.[6]);
+    c679.[2] <- (c679.[2] `^` a.[7]);
+    c679.[3] <- (c679.[3] `^` a.[8]);
+    c679.[4] <- (c679.[4] `^` a.[9]);
+    c679.[0] <- (c679.[0] `^` a.[10]);
+    c679.[1] <- (c679.[1] `^` a.[11]);
+    c679.[2] <- (c679.[2] `^` a.[12]);
+    c679.[3] <- (c679.[3] `^` a.[13]);
+    c679.[4] <- (c679.[4] `^` a.[14]);
+    c679.[0] <- (c679.[0] `^` a.[15]);
+    c679.[1] <- (c679.[1] `^` a.[16]);
+    c679.[2] <- (c679.[2] `^` a.[17]);
+    c679.[3] <- (c679.[3] `^` a.[18]);
+    c679.[4] <- (c679.[4] `^` a.[19]);
+    c679.[0] <- (c679.[0] `^` a.[20]);
+    c679.[1] <- (c679.[1] `^` a.[21]);
+    c679.[2] <- (c679.[2] `^` a.[22]);
+    c679.[3] <- (c679.[3] `^` a.[23]);
+    c679.[4] <- (c679.[4] `^` a.[24]);
+    x682 <- c679.[1];
+    ( _0,  _1, t684) <- (ROL_64 x682 (W8.of_int 1));
+    t685 <- (t684 `^` c679.[4]);
+    d762.[0] <- t685;
+    x687 <- c679.[2];
+    ( _2,  _3, t689) <- (ROL_64 x687 (W8.of_int 1));
+    t690 <- (t689 `^` c679.[0]);
+    d762.[1] <- t690;
+    x692 <- c679.[3];
+    ( _4,  _5, t694) <- (ROL_64 x692 (W8.of_int 1));
+    t695 <- (t694 `^` c679.[1]);
+    d762.[2] <- t695;
+    x697 <- c679.[4];
+    ( _6,  _7, t699) <- (ROL_64 x697 (W8.of_int 1));
+    t700 <- (t699 `^` c679.[2]);
+    d762.[3] <- t700;
+    x702 <- c679.[0];
+    ( _8,  _9, t704) <- (ROL_64 x702 (W8.of_int 1));
+    t705 <- (t704 `^` c679.[3]);
+    d762.[4] <- t705;
+    t708 <- a.[0];
+    b0712 <- (t708 `^` d762.[0]);
+    t715 <- a.[6];
+    x717 <- (t715 `^` d762.[1]);
+    ( _10,  _11, b1720) <- (ROL_64 x717 (W8.of_int 44));
+    t723 <- a.[12];
+    x725 <- (t723 `^` d762.[2]);
+    ( _12,  _13, b2728) <- (ROL_64 x725 (W8.of_int 43));
+    t731 <- a.[18];
+    x733 <- (t731 `^` d762.[3]);
+    ( _14,  _15, b3736) <- (ROL_64 x733 (W8.of_int 21));
+    t739 <- a.[24];
+    x741 <- (t739 `^` d762.[4]);
+    ( _16,  _17, b4744) <- (ROL_64 x741 (W8.of_int 14));
+    t745 <- b1720;
+    t746 <- (t745 `|` b2728);
+    t747 <- (t746 `^` b0712);
+    e.[0] <- t747;
+    t748 <- b2728;
+    t749 <- (invw t748);
+    t750 <- (t749 `|` b3736);
+    t751 <- (t750 `^` b1720);
+    e.[1] <- t751;
+    t752 <- b3736;
+    t753 <- (t752 `&` b4744);
+    t754 <- (t753 `^` b2728);
+    e.[2] <- t754;
+    t755 <- b0712;
+    t756 <- (t755 `|` b4744);
+    t757 <- (t756 `^` b3736);
+    e.[3] <- t757;
+    t758 <- b0712;
+    t759 <- (t758 `&` b1720);
+    t760 <- (t759 `^` b4744);
+    e.[4] <- t760;
+    t763 <- a.[3];
+    x765 <- (t763 `^` d762.[3]);
+    ( _18,  _19, t767) <- (ROL_64 x765 (W8.of_int 28));
+    t771 <- a.[9];
+    x773 <- (t771 `^` d762.[4]);
+    ( _20,  _21, b1776) <- (ROL_64 x773 (W8.of_int 20));
+    t779 <- a.[10];
+    x781 <- (t779 `^` d762.[0]);
+    ( _22,  _23, b2784) <- (ROL_64 x781 (W8.of_int 3));
+    t787 <- a.[16];
+    x789 <- (t787 `^` d762.[1]);
+    ( _24,  _25, b3792) <- (ROL_64 x789 (W8.of_int 45));
+    t795 <- a.[22];
+    x797 <- (t795 `^` d762.[2]);
+    ( _26,  _27, b4800) <- (ROL_64 x797 (W8.of_int 61));
+    t801 <- b1776;
+    t802 <- (t801 `|` b2784);
+    t803 <- (t802 `^` t767);
+    e.[5] <- t803;
+    t804 <- b2784;
+    t805 <- (t804 `&` b3792);
+    t806 <- (t805 `^` b1776);
+    e.[6] <- t806;
+    t807 <- b4800;
+    t808 <- (invw t807);
+    t809 <- (t808 `|` b3792);
+    t810 <- (t809 `^` b2784);
+    e.[7] <- t810;
+    t811 <- t767;
+    t812 <- (t811 `|` b4800);
+    t813 <- (t812 `^` b3792);
+    e.[8] <- t813;
+    t814 <- t767;
+    t815 <- (t814 `&` b1776);
+    t816 <- (t815 `^` b4800);
+    e.[9] <- t816;
+    t819 <- a.[1];
+    x821 <- (t819 `^` d762.[1]);
+    ( _28,  _29, b0824) <- (ROL_64 x821 (W8.of_int 1));
+    t827 <- a.[7];
+    x829 <- (t827 `^` d762.[2]);
+    ( _30,  _31, b1832) <- (ROL_64 x829 (W8.of_int 6));
+    t835 <- a.[13];
+    x837 <- (t835 `^` d762.[3]);
+    ( _32,  _33, b2840) <- (ROL_64 x837 (W8.of_int 25));
+    t843 <- a.[19];
+    x845 <- (t843 `^` d762.[4]);
+    ( _34,  _35, b3848) <- (ROL_64 x845 (W8.of_int 8));
+    t851 <- a.[20];
+    x853 <- (t851 `^` d762.[0]);
+    ( _36,  _37, b4856) <- (ROL_64 x853 (W8.of_int 18));
+    t857 <- b1832;
+    t858 <- (t857 `|` b2840);
+    t859 <- (t858 `^` b0824);
+    e.[10] <- t859;
+    t860 <- b2840;
+    t861 <- (t860 `&` b3848);
+    t862 <- (t861 `^` b1832);
+    e.[11] <- t862;
+    t863 <- b3848;
+    t864 <- (invw t863);
+    t865 <- (t864 `&` b4856);
+    t866 <- (t865 `^` b2840);
+    e.[12] <- t866;
+    u867 <- b0824;
+    u868 <- (u867 `|` b4856);
+    t869 <- b3848;
+    t870 <- (invw t869);
+    t871 <- (t870 `^` u868);
+    e.[13] <- t871;
+    t872 <- b0824;
+    t873 <- (t872 `&` b1832);
+    t874 <- (t873 `^` b4856);
+    e.[14] <- t874;
+    t877 <- a.[4];
+    x879 <- (t877 `^` d762.[4]);
+    ( _38,  _39, b0882) <- (ROL_64 x879 (W8.of_int 27));
+    t885 <- a.[5];
+    x887 <- (t885 `^` d762.[0]);
+    ( _40,  _41, b1890) <- (ROL_64 x887 (W8.of_int 36));
+    t893 <- a.[11];
+    x895 <- (t893 `^` d762.[1]);
+    ( _42,  _43, b2898) <- (ROL_64 x895 (W8.of_int 10));
+    t901 <- a.[17];
+    x903 <- (t901 `^` d762.[2]);
+    ( _44,  _45, b3906) <- (ROL_64 x903 (W8.of_int 15));
+    t909 <- a.[23];
+    x911 <- (t909 `^` d762.[3]);
+    ( _46,  _47, b4914) <- (ROL_64 x911 (W8.of_int 56));
+    t915 <- b1890;
+    t916 <- (t915 `&` b2898);
+    t917 <- (t916 `^` b0882);
+    e.[15] <- t917;
+    t918 <- b2898;
+    t919 <- (t918 `|` b3906);
+    t920 <- (t919 `^` b1890);
+    e.[16] <- t920;
+    t921 <- b3906;
+    t922 <- (invw t921);
+    t923 <- (t922 `|` b4914);
+    t924 <- (t923 `^` b2898);
+    e.[17] <- t924;
+    u925 <- b0882;
+    u926 <- (u925 `&` b4914);
+    t927 <- b3906;
+    t928 <- (invw t927);
+    t929 <- (t928 `^` u926);
+    e.[18] <- t929;
+    t930 <- b0882;
+    t931 <- (t930 `|` b1890);
+    t932 <- (t931 `^` b4914);
+    e.[19] <- t932;
+    t935 <- a.[2];
+    x937 <- (t935 `^` d762.[2]);
+    ( _48,  _49, b0940) <- (ROL_64 x937 (W8.of_int 62));
+    t943 <- a.[8];
+    x945 <- (t943 `^` d762.[3]);
+    ( _50,  _51, b1948) <- (ROL_64 x945 (W8.of_int 55));
+    t951 <- a.[14];
+    x953 <- (t951 `^` d762.[4]);
+    ( _52,  _53, b2956) <- (ROL_64 x953 (W8.of_int 39));
+    t959 <- a.[15];
+    x961 <- (t959 `^` d762.[0]);
+    ( _54,  _55, b3964) <- (ROL_64 x961 (W8.of_int 41));
+    t967 <- a.[21];
+    x969 <- (t967 `^` d762.[1]);
+    ( _56,  _57, b4972) <- (ROL_64 x969 (W8.of_int 2));
+    t973 <- b1948;
+    t974 <- (invw t973);
+    t975 <- (t974 `&` b2956);
+    t976 <- (t975 `^` b0940);
+    e.[20] <- t976;
+    u977 <- b2956;
+    u978 <- (u977 `|` b3964);
+    t979 <- b1948;
+    t980 <- (invw t979);
+    t981 <- (t980 `^` u978);
+    e.[21] <- t981;
+    t982 <- b3964;
+    t983 <- (t982 `&` b4972);
+    t984 <- (t983 `^` b2956);
+    e.[22] <- t984;
+    t985 <- b0940;
+    t986 <- (t985 `|` b4972);
+    t987 <- (t986 `^` b3964);
+    e.[23] <- t987;
+    t988 <- b0940;
+    t989 <- (t988 `&` b1948);
+    t990 <- (t989 `^` b4972);
+    e.[24] <- t990;
+    return e;
+  }
+  proc __not_lane_basic (st:W64.t Array25.t, idx:int) : W64.t Array25.t = {
+    var t:W64.t;
+    t <- st.[idx];
+    t <- (invw t);
+    st.[idx] <- t;
+    return st;
+  }
+  proc __complement_lanes_basic (st:W64.t Array25.t) : W64.t Array25.t = {
+    
+    st <@ __not_lane_basic (st, 1);
+    st <@ __not_lane_basic (st, 2);
+    st <@ __not_lane_basic (st, 8);
+    st <@ __not_lane_basic (st, 12);
+    st <@ __not_lane_basic (st, 17);
+    st <@ __not_lane_basic (st, 20);
+    return st;
+  }
+  proc __keccakf1600_basic (a:W64.t Array25.t) : W64.t Array25.t = {
+    var s_e:W64.t Array25.t;
+    var e:W64.t Array25.t;
+    var rC:W64.t Array24.t;
+    var rc:W64.t;
+    var c:int;
+    rC <- witness;
+    e <- witness;
+    s_e <- witness;
+    a <@ __complement_lanes_basic (a);
+    e <- s_e;
+    c <- 0;
+    (* Erased call to spill *)
+    e <@ __pround_basic_inlined (e, a);
+    (a, e) <- (swap_ e a);
+    rC <- kECCAK1600_RC;
+    rc <- rC.[c];
+    e.[0] <- (e.[0] `^` rc);
+    a <@ __pround_basic_inlined (a, e);
+    (a, e) <- (swap_ e a);
+    rC <- kECCAK1600_RC;
+    rc <- rC.[(c + 1)];
+    a.[0] <- (a.[0] `^` rc);
+    (* Erased call to unspill *)
+    c <- (c + 2);
+    while ((c < (24 - 1))) {
+      (* Erased call to spill *)
+      e <@ __pround_basic_inlined (e, a);
+      (a, e) <- (swap_ e a);
+      rC <- kECCAK1600_RC;
+      rc <- rC.[c];
+      e.[0] <- (e.[0] `^` rc);
+      a <@ __pround_basic_inlined (a, e);
+      (a, e) <- (swap_ e a);
+      rC <- kECCAK1600_RC;
+      rc <- rC.[(c + 1)];
+      a.[0] <- (a.[0] `^` rc);
+      (* Erased call to unspill *)
+      c <- (c + 2);
+    }
+    a <@ __complement_lanes_basic (a);
+    return a;
+  }
+  proc _keccakf1600_basic (a:W64.t Array25.t) : W64.t Array25.t = {
+    
+    a <@ __keccakf1600_basic (a);
+    return a;
+  }
+  proc keccakf1600_opt_loop_body (rax:W64.t, rbp:W64.t, rdi:W64.t, r13:W64.t,
+                                  r10:W64.t, r11:W64.t, r8:W64.t, rsi:W64.t,
+                                  r15:W64.t, rbx:W64.t, a:W64.t Array25.t,
+                                  e:W64.t Array25.t) : W64.t * W64.t *
+                                                       W64.t * W64.t *
+                                                       W64.t * W64.t *
+                                                       W64.t * W64.t *
+                                                       W64.t * W64.t *
+                                                       W64.t Array25.t *
+                                                       W64.t Array25.t = {
+    var cnt:W64.t;
+    var rcx:W64.t;
+    var rdx:W64.t;
+    var r9:W64.t;
+    var r12:W64.t;
+    var r14:W64.t;
+    var rC:W64.t Array24.t;
+    rC <- witness;
+    e.[0] <- r11;
+    e.[1] <- rdi;
+    cnt <- rax;
+    e.[2] <- rsi;
+    rcx <- a.[15];
+    rcx <- (rcx `^` r8);
+    rax <- rdi;
+    rax <- (rax `^` a.[5]);
+    rax <- (rax `^` rcx);
+    rdx <- a.[16];
+    rdx <- (rdx `^` rsi);
+    rcx <- a.[11];
+    rsi <- a.[6];
+    rcx <- (rcx `^` rsi);
+    rcx <- (rcx `^` rdx);
+    rdx <- a.[17];
+    rdx <- (rdx `^` r15);
+    r9 <- r13;
+    r9 <- (r9 `^` a.[7]);
+    r9 <- (r9 `^` rdx);
+    rdx <- r10;
+    rdx <- (rdx `^` a.[23]);
+    r12 <- a.[13];
+    r12 <- (r12 `^` a.[8]);
+    r12 <- (r12 `^` rdx);
+    rdx <- r11;
+    rdx <- (rdx `^` rbx);
+    r14 <- a.[14];
+    r14 <- (r14 `^` a.[9]);
+    r14 <- (r14 `^` rdx);
+    rax <- (rax `^` rbp);
+    rcx <- (rcx `^` a.[1]);
+    r9 <- (r9 `^` a.[2]);
+    rdi <- a.[3];
+    r12 <- (r12 `^` rdi);
+    r14 <- (r14 `^` a.[4]);
+    rdx <- (RORX_64 r12 (W8.of_int 63));
+    rdx <- (rdx `^` rcx);
+    e.[10] <- rdx;
+    r11 <- (RORX_64 rcx (W8.of_int 63));
+    r11 <- (r11 `^` r14);
+    e.[9] <- r11;
+    rcx <- (RORX_64 r14 (W8.of_int 63));
+    rcx <- (rcx `^` r9);
+    r9 <- (RORX_64 r9 (W8.of_int 63));
+    r9 <- (r9 `^` rax);
+    rax <- (RORX_64 rax (W8.of_int 63));
+    rax <- (rax `^` r12);
+    rbp <- (rbp `^` r11);
+    rsi <- (rsi `^` r9);
+    r11 <- r9;
+    r9 <- (RORX_64 rsi (W8.of_int 20));
+    r13 <- (r13 `^` rdx);
+    r14 <- (RORX_64 r13 (W8.of_int 21));
+    r10 <- (r10 `^` rcx);
+    r10 <- (RORX_64 r10 (W8.of_int 43));
+    rbx <- (rbx `^` rax);
+    rbx <- (RORX_64 rbx (W8.of_int 50));
+    rsi <- ((invw rbx) `&` rbp);
+    rsi <- (rsi `^` r10);
+    a.[6] <- rsi;
+    rsi <- ((invw r14) `&` r10);
+    r10 <- ((invw r10) `&` rbx);
+    r10 <- (r10 `^` r14);
+    e.[8] <- r10;
+    r12 <- ((invw r9) `&` r14);
+    rC <- kECCAK1600_RC;
+    r14 <- cnt;
+    r12 <- (r12 `^` rC.[(W64.to_uint r14)]);
+    r12 <- (r12 `^` rbp);
+    rsi <- (rsi `^` r9);
+    e.[6] <- rsi;
+    r9 <- ((invw rbp) `&` r9);
+    r9 <- (r9 `^` rbx);
+    e.[7] <- r9;
+    rdi <- (rdi `^` rcx);
+    rdx <- rcx;
+    r9 <- (RORX_64 rdi (W8.of_int 36));
+    rsi <- a.[9];
+    rsi <- (rsi `^` rax);
+    r10 <- (RORX_64 rsi (W8.of_int 44));
+    rsi <- e.[1];
+    r13 <- e.[9];
+    rsi <- (rsi `^` r13);
+    rsi <- (RORX_64 rsi (W8.of_int 61));
+    rdi <- a.[16];
+    rcx <- r11;
+    rdi <- (rdi `^` r11);
+    rdi <- (RORX_64 rdi (W8.of_int 19));
+    rbp <- e.[10];
+    r15 <- (r15 `^` rbp);
+    rbx <- (RORX_64 r15 (W8.of_int 3));
+    r15 <- ((invw rbx) `&` r9);
+    r15 <- (r15 `^` rdi);
+    e.[1] <- r15;
+    r15 <- ((invw rsi) `&` rdi);
+    rdi <- ((invw rdi) `&` rbx);
+    rdi <- (rdi `^` rsi);
+    e.[5] <- rdi;
+    rsi <- ((invw r10) `&` rsi);
+    rsi <- (rsi `^` r9);
+    a.[16] <- rsi;
+    r15 <- (r15 `^` r10);
+    a.[3] <- r15;
+    rsi <- ((invw r9) `&` r10);
+    rsi <- (rsi `^` rbx);
+    a.[9] <- rsi;
+    rsi <- a.[1];
+    rsi <- (rsi `^` r11);
+    rsi <- (RORX_64 rsi (W8.of_int 63));
+    rdi <- a.[7];
+    rdi <- (rdi `^` rbp);
+    rdi <- (RORX_64 rdi (W8.of_int 58));
+    r9 <- a.[13];
+    r9 <- (r9 `^` rdx);
+    r9 <- (RORX_64 r9 (W8.of_int 39));
+    r10 <- e.[0];
+    r10 <- (r10 `^` rax);
+    r10 <- (RORX_64 r10 (W8.of_int 56));
+    r14 <- r13;
+    r8 <- (r8 `^` r13);
+    r8 <- (RORX_64 r8 (W8.of_int 46));
+    r11 <- ((invw r8) `&` rsi);
+    r11 <- (r11 `^` r10);
+    a.[13] <- r11;
+    r11 <- ((invw r9) `&` r10);
+    r13 <- ((invw r10) `&` r8);
+    r13 <- (r13 `^` r9);
+    r9 <- ((invw rdi) `&` r9);
+    r9 <- (r9 `^` rsi);
+    a.[7] <- r9;
+    r11 <- (r11 `^` rdi);
+    e.[4] <- r11;
+    rsi <- ((invw rsi) `&` rdi);
+    rsi <- (rsi `^` r8);
+    e.[0] <- rsi;
+    rsi <- a.[4];
+    rsi <- (rsi `^` rax);
+    rsi <- (RORX_64 rsi (W8.of_int 37));
+    rdi <- a.[5];
+    rdi <- (rdi `^` r14);
+    rdi <- (RORX_64 rdi (W8.of_int 28));
+    r8 <- a.[11];
+    r8 <- (r8 `^` rcx);
+    r8 <- (RORX_64 r8 (W8.of_int 54));
+    r9 <- a.[17];
+    r9 <- (r9 `^` rbp);
+    r11 <- (RORX_64 r9 (W8.of_int 49));
+    r9 <- a.[23];
+    r9 <- (r9 `^` rdx);
+    rbx <- (RORX_64 r9 (W8.of_int 8));
+    r10 <- ((invw rbx) `&` rsi);
+    r10 <- (r10 `^` r11);
+    r15 <- ((invw r8) `&` r11);
+    r11 <- ((invw r11) `&` rbx);
+    r11 <- (r11 `^` r8);
+    a.[17] <- r11;
+    r8 <- ((invw rdi) `&` r8);
+    r8 <- (r8 `^` rsi);
+    a.[23] <- r8;
+    r15 <- (r15 `^` rdi);
+    a.[5] <- r15;
+    rsi <- ((invw rsi) `&` rdi);
+    rsi <- (rsi `^` rbx);
+    a.[11] <- rsi;
+    rsi <- rbp;
+    rsi <- (rsi `^` a.[2]);
+    rdx <- (rdx `^` a.[8]);
+    rax <- (rax `^` a.[14]);
+    rdi <- r14;
+    rdi <- (rdi `^` a.[15]);
+    rcx <- (rcx `^` e.[2]);
+    rsi <- (RORX_64 rsi (W8.of_int 2));
+    rdx <- (RORX_64 rdx (W8.of_int 9));
+    rax <- (RORX_64 rax (W8.of_int 25));
+    rdi <- (RORX_64 rdi (W8.of_int 23));
+    rcx <- (RORX_64 rcx (W8.of_int 62));
+    r9 <- ((invw rcx) `&` rsi);
+    r9 <- (r9 `^` rdi);
+    a.[15] <- r9;
+    r14 <- ((invw rax) `&` rdi);
+    r11 <- ((invw rdi) `&` rcx);
+    r11 <- (r11 `^` rax);
+    rax <- ((invw rdx) `&` rax);
+    rax <- (rax `^` rsi);
+    rbp <- rax;
+    a.[14] <- rax;
+    r14 <- (r14 `^` rdx);
+    e.[2] <- r14;
+    rdi <- ((invw rsi) `&` rdx);
+    rdi <- (rdi `^` rcx);
+    rax <- r8;
+    rax <- (rax `^` a.[7]);
+    rsi <- a.[16];
+    rsi <- (rsi `^` rbp);
+    rsi <- (rsi `^` rax);
+    rbp <- a.[3];
+    rax <- rbp;
+    rax <- (rax `^` e.[6]);
+    rdx <- r15;
+    rdx <- (rdx `^` e.[4]);
+    rdx <- (rdx `^` rax);
+    rax <- e.[5];
+    rax <- (rax `^` a.[17]);
+    r8 <- r11;
+    r8 <- (r8 `^` e.[8]);
+    r8 <- (r8 `^` rax);
+    rbx <- a.[13];
+    rbx <- (rbx `^` e.[1]);
+    rcx <- r9;
+    rcx <- (rcx `^` a.[6]);
+    rcx <- (rcx `^` rbx);
+    rbx <- e.[7];
+    rbx <- (rbx `^` rdi);
+    rax <- e.[0];
+    rax <- (rax `^` a.[9]);
+    rax <- (rax `^` rbx);
+    rsi <- (rsi `^` r12);
+    rdx <- (rdx `^` r14);
+    r8 <- (r8 `^` r13);
+    rcx <- (rcx `^` r10);
+    r14 <- a.[11];
+    rax <- (rax `^` r14);
+    r15 <- (RORX_64 rcx (W8.of_int 63));
+    r15 <- (r15 `^` rdx);
+    rbx <- (RORX_64 rdx (W8.of_int 63));
+    rbx <- (rbx `^` rax);
+    r9 <- (RORX_64 rax (W8.of_int 63));
+    r9 <- (r9 `^` r8);
+    r8 <- (RORX_64 r8 (W8.of_int 63));
+    r8 <- (r8 `^` rsi);
+    rdx <- (RORX_64 rsi (W8.of_int 63));
+    rdx <- (rdx `^` rcx);
+    r12 <- (r12 `^` rbx);
+    rbp <- (rbp `^` r8);
+    rax <- (RORX_64 rbp (W8.of_int 20));
+    r13 <- (r13 `^` r15);
+    rcx <- (RORX_64 r13 (W8.of_int 21));
+    r10 <- (r10 `^` r9);
+    rsi <- (RORX_64 r10 (W8.of_int 43));
+    rdi <- (rdi `^` rdx);
+    rdi <- (RORX_64 rdi (W8.of_int 50));
+    r10 <- ((invw rdi) `&` r12);
+    r10 <- (r10 `^` rsi);
+    a.[3] <- r10;
+    r10 <- ((invw rcx) `&` rsi);
+    rsi <- ((invw rsi) `&` rdi);
+    rsi <- (rsi `^` rcx);
+    a.[2] <- rsi;
+    rbp <- ((invw rax) `&` rcx);
+    rcx <- cnt;
+    rC <- kECCAK1600_RC;
+    rbp <- (rbp `^` rC.[(W64.to_uint (rcx + (W64.of_int 1)))]);
+    rbp <- (rbp `^` r12);
+    e.[9] <- rbp;
+    r10 <- (r10 `^` rax);
+    a.[1] <- r10;
+    rax <- ((invw r12) `&` rax);
+    rax <- (rax `^` rdi);
+    a.[4] <- rax;
+    rax <- a.[6];
+    rax <- (rax `^` r9);
+    rax <- (RORX_64 rax (W8.of_int 36));
+    rcx <- a.[9];
+    rcx <- (rcx `^` rdx);
+    rcx <- (RORX_64 rcx (W8.of_int 44));
+    rsi <- a.[7];
+    rsi <- (rsi `^` rbx);
+    rsi <- (RORX_64 rsi (W8.of_int 61));
+    rdi <- a.[5];
+    rdi <- (rdi `^` r8);
+    rdi <- (RORX_64 rdi (W8.of_int 19));
+    r11 <- (r11 `^` r15);
+    r10 <- (RORX_64 r11 (W8.of_int 3));
+    r11 <- ((invw r10) `&` rax);
+    r11 <- (r11 `^` rdi);
+    a.[8] <- r11;
+    r11 <- ((invw rsi) `&` rdi);
+    rdi <- ((invw rdi) `&` r10);
+    rdi <- (rdi `^` rsi);
+    a.[7] <- rdi;
+    rsi <- ((invw rcx) `&` rsi);
+    rsi <- (rsi `^` rax);
+    a.[5] <- rsi;
+    r11 <- (r11 `^` rcx);
+    a.[6] <- r11;
+    rax <- ((invw rax) `&` rcx);
+    rax <- (rax `^` r10);
+    a.[9] <- rax;
+    rax <- e.[6];
+    rax <- (rax `^` r8);
+    rax <- (RORX_64 rax (W8.of_int 63));
+    rcx <- e.[5];
+    rcx <- (rcx `^` r15);
+    rcx <- (RORX_64 rcx (W8.of_int 58));
+    rsi <- a.[13];
+    rsi <- (rsi `^` r9);
+    rsi <- (RORX_64 rsi (W8.of_int 39));
+    rdi <- r14;
+    rdi <- (rdi `^` rdx);
+    rdi <- (RORX_64 rdi (W8.of_int 56));
+    r10 <- a.[14];
+    r10 <- (r10 `^` rbx);
+    r10 <- (RORX_64 r10 (W8.of_int 46));
+    r11 <- ((invw r10) `&` rax);
+    r11 <- (r11 `^` rdi);
+    a.[13] <- r11;
+    r11 <- ((invw rsi) `&` rdi);
+    r13 <- ((invw rdi) `&` r10);
+    r13 <- (r13 `^` rsi);
+    rdi <- ((invw rcx) `&` rsi);
+    rdi <- (rdi `^` rax);
+    r11 <- (r11 `^` rcx);
+    a.[11] <- r11;
+    rax <- ((invw rax) `&` rcx);
+    rax <- (rax `^` r10);
+    a.[14] <- rax;
+    rax <- e.[7];
+    rax <- (rax `^` rdx);
+    rax <- (RORX_64 rax (W8.of_int 37));
+    rcx <- a.[16];
+    rcx <- (rcx `^` rbx);
+    rcx <- (RORX_64 rcx (W8.of_int 28));
+    rsi <- e.[4];
+    rsi <- (rsi `^` r8);
+    r11 <- (RORX_64 rsi (W8.of_int 54));
+    rsi <- a.[17];
+    rsi <- (rsi `^` r15);
+    r14 <- (RORX_64 rsi (W8.of_int 49));
+    rsi <- a.[15];
+    rsi <- (rsi `^` r9);
+    r12 <- (RORX_64 rsi (W8.of_int 8));
+    r10 <- ((invw r12) `&` rax);
+    r10 <- (r10 `^` r14);
+    rsi <- ((invw r11) `&` r14);
+    r14 <- ((invw r14) `&` r12);
+    r14 <- (r14 `^` r11);
+    a.[17] <- r14;
+    r11 <- ((invw rcx) `&` r11);
+    r11 <- (r11 `^` rax);
+    a.[15] <- r11;
+    rsi <- (rsi `^` rcx);
+    a.[16] <- rsi;
+    r11 <- ((invw rax) `&` rcx);
+    r11 <- (r11 `^` r12);
+    r15 <- (r15 `^` e.[8]);
+    r9 <- (r9 `^` e.[1]);
+    rdx <- (rdx `^` e.[0]);
+    rbx <- (rbx `^` a.[23]);
+    r8 <- (r8 `^` e.[2]);
+    rax <- (RORX_64 r15 (W8.of_int 2));
+    rcx <- (RORX_64 r9 (W8.of_int 9));
+    rdx <- (RORX_64 rdx (W8.of_int 25));
+    r9 <- (RORX_64 rbx (W8.of_int 23));
+    r14 <- (RORX_64 r8 (W8.of_int 62));
+    r8 <- ((invw r14) `&` rax);
+    r8 <- (r8 `^` r9);
+    a.[23] <- r8;
+    rsi <- ((invw rdx) `&` r9);
+    r15 <- ((invw r9) `&` r14);
+    r15 <- (r15 `^` rdx);
+    r8 <- ((invw rcx) `&` rdx);
+    r8 <- (r8 `^` rax);
+    rsi <- (rsi `^` rcx);
+    rbx <- ((invw rax) `&` rcx);
+    rbx <- (rbx `^` r14);
+    rcx <- cnt;
+    rcx <- (rcx + (W64.of_int 2));
+    rax <- rcx;
+    rbp <- e.[9];
+    return (rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e);
+  }
+  proc read_regs_opt (a:W64.t Array25.t) : W64.t * W64.t * W64.t * W64.t *
+                                           W64.t * W64.t * W64.t * W64.t *
+                                           W64.t = {
+    var rbp:W64.t;
+    var rdi:W64.t;
+    var r13:W64.t;
+    var r10:W64.t;
+    var r11:W64.t;
+    var r8:W64.t;
+    var rsi:W64.t;
+    var r15:W64.t;
+    var rbx:W64.t;
+    rbp <- a.[0];
+    rdi <- a.[10];
+    r13 <- a.[12];
+    r10 <- a.[18];
+    r11 <- a.[19];
+    r8 <- a.[20];
+    rsi <- a.[21];
+    r15 <- a.[22];
+    rbx <- a.[24];
+    return (rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx);
+  }
+  proc store_regs_opt (a:W64.t Array25.t, rbp:W64.t, rdi:W64.t, r13:W64.t,
+                       r10:W64.t, r11:W64.t, r8:W64.t, rsi:W64.t, r15:W64.t,
+                       rbx:W64.t) : W64.t Array25.t = {
+    
+    a.[0] <- rbp;
+    a.[10] <- rdi;
+    a.[12] <- r13;
+    a.[18] <- r10;
+    a.[19] <- r11;
+    a.[20] <- r8;
+    a.[21] <- rsi;
+    a.[22] <- r15;
+    a.[24] <- rbx;
+    return a;
+  }
+  proc __keccakf1600_opt (a:W64.t Array25.t) : W64.t Array25.t = {
+    var rbp:W64.t;
+    var rdi:W64.t;
+    var r13:W64.t;
+    var r10:W64.t;
+    var r11:W64.t;
+    var r8:W64.t;
+    var rsi:W64.t;
+    var r15:W64.t;
+    var rbx:W64.t;
+    var rax:W64.t;
+    var e:W64.t Array25.t;
+    e <- witness;
+    (rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx) <@ read_regs_opt (a);
+    rax <- (W64.of_int 0);
+    (rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e) <@ keccakf1600_opt_loop_body (
+    rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e);
+    while ((rax \ult (W64.of_int 24))) {
+      (rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e) <@ keccakf1600_opt_loop_body (
+      rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e);
+    }
+    a <@ store_regs_opt (a, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx);
+    return a;
+  }
+  proc _keccakf1600_opt (a:W64.t Array25.t) : W64.t Array25.t = {
+    
+    a <@ __keccakf1600_opt (a);
+    return a;
+  }
+  proc _keccakf1600 (a:W64.t Array25.t) : W64.t Array25.t = {
+    var kECCAK_F:int;
+    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    if ((kECCAK_F = 2)) {
+      a <@ _keccakf1600_opt (a);
+    } else {
+      if ((kECCAK_F = 1)) {
+        a <@ _keccakf1600_basic (a);
+      } else {
+        if ((kECCAK_F = 3)) {
+          a <@ _keccakf1600_st25_avx2 (a);
+        } else {
+          a <@ _keccakf1600_ref (a);
+        }
+      }
+    }
+    return a;
+  }
+  proc __state_init (st:W64.t Array25.t) : W64.t Array25.t = {
+    var hAS_AVX2:bool;
+    var z64:W64.t;
+    var z256:W256.t;
+    var i:int;
+    hAS_AVX2 <@ __HAS_FEATURE (4, ((1 + 2) + 4));
+    if (hAS_AVX2) {
+      z256 <- (set0_256);
+      st <-
+      (Array25.init
+      (WArray200.get64
+      (WArray200.set256 (WArray200.init64 (fun i_0 => st.[i_0])) 0 z256)));
+      st <-
+      (Array25.init
+      (WArray200.get64
+      (WArray200.set256 (WArray200.init64 (fun i_0 => st.[i_0])) 1 z256)));
+      st <-
+      (Array25.init
+      (WArray200.get64
+      (WArray200.set256 (WArray200.init64 (fun i_0 => st.[i_0])) 2 z256)));
+      st <-
+      (Array25.init
+      (WArray200.get64
+      (WArray200.set256 (WArray200.init64 (fun i_0 => st.[i_0])) 3 z256)));
+      st <-
+      (Array25.init
+      (WArray200.get64
+      (WArray200.set256 (WArray200.init64 (fun i_0 => st.[i_0])) 4 z256)));
+      st <-
+      (Array25.init
+      (WArray200.get64
+      (WArray200.set256 (WArray200.init64 (fun i_0 => st.[i_0])) 5 z256)));
+      st.[24] <- (W64.of_int 0);
+    } else {
+      z64 <- (W64.of_int 0);
+      i <- 0;
+      while ((i < 25)) {
+        st.[i] <- z64;
+        i <- (i + 1);
+      }
+    }
     return st;
   }
   proc __4u64x4_u256x4 (y0:W256.t, y1:W256.t, y2:W256.t, y3:W256.t) : 
@@ -5566,31 +6836,6 @@ module M = {
     st.[((rATE8 - 1) %/ 8)] <- t256;
     return st;
   }
-  proc _init_updstate_avx2 (st:W64.t Array26.t, r64:int, trailb:W8.t) : 
-  W64.t Array26.t = {
-    var r256:W256.t;
-    var i:int;
-    var status:W64.t;
-    var t:W64.t;
-    r256 <- (set0_256);
-    i <- 0;
-    while ((i < 6)) {
-      st <-
-      (Array26.init
-      (WArray208.get64
-      (WArray208.set256 (WArray208.init64 (fun i_0 => st.[i_0])) i r256)));
-      i <- (i + 1);
-    }
-    st.[24] <- (W64.of_int 0);
-    status <- (zeroextu64 trailb);
-    status <- (status `<<` (W8.of_int 8));
-    r64 <- (W8.to_uint ((W8.of_int r64) - (W8.of_int 1)));
-    t <- (zeroextu64 (W8.of_int r64));
-    status <- (status + t);
-    status <- (status `<<` (W8.of_int 8));
-    st.[25] <- status;
-    return st;
-  }
   proc _ststatus_data (ststatus:W64.t) : W8.t * int * int = {
     var trailb:W8.t;
     var at:W64.t;
@@ -5616,15 +6861,31 @@ module M = {
     at_ui <- (W64.to_uint at);
     return (trailb, r8_ui, at_ui);
   }
-  proc _finish_updstate_avx2 (st:W64.t Array26.t) : W64.t Array26.t = {
+  proc _init_updstate (st:W64.t Array26.t, r64:int, trailb:W8.t) : W64.t Array26.t = {
+    var kst:W64.t Array25.t;
+    var status:W64.t;
+    var t:W64.t;
+    kst <- witness;
+    kst <- (Array25.init (fun i => st.[(0 + i)]));
+    kst <@ __state_init (kst);
+    st <-
+    (Array26.init
+    (fun i => (if (0 <= i < (0 + 25)) then kst.[(i - 0)] else st.[i])));
+    status <- (zeroextu64 trailb);
+    status <- (status `<<` (W8.of_int 8));
+    r64 <- (W8.to_uint ((W8.of_int r64) - (W8.of_int 1)));
+    t <- (zeroextu64 (W8.of_int r64));
+    status <- (status + t);
+    status <- (status `<<` (W8.of_int 8));
+    st.[25] <- status;
+    return st;
+  }
+  proc _finish_updstate (st:W64.t Array26.t) : W64.t Array26.t = {
     var ststatus:W64.t;
     var trailb:W8.t;
     var r8:int;
     var at:int;
-    var  _0:W64.t;
     ststatus <- st.[25];
-    (* Erased call to declassify *)
-     _0 <- (init_msf);
     (trailb, r8, at) <@ _ststatus_data (ststatus);
     st <-
     (Array26.init
@@ -5645,15 +6906,19 @@ module M = {
     (W32.of_int 4278255360)))));
     return st;
   }
-  proc _add_m_updstate_avx2 (st:W64.t Array25.t, at:int, buf:int, upto:int) : 
+  proc _add_m_updstate (st:W64.t Array25.t, at:int, buf:int, upto:int) : 
   W64.t Array25.t * int * int = {
+    var hAS_AVX2:bool;
     var at8:W64.t;
     var t64:W64.t;
     var sh:W8.t;
+    var t256:W256.t;
+    var t128:W128.t;
     var upto8:W64.t;
     var len:int;
     var buf2:int;
     var newat:int;
+    hAS_AVX2 <@ __HAS_FEATURE (4, ((1 + 2) + 4));
     at8 <- (W64.of_int at);
     at8 <- (at8 `&` (W64.of_int 7));
     if ((at8 <> (W64.of_int 0))) {
@@ -5683,17 +6948,65 @@ module M = {
       
     }
     newat <- at;
-    newat <- (newat + 8);
-    while ((newat <= upto)) {
-      t64 <- (loadW64 Glob.mem buf);
-      st <-
-      (Array25.init
-      (WArray200.get64
-      (WArray200.set64_direct (WArray200.init64 (fun i => st.[i])) at
-      ((get64_direct (WArray200.init64 (fun i => st.[i])) at) `^` t64))));
-      at <- newat;
-      buf <- (buf + 8);
+    if (hAS_AVX2) {
+      newat <- (newat + 32);
+      while ((newat <= upto)) {
+        t256 <- (loadW256 Glob.mem buf);
+        buf <- (buf + 32);
+        t256 <-
+        (t256 `^` (get256_direct (WArray200.init64 (fun i => st.[i])) at));
+        st <-
+        (Array25.init
+        (WArray200.get64
+        (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) 
+        at t256)));
+        at <- newat;
+        newat <- (newat + 32);
+      }
+      newat <- (newat - 16);
+      if ((newat <= upto)) {
+        t128 <- (loadW128 Glob.mem buf);
+        buf <- (buf + 16);
+        t128 <-
+        (t128 `^` (get128_direct (WArray200.init64 (fun i => st.[i])) at));
+        st <-
+        (Array25.init
+        (WArray200.get64
+        (WArray200.set128_direct (WArray200.init64 (fun i => st.[i])) 
+        at t128)));
+        at <- newat;
+      } else {
+        
+      }
+      newat <- at;
       newat <- (newat + 8);
+      if ((newat <= upto)) {
+        t64 <- (loadW64 Glob.mem buf);
+        buf <- (buf + 8);
+        st <-
+        (Array25.init
+        (WArray200.get64
+        (WArray200.set64_direct (WArray200.init64 (fun i => st.[i])) 
+        at ((get64_direct (WArray200.init64 (fun i => st.[i])) at) `^` t64)))
+        );
+        at <- newat;
+      } else {
+        
+      }
+    } else {
+      newat <- (newat + 8);
+      while ((newat <= upto)) {
+        t64 <- (loadW64 Glob.mem buf);
+        st <-
+        (Array25.init
+        (WArray200.get64
+        (WArray200.set64_direct (WArray200.init64 (fun i => st.[i])) 
+        at ((get64_direct (WArray200.init64 (fun i => st.[i])) at) `^` t64)))
+        );
+        at <- newat;
+        buf <- (buf + 8);
+        newat <- (newat + 8);
+      }
     }
     if ((at < upto)) {
       upto8 <- (W64.of_int upto);
@@ -5710,32 +7023,30 @@ module M = {
     at <- upto;
     return (st, at, buf);
   }
-  proc _absorb_m_updstate_avx2 (st:W64.t Array26.t, buf:int, len:int) : 
-  W64.t Array26.t = {
+  proc _absorb_m_updstate (st:W64.t Array26.t, buf:int, len:int) : W64.t Array26.t = {
     var ststatus:W64.t;
     var stk:W64.t Array25.t;
     var r8:int;
     var at:int;
-    var  _0:W64.t;
-    var  _1:W8.t;
-    var  _2:int;
+    var  _0:W8.t;
+    var  _1:int;
     stk <- witness;
     ststatus <- st.[25];
-    (* Erased call to declassify *)
-     _0 <- (init_msf);
-    ( _1, r8, at) <@ _ststatus_data (ststatus);
+    ( _0, r8, at) <@ _ststatus_data (ststatus);
     stk <- (Array25.init (fun i => st.[(0 + i)]));
     (* Erased call to spill *)
     len <- (len + at);
     while ((r8 <= len)) {
-      (stk, at, buf) <@ _add_m_updstate_avx2 (stk, at, buf, r8);
-      stk <@ _keccakf1600_st25_avx2 (stk);
+      (stk, at, buf) <@ _add_m_updstate (stk, at, buf, r8);
+      (* Erased call to spill *)
+      stk <@ _keccakf1600 (stk);
+      (* Erased call to unspill *)
       len <- (len - r8);
       at <- 0;
     }
     len <- len;
     (* Erased call to unspill *)
-    (stk, at,  _2) <@ _add_m_updstate_avx2 (stk, at, buf, len);
+    (stk, at,  _1) <@ _add_m_updstate (stk, at, buf, len);
     st <-
     (Array26.init
     (fun i => (if (0 <= i < (0 + 25)) then stk.[(i - 0)] else st.[i])));
@@ -7318,17 +8629,19 @@ module M = {
     }
     return (st, aT);
   }
-  proc a64___dump_updstate_avx2 (buf:W8.t Array64.t, off:int,
-                                 st:W64.t Array25.t, at:int, upto:int) : 
-  int * int * W8.t Array64.t = {
+  proc a64___dump_updstate (buf:W8.t Array64.t, off:int, st:W64.t Array25.t,
+                            at:int, upto:int) : W8.t Array64.t * int * int = {
+    var hAS_AVX2:bool;
     var at8:W64.t;
     var t64:W64.t;
     var sh:W8.t;
     var t256:W256.t;
+    var t128:W128.t;
     var upto8:W64.t;
     var len:int;
     var off2:int;
     var newat:int;
+    hAS_AVX2 <@ __HAS_FEATURE (4, ((1 + 2) + 4));
     at8 <- (W64.of_int at);
     at8 <- (at8 `&` (W64.of_int 7));
     if ((at8 <> (W64.of_int 0))) {
@@ -7354,28 +8667,57 @@ module M = {
       
     }
     newat <- at;
-    newat <- (newat + 32);
-    while ((newat <= upto)) {
-      t256 <- (get256_direct (WArray200.init64 (fun i => st.[i])) at);
-      buf <-
-      (Array64.init
-      (WArray64.get8
-      (WArray64.set256_direct (WArray64.init8 (fun i => buf.[i])) off t256)));
-      at <- newat;
-      off <- (off + 32);
+    if (hAS_AVX2) {
       newat <- (newat + 32);
-    }
-    newat <- at;
-    newat <- (newat + 8);
-    while ((newat <= upto)) {
-      t64 <- (get64_direct (WArray200.init64 (fun i => st.[i])) at);
-      buf <-
-      (Array64.init
-      (WArray64.get8
-      (WArray64.set64_direct (WArray64.init8 (fun i => buf.[i])) off t64)));
-      at <- newat;
-      off <- (off + 8);
+      while ((newat <= upto)) {
+        t256 <- (get256_direct (WArray200.init64 (fun i => st.[i])) at);
+        buf <-
+        (Array64.init
+        (WArray64.get8
+        (WArray64.set256_direct (WArray64.init8 (fun i => buf.[i])) off t256)
+        ));
+        off <- (off + 32);
+        at <- newat;
+        newat <- (newat + 32);
+      }
+      newat <- (newat - 16);
+      if ((newat <= upto)) {
+        t128 <- (get128_direct (WArray200.init64 (fun i => st.[i])) at);
+        buf <-
+        (Array64.init
+        (WArray64.get8
+        (WArray64.set128_direct (WArray64.init8 (fun i => buf.[i])) off t128)
+        ));
+        at <- newat;
+        off <- (off + 16);
+      } else {
+        
+      }
+      newat <- at;
       newat <- (newat + 8);
+      if ((newat <= upto)) {
+        t64 <- (get64_direct (WArray200.init64 (fun i => st.[i])) at);
+        buf <-
+        (Array64.init
+        (WArray64.get8
+        (WArray64.set64_direct (WArray64.init8 (fun i => buf.[i])) off t64)));
+        off <- (off + 8);
+        at <- newat;
+      } else {
+        
+      }
+    } else {
+      newat <- (newat + 8);
+      while ((newat <= upto)) {
+        t64 <- (get64_direct (WArray200.init64 (fun i => st.[i])) at);
+        buf <-
+        (Array64.init
+        (WArray64.get8
+        (WArray64.set64_direct (WArray64.init8 (fun i => buf.[i])) off t64)));
+        at <- newat;
+        off <- (off + 8);
+        newat <- (newat + 8);
+      }
     }
     if ((at < upto)) {
       upto8 <- (W64.of_int upto);
@@ -7387,28 +8729,26 @@ module M = {
       
     }
     at <- upto;
-    return (at, off, buf);
+    return (buf, off, at);
   }
-  proc a64___squeeze_updstate_avx2 (st:W64.t Array26.t, buf:W8.t Array64.t,
-                                    len:int) : W64.t Array26.t *
-                                               W8.t Array64.t = {
+  proc a64___squeeze_updstate (st:W64.t Array26.t, buf:W8.t Array64.t,
+                               len:int) : W64.t Array26.t * W8.t Array64.t = {
     var ststatus:W64.t;
     var stk:W64.t Array25.t;
     var r8:int;
     var at:int;
     var off:int;
-    var  _0:W64.t;
-    var  _1:W8.t;
-    var  _2:int;
+    var  _0:W8.t;
+    var  _1:int;
     stk <- witness;
     ststatus <- st.[25];
-    (* Erased call to declassify *)
-     _0 <- (init_msf);
-    ( _1, r8, at) <@ _ststatus_data (ststatus);
+    ( _0, r8, at) <@ _ststatus_data (ststatus);
     stk <- (Array25.init (fun i => st.[(0 + i)]));
     (* Erased call to spill *)
     if ((at = 0)) {
-      stk <@ _keccakf1600_st25_avx2 (stk);
+      (* Erased call to spill *)
+      stk <@ _keccakf1600 (stk);
+      (* Erased call to unspill *)
       at <- 0;
     } else {
       
@@ -7416,13 +8756,15 @@ module M = {
     off <- 0;
     len <- (len + at);
     while ((r8 < len)) {
-      (at, off, buf) <@ a64___dump_updstate_avx2 (buf, off, stk, at, r8);
-      stk <@ _keccakf1600_st25_avx2 (stk);
+      (buf, off, at) <@ a64___dump_updstate (buf, off, stk, at, r8);
+      (* Erased call to spill *)
+      stk <@ _keccakf1600 (stk);
+      (* Erased call to unspill *)
       len <- (len - r8);
       at <- 0;
     }
     len <- len;
-    (at,  _2, buf) <@ a64___dump_updstate_avx2 (buf, off, stk, at, len);
+    (buf,  _1, at) <@ a64___dump_updstate (buf, off, stk, at, len);
     (* Erased call to unspill *)
     st <-
     (Array26.init
@@ -7491,18 +8833,19 @@ module M = {
     }
     return (off, w);
   }
-  proc a66___add_updstate_avx2 (st:W64.t Array25.t, at:int,
-                                buf:W8.t Array66.t, off:int, upto:int) : 
-  int * int * W64.t Array25.t = {
+  proc a66___add_updstate (st:W64.t Array25.t, at:int, buf:W8.t Array66.t,
+                           off:int, upto:int) : W64.t Array25.t * int * int = {
+    var hAS_AVX2:bool;
     var at8:W64.t;
     var t64:W64.t;
     var sh:W8.t;
-    var r256:W256.t;
     var t256:W256.t;
+    var t128:W128.t;
     var upto8:W64.t;
     var len:int;
     var off2:int;
     var newat:int;
+    hAS_AVX2 <@ __HAS_FEATURE (4, ((1 + 2) + 4));
     at8 <- (W64.of_int at);
     at8 <- (at8 `&` (W64.of_int 7));
     if ((at8 <> (W64.of_int 0))) {
@@ -7532,32 +8875,65 @@ module M = {
       
     }
     newat <- at;
-    newat <- (newat + 32);
-    while ((newat <= upto)) {
-      r256 <- (get256_direct (WArray200.init64 (fun i => st.[i])) at);
-      t256 <- (get256_direct (WArray66.init8 (fun i => buf.[i])) off);
-      r256 <- (r256 `^` t256);
-      st <-
-      (Array25.init
-      (WArray200.get64
-      (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) at r256))
-      );
-      at <- newat;
-      off <- (off + 32);
+    if (hAS_AVX2) {
       newat <- (newat + 32);
-    }
-    newat <- at;
-    newat <- (newat + 8);
-    while ((newat <= upto)) {
-      t64 <- (get64_direct (WArray66.init8 (fun i => buf.[i])) off);
-      st <-
-      (Array25.init
-      (WArray200.get64
-      (WArray200.set64_direct (WArray200.init64 (fun i => st.[i])) at
-      ((get64_direct (WArray200.init64 (fun i => st.[i])) at) `^` t64))));
-      at <- newat;
-      off <- (off + 8);
+      while ((newat <= upto)) {
+        t256 <- (get256_direct (WArray66.init8 (fun i => buf.[i])) off);
+        off <- (off + 32);
+        t256 <-
+        (t256 `^` (get256_direct (WArray200.init64 (fun i => st.[i])) at));
+        st <-
+        (Array25.init
+        (WArray200.get64
+        (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) 
+        at t256)));
+        at <- newat;
+        newat <- (newat + 32);
+      }
+      newat <- (newat - 16);
+      if ((newat <= upto)) {
+        t128 <- (get128_direct (WArray66.init8 (fun i => buf.[i])) off);
+        off <- (off + 16);
+        t128 <-
+        (t128 `^` (get128_direct (WArray200.init64 (fun i => st.[i])) at));
+        st <-
+        (Array25.init
+        (WArray200.get64
+        (WArray200.set128_direct (WArray200.init64 (fun i => st.[i])) 
+        at t128)));
+        at <- newat;
+      } else {
+        
+      }
+      newat <- at;
       newat <- (newat + 8);
+      if ((newat <= upto)) {
+        t64 <- (get64_direct (WArray66.init8 (fun i => buf.[i])) off);
+        off <- (off + 8);
+        st <-
+        (Array25.init
+        (WArray200.get64
+        (WArray200.set64_direct (WArray200.init64 (fun i => st.[i])) 
+        at ((get64_direct (WArray200.init64 (fun i => st.[i])) at) `^` t64)))
+        );
+        at <- newat;
+      } else {
+        
+      }
+    } else {
+      newat <- (newat + 8);
+      while ((newat <= upto)) {
+        t64 <- (get64_direct (WArray66.init8 (fun i => buf.[i])) off);
+        st <-
+        (Array25.init
+        (WArray200.get64
+        (WArray200.set64_direct (WArray200.init64 (fun i => st.[i])) 
+        at ((get64_direct (WArray200.init64 (fun i => st.[i])) at) `^` t64)))
+        );
+        at <- newat;
+        off <- (off + 8);
+        newat <- (newat + 8);
+      }
     }
     if ((at < upto)) {
       upto8 <- (W64.of_int upto);
@@ -7572,36 +8948,35 @@ module M = {
       
     }
     at <- upto;
-    return (at, off, st);
+    return (st, at, off);
   }
-  proc a66___update_updstate_avx2 (st:W64.t Array26.t, buf:W8.t Array66.t,
-                                   len:int) : W64.t Array26.t = {
+  proc a66___absorb_updstate (st:W64.t Array26.t, buf:W8.t Array66.t, len:int) : 
+  W64.t Array26.t = {
     var ststatus:W64.t;
     var stk:W64.t Array25.t;
     var r8:int;
     var at:int;
     var off:int;
-    var  _0:W64.t;
-    var  _1:W8.t;
-    var  _2:int;
+    var  _0:W8.t;
+    var  _1:int;
     stk <- witness;
     ststatus <- st.[25];
-    (* Erased call to declassify *)
-     _0 <- (init_msf);
-    ( _1, r8, at) <@ _ststatus_data (ststatus);
+    ( _0, r8, at) <@ _ststatus_data (ststatus);
     stk <- (Array25.init (fun i => st.[(0 + i)]));
     (* Erased call to spill *)
     off <- 0;
     len <- (len + at);
     while ((r8 <= len)) {
-      (at, off, stk) <@ a66___add_updstate_avx2 (stk, at, buf, off, r8);
-      stk <@ _keccakf1600_st25_avx2 (stk);
+      (stk, at, off) <@ a66___add_updstate (stk, at, buf, off, r8);
+      (* Erased call to spill *)
+      stk <@ _keccakf1600 (stk);
+      (* Erased call to unspill *)
       len <- (len - r8);
       at <- 0;
     }
     len <- len;
     (* Erased call to unspill *)
-    (at,  _2, stk) <@ a66___add_updstate_avx2 (stk, at, buf, off, len);
+    (stk, at,  _1) <@ a66___add_updstate (stk, at, buf, off, len);
     st <-
     (Array26.init
     (fun i => (if (0 <= i < (0 + 25)) then stk.[(i - 0)] else st.[i])));
@@ -10162,20 +11537,20 @@ module M = {
     (* Erased call to spill *)
     rate64 <- 17;
     trailb <- (W8.of_int 31);
-    state <@ _init_updstate_avx2 (state, rate64, trailb);
+    state <@ _init_updstate (state, rate64, trailb);
     len <- 66;
-    state <@ a66___update_updstate_avx2 (state, prefix, len);
+    state <@ a66___absorb_updstate (state, prefix, len);
     (* Erased call to unspill *)
     buf <- context_pointer;
     len <- context_size;
-    state <@ _absorb_m_updstate_avx2 (state, buf, len);
+    state <@ _absorb_m_updstate (state, buf, len);
     (* Erased call to unspill *)
     buf <- message_pointer;
     len <- message_size;
-    state <@ _absorb_m_updstate_avx2 (state, buf, len);
-    state <@ _finish_updstate_avx2 (state);
+    state <@ _absorb_m_updstate (state, buf, len);
+    state <@ _finish_updstate (state);
     len <- 64;
-    (state, message_representative) <@ a64___squeeze_updstate_avx2 (state,
+    (state, message_representative) <@ a64___squeeze_updstate (state,
     message_representative, len);
     return message_representative;
   }
@@ -10328,13 +11703,11 @@ module M = {
                                                    randombytes:W8.t Array848.t) : 
   W32.t Array256.t * W64.t = {
     var filled:W64.t;
-    var ms:W64.t;
     var shuffle_table_pointer:W8.t Array256.t;
     var bytes_filled:W64.t;
     var input_offset:W64.t;
     var modulus:W256.t;
     var stop_sampling:W64.t;
-    var condition_loop:bool;
     var potential_coefficients:W256.t;
     var compare_with_field_modulus:W256.t;
     var good:W64.t;
@@ -10344,7 +11717,6 @@ module M = {
     var shuffles:W128.t;
     var upper_coefficients:W128.t;
     var good_upper:W64.t;
-    var condition:bool;
     var byte0:W32.t;
     var byte1:W32.t;
     var byte2:W32.t;
@@ -10360,15 +11732,12 @@ module M = {
     var  _8:bool;
     var  _9:bool;
     shuffle_table_pointer <- witness;
-    ms <- (init_msf);
     shuffle_table_pointer <- matrix_A__SHUFFLE_TABLE;
     bytes_filled <- (W64.of_int 0);
     input_offset <- (W64.of_int 0);
     modulus <- mODULUS_VECTOR;
     stop_sampling <- (W64.of_int 0);
-    condition_loop <- (stop_sampling <> (W64.of_int 1));
-    while (condition_loop) {
-      ms <- (update_msf condition_loop ms);
+    while ((stop_sampling <> (W64.of_int 1))) {
       potential_coefficients <-
       (get256_direct (WArray848.init8 (fun i => randombytes.[i]))
       (W64.to_uint input_offset));
@@ -10378,8 +11747,6 @@ module M = {
       compare_with_field_modulus <-
       (VPCMPGT_8u32 modulus potential_coefficients);
       good <- (zeroextu64 (MOVEMASK_8u32 compare_with_field_modulus));
-      (* Erased call to declassify *)
-      good <- (protect_64 good ms);
       lower_coefficients <-
       (VEXTRACTI128 potential_coefficients (W8.of_int 0));
       good_lower <- good;
@@ -10417,42 +11784,29 @@ module M = {
       good_upper <- (good_upper `<<` (W8.of_int 2));
       bytes_filled <- (bytes_filled + good_upper);
       stop_sampling <- (W64.of_int 0);
-      condition <- ((W64.of_int (((256 * 32) %/ 8) - 32)) \ule bytes_filled);
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if (((W64.of_int (((256 * 32) %/ 8) - 32)) \ule bytes_filled)) {
         stop_sampling <- (W64.of_int 1);
       } else {
-        ms <- (update_msf (! condition) ms);
-        condition <- ((W64.of_int (5 * 168)) \ule input_offset);
-        if (condition) {
-          ms <- (update_msf condition ms);
+        if (((W64.of_int (5 * 168)) \ule input_offset)) {
           stop_sampling <- (W64.of_int 1);
         } else {
-          ms <- (update_msf (! condition) ms);
+          
         }
       }
-      condition_loop <- (stop_sampling <> (W64.of_int 1));
     }
-    ms <- (update_msf (! condition_loop) ms);
     filled <- bytes_filled;
     filled <- (filled `>>` (W8.of_int 2));
     stop_sampling <- (W64.of_int 1);
-    condition <- (filled \ult (W64.of_int 256));
-    if (condition) {
-      ms <- (update_msf condition ms);
-      condition <- (input_offset \ult (W64.of_int ((5 * 168) - 2)));
-      if (condition) {
-        ms <- (update_msf condition ms);
+    if ((filled \ult (W64.of_int 256))) {
+      if ((input_offset \ult (W64.of_int ((5 * 168) - 2)))) {
         stop_sampling <- (W64.of_int 0);
       } else {
-        ms <- (update_msf (! condition) ms);
+        
       }
     } else {
-      ms <- (update_msf (! condition) ms);
+      
     }
-    condition_loop <- (stop_sampling <> (W64.of_int 1));
-    while (condition_loop) {
-      ms <- (update_msf condition_loop ms);
+    while ((stop_sampling <> (W64.of_int 1))) {
       byte0 <- (zeroextu32 randombytes.[(W64.to_uint input_offset)]);
       input_offset <- (input_offset + (W64.of_int 1));
       byte1 <- (zeroextu32 randombytes.[(W64.to_uint input_offset)]);
@@ -10465,32 +11819,22 @@ module M = {
       byte2 <- (byte2 `<<` (W8.of_int 16));
       coeff <- (coeff `|` byte2);
       coeff <- (coeff `&` (W32.of_int 8388607));
-      (* Erased call to declassify *)
-      coeff <- (protect_32 coeff ms);
-      condition <- (coeff \ult (W32.of_int 8380417));
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if ((coeff \ult (W32.of_int 8380417))) {
         polynomial.[(W64.to_uint filled)] <- coeff;
         filled <- (filled + (W64.of_int 1));
       } else {
-        ms <- (update_msf (! condition) ms);
+        
       }
       stop_sampling <- (W64.of_int 0);
-      condition <- ((W64.of_int 256) \ule filled);
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if (((W64.of_int 256) \ule filled)) {
         stop_sampling <- (W64.of_int 1);
       } else {
-        ms <- (update_msf (! condition) ms);
-        condition <- ((W64.of_int ((5 * 168) - 2)) \ule input_offset);
-        if (condition) {
-          ms <- (update_msf condition ms);
+        if (((W64.of_int ((5 * 168) - 2)) \ule input_offset)) {
           stop_sampling <- (W64.of_int 1);
         } else {
-          ms <- (update_msf (! condition) ms);
+          
         }
       }
-      condition_loop <- (stop_sampling <> (W64.of_int 1));
     }
     return (polynomial, filled);
   }
@@ -10499,27 +11843,19 @@ module M = {
                                              block:W8.t Array168.t) : 
   W32.t Array256.t * W64.t = {
     var block_offset:W64.t;
-    var ms:W64.t;
     var stop_sampling:W8.t;
-    var condition:bool;
-    var condition_loop:bool;
     var byte0:W32.t;
     var byte1:W32.t;
     var byte2:W32.t;
     var coeff:W32.t;
     block_offset <- (W64.of_int 0);
-    ms <- (init_msf);
     stop_sampling <- (W8.of_int 0);
-    condition <- ((W64.of_int 256) \ule filled);
-    if (condition) {
-      ms <- (update_msf condition ms);
+    if (((W64.of_int 256) \ule filled)) {
       stop_sampling <- (W8.of_int 1);
     } else {
-      ms <- (update_msf (! condition) ms);
+      
     }
-    condition_loop <- (stop_sampling <> (W8.of_int 1));
-    while (condition_loop) {
-      ms <- (update_msf condition_loop ms);
+    while ((stop_sampling <> (W8.of_int 1))) {
       byte0 <- (zeroextu32 block.[(W64.to_uint block_offset)]);
       block_offset <- (block_offset + (W64.of_int 1));
       byte1 <- (zeroextu32 block.[(W64.to_uint block_offset)]);
@@ -10532,32 +11868,22 @@ module M = {
       byte2 <- (byte2 `<<` (W8.of_int 16));
       coeff <- (coeff `|` byte2);
       coeff <- (coeff `&` (W32.of_int 8388607));
-      (* Erased call to declassify *)
-      coeff <- (protect_32 coeff ms);
-      condition <- (coeff \ult (W32.of_int 8380417));
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if ((coeff \ult (W32.of_int 8380417))) {
         polynomial.[(W64.to_uint filled)] <- coeff;
         filled <- (filled + (W64.of_int 1));
       } else {
-        ms <- (update_msf (! condition) ms);
+        
       }
       stop_sampling <- (W8.of_int 0);
-      condition <- ((W64.of_int 256) \ule filled);
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if (((W64.of_int 256) \ule filled)) {
         stop_sampling <- (W8.of_int 1);
       } else {
-        ms <- (update_msf (! condition) ms);
-        condition <- ((W64.of_int 168) \ule block_offset);
-        if (condition) {
-          ms <- (update_msf condition ms);
+        if (((W64.of_int 168) \ule block_offset)) {
           stop_sampling <- (W8.of_int 1);
         } else {
-          ms <- (update_msf (! condition) ms);
+          
         }
       }
-      condition_loop <- (stop_sampling <> (W8.of_int 1));
     }
     return (polynomial, filled);
   }
@@ -10755,10 +12081,6 @@ module M = {
     var signs:W64.t;
     var xof_offset:W64.t;
     var i:W64.t;
-    var ms:W64.t;
-    var condition_loop:bool;
-    var condition_resample:bool;
-    var condition_refill:bool;
     var sample_at:W64.t;
     var coefficient:W32.t;
     var shift:W32.t;
@@ -10779,43 +12101,28 @@ module M = {
       zeros_256)));
       i <- (i + (W64.of_int 32));
     }
-    ms <- (init_msf);
     i <- (W64.of_int (256 - 49));
-    condition_loop <- (i \ult (W64.of_int 256));
-    while (condition_loop) {
-      ms <- (update_msf condition_loop ms);
-      condition_refill <- ((W64.of_int 136) \ule xof_offset);
-      if (condition_refill) {
+    while ((i \ult (W64.of_int 256))) {
+      if (((W64.of_int 136) \ule xof_offset)) {
         state <@ shake256_permute (state);
         xof_block <@ shake256_squeeze_block (xof_block, state);
         xof_offset <- (W64.of_int 0);
-        ms <- (init_msf);
       } else {
-        ms <- (update_msf (! condition_refill) ms);
+        
       }
       sample_at <- (zeroextu64 xof_block.[(W64.to_uint xof_offset)]);
-      (* Erased call to declassify *)
-      sample_at <- (protect_64 sample_at ms);
       xof_offset <- (xof_offset + (W64.of_int 1));
-      condition_resample <- (i \ult sample_at);
-      while (condition_resample) {
-        ms <- (update_msf condition_resample ms);
-        condition_refill <- ((W64.of_int 136) \ule xof_offset);
-        if (condition_refill) {
+      while ((i \ult sample_at)) {
+        if (((W64.of_int 136) \ule xof_offset)) {
           state <@ shake256_permute (state);
           xof_block <@ shake256_squeeze_block (xof_block, state);
           xof_offset <- (W64.of_int 0);
-          ms <- (init_msf);
         } else {
-          ms <- (update_msf (! condition_refill) ms);
+          
         }
         sample_at <- (zeroextu64 xof_block.[(W64.to_uint xof_offset)]);
-        (* Erased call to declassify *)
-        sample_at <- (protect_64 sample_at ms);
         xof_offset <- (xof_offset + (W64.of_int 1));
-        condition_resample <- (i \ult sample_at);
       }
-      ms <- (update_msf (! condition_resample) ms);
       coefficient <- output_challenge.[(W64.to_uint sample_at)];
       output_challenge.[(W64.to_uint i)] <- coefficient;
       shift <- (truncateu32 signs);
@@ -10826,7 +12133,6 @@ module M = {
       output_challenge.[(W64.to_uint sample_at)] <- coefficient;
       signs <- (signs `>>` (W8.of_int 1));
       i <- (i + (W64.of_int 1));
-      condition_loop <- (i \ult (W64.of_int 256));
     }
     return output_challenge;
   }
@@ -11078,7 +12384,7 @@ module M = {
       exceeds_any <- (VPOR_256 exceeds_any exceeds);
       offset <- (offset + 32);
     }
-    (* Erased call to declassify *)
+    exceeds_any <- exceeds_any;
     msb_mask <- (MOVEMASK_8u32 exceeds_any);
     ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
     res8 <- (SETcc (! zf));
@@ -11658,11 +12964,9 @@ module M = {
   }
   proc signature____encode_hint (signature:W8.t Array3309.t,
                                  hint_0:W32.t Array1536.t) : W8.t Array3309.t = {
-    var ms:W64.t;
-    var condition1:bool;
-    var condition2:bool;
     var hint_coefficient:W32.t;
-    var condition_hint:bool;
+    var condition2:bool;
+    var condition1:bool;
     var i:int;
     var hints_written:int;
     var j:int;
@@ -11672,34 +12976,27 @@ module M = {
       signature.[((48 + (5 * ((20 * 256) %/ 8))) + i)] <- (W8.of_int 0);
       i <- (i + 1);
     }
-    ms <- (init_msf);
     hints_written <- 0;
     i <- 0;
     condition1 <- (i < 6);
     while (condition1) {
-      ms <- (update_msf condition1 ms);
       j <- 0;
       condition2 <- (j < 256);
       while (condition2) {
-        ms <- (update_msf condition2 ms);
         hint_offset <- i;
         hint_offset <- (hint_offset `<<` 8);
         hint_offset <- (hint_offset + j);
         hint_coefficient <- hint_0.[hint_offset];
-        hint_coefficient <- (protect_32 hint_coefficient ms);
-        condition_hint <- (hint_coefficient <> (W32.of_int 0));
-        if (condition_hint) {
-          ms <- (update_msf condition_hint ms);
+        if ((hint_coefficient <> (W32.of_int 0))) {
           signature.[((48 + (5 * ((20 * 256) %/ 8))) + hints_written)] <-
           (truncateu8 (W64.of_int j));
           hints_written <- (hints_written + 1);
         } else {
-          ms <- (update_msf (! condition_hint) ms);
+          
         }
         j <- (j + 1);
         condition2 <- (j < 256);
       }
-      ms <- (update_msf (! condition2) ms);
       signature.[(((48 + (5 * ((20 * 256) %/ 8))) + 55) + i)] <-
       (truncateu8 (W64.of_int hints_written));
       i <- (i + 1);
@@ -11740,24 +13037,12 @@ module M = {
                                  hint_encoded:W8.t Array61.t) : W32.t Array1536.t *
                                                                 W64.t = {
     var ill_formed_hint:W64.t;
-    var ms:W64.t;
-    var not_done1:bool;
-    var condition_zero:bool;
-    var true_hints_seen:W64.t;
-    var condition_decreasing:bool;
-    var condition_too_many:bool;
-    var not_done2:bool;
     var hint_at_j:W64.t;
-    var condition_not_first:bool;
     var hint_at_j_minus_one:W64.t;
-    var condition_unordered:bool;
-    var condition_well_formed:bool;
-    var within_bounds:bool;
     var done2:W8.t;
+    var within_bounds:bool;
     var done1:W8.t;
-    var not_done3:bool;
     var hint_0:W64.t;
-    var condition_nonzero:bool;
     var done3:W8.t;
     var previous_true_hints_seen:int;
     var encoded_offset:int;
@@ -11765,128 +13050,89 @@ module M = {
     var j:int;
     var index:int;
     var current_true_hints_seen:int;
-    ms <- (init_msf);
     ill_formed_hint <- (W64.of_int 0);
     previous_true_hints_seen <- 0;
     encoded_offset <- 0;
     within_bounds <- (6 <= encoded_offset);
     done1 <- (SETcc within_bounds);
     done1 <- (done1 `|` (truncateu8 ill_formed_hint));
-    not_done1 <- (done1 = (W8.of_int 0));
-    while (not_done1) {
-      ms <- (update_msf not_done1 ms);
+    while ((done1 = (W8.of_int 0))) {
       decoded_offset <- encoded_offset;
       decoded_offset <- (decoded_offset `<<` 8);
       j <- 0;
-      condition_zero <- (j < 256);
-      while (condition_zero) {
-        ms <- (update_msf condition_zero ms);
+      while ((j < 256)) {
         index <- decoded_offset;
         index <- (index + j);
         hints.[index] <- (W32.of_int 0);
         j <- (j + 1);
-        condition_zero <- (j < 256);
       }
-      ms <- (update_msf (! condition_zero) ms);
-      true_hints_seen <- (zeroextu64 hint_encoded.[(55 + encoded_offset)]);
-      true_hints_seen <- (protect_64 true_hints_seen ms);
-      current_true_hints_seen <- (W64.to_uint true_hints_seen);
-      condition_decreasing <-
-      (current_true_hints_seen < previous_true_hints_seen);
-      if (condition_decreasing) {
-        ms <- (update_msf condition_decreasing ms);
+      current_true_hints_seen <-
+      (W64.to_uint (zeroextu64 hint_encoded.[(55 + encoded_offset)]));
+      if ((current_true_hints_seen < previous_true_hints_seen)) {
         ill_formed_hint <- (W64.of_int 1);
       } else {
-        ms <- (update_msf (! condition_decreasing) ms);
-        condition_too_many <- (55 < current_true_hints_seen);
-        if (condition_too_many) {
-          ms <- (update_msf condition_too_many ms);
+        if ((55 < current_true_hints_seen)) {
           ill_formed_hint <- (W64.of_int 1);
         } else {
-          ms <- (update_msf (! condition_too_many) ms);
           j <- previous_true_hints_seen;
           within_bounds <- (current_true_hints_seen <= j);
           done2 <- (SETcc within_bounds);
           done2 <- (done2 `|` (truncateu8 ill_formed_hint));
-          not_done2 <- (done2 = (W8.of_int 0));
-          while (not_done2) {
-            ms <- (update_msf not_done2 ms);
+          while ((done2 = (W8.of_int 0))) {
             hint_at_j <- (zeroextu64 hint_encoded.[j]);
-            hint_at_j <- (protect_64 hint_at_j ms);
-            condition_not_first <- (previous_true_hints_seen < j);
-            if (condition_not_first) {
-              ms <- (update_msf condition_not_first ms);
+            if ((previous_true_hints_seen < j)) {
               hint_at_j_minus_one <- (zeroextu64 hint_encoded.[(j - 1)]);
-              hint_at_j_minus_one <- (protect_64 hint_at_j_minus_one ms);
-              condition_unordered <- (hint_at_j \ule hint_at_j_minus_one);
-              if (condition_unordered) {
-                ms <- (update_msf condition_unordered ms);
+              if ((hint_at_j \ule hint_at_j_minus_one)) {
                 ill_formed_hint <- (W64.of_int 1);
               } else {
-                ms <- (update_msf (! condition_unordered) ms);
+                
               }
             } else {
-              ms <- (update_msf (! condition_not_first) ms);
+              
             }
-            condition_well_formed <- (ill_formed_hint = (W64.of_int 0));
-            if (condition_well_formed) {
-              ms <- (update_msf condition_well_formed ms);
+            if ((ill_formed_hint = (W64.of_int 0))) {
               index <- decoded_offset;
               index <- (index + (W64.to_uint hint_at_j));
               hints.[index] <- (W32.of_int 1);
               j <- (j + 1);
             } else {
-              ms <- (update_msf (! condition_well_formed) ms);
+              
             }
             within_bounds <- (current_true_hints_seen <= j);
             done2 <- (SETcc within_bounds);
             done2 <- (done2 `|` (truncateu8 ill_formed_hint));
-            not_done2 <- (done2 = (W8.of_int 0));
           }
-          ms <- (update_msf (! not_done2) ms);
         }
       }
-      condition_well_formed <- (ill_formed_hint = (W64.of_int 0));
-      if (condition_well_formed) {
-        ms <- (update_msf condition_well_formed ms);
+      if ((ill_formed_hint = (W64.of_int 0))) {
         previous_true_hints_seen <- current_true_hints_seen;
         encoded_offset <- (encoded_offset + 1);
       } else {
-        ms <- (update_msf (! condition_well_formed) ms);
+        
       }
       within_bounds <- (6 <= encoded_offset);
       done1 <- (SETcc within_bounds);
       done1 <- (done1 `|` (truncateu8 ill_formed_hint));
-      not_done1 <- (done1 = (W8.of_int 0));
     }
-    ms <- (update_msf (! not_done1) ms);
     encoded_offset <- previous_true_hints_seen;
     within_bounds <- (55 <= encoded_offset);
     done3 <- (SETcc within_bounds);
     done3 <- (done3 `|` (truncateu8 ill_formed_hint));
-    not_done3 <- (done3 = (W8.of_int 0));
-    while (not_done3) {
-      ms <- (update_msf not_done3 ms);
+    while ((done3 = (W8.of_int 0))) {
       hint_0 <- (zeroextu64 hint_encoded.[encoded_offset]);
-      hint_0 <- (protect_64 hint_0 ms);
-      condition_nonzero <- (hint_0 <> (W64.of_int 0));
-      if (condition_nonzero) {
-        ms <- (update_msf condition_nonzero ms);
+      if ((hint_0 <> (W64.of_int 0))) {
         ill_formed_hint <- (W64.of_int 1);
       } else {
-        ms <- (update_msf (! condition_nonzero) ms);
+        
       }
-      condition_well_formed <- (ill_formed_hint = (W64.of_int 0));
-      if (condition_well_formed) {
-        ms <- (update_msf condition_well_formed ms);
+      if ((ill_formed_hint = (W64.of_int 0))) {
         encoded_offset <- (encoded_offset + 1);
       } else {
-        ms <- (update_msf (! condition_well_formed) ms);
+        
       }
       within_bounds <- (55 <= encoded_offset);
       done3 <- (SETcc within_bounds);
       done3 <- (done3 `|` (truncateu8 ill_formed_hint));
-      not_done3 <- (done3 = (W8.of_int 0));
     }
     ill_formed_hint <- (- ill_formed_hint);
     return (hints, ill_formed_hint);
@@ -12052,23 +13298,19 @@ module M = {
                                                    randombytes:W8.t Array272.t) : 
   W32.t Array256.t * W64.t = {
     var filled:W64.t;
-    var ms:W64.t;
     var temp:W64.t;
     var eta_0:W256.t;
     var bound:W256.t;
     var bytes_filled:W64.t;
     var xof_offset:W64.t;
     var stop_sampling:W64.t;
-    var condition_loop:bool;
     var bytestream:W128.t;
     var coefficients:W256.t;
     var comparisons:W256.t;
     var good_overall:W64.t;
     var coefficient_block:W128.t;
-    var condition:bool;
     var coefficient:W32.t;
     var  _0:W64.t;
-    ms <- (init_msf);
     temp <- (W64.of_int 4);
     eta_0 <- (zeroextu256 (VMOV_64 temp));
     eta_0 <- (VPBROADCAST_32u8 (truncateu8 eta_0));
@@ -12078,9 +13320,7 @@ module M = {
     bytes_filled <- (W64.of_int 0);
     xof_offset <- (W64.of_int 0);
     stop_sampling <- (W64.of_int 0);
-    condition_loop <- (stop_sampling <> (W64.of_int 1));
-    while (condition_loop) {
-      ms <- (update_msf condition_loop ms);
+    while ((stop_sampling <> (W64.of_int 1))) {
       bytestream <-
       (get128_direct (WArray272.init8 (fun i => randombytes.[i]))
       (W64.to_uint xof_offset));
@@ -12089,129 +13329,91 @@ module M = {
       good_overall <- (zeroextu64 (MOVEMASK_32u8 comparisons));
       coefficients <- (VPSUB_32u8 eta_0 coefficients);
       coefficient_block <- (VEXTRACTI128 coefficients (W8.of_int 0));
-      (* Erased call to declassify *)
-      good_overall <- (protect_64 good_overall ms);
+      good_overall <- good_overall;
       (error, bytes_filled, good_overall) <@ error_4x____write_out_8_coefficients (
       error, bytes_filled, good_overall, coefficient_block);
       xof_offset <- (xof_offset + (W64.of_int 4));
-      condition <- (bytes_filled \ult (W64.of_int (((256 * 32) %/ 8) - 32)));
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if ((bytes_filled \ult (W64.of_int (((256 * 32) %/ 8) - 32)))) {
         coefficient_block <- (VPSRLDQ_128 coefficient_block (W8.of_int 8));
         (error, bytes_filled, good_overall) <@ error_4x____write_out_8_coefficients (
         error, bytes_filled, good_overall, coefficient_block);
         xof_offset <- (xof_offset + (W64.of_int 4));
-        condition <-
-        (bytes_filled \ult (W64.of_int (((256 * 32) %/ 8) - 32)));
-        if (condition) {
-          ms <- (update_msf condition ms);
+        if ((bytes_filled \ult (W64.of_int (((256 * 32) %/ 8) - 32)))) {
           coefficient_block <- (VEXTRACTI128 coefficients (W8.of_int 1));
           (error, bytes_filled, good_overall) <@ error_4x____write_out_8_coefficients (
           error, bytes_filled, good_overall, coefficient_block);
           xof_offset <- (xof_offset + (W64.of_int 4));
-          condition <-
-          (bytes_filled \ult (W64.of_int (((256 * 32) %/ 8) - 32)));
-          if (condition) {
-            ms <- (update_msf condition ms);
+          if ((bytes_filled \ult (W64.of_int (((256 * 32) %/ 8) - 32)))) {
             coefficient_block <-
             (VPSRLDQ_128 coefficient_block (W8.of_int 8));
             (error, bytes_filled,  _0) <@ error_4x____write_out_8_coefficients (
             error, bytes_filled, good_overall, coefficient_block);
             xof_offset <- (xof_offset + (W64.of_int 4));
           } else {
-            ms <- (update_msf (! condition) ms);
+            
           }
         } else {
-          ms <- (update_msf (! condition) ms);
+          
         }
       } else {
-        ms <- (update_msf (! condition) ms);
+        
       }
-      condition <- ((W64.of_int (((256 * 32) %/ 8) - 32)) \ule bytes_filled);
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if (((W64.of_int (((256 * 32) %/ 8) - 32)) \ule bytes_filled)) {
         stop_sampling <- (W64.of_int 1);
       } else {
-        ms <- (update_msf (! condition) ms);
-        condition <- ((W64.of_int ((2 * 136) - 16)) \ule xof_offset);
-        if (condition) {
-          ms <- (update_msf condition ms);
+        if (((W64.of_int ((2 * 136) - 16)) \ule xof_offset)) {
           stop_sampling <- (W64.of_int 1);
         } else {
-          ms <- (update_msf (! condition) ms);
+          
         }
       }
-      condition_loop <- (stop_sampling <> (W64.of_int 1));
     }
-    ms <- (update_msf (! condition_loop) ms);
     filled <- bytes_filled;
     filled <- (filled `>>` (W8.of_int 2));
-    condition <- (filled \ult (W64.of_int 256));
-    if (condition) {
-      ms <- (update_msf condition ms);
-      condition <- (xof_offset \ult (W64.of_int (2 * 136)));
-      if (condition) {
-        ms <- (update_msf condition ms);
+    if ((filled \ult (W64.of_int 256))) {
+      if ((xof_offset \ult (W64.of_int (2 * 136)))) {
         stop_sampling <- (W64.of_int 0);
       } else {
-        ms <- (update_msf (! condition) ms);
+        
       }
     } else {
-      ms <- (update_msf (! condition) ms);
+      
     }
-    condition_loop <- (stop_sampling <> (W64.of_int 1));
-    while (condition_loop) {
-      ms <- (update_msf condition_loop ms);
+    while ((stop_sampling <> (W64.of_int 1))) {
       coefficient <- (zeroextu32 randombytes.[(W64.to_uint xof_offset)]);
       coefficient <- (coefficient `&` (W32.of_int 15));
-      (* Erased call to declassify *)
-      coefficient <- (protect_32 coefficient ms);
-      condition <- (coefficient \ult (W32.of_int 9));
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if ((coefficient \ult (W32.of_int 9))) {
         coefficient <- (coefficient - (W32.of_int 4));
         coefficient <- (- coefficient);
         error.[(W64.to_uint filled)] <- coefficient;
         filled <- (filled + (W64.of_int 1));
       } else {
-        ms <- (update_msf (! condition) ms);
+        
       }
-      condition <- (filled \ult (W64.of_int 256));
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if ((filled \ult (W64.of_int 256))) {
         coefficient <- (zeroextu32 randombytes.[(W64.to_uint xof_offset)]);
         coefficient <- (coefficient `>>` (W8.of_int 4));
-        (* Erased call to declassify *)
-        coefficient <- (protect_32 coefficient ms);
-        condition <- (coefficient \ult (W32.of_int 9));
-        if (condition) {
-          ms <- (update_msf condition ms);
+        if ((coefficient \ult (W32.of_int 9))) {
           coefficient <- (coefficient - (W32.of_int 4));
           coefficient <- (- coefficient);
           error.[(W64.to_uint filled)] <- coefficient;
           filled <- (filled + (W64.of_int 1));
         } else {
-          ms <- (update_msf (! condition) ms);
+          
         }
       } else {
-        ms <- (update_msf (! condition) ms);
+        
       }
       xof_offset <- (xof_offset + (W64.of_int 1));
-      condition <- ((W64.of_int (2 * 136)) \ule xof_offset);
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if (((W64.of_int (2 * 136)) \ule xof_offset)) {
         stop_sampling <- (W64.of_int 1);
       } else {
-        ms <- (update_msf (! condition) ms);
-        condition <- ((W64.of_int 256) \ule filled);
-        if (condition) {
-          ms <- (update_msf condition ms);
+        if (((W64.of_int 256) \ule filled)) {
           stop_sampling <- (W64.of_int 1);
         } else {
-          ms <- (update_msf (! condition) ms);
+          
         }
       }
-      condition_loop <- (stop_sampling <> (W64.of_int 1));
     }
     return (error, filled);
   }
@@ -12219,68 +13421,46 @@ module M = {
                                              filled:W64.t,
                                              randombytes:W8.t Array136.t) : 
   W32.t Array256.t * W64.t = {
-    var ms:W64.t;
     var xof_offset:W64.t;
     var stop_sampling:W64.t;
-    var condition_loop:bool;
     var coefficient:W32.t;
-    var condition:bool;
-    ms <- (init_msf);
     xof_offset <- (W64.of_int 0);
     stop_sampling <- (W64.of_int 0);
-    condition_loop <- (stop_sampling <> (W64.of_int 1));
-    while (condition_loop) {
-      ms <- (update_msf condition_loop ms);
+    while ((stop_sampling <> (W64.of_int 1))) {
       coefficient <- (zeroextu32 randombytes.[(W64.to_uint xof_offset)]);
       coefficient <- (coefficient `&` (W32.of_int 15));
-      (* Erased call to declassify *)
-      coefficient <- (protect_32 coefficient ms);
-      condition <- (coefficient \ult (W32.of_int 9));
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if ((coefficient \ult (W32.of_int 9))) {
         coefficient <- (coefficient - (W32.of_int 4));
         coefficient <- (- coefficient);
         error.[(W64.to_uint filled)] <- coefficient;
         filled <- (filled + (W64.of_int 1));
       } else {
-        ms <- (update_msf (! condition) ms);
+        
       }
-      condition <- (filled \ult (W64.of_int 256));
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if ((filled \ult (W64.of_int 256))) {
         coefficient <- (zeroextu32 randombytes.[(W64.to_uint xof_offset)]);
         coefficient <- (coefficient `>>` (W8.of_int 4));
-        (* Erased call to declassify *)
-        coefficient <- (protect_32 coefficient ms);
-        condition <- (coefficient \ult (W32.of_int 9));
-        if (condition) {
-          ms <- (update_msf condition ms);
+        if ((coefficient \ult (W32.of_int 9))) {
           coefficient <- (coefficient - (W32.of_int 4));
           coefficient <- (- coefficient);
           error.[(W64.to_uint filled)] <- coefficient;
           filled <- (filled + (W64.of_int 1));
         } else {
-          ms <- (update_msf (! condition) ms);
+          
         }
       } else {
-        ms <- (update_msf (! condition) ms);
+        
       }
       xof_offset <- (xof_offset + (W64.of_int 1));
-      condition <- ((W64.of_int 136) \ule xof_offset);
-      if (condition) {
-        ms <- (update_msf condition ms);
+      if (((W64.of_int 136) \ule xof_offset)) {
         stop_sampling <- (W64.of_int 1);
       } else {
-        ms <- (update_msf (! condition) ms);
-        condition <- ((W64.of_int 256) \ule filled);
-        if (condition) {
-          ms <- (update_msf condition ms);
+        if (((W64.of_int 256) \ule filled)) {
           stop_sampling <- (W64.of_int 1);
         } else {
-          ms <- (update_msf (! condition) ms);
+          
         }
       }
-      condition_loop <- (stop_sampling <> (W64.of_int 1));
     }
     return (error, filled);
   }
@@ -12709,7 +13889,6 @@ module M = {
     (* Erased call to spill *)
     prf_output <@ __keygen_prf (prf_output, randomness);
     seed_for_matrix_A <- (Array32.init (fun i => prf_output.[(0 + i)]));
-    (* Erased call to declassify *)
     matrix_A <@ sample____matrix_A (seed_for_matrix_A);
     seed_for_error_vectors <-
     (Array64.init (fun i => prf_output.[(32 + i)]));
@@ -12775,7 +13954,7 @@ module M = {
     (fun i => (if (32 <= i < (32 + 1920)) then aux_1.[(i - 32)] else 
               verification_key.[i]))
     );
-    (* Erased call to declassify *)
+    verification_key <- verification_key;
     verification_key_pointer_copy <- verification_key;
     (* Erased call to unspill *)
     verification_key_hash <-
@@ -13017,10 +14196,8 @@ module M = {
   W32.t Array1280.t * W64.t = {
     var aux:W32.t Array256.t;
     var base:int;
-    var  _0:W64.t;
     base <- 0;
-    (* Erased call to declassify *)
-     _0 <- (init_msf);
+    infinity_norm_check_result <- infinity_norm_check_result;
     if ((infinity_norm_check_result <> (W64.of_int 0))) {
       base <- (5 * 256);
     } else {
@@ -13040,8 +14217,7 @@ module M = {
       (Array256.init (fun i => signer_response.[(base + i)])),
       ((1 `<<` 19) - (49 * 4)));
       base <- (base + 256);
-      (* Erased call to declassify *)
-       _0 <- (init_msf);
+      infinity_norm_check_result <- infinity_norm_check_result;
       if ((infinity_norm_check_result <> (W64.of_int 0))) {
         base <- (5 * 256);
       } else {
@@ -13059,11 +14235,9 @@ module M = {
     var aux:W32.t Array256.t;
     var cs2:W32.t Array256.t;
     var base:int;
-    var  _0:W64.t;
     cs2 <- witness;
     base <- 0;
-    (* Erased call to declassify *)
-     _0 <- (init_msf);
+    infinity_norm_check_result <- infinity_norm_check_result;
     if ((infinity_norm_check_result <> (W64.of_int 0))) {
       base <- (6 * 256);
     } else {
@@ -13092,8 +14266,7 @@ module M = {
       (Array256.init (fun i => w0_minus_cs2.[(base + i)])),
       (((8380417 - 1) %/ 32) - (49 * 4)));
       base <- (base + 256);
-      (* Erased call to declassify *)
-       _0 <- (init_msf);
+      infinity_norm_check_result <- infinity_norm_check_result;
       if ((infinity_norm_check_result <> (W64.of_int 0))) {
         base <- (6 * 256);
       } else {
@@ -13111,12 +14284,9 @@ module M = {
     var aux:W32.t Array256.t;
     var ct0:W32.t Array256.t;
     var base:int;
-    var  _0:W64.t;
-    var  _1:W64.t;
     ct0 <- witness;
     base <- 0;
-    (* Erased call to declassify *)
-     _1 <- (init_msf);
+    infinity_norm_check_result <- infinity_norm_check_result;
     if ((infinity_norm_check_result <> (W64.of_int 0))) {
       base <- (6 * 256);
     } else {
@@ -13129,8 +14299,7 @@ module M = {
       ct0 <@ polynomial__reduce32 (ct0);
       infinity_norm_check_result <@ polynomial____check_infinity_norm (
       ct0, ((8380417 - 1) %/ 32));
-      (* Erased call to declassify *)
-       _0 <- (init_msf);
+      infinity_norm_check_result <- infinity_norm_check_result;
       if ((infinity_norm_check_result = (W64.of_int 0))) {
         aux <@ polynomial__add ((Array256.init
                                 (fun i => w0_minus_cs2_plus_ct0.[(base + i)])
@@ -13145,8 +14314,7 @@ module M = {
         
       }
       base <- (base + 256);
-      (* Erased call to declassify *)
-       _1 <- (init_msf);
+      infinity_norm_check_result <- infinity_norm_check_result;
       if ((infinity_norm_check_result <> (W64.of_int 0))) {
         base <- (6 * 256);
       } else {
@@ -13166,12 +14334,10 @@ module M = {
     var total_ones_in_hint:int;
     var base:int;
     var ones_in_hint:int;
-    var  _0:W64.t;
     hint_element <- witness;
     total_ones_in_hint <- 0;
     base <- 0;
-    (* Erased call to declassify *)
-     _0 <- (init_msf);
+    infinity_norm_check_result <- infinity_norm_check_result;
     if ((infinity_norm_check_result <> (W64.of_int 0))) {
       base <- (6 * 256);
     } else {
@@ -13194,8 +14360,7 @@ module M = {
       hint_count_fail_64 <- (zeroextu64 hint_count_fail);
       infinity_norm_check_result <-
       (infinity_norm_check_result `|` hint_count_fail_64);
-      (* Erased call to declassify *)
-       _0 <- (init_msf);
+      infinity_norm_check_result <- infinity_norm_check_result;
       if ((infinity_norm_check_result <> (W64.of_int 0))) {
         base <- (6 * 256);
       } else {
@@ -13240,12 +14405,10 @@ module M = {
     var kappa_bit:W8.t;
     var kappa_bit_64:W64.t;
     var j:int;
-    var  _0:W64.t;
+    var  _0:bool;
     var  _1:bool;
     var  _2:bool;
     var  _3:bool;
-    var  _4:bool;
-    var  _5:W64.t;
     commitment_encoded <- witness;
     commitment_hash <- witness;
     hint_0 <- witness;
@@ -13267,7 +14430,6 @@ module M = {
     w1 <- witness;
     (* Erased call to spill *)
     seed_for_matrix_A <- (Array32.init (fun i => signing_key.[(0 + i)]));
-    (* Erased call to declassify *)
     matrix_A <@ sample____matrix_A (seed_for_matrix_A);
     (* Erased call to unspill *)
     message_representative <@ __derive_message_representative ((Array64.init
@@ -13338,15 +14500,14 @@ module M = {
       w0_minus_cs2_plus_ct0 <- w0_minus_cs2_plus_ct0;
       (hint_0, infinity_norm_check_result) <@ __make_hint_vector (w0_minus_cs2_plus_ct0,
       w1, hint_0, infinity_norm_check_result);
-      (* Erased call to declassify *)
-       _0 <- (init_msf);
+      infinity_norm_check_result <- infinity_norm_check_result;
       last_norm_check_result <- infinity_norm_check_result;
       exit_rejection_sampling_loop <- infinity_norm_check_result;
       exit_rejection_sampling_loop <-
       (exit_rejection_sampling_loop `^` (W64.of_int 1));
       kappa_diff <- (zeroextu32 domain_separator_for_mask);
       kappa_diff <- (kappa_diff `^` (W32.of_int (((65535 - 5) %/ 5) * 5)));
-      ( _1,  _2,  _3,  _4, kappa_zf) <- (TEST_32 kappa_diff kappa_diff);
+      ( _0,  _1,  _2,  _3, kappa_zf) <- (TEST_32 kappa_diff kappa_diff);
       kappa_bit <- (SETcc kappa_zf);
       kappa_bit_64 <- (zeroextu64 kappa_bit);
       kappa_exceeded <- (kappa_exceeded `|` kappa_bit_64);
@@ -13354,12 +14515,11 @@ module M = {
       (exit_rejection_sampling_loop `|` kappa_exceeded);
     }
     (* Erased call to unspill *)
-    (* Erased call to declassify *)
-    (* Erased call to declassify *)
-    (* Erased call to declassify *)
+    hint_0 <- hint_0;
+    commitment_hash <- commitment_hash;
+    signer_response <- signer_response;
     signature <@ signature____encode (signature, commitment_hash,
     signer_response, hint_0);
-     _5 <- (init_msf);
     result <- last_norm_check_result;
     result <- (result `<<` (W8.of_int 63));
     result <- (result `|>>` (W8.of_int 63));
@@ -13373,7 +14533,6 @@ module M = {
     var result_vec:W128.t;
     var temp:W128.t;
     var offset:int;
-    var  _0:W64.t;
     offset <- 0;
     lhs_bytes <- (get128_direct (WArray48.init8 (fun i => lhs.[i])) offset);
     rhs_bytes <- (get128_direct (WArray48.init8 (fun i => rhs.[i])) offset);
@@ -13389,8 +14548,7 @@ module M = {
       offset <- (offset + 16);
     }
     result <- (zeroextu64 (MOVEMASK_16u8 result_vec));
-    (* Erased call to declassify *)
-     _0 <- (init_msf);
+    result <- result;
     if ((result = (W64.of_int 65535))) {
       result <- (W64.of_int 0);
     } else {
@@ -13470,9 +14628,6 @@ module M = {
     var verification_key_hash:W8.t Array64.t;
     var message_representative:W8.t Array64.t;
     var expected_commitment_hash:W8.t Array48.t;
-    var  _0:W64.t;
-    var  _1:W64.t;
-    var  _2:W64.t;
     a_times_signer_response <- witness;
     challenge <- witness;
     expected_commitment_hash <- witness;
@@ -13488,7 +14643,6 @@ module M = {
     result2 <@ row_vector____check_infinity_norm (signer_response,
     ((1 `<<` 19) - (49 * 4)));
     result <- (result1 `|` result2);
-     _0 <- (init_msf);
     if ((result = (W64.of_int 0))) {
       (* Erased call to spill *)
       matrix_A <@ sample____matrix_A ((Array32.init
@@ -13501,12 +14655,10 @@ module M = {
       (Array48.init (fun i => signature_encoded.[(0 + i)])));
       challenge <@ polynomial__ntt (challenge);
       (* Erased call to unspill *)
-       _1 <- (init_msf);
       reconstructed_signer_commitment <@ reconstruct_signer_commitment (
       (Array1920.init (fun i => verification_key.[(32 + i)])), challenge,
       a_times_signer_response, hints);
       (* Erased call to unspill *)
-       _2 <- (init_msf);
       verification_key_hash <@ hash_verification_key (verification_key_hash,
       verification_key);
       (* Erased call to unspill *)
@@ -13526,8 +14678,7 @@ module M = {
                          signing_key:W8.t Array4032.t,
                          randomness:W8.t Array32.t) : W8.t Array1952.t *
                                                       W8.t Array4032.t = {
-    var  _0:W64.t;
-     _0 <- (init_msf);
+    
     (* Erased call to spill *)
     (verification_key, signing_key) <@ __keygen_internal (verification_key,
     signing_key, randomness);
@@ -13540,12 +14691,8 @@ module M = {
     var result:W64.t;
     var context_pointer:int;
     var context_size:int;
-    var  _0:W64.t;
-    var  _1:W64.t;
-     _0 <- (init_msf);
     context_pointer <- (W64.to_uint context.[0]);
     context_size <- (W64.to_uint context.[1]);
-     _1 <- (init_msf);
     if ((context_size <= 255)) {
       (signature, result) <@ __sign_internal (signature, signing_key,
       context_pointer, context_size, message_pointer, message_size,
@@ -13562,12 +14709,8 @@ module M = {
     var verification_result:W64.t;
     var context_pointer:int;
     var context_size:int;
-    var  _0:W64.t;
-    var  _1:W64.t;
-     _0 <- (init_msf);
     context_pointer <- (W64.to_uint context.[0]);
     context_size <- (W64.to_uint context.[1]);
-     _1 <- (init_msf);
     if ((context_size <= 255)) {
       verification_result <@ __verify_internal (verification_key,
       context_pointer, context_size, message_pointer, message_size,

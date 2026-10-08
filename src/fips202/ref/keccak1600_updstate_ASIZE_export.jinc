@@ -1,6 +1,6 @@
 require "keccak1600_updstate_ASIZE.jinc"
 
-export fn absorb_updstate_avx2
+export fn absorb_updstate
 ( reg mut ptr keccak_updstate st
 , reg const ptr u8[_ASIZE] buf
 , reg ui64 len
@@ -8,20 +8,21 @@ export fn absorb_updstate_avx2
 {
   st = st;
   buf = buf;
-  st = _update_updstate_avx2(st, buf, len);
+  len = len;
+  st = _absorb_updstate(st, buf, len);
   return st;
 }
 
-export fn squeeze_updstate_avx2
+export fn squeeze_updstate
 ( reg mut ptr keccak_updstate st
 , reg mut ptr u8[_ASIZE] buf
 , reg ui64 len
 ) -> reg ptr keccak_updstate /* st */
-   , reg ptr u8[_ASIZE] /* buf */
+   , reg ptr u8[_ASIZE]      /* buf */
 {
   st = st;
   buf = buf;
   len = len;
-  st, buf = _squeeze_updstate_avx2(st, buf, len);
+  st, buf = _squeeze_updstate(st, buf, len);
   return st, buf;
 }

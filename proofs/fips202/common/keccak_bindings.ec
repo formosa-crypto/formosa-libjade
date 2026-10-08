@@ -2,10 +2,11 @@ require import AllCore List IntDiv QFABV.
 
 from Jasmin require import JModel_x86.
 
-require JWordExtra.
-
 from CryptoSpecs require export Keccak1600_arrays.
 from JazzEC require import Array7 WArray200 WArray800 Array100.
+
+(* proved [W16_sar_div]/[W32_sar_div], used by the [bvashrP] realizations *)
+require JWord_extra.
 
 
 import BitEncoding BS2Int BitChunking.
@@ -211,25 +212,6 @@ qed.
 
 (* ------------- END W8 Bindings -------------------- *)
 
-lemma W16_sar_div (w1 : W16.t) k:
- 0 <= k =>
- to_sint (w1 `|>>>` k)
- = to_sint w1 %/ 2 ^ k.
-proof. exact JWordExtra.WE16.to_sint_sar. qed.
-
-lemma W32_sar_div (w1 : W32.t) k:
- 0 <= k =>
- to_sint (w1 `|>>>` k)
- = to_sint w1 %/ 2 ^ k.
-proof. exact JWordExtra.WE32.to_sint_sar. qed.
-
-lemma W64_sar_div (w1 : W64.t) k:
- 0 <= k =>
- to_sint (w1 `|>>>` k)
- = to_sint w1 %/ 2 ^ k.
-proof. exact JWordExtra.WE64.to_sint_sar. qed.
-
-
 (* ----------- BEGIN W16 BINDINGS ---------- *)
 
 bind bitstring W16.w2bits W16.bits2w W16.to_uint W16.to_sint W16.of_int W16.t 16.
@@ -322,7 +304,7 @@ W16.sar w1 (to_uint w2).
 
 bind op [W16.t] sra_16 "ashr".
 realize bvashrP.
-move=> bv1 bv2; rewrite W16_sar_div; smt(W16.to_uint_cmp).
+move=> bv1 bv2; rewrite JWord_extra.W16_sar_div; smt(W16.to_uint_cmp).
 qed.
 
 op srl_16 (w1 w2 : W16.t) : W16.t =
@@ -469,7 +451,7 @@ op sra_32 (w1 w2 : W32.t) : W32.t =
 
 bind op [W32.t] sra_32 "ashr".
 realize bvashrP.
-move => bv1 bv2; rewrite W32_sar_div; smt(W32.to_uint_cmp).
+move => bv1 bv2; rewrite JWord_extra.W32_sar_div; smt(W32.to_uint_cmp).
 qed.
 
 bind op [W8.t & W32.t] W4u8.zeroextu32 "zextend".

@@ -1,6 +1,6 @@
 require "keccak1600_updstate.jinc"
 
-export fn keccak_ststatus
+export fn ststatus_updstate
 ( reg mut ptr u8[3] status
 , reg const ptr keccak_updstate st
 ) -> reg ptr u8[3]
@@ -8,7 +8,6 @@ export fn keccak_ststatus
   reg ui64 r8 at;
   reg u64 ststatus;
   ststatus = st[25];
-  () = #declassify(ststatus);
   _, r8, at = _ststatus_data(ststatus);
   status[0] = (8u) (64u) r8;
   status[1] = (8u) (64u) at;
@@ -16,7 +15,7 @@ export fn keccak_ststatus
   return status;
 }
 
-export fn init_updstate_avx2
+export fn init_updstate
 ( reg mut ptr keccak_updstate st
 , reg ui8 r64
 , reg u8 trailb
@@ -25,32 +24,20 @@ export fn init_updstate_avx2
   st = st;
   r64 = r64;
   trailb = trailb;
-  st = _init_updstate_avx2(st, r64, trailb);
+  st = _init_updstate(st, r64, trailb);
   return st;
 }
 
-export fn finish_updstate_avx2
+export fn finish_updstate
 ( reg mut ptr keccak_updstate st
 ) -> reg ptr keccak_updstate /* st */
 {
   st = st;
-  st = _finish_updstate_avx2(st);
+  st = _finish_updstate(st);
   return st;
 }
 
-export fn absorb_m_updstate_avx2
-( reg mut ptr keccak_updstate st
-, reg ui64 buf
-, reg ui64 len
-) -> reg ptr keccak_updstate /* st */
-{
-  st = st;
-  buf = buf;
-  st = _absorb_m_updstate_avx2(st, buf, len);
-  return st;
-}
-
-export fn squeeze_m_updstate_avx2
+export fn absorb_m_updstate
 ( reg mut ptr keccak_updstate st
 , reg ui64 buf
 , reg ui64 len
@@ -58,6 +45,18 @@ export fn squeeze_m_updstate_avx2
 {
   st = st;
   buf = buf;
-  _, st = _squeeze_m_updstate_avx2(buf, len, st);
+  st = _absorb_m_updstate(st, buf, len);
+  return st;
+}
+
+export fn squeeze_m_updstate
+( reg mut ptr keccak_updstate st
+, reg ui64 buf
+, reg ui64 len
+) -> reg ptr keccak_updstate /* st */
+{
+  st = st;
+  buf = buf;
+  st = _squeeze_m_updstate(st, buf, len);
   return st;
 }
