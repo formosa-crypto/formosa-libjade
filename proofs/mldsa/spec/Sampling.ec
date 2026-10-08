@@ -145,7 +145,7 @@ module ExpandA(XOF : XOF_RejNTTPoly) = {
       while (r < kvec) {
           s <- 0;
           while (s < lvec) {
-            rhop <- Bytes34.of_list (Bytes32.to_list rho ++ [W8.of_int r; W8.of_int s]);
+            rhop <- Bytes34.of_list (Bytes32.to_list rho ++ [W8.of_int s; W8.of_int r]);
             ars <@ RejNTTPoly(XOF).sample(rhop);
             aa <- aa.[(r,s) <- ars];
             s <- s + 1;
@@ -181,6 +181,7 @@ module ExpandS(XOF : XOF_RejBPoly) = {
          s1 <- s1.[r <- si];
             r <- r + 1;
       }
+      r <- 0;
       while (r < kvec) {
          rhop <- Bytes66.of_list (Bytes64.to_list rho ++ (IntegerToBytes (r+lvec) 2));        
          si <@ RejBoundedPoly(XOF).sample(rhop);

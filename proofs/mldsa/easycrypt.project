@@ -16,6 +16,7 @@ rdirs = ../core
 idirs = Spec:spec
 idirs = Spec:spec/properties
 rdirs = spec
+rdirs = security
 
 rdirs = eclib
 idirs = JazzEC:x86-64/avx2/ml_dsa_65/common/arithmetic

@@ -55,8 +55,8 @@ op H_tr (pk : BytesPK.t) : Bytes64.t =
 op H_mu (tr : Bytes64.t) (msg : W8.t list) : Bytes64.t =
   Bytes64.of_list (SHAKE256 (Bytes64.to_list tr ++ msg) 64).
 
-type rnd_. (* either 0 or 32 bytes *)
-op rnd_to_list : rnd_ -> W8.t list.
+type rnd_ = Bytes32.t.
+op rnd_to_list (r : rnd_) : W8.t list = Bytes32.to_list r.
 
 (* H_rhopp: SHAKE256(K || rnd || mu, 64). First input is secret (PRF). *)
 op H_rhopp (K : Bytes32.t) (r : rnd_) (mu : Bytes64.t) : Bytes64.t =
