@@ -578,9 +578,10 @@ fn __poly_cbd_eta1(reg ptr u16[MLKEM_N] rp, reg ptr u8[MLKEM_ETA1*MLKEM_N/4+(MLK
    , ensures = is_arr_init(rp,0,MLKEM_N * 2)
    }
  ]
-fn _poly_getnoise_eta2(#[spill_to_mmx] reg ptr u16[MLKEM_N] rp, reg ptr u8[MLKEM_SYMBYTES] seed, reg u8 nonce) -> reg ptr u16[MLKEM_N]
+fn _poly_getnoise_eta2(reg ptr u16[MLKEM_N] rp, reg ptr u8[MLKEM_SYMBYTES] seed, reg u8 nonce) -> reg ptr u16[MLKEM_N]
 {
   stack u8[MLKEM_ETA2*MLKEM_N/4] buf;
+  #[msf] reg u64 ms;
   () = #spill(rp);
 
   stack u8[1] nonce_s;
@@ -588,6 +589,7 @@ fn _poly_getnoise_eta2(#[spill_to_mmx] reg ptr u16[MLKEM_N] rp, reg ptr u8[MLKEM
   buf = _shake256_A128__A32_A1(buf, seed, nonce_s);
 
   () = #unspill(rp);
+  ms = #init_msf();
   rp =__poly_cbd_eta1(rp, buf);
 
   return rp;

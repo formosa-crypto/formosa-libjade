@@ -445,9 +445,14 @@ fn _gen_matrix_sample_four_polynomials
 
   indexes.[:u64 0] = gen_matrix_get_indexes(pos_entry, transposed);
 
+  #spill(buf,polx4);
   stx4 = state;
   stx4 = _shake128x4_absorb_A32_A2(stx4, rho, indexes);
+  #unspill(buf);
+  ms = #init_msf();
   _, buf = _shake128x4_squeeze3blocks(stx4, buf);
+  #unspill(polx4);
+  ms = #init_msf();
 
   #spill(buf,polx4);
   bufp = buf[BUF_size * 0 : BUF_size];

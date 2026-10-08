@@ -9,25 +9,28 @@ require "../common/verify.jinc"
 inline
 fn __crypto_kem_keypair_jazz
 ( reg ptr u8[MLKEM_PUBLICKEYBYTES] pk
-, #[spill_to_mmx] reg ptr u8[MLKEM_SECRETKEYBYTES] sk
+, reg ptr u8[MLKEM_SECRETKEYBYTES] sk
 , reg ptr u8[MLKEM_SYMBYTES*2] randomnessp
 ) -> reg ptr u8[MLKEM_PUBLICKEYBYTES]
    , reg ptr u8[MLKEM_SECRETKEYBYTES]
 {
-  #[mmx] reg ptr u8[MLKEM_SYMBYTES*2] s_randomnessp;
+  stack ptr u8[MLKEM_SYMBYTES*2] s_randomnessp;
   reg ptr u8[MLKEM_SYMBYTES] randomnessp1;
   reg ptr u8[32] hpk;
   reg u64 t64;
   inline int i;
   reg ptr u8[MLKEM_POLYVECBYTES] skcpa;
-  #[mmx] reg ptr u8[MLKEM_SECRETKEYBYTES]sk_s;
+  stack ptr u8[MLKEM_SECRETKEYBYTES]sk_s;
+  #[msf] reg u64 ms;
 
   s_randomnessp = randomnessp;
 
   randomnessp1 = randomnessp[0:MLKEM_SYMBYTES];
-  skcpa = sk[0:MLKEM_POLYVECBYTES]; sk_s = sk; 
+  skcpa = sk[0:MLKEM_POLYVECBYTES]; sk_s = sk;
   pk, skcpa = __indcpa_keypair(pk, skcpa, randomnessp1);
-  sk = sk_s; sk[0:MLKEM_POLYVECBYTES] = skcpa; 
+  sk = sk_s;
+  ms = #init_msf();
+  sk[0:MLKEM_POLYVECBYTES] = skcpa;
 
   for i = 0 to MLKEM_INDCPA_PUBLICKEYBYTES/8
   {
@@ -39,9 +42,9 @@ fn __crypto_kem_keypair_jazz
   hpk = sk[MLKEM_POLYVECBYTES + MLKEM_PUBLICKEYBYTES:32];
   hpk = _sha3_256A_A1184(hpk, pk);
   #unspill(sk);
-  sk[MLKEM_POLYVECBYTES + MLKEM_PUBLICKEYBYTES:32] = hpk;
-
   randomnessp = s_randomnessp;
+  ms = #init_msf();
+  sk[MLKEM_POLYVECBYTES + MLKEM_PUBLICKEYBYTES:32] = hpk;
 
   for i = 0 to MLKEM_SYMBYTES/8
   {
@@ -59,13 +62,14 @@ fn __crypto_kem_keypair_jazz
  ]
 inline
 fn __crypto_kem_enc_jazz(
-  #[spill_to_mmx] reg ptr u8[MLKEM_CIPHERTEXTBYTES] ct,
-  #[spill_to_mmx] reg ptr u8[MLKEM_SYMBYTES] shk,
-  #[spill_to_mmx] reg ptr u8[MLKEM_PUBLICKEYBYTES] pk,
+  reg ptr u8[MLKEM_CIPHERTEXTBYTES] ct,
+  reg ptr u8[MLKEM_SYMBYTES] shk,
+  reg ptr u8[MLKEM_PUBLICKEYBYTES] pk,
   reg ptr u8[MLKEM_SYMBYTES] randomnessp)
   -> reg ptr u8[MLKEM_CIPHERTEXTBYTES], reg ptr u8[MLKEM_SYMBYTES]
 {
   stack u8[MLKEM_SYMBYTES * 2] buf kr;
+  #[msf] reg u64 ms;
 
   () = #spill(ct, pk, shk);
 
@@ -77,10 +81,12 @@ fn __crypto_kem_enc_jazz(
   kr = _sha3_512A_A64(kr, buf);
 
   () = #unspill(ct, pk);
+  ms = #init_msf();
 
   ct = __indcpa_enc(ct, buf[0:MLKEM_INDCPA_MSGBYTES], pk, kr[MLKEM_SYMBYTES:MLKEM_SYMBYTES]);
 
   () = #unspill(shk);
+  ms = #init_msf();
 
   reg u256 k = kr[:u256 0];
   shk[#unaligned:u256 0] = k;
@@ -95,9 +101,9 @@ fn __crypto_kem_enc_jazz(
  ]
 inline
 fn __crypto_kem_dec_jazz(
-  #[spill_to_mmx] reg ptr u8[MLKEM_SYMBYTES] shk,
-  #[spill_to_mmx] reg ptr u8[MLKEM_CIPHERTEXTBYTES] ct,
-  #[spill_to_mmx] reg ptr u8[MLKEM_SECRETKEYBYTES] sk)
+  reg ptr u8[MLKEM_SYMBYTES] shk,
+  reg ptr u8[MLKEM_CIPHERTEXTBYTES] ct,
+  reg ptr u8[MLKEM_SECRETKEYBYTES] sk)
   -> reg ptr u8[MLKEM_SYMBYTES]
 {
   stack u8[MLKEM_INDCPA_CIPHERTEXTBYTES] ctc;
@@ -105,6 +111,7 @@ fn __crypto_kem_dec_jazz(
   stack u8[MLKEM_SYMBYTES + MLKEM_CIPHERTEXTBYTES] zp_ct; // used instead of reg u64 zp
   reg ptr u8[MLKEM_POLYVECBYTES] skp;
   reg u64 cnd;
+  #[msf] reg u64 ms;
 
   () = #spill(shk, ct, sk);
   reg u256 z = sk.[:u256 MLKEM_SECRETKEYBYTES - MLKEM_SYMBYTES];
@@ -123,9 +130,11 @@ fn __crypto_kem_dec_jazz(
   // No need for pointer arithmetic
 
   #unspill(sk);
+  ms = #init_msf();
   ctc = __indcpa_enc(ctc, buf[0:MLKEM_SYMBYTES], sk[MLKEM_POLYVECBYTES:MLKEM_PUBLICKEYBYTES], kr[MLKEM_SYMBYTES:MLKEM_SYMBYTES]);
 
-  () = #unspill(ct);
+  () = #unspill(ct, shk);
+  ms = #init_msf();
 
   cnd = __verify(ct, ctc);
   #spill(cnd);
@@ -139,8 +148,6 @@ fn __crypto_kem_dec_jazz(
   }
 
   /* fixme: should this be done in memory? */
-  () = #unspill(shk);
-
   shk = _shake256_A32__A1120(shk, zp_ct);
 
   #unspill(cnd);

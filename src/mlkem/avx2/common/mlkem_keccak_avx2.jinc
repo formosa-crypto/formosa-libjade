@@ -1,10 +1,19 @@
-from Keccak require "common/keccak1600_default.jinc"
+from Keccak require "common/keccakf1600_generic.jinc"
+
+param int KECCAK_FEATURES
+ = KECCAK_FEATURE_BMI+KECCAK_FEATURE_BMI2+KECCAK_FEATURE_AVX2;
+
+param int KECCAK_PERMUTATION
+ = KECCAK_F1600_AVX2+KECCAK_F1600x4_NAT;
+
 from Keccak require "ref/keccakf1600.jinc"
 from Keccak require "ref/keccak1600.jinc"
+from Keccak require "avx2/keccak1600.jinc"
 from Keccak require "avx2/keccakf1600x4.jinc"
 from Keccak require "avx2/keccak1600x4.jinc"
 
 from Keccak require "ref/keccak1600_fixedsizes.jinc"
+from Keccak require "avx2/keccak1600_fixedsizes.jinc"
 from Keccak require "avx2/keccak1600x4_fixedsizes.jinc"
 
 /* instantiate the Keccak code with variants for reading/writing
@@ -12,65 +21,76 @@ from Keccak require "avx2/keccak1600x4_fixedsizes.jinc"
 namespace A1 {
   param int _ASIZE = 1;
   from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
   from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
 }
 
 namespace A2 {
   param int _ASIZE = 2;
   from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
   from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
 }
 
 namespace A32 {
   param int _ASIZE = 32;
   from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
   from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
 }
 
 namespace A33 {
   param int _ASIZE = 33;
   from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
   from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
 }
 
 namespace A64 {
   param int _ASIZE = 64;
   from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
 }
 
 namespace A128 {
   param int _ASIZE = 128;
   from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
   from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
 }
 
 namespace A1184 {
   param int _ASIZE = 1184;
   from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
   from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
 }
 
 namespace A1568 {
   param int _ASIZE = 1568;
   from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
   from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
 }
 
 namespace A1120 {
   param int _ASIZE = 1120;
   from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
   from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
 }
 
 namespace A1600 {
   param int _ASIZE = 1600;
   from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
   from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
 }
 
 namespace ABUFLEN {
   param int _ASIZE = 536;
   from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
   from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
 }
 
@@ -123,10 +143,19 @@ fn _sha3_512A_A33
 ( #[spill_to_mmx] reg mut ptr u8[64] out
 , reg const ptr u8[33] in
 ) -> reg ptr u8[64]
-{ stack u64[25] st;
-  st = __state_init(st);
-  st, _ = A33::__absorb(st, 0, in, SHA3, R72);
-  _, out = A64::__squeeze(st, out, R72);
+{ inline int KECCAK_F;
+  stack u64[25] st;
+  reg u256[7] state;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  if (KECCAK_F == KECCAK_F1600_AVX2) {
+    state = __state_init_avx2();
+    state, _ = A33::__absorb_avx2(state, 0, in, SHA3, R72);
+    _, out = A64::__squeeze_avx2(state, out, R72);
+  } else {
+    st = __state_init(st);
+    st, _ = A33::__absorb(st, 0, in, SHA3, R72);
+    _, out = A64::__squeeze(st, out, R72);
+  }
   return out;
 }
 
@@ -141,12 +170,21 @@ fn _sha3_512A_A64
 ( #[spill_to_mmx] reg mut ptr u8[64] out
 , reg const ptr u8[64] in
 ) -> reg ptr u8[64]
-{ stack u64[25] st;
-  #spill(out);
-  st = __state_init(st);
-  st, _ = A64::__absorb(st, 0, in, SHA3, R72);
-  #unspill(out);
-  _, out = A64::__squeeze(st, out, R72);
+{ inline int KECCAK_F;
+  stack u64[25] st;
+  reg u256[7] state;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  if (KECCAK_F == KECCAK_F1600_AVX2) {
+    state = __state_init_avx2();
+    state, _ = A64::__absorb_avx2(state, 0, in, SHA3, R72);
+    _, out = A64::__squeeze_avx2(state, out, R72);
+  } else {
+    #spill(out);
+    st = __state_init(st);
+    st, _ = A64::__absorb(st, 0, in, SHA3, R72);
+    #unspill(out);
+    _, out = A64::__squeeze(st, out, R72);
+  }
   return out;
 }
 
@@ -192,12 +230,21 @@ fn _shake256_A128__A32_A1
 , reg const ptr u8[32] seed
 , reg const ptr u8[1] nonce
 ) -> reg ptr u8[128]
-{ stack u64[25] st;
-  st = __state_init(st);
-  st, _ = A32::__absorb(st, 0, seed, UNFINISHED, R136);
-  st, _ = A1::__absorb(st, 32, nonce, SHAKE, R136);
-  _, out = A128::__squeeze(st, out, R136);
-
+{ inline int KECCAK_F;
+  stack u64[25] st;
+  reg u256[7] state;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  if (KECCAK_F == KECCAK_F1600_AVX2) {
+    state = __state_init_avx2();
+    state, _ = A32::__absorb_avx2(state, 0, seed, UNFINISHED, R136);
+    state, _ = A1::__absorb_avx2(state, 32, nonce, SHAKE, R136);
+    _, out = A128::__squeeze_avx2(state, out, R136);
+  } else {
+    st = __state_init(st);
+    st, _ = A32::__absorb(st, 0, seed, UNFINISHED, R136);
+    st, _ = A1::__absorb(st, 32, nonce, SHAKE, R136);
+    _, out = A128::__squeeze(st, out, R136);
+  }
   return out;
 }
 
@@ -243,11 +290,19 @@ fn _shake128_absorb_A32_A2
 , reg const ptr u8[32] seed
 , reg const ptr u8[2] pos
 ) -> reg ptr u64[25]
-{ 
-  st = __state_init(st);
-  st, _ = A32::__absorb(st, 0, seed, UNFINISHED, R168);
-  st, _ = A2::__absorb(st, 32, pos, SHAKE, R168);
-
+{ inline int KECCAK_F;
+  reg u256[7] state;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  if (KECCAK_F == KECCAK_F1600_AVX2) {
+    state = __state_init_avx2();
+    state, _ = A32::__absorb_avx2(state, 0, seed, UNFINISHED, R168);
+    state, _ = A2::__absorb_avx2(state, 32, pos, SHAKE, R168);
+    st = __stavx2_unpack(st, state);
+  } else {
+    st = __state_init(st);
+    st, _ = A32::__absorb(st, 0, seed, UNFINISHED, R168);
+    st, _ = A2::__absorb(st, 32, pos, SHAKE, R168);
+  }
   return st;
 }
 
@@ -284,27 +339,42 @@ fn _shake128_squeeze3blocks
 ) -> reg ptr u64[25]
    , reg ptr u8[ABUFLEN::_ASIZE]
 {
+ inline int KECCAK_F;
+ reg u256[7] state;
  reg ui64 offset;
  #[msf] reg u64 ms;
- #spill(buf);
- st = _keccakf1600(st);
- #unspill(buf);
- ms = #init_msf();
- buf = #protect_ptr(buf, ms);
- offset = 0;
- buf, offset = ABUFLEN::__dumpstate(buf, offset, R168, st);
- #spill(buf,offset);
- st = _keccakf1600(st);
- #unspill(buf,offset);
- ms = #init_msf();
- buf = #protect_ptr(buf, ms);
- buf, offset = ABUFLEN::__dumpstate(buf, offset, R168, st);
- #spill(buf,offset);
- st = _keccakf1600(st);
- #unspill(buf,offset);
- ms = #init_msf();
- buf = #protect_ptr(buf, ms);
- buf, offset = ABUFLEN::__dumpstate(buf, offset, 200, st);
+ KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+ if (KECCAK_F == KECCAK_F1600_AVX2) {
+   state = __stavx2_pack(st);
+   offset = 0;
+   state = _keccakf1600_avx2(state);
+   buf, offset = ABUFLEN::__dumpstate_avx2(buf, offset, R168, state);
+   state = _keccakf1600_avx2(state);
+   buf, offset = ABUFLEN::__dumpstate_avx2(buf, offset, R168, state);
+   state = _keccakf1600_avx2(state);
+   buf, offset = ABUFLEN::__dumpstate_avx2(buf, offset, 200, state);
+   st = __stavx2_unpack(st, state);
+ } else {
+   #spill(buf);
+   st = _keccakf1600(st);
+   #unspill(buf);
+   ms = #init_msf();
+   buf = #protect_ptr(buf, ms);
+   offset = 0;
+   buf, offset = ABUFLEN::__dumpstate(buf, offset, R168, st);
+   #spill(buf,offset);
+   st = _keccakf1600(st);
+   #unspill(buf,offset);
+   ms = #init_msf();
+   buf = #protect_ptr(buf, ms);
+   buf, offset = ABUFLEN::__dumpstate(buf, offset, R168, st);
+   #spill(buf,offset);
+   st = _keccakf1600(st);
+   #unspill(buf,offset);
+   ms = #init_msf();
+   buf = #protect_ptr(buf, ms);
+   buf, offset = ABUFLEN::__dumpstate(buf, offset, 200, st);
+ }
  return st, buf;
 }
 
@@ -319,16 +389,23 @@ fn _shake128_next_state
 ( reg mut ptr u8[ABUFLEN::_ASIZE] buf
 ) -> reg ptr u8[ABUFLEN::_ASIZE] /* buf */
 {
+ inline int KECCAK_F;
  reg ptr u64[25] st;
  #[msf] reg u64 ms;
- #spill(buf);
- st = buf[:u64 2*(168/8) : 25];
- st = _keccakf1600(st);
- #unspill(buf);
- ms = #init_msf();
- buf = #protect_ptr(buf, ms);
- buf[:u64 2*(168/8) : 25] = st;
-
+ KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+ if (KECCAK_F == KECCAK_F1600_AVX2) {
+   st = buf[:u64 2*(168/8) : 25];
+   st = _keccakf1600_st25_avx2(st);
+   buf[:u64 2*(168/8) : 25] = st;
+ } else {
+   #spill(buf);
+   st = buf[:u64 2*(168/8) : 25];
+   st = _keccakf1600(st);
+   #unspill(buf);
+   ms = #init_msf();
+   buf = #protect_ptr(buf, ms);
+   buf[:u64 2*(168/8) : 25] = st;
+ }
  return buf;
 }
 
@@ -378,13 +455,21 @@ fn _sha3_256A_A1184
 ( #[spill_to_mmx] reg mut ptr u8[32] out
 , #[spill_to_mmx] reg const ptr u8[1184] in
 ) -> reg ptr u8[32]
-{ stack u64[25] st;
-  #spill(out);
-  st = __state_init(st);
-  st, _ = A1184::__absorb(st, 0, in, SHA3, R136);
-  #unspill(out);
-  _, out = A32::__squeeze(st, out, R136);
-
+{ inline int KECCAK_F;
+  stack u64[25] st;
+  reg u256[7] state;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  if (KECCAK_F == KECCAK_F1600_AVX2) {
+    state = __state_init_avx2();
+    state, _ = A1184::__absorb_avx2(state, 0, in, SHA3, R136);
+    _, out = A32::__squeeze_avx2(state, out, R136);
+  } else {
+    #spill(out);
+    st = __state_init(st);
+    st, _ = A1184::__absorb(st, 0, in, SHA3, R136);
+    #unspill(out);
+    _, out = A32::__squeeze(st, out, R136);
+  }
   return out;
 }
 
@@ -397,13 +482,21 @@ fn _sha3_256A_A1568
 ( #[spill_to_mmx] reg mut ptr u8[32] out
 , #[spill_to_mmx] reg const ptr u8[1568] in
 ) -> reg ptr u8[32]
-{ stack u64[25] st;
-  #spill(out);
-  st = __state_init(st);
-  st, _ = A1568::__absorb(st, 0, in, SHA3, R136);
-  #unspill(out);
-  _, out = A32::__squeeze(st, out, R136);
-
+{ inline int KECCAK_F;
+  stack u64[25] st;
+  reg u256[7] state;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  if (KECCAK_F == KECCAK_F1600_AVX2) {
+    state = __state_init_avx2();
+    state, _ = A1568::__absorb_avx2(state, 0, in, SHA3, R136);
+    _, out = A32::__squeeze_avx2(state, out, R136);
+  } else {
+    #spill(out);
+    st = __state_init(st);
+    st, _ = A1568::__absorb(st, 0, in, SHA3, R136);
+    #unspill(out);
+    _, out = A32::__squeeze(st, out, R136);
+  }
   return out;
 }
 
@@ -416,12 +509,21 @@ fn _shake256_A32__A1120
 (  #[spill_to_mmx] reg mut ptr u8[32] out
 ,  reg const ptr u8[1120] in
 ) -> reg ptr u8[32]
-{ stack u64[25] st;
-  #spill(out);
-  st = __state_init(st);
-  st, _ = A1120::__absorb(st, 0, in, SHAKE, R136);
-  #unspill(out);
-  _, out = A32::__squeeze(st, out, R136);
+{ inline int KECCAK_F;
+  stack u64[25] st;
+  reg u256[7] state;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  if (KECCAK_F == KECCAK_F1600_AVX2) {
+    state = __state_init_avx2();
+    state, _ = A1120::__absorb_avx2(state, 0, in, SHAKE, R136);
+    _, out = A32::__squeeze_avx2(state, out, R136);
+  } else {
+    #spill(out);
+    st = __state_init(st);
+    st, _ = A1120::__absorb(st, 0, in, SHAKE, R136);
+    #unspill(out);
+    _, out = A32::__squeeze(st, out, R136);
+  }
   return out;
 }
 
@@ -434,12 +536,21 @@ fn _shake256_A32__A1600
 (  #[spill_to_mmx] reg mut ptr u8[32] out
 ,  reg const ptr u8[1600] in
 ) -> reg ptr u8[32]
-{ stack u64[25] st;
-  #spill(out);
-  st = __state_init(st);
-  st, _ = A1600::__absorb(st, 0, in, SHAKE, R136);
-  #unspill(out);
-  _, out = A32::__squeeze(st, out, R136);
+{ inline int KECCAK_F;
+  stack u64[25] st;
+  reg u256[7] state;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  if (KECCAK_F == KECCAK_F1600_AVX2) {
+    state = __state_init_avx2();
+    state, _ = A1600::__absorb_avx2(state, 0, in, SHAKE, R136);
+    _, out = A32::__squeeze_avx2(state, out, R136);
+  } else {
+    #spill(out);
+    st = __state_init(st);
+    st, _ = A1600::__absorb(st, 0, in, SHAKE, R136);
+    #unspill(out);
+    _, out = A32::__squeeze(st, out, R136);
+  }
   return out;
 }
 

@@ -7,9 +7,9 @@ require "../common/gen_matrix.jinc"
    }
  ]
 fn _gen_matrix_avx2
-( #[spill_to_mmx] reg mut ptr u16[MLKEM_K * MLKEM_K * MLKEM_N] matrix
-, #[spill_to_mmx] reg const ptr u8[32] rho
-, #[spill_to_mmx] reg u64 transposed
+( reg mut ptr u16[MLKEM_K * MLKEM_K * MLKEM_N] matrix
+, reg const ptr u8[32] rho
+, reg u64 transposed
 ) -> reg ptr u16[MLKEM_K * MLKEM_K * MLKEM_N]
 {
   // local variables
@@ -18,6 +18,7 @@ fn _gen_matrix_avx2
   reg ptr u8[BUF_size * 4] buf;
   reg ptr u16[4*MLKEM_N] polx4;
   reg u64 pos_entry;
+  #[msf] reg u64 ms;
 
   () = #spill(transposed);
 
@@ -31,6 +32,7 @@ fn _gen_matrix_avx2
     () = #unspill(transposed);
     polx4, buf = _gen_matrix_sample_four_polynomials(polx4, buf, rho, pos_entry, transposed);
     #unspill(matrix,rho);
+    ms = #init_msf();
     matrix[i*4*MLKEM_N:4*MLKEM_N] = polx4;
   }
 

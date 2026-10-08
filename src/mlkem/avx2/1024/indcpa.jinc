@@ -10,8 +10,8 @@ require "gen_matrix.jinc"
  ]
 inline
 fn __indcpa_keypair
-( #[spill_to_mmx] reg ptr u8[MLKEM_PUBLICKEYBYTES] pk
-, #[spill_to_mmx] reg ptr u8[MLKEM_POLYVECBYTES] sk
+( reg ptr u8[MLKEM_PUBLICKEYBYTES] pk
+, reg ptr u8[MLKEM_POLYVECBYTES] sk
 , reg ptr u8[MLKEM_SYMBYTES] randomnessp
 ) -> reg ptr u8[MLKEM_PUBLICKEYBYTES]
    , reg ptr u8[MLKEM_POLYVECBYTES]
@@ -25,6 +25,7 @@ fn __indcpa_keypair
   reg u8 nonce;
   inline int i;
   reg u64 transposed;
+  #[msf] reg u64 ms;
 
   () = #spill(pk, sk);
 
@@ -68,6 +69,7 @@ fn __indcpa_keypair
   pkpv = __polyvec_reduce(pkpv);
 
   () = #unspill(pk, sk);
+  ms = #init_msf();
 
   sk = __i_polyvec_tobytes(sk, skpv);
   pk[0:MLKEM_POLYVECBYTES] = __i_polyvec_tobytes(pk[0:MLKEM_POLYVECBYTES], pkpv);
@@ -88,10 +90,10 @@ fn __indcpa_keypair
  ]
 inline
 fn __indcpa_enc(
-  #[spill_to_mmx] reg mut ptr u8[MLKEM_CIPHERTEXTBYTES] ct,
+  reg mut ptr u8[MLKEM_CIPHERTEXTBYTES] ct,
   reg ptr u8[MLKEM_INDCPA_MSGBYTES] msgp,
   reg ptr u8[MLKEM_PUBLICKEYBYTES] pk,
-  #[spill_to_mmx] reg ptr u8[MLKEM_SYMBYTES] noiseseed)
+  reg ptr u8[MLKEM_SYMBYTES] noiseseed)
 -> reg ptr u8[MLKEM_CIPHERTEXTBYTES]
 {
   stack u16[MLKEM_VECN] pkpv sp ep bp;
@@ -102,6 +104,7 @@ fn __indcpa_enc(
   reg u8 nonce;
   inline int w;
   reg u64 transposed;
+  #[msf] reg u64 ms;
 
   () = #spill(ct, noiseseed);
   pkpv = __i_polyvec_frombytes(pk[0:MLKEM_POLYVECBYTES]);
@@ -119,12 +122,17 @@ fn __indcpa_enc(
   aat = _gen_matrix_avx2(aat, publicseed, transposed);
 
   #unspill(noiseseed);
+  ms = #init_msf();
   nonce = 0;
   sp[0:MLKEM_N], sp[MLKEM_N:MLKEM_N], sp[2*MLKEM_N:MLKEM_N], sp[3*MLKEM_N:MLKEM_N] = _poly_getnoise_eta1_4x(sp[0:MLKEM_N], sp[MLKEM_N:MLKEM_N], sp[2*MLKEM_N:MLKEM_N], sp[3*MLKEM_N:MLKEM_N], noiseseed, nonce);
 
+  #unspill(noiseseed);
+  ms = #init_msf();
   nonce = 4;
   ep[0:MLKEM_N], ep[MLKEM_N:MLKEM_N], ep[2*MLKEM_N:MLKEM_N], ep[3*MLKEM_N:MLKEM_N] = _poly_getnoise_eta1_4x(ep[0:MLKEM_N], ep[MLKEM_N:MLKEM_N], ep[2*MLKEM_N:MLKEM_N], ep[3*MLKEM_N:MLKEM_N], noiseseed, nonce);
 
+  #unspill(noiseseed);
+  ms = #init_msf();
   nonce = 8;
   epp = _poly_getnoise_eta2(epp, noiseseed, nonce);
 
@@ -147,6 +155,7 @@ fn __indcpa_enc(
   v  = __poly_reduce(v);
 
   () = #unspill(ct);
+  ms = #init_msf();
   ct[0:MLKEM_POLYVECCOMPRESSEDBYTES+2] = __i_polyvec_compress(ct[0:MLKEM_POLYVECCOMPRESSEDBYTES+2], bp);
   ct[MLKEM_POLYVECCOMPRESSEDBYTES:MLKEM_POLYCOMPRESSEDBYTES], v = _i_poly_compress(ct[MLKEM_POLYVECCOMPRESSEDBYTES:MLKEM_POLYCOMPRESSEDBYTES], v);
 
