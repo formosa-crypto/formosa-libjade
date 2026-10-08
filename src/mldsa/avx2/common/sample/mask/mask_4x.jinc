@@ -6,15 +6,16 @@ param int BLOCKS_TO_SQUEEZE =
 param int EXPAND_TO_BUFFER_SIZE =
     BLOCKS_TO_SQUEEZE * SHAKE256_RATE;
 
+inline
 fn shake256_squeeze_multiple_blocks_4x(
-    reg ptr u256[25] state,
-    reg ptr u8[EXPAND_TO_BUFFER_SIZE] b0 b1 b2 b3
+    stack shakex4_state state,
+    stack u8[EXPAND_TO_BUFFER_SIZE] b0 b1 b2 b3
 ) ->
-    reg ptr u256[25],
-    reg ptr u8[EXPAND_TO_BUFFER_SIZE],
-    reg ptr u8[EXPAND_TO_BUFFER_SIZE],
-    reg ptr u8[EXPAND_TO_BUFFER_SIZE],
-    reg ptr u8[EXPAND_TO_BUFFER_SIZE]
+    stack shakex4_state,
+    stack u8[EXPAND_TO_BUFFER_SIZE],
+    stack u8[EXPAND_TO_BUFFER_SIZE],
+    stack u8[EXPAND_TO_BUFFER_SIZE],
+    stack u8[EXPAND_TO_BUFFER_SIZE]
 {
     inline int i;
 
@@ -47,7 +48,7 @@ fn __sample_mask_polynomial_4x(
      stack u32[COEFFICIENTS_IN_POLYNOMIAL],
      stack u32[COEFFICIENTS_IN_POLYNOMIAL]
 {
-    stack u256[25] xof_state;
+    stack shakex4_state xof_state;
 
     stack u8[EXPAND_TO_BUFFER_SIZE] mask_encoded0 mask_encoded1 mask_encoded2 mask_encoded3;
     stack u32[COEFFICIENTS_IN_POLYNOMIAL] mask0 mask1 mask2 mask3;

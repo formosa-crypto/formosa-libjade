@@ -1,9 +1,10 @@
-inline
+type shakex4_state = u256[25];
+
 fn shake128_absorb_34_4x(
-    reg ptr u256[25] state,
-    reg ptr u8[32] rho,
-    reg ptr u16[4] domain_separators
-) -> reg ptr u256[25]
+    reg mut ptr shakex4_state state,
+    reg const ptr u8[32] rho,
+    reg const ptr u16[4] domain_separators
+) -> reg ptr shakex4_state
 {
     stack u8[2] d0 d1 d2 d3;
 
@@ -20,12 +21,11 @@ fn shake128_absorb_34_4x(
     return state;
 }
 
-inline
 fn shake256_absorb_66_4x(
-    reg ptr u256[25] state,
-    reg ptr u8[64] rho_prime,
+    reg mut ptr shakex4_state state,
+    reg const ptr u8[64] rho_prime,
     reg u16 starting_domain_separator
-) -> reg ptr u256[25]
+) -> reg ptr shakex4_state
 {
     stack u8[2] d0 d1 d2 d3;
     reg u16 t;
@@ -44,12 +44,11 @@ fn shake256_absorb_66_4x(
     return state;
 }
 
-inline
 fn shake128_squeezeblock4x(
-    reg ptr u256[25] state,
-    reg ptr u8[SHAKE128_RATE] h0 h1 h2 h3
+    reg mut ptr shakex4_state state,
+    reg mut ptr u8[SHAKE128_RATE] h0 h1 h2 h3
 ) ->
-    reg ptr u256[25],
+    reg ptr shakex4_state,
     reg ptr u8[SHAKE128_RATE],
     reg ptr u8[SHAKE128_RATE],
     reg ptr u8[SHAKE128_RATE],
@@ -64,12 +63,11 @@ fn shake128_squeezeblock4x(
     return state, h0, h1, h2, h3;
 }
 
-inline
 fn shake256_squeezeblock4x(
-    reg ptr u256[25] state,
-    reg ptr u8[SHAKE256_RATE] h0 h1 h2 h3
+    reg mut ptr shakex4_state state,
+    reg mut ptr u8[SHAKE256_RATE] h0 h1 h2 h3
 ) ->
-    reg ptr u256[25],
+    reg ptr shakex4_state,
     reg ptr u8[SHAKE256_RATE],
     reg ptr u8[SHAKE256_RATE],
     reg ptr u8[SHAKE256_RATE],

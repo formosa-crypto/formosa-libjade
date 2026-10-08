@@ -12,11 +12,9 @@ fn __keygen_prf(
     reg ptr u8[32] randomness
 ) -> reg ptr u8[128] {
     stack u8[2] extra;
-    reg u256[7] state;
     extra[:u8 0] = ROWS_IN_MATRIX_A;
     extra[:u8 1] = COLUMNS_IN_MATRIX_A;
-    state = shake256_absorb_34(randomness, extra);
-    prf_output = squeeze_128_bytes(prf_output, state);
+    prf_output = _shake256_A128__A32_A2(prf_output, randomness, extra);
     return prf_output;
 }
 
@@ -49,13 +47,14 @@ inline fn __compute_t0_t1(
        {ptr: public, val: secret} ->
        {ptr: public, val: transient} * {ptr: public, val: secret}"]
 fn __keygen_internal(
-    #[spill_to_mmx] reg ptr u8[VERIFICATION_KEY_SIZE] verification_key,
-    #[spill_to_mmx] reg ptr u8[SIGNING_KEY_SIZE] signing_key,
+    reg ptr u8[VERIFICATION_KEY_SIZE] verification_key,
+    reg ptr u8[SIGNING_KEY_SIZE] signing_key,
     reg ptr u8[32] randomness
 )
     -> reg ptr u8[VERIFICATION_KEY_SIZE],
        reg ptr u8[SIGNING_KEY_SIZE]
 {
+    #[msf] reg u64 ms;
     reg ptr u8[VERIFICATION_KEY_SIZE] verification_key_pointer_copy;
 
     // PRF
@@ -91,7 +90,10 @@ fn __keygen_internal(
     s1, s2 = sample::__error_vectors(seed_for_error_vectors);
 
     // Serialize s1 and s2 before applying the NTT.
-    () = #unspill(signing_key);
+    () = #unspill(verification_key, signing_key);
+    ms = #init_msf();
+    verification_key = #protect_ptr(verification_key, ms);
+    signing_key = #protect_ptr(signing_key, ms);
 
     // SEED_FOR_MATRIX_A_SIZE is always 32.
     copied_32_bytes = seed_for_matrix_A.[:u256 0];
@@ -125,8 +127,14 @@ fn __keygen_internal(
     // and hash_verification_key is a function call that uses all registers.
     verification_key_pointer_copy = verification_key;
     () = #unspill(signing_key);
+    ms = #init_msf();
     verification_key_hash = signing_key[64:VERIFICATION_KEY_HASH_SIZE];
+    () = #spill(verification_key, signing_key);
     verification_key_hash = hash_verification_key(verification_key_hash, verification_key_pointer_copy);
+    () = #unspill(verification_key, signing_key);
+    ms = #init_msf();
+    verification_key = #protect_ptr(verification_key, ms);
+    signing_key = #protect_ptr(signing_key, ms);
     signing_key[64:VERIFICATION_KEY_HASH_SIZE] = verification_key_hash;
 
     // Encode t0 into the signing key.

@@ -10,15 +10,16 @@ namespace error_4x {
     param int REJECTION_SAMPLE_INPUT_SIZE = REJECTION_SAMPLING_BYTES;
     require "rejection_sample.jinc"
 
+    inline
     fn __shake256_squeeze_multiple_blocks_4x(
-      reg ptr u256[25] state,
-      reg ptr u8[REJECTION_SAMPLE_INPUT_SIZE] b0 b1 b2 b3
+      stack shakex4_state state,
+      stack u8[REJECTION_SAMPLE_INPUT_SIZE] b0 b1 b2 b3
     ) ->
-      reg ptr u256[25],
-      reg ptr u8[REJECTION_SAMPLE_INPUT_SIZE],
-      reg ptr u8[REJECTION_SAMPLE_INPUT_SIZE],
-      reg ptr u8[REJECTION_SAMPLE_INPUT_SIZE],
-      reg ptr u8[REJECTION_SAMPLE_INPUT_SIZE]
+      stack shakex4_state,
+      stack u8[REJECTION_SAMPLE_INPUT_SIZE],
+      stack u8[REJECTION_SAMPLE_INPUT_SIZE],
+      stack u8[REJECTION_SAMPLE_INPUT_SIZE],
+      stack u8[REJECTION_SAMPLE_INPUT_SIZE]
     {
         inline int i;
 
@@ -51,7 +52,7 @@ namespace error_4x {
          stack u32[COEFFICIENTS_IN_POLYNOMIAL],
          stack u32[COEFFICIENTS_IN_POLYNOMIAL]
     {
-        stack u256[25] xof_state;
+        stack shakex4_state xof_state;
 
         stack u8[REJECTION_SAMPLE_INPUT_SIZE] buf0 buf1 buf2 buf3;
 
@@ -101,6 +102,7 @@ namespace error_4x {
         }
 
         while (stop_sampling != 1) {
+            () = #spill(filled0, filled1, filled2, filled3);
             xof_state,
             buf0[0:SHAKE256_RATE],
             buf1[0:SHAKE256_RATE],
@@ -113,6 +115,8 @@ namespace error_4x {
                 buf2[0:SHAKE256_RATE],
                 buf3[0:SHAKE256_RATE]
             );
+            () = #unspill(filled0, filled1, filled2, filled3);
+            _ = #init_msf();
 
             if (filled0 < COEFFICIENTS_IN_POLYNOMIAL) {
                 filled = filled0;

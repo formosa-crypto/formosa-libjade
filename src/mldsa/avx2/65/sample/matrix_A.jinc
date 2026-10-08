@@ -7,8 +7,13 @@ namespace sample {
     {
         stack u32[ROWS_IN_MATRIX_A * COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] matrix_A;
         stack u16[4] domain_separators;
+        stack u8[32] seed;
+        reg u256 copied_32_bytes;
 
         inline int row column chunk index lane;
+
+        copied_32_bytes = rho.[:u256 0];
+        seed.[:u256 0] = copied_32_bytes;
 
         for chunk = 0 to (ROWS_IN_MATRIX_A * COLUMNS_IN_MATRIX_A) / 4 {
             index = 4 * chunk;
@@ -24,7 +29,7 @@ namespace sample {
             matrix_A[(index + 2) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
             matrix_A[(index + 3) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL]
                 = matrix_A::__sample_4_polynomials(
-                    rho,
+                    seed,
                     domain_separators
                 );
         }
@@ -42,7 +47,7 @@ namespace sample {
         matrix_A[(index + 1) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
         _, _ 
         = matrix_A::__sample_4_polynomials(
-            rho,
+            seed,
             domain_separators
         );
 
