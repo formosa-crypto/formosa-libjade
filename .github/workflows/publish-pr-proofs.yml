@@ -1,0 +1,68 @@
+name: publish-pr-proofs
+
+# Adds a pull request's proofs timing to the results repo
+# (https://github.com/strub/jasmin-nist-timing), as
+# data/pr/<number>/proofs/<head>.json with the PR's merge base, once its
+# proofs run has succeeded.
+#
+# The proofs workflow runs on pull_request, i.e. with the PR's own copy of
+# the workflow, so it must never hold the deploy key. This workflow is
+# triggered by its completion and always runs main's version (workflow_run):
+# it only downloads the run's artifact as data, validates it, and takes the
+# target (PR, head, merge base) from the event and the API.
+
+on:
+  workflow_run:
+    workflows: [proofs]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: proofs-timing
+          path: result
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Target
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD: ${{ github.event.workflow_run.head_sha }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          set -euo pipefail
+          [ -n "$PR" ] || { echo "no pull request for this run"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr.json"
+          base=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["base"]["sha"])' "$RUNNER_TEMP/pr.json")
+          mb=$(gh api "repos/$GITHUB_REPOSITORY/compare/$base...$HEAD" \
+                 --jq '[.merge_base_commit.sha, .merge_base_commit.commit.committer.date] | @tsv')
+          meta=$(MB="$mb" python3 -I -c '
+          import json, os, sys
+          pr = json.load(open(sys.argv[1]))
+          sha, date = os.environ["MB"].split("\t")
+          print(json.dumps({"pr": {"number": pr["number"], "title": pr["title"],
+                                   "head_ref": pr["head"]["ref"], "base": pr["base"]["sha"],
+                                   "merge_base": sha, "merge_base_date": date}}))' "$RUNNER_TEMP/pr.json")
+          { echo "dest=data/pr/$PR/proofs"; echo "commit=$HEAD"; echo "meta=$meta"; } >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/publish-result
+        with:
+          file: result/proofs-timing.json
+          dest: ${{ steps.target.outputs.dest }}
+          commit: ${{ steps.target.outputs.commit }}
+          meta: ${{ steps.target.outputs.meta }}
+          deploy-key: ${{ secrets.TIMING_DEPLOY_KEY }}
