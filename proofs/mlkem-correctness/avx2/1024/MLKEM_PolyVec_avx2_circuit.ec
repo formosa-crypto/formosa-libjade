@@ -121,7 +121,7 @@ proc change 5: { shift <- BSWAS_16u16_256.sliceget pvd_shift_s 0;}; 1: by auto; 
 proc change ^while.^while.1 : {f <- if (0 <= (352*k + 22*i)*8 <= 1568*8-256) then BSWAS_1568u8_256.sliceget rp ((352*k + 22*i)*8) else get256_direct (WArray1568.init8 (fun (i_0 : int) => rp.[i_0])) (352*k + 22*i) ;};
 1: by auto; move => &1 &2 [#] -> -> ->; case (0 <= (352*k{2} + 22*i{2})*8 <= 1568*8-256); [ move => ?; rewrite BSWAS_1568u8_256_slicegetE /# | by auto ].
 proc change ^while.^while.10 : {r <- if (0 <= (32*(16*k+i))*8 <= 16*1024-256) then BSWAS_1024u16_256.sliceset r ((32*(16*k+i))*8) f else Array1024.init (fun (i1:int) => WArray2048.get16 (WArray2048.set256 (WArray2048.init16 (fun (i_0 : int) => r.[i_0])) (16*k+i) f) i1) ;};
-1: by auto; move => &1 &2 [#] _ -> -> -> ->; case (0 <= (32*(16*k{2}+i{2}))*8 <= 16*1024-256); [ move => ?; rewrite BSWAS_1024u16_256_slicesetE // | by auto ].
+1: by auto; move => &1 &2 [#] -> -> -> ->; case (0 <= (32*(16*k{2}+i{2}))*8 <= 16*1024-256); [ move => ?; rewrite BSWAS_1024u16_256_slicesetE // | by auto ].
 unroll for ^while.
 cfold ^inc<-.
 do 4!(unroll for ^while).

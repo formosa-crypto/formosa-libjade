@@ -45,7 +45,7 @@ proc change 4: { shift <- BSWAS_16u16_256.sliceget pd_shift_s 0; } ; 1: by auto;
 proc change ^while.1 : { t <- zeroextu128 (if (0 <= (10*i)*8 <= 160*8-64) then BSWAS_160u8_64.sliceget a ((10*i)*8) else get64_direct (WArray160.init8 (fun (i_0 : int) => a.[i_0])) (10*i)); };
 1: by auto; move => &1 &2 [#] -> ->; case (0 <= (10 * i{2}) * 8 <= 160*8-64); [ move => ?; rewrite BSWAS_160u8_64_slicegetE /# | by auto ].
 proc change ^while.10 : { rp <- if (0 <= (32*i)*8 <= 256*16-256) then BSWAS_256u16_256.sliceset rp ((32*i)*8) f else Array256.init (fun (i0:int) => WArray512.get16 (WArray512.set256 (WArray512.init16 (fun (i_0 : int) => rp.[i_0])) i f) i0) ; };
-1: by auto; move => &1 &2 [#] _ -> -> ->; case (0 <= (32*i{2})*8 <= 256*16-256); [ move => ?; rewrite BSWAS_256u16_256_slicesetE // | by auto ].
+1: by auto; move => &1 &2 [#] -> -> ->; case (0 <= (32*i{2})*8 <= 256*16-256); [ move => ?; rewrite BSWAS_256u16_256_slicesetE // | by auto ].
 proc change ^while.2: { ti <- if (0 <= (10*i+8)*8 <= 160*8-16) then BSWAS_160u8_16.sliceget a ((10*i+8)*8) else get16_direct (WArray160.init8 (fun (i_0 : int) => a.[i_0])) (10*i+8) ; };
 1: by auto; move => &1 &2 [#] -> ->; case (0 <= (10*i{2}+8)*8 <= 160*8-16); [ move => ?; rewrite BSWAS_160u8_16_slicegetE /# | by auto ].
 

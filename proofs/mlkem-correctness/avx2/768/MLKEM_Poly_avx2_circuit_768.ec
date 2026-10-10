@@ -43,7 +43,7 @@ proc change 6: { shufbidx <- BSWAS_32u8_256.sliceget x32p 0;}; 1: by auto; move 
 proc change ^while.1 : { h <- zeroextu128 (if (0 <= (8*i)*8 <= 128*8-64) then BSWAS_128u8_64.sliceget a ((8*i)*8) else get64_direct (WArray128.init8 (fun (i_0 : int) => a.[i_0])) (8*i)); };
 1: by auto; move => &1 &2 [#] -> ->; case (0 <= (8*i{2})*8 <= 128*8-64); [ move => ?; rewrite BSWAS_128u8_64_slicegetE /# | by auto ].
 proc change ^while.8 : { rp <- if (0 <= (32*i)*8 <= 256*16-256) then BSWAS_256u16_256.sliceset rp ((32*i)*8) f else Array256.init (fun (i1:int) => WArray512.get16 (WArray512.set256 (WArray512.init16 (fun (i_0 : int) => rp.[i_0])) i f) i1) ; };
-1: by auto; move => &1 &2 [#] _ -> -> ->; case (0 <= (32*i{2})*8 <= 256*16-256); [ move => ?; rewrite BSWAS_256u16_256_slicesetE // | by auto ].
+1: by auto; move => &1 &2 [#] -> -> ->; case (0 <= (32*i{2})*8 <= 256*16-256); [ move => ?; rewrite BSWAS_256u16_256_slicesetE // | by auto ].
 
 cfold 9.
 unroll for ^while.

@@ -39,7 +39,7 @@ proc change 1: { qx16 <- BSWAS_16u16_256.sliceget jqx16 0;}; 1: by auto; move =>
 proc change ^while.1: { r <- if (0 <= (32*i)*8 <= 256*16-256) then BSWAS_256u16_256.sliceget rp ((32*i)*8) else get256_direct (WArray512.init16 (fun (i_0 : int) => rp.[i_0])) (32*i) ;};
 1: by auto; move => &1 &2 [#] -> ->; case (0 <= (32*i{2})*8 <= 256*16-256); [ move => ?; rewrite BSWAS_256u16_256_slicegetE /# | by auto ].
 proc change ^while.9: { rp <- if (0 <= (32*i)*8 <= 256*16-256) then BSWAS_256u16_256.sliceset rp ((32*i)*8) r else Array256.init (fun (i1:int) => WArray512.get16 (WArray512.set256 (WArray512.init16 (fun (i_0 : int) => rp.[i_0])) i r) i1) ;};
-1: by auto; move => &1 &2 [#] _ _ -> -> ->; case (0 <= (32*i{2})*8 <= 256*16-256); [ move => ?; rewrite BSWAS_256u16_256_slicesetE // | by auto ].
+1: by auto; move => &1 &2 [#] -> -> ->; case (0 <= (32*i{2})*8 <= 256*16-256); [ move => ?; rewrite BSWAS_256u16_256_slicesetE // | by auto ].
 unroll for ^while.
 cfold ^i<-.
 wp -1.

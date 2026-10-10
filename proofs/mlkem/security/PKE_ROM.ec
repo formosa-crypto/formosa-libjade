@@ -430,7 +430,7 @@ have H0 :
   seq 6 : true  (1%r)  (MAX%r * eps_msg) (0%r) (0%r).
   + by trivial.
   + by trivial. 
-  + by rnd; auto => /> *;apply boundl =>/#.  
+  + by rnd; [auto => /> *; apply boundl => /# | move=> _; rewrite /eps_msg; smt(MFinT.card_gt0)].  
   + by hoare; trivial.
   by trivial.
   
@@ -454,7 +454,7 @@ proc;inline *; swap 3 4.
 seq 6 : true  (1%r)  (MAX%r * eps_msg) (0%r) (0%r).
 + by trivial.
 + by trivial. 
-+ by rnd; auto => /> *;apply boundl =>/#.  
++ by rnd; [auto => /> *; apply boundl => /# | move=> _; rewrite /eps_msg; smt(MFinT.card_gt0)].  
 + by hoare; trivial.
 by trivial.
 qed.
