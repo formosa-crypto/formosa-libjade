@@ -16,9 +16,12 @@ on:
     workflows: [proofs]
     types: [completed]
 
+# actions: read to download the proofs run's artifact; pull-requests: read
+# for the PR's details (base, branch, title).
 permissions:
   contents: read
   actions: read
+  pull-requests: read
 
 jobs:
   publish:
