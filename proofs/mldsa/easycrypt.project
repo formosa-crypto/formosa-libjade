@@ -19,6 +19,9 @@ rdirs = spec
 rdirs = security
 
 rdirs = eclib
+
+rdirs = extraction
+rdirs = generic
 idirs = JazzEC:x86-64/avx2/ml_dsa_65/common/arithmetic
 rdirs = x86-64/avx2/ml_dsa_65
 

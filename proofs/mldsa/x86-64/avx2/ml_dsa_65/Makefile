@@ -19,4 +19,4 @@ ec:
 # 	  -f ml_dsa_65_verify
 
 clean:
-	rm -f *.ec
+	rm -f ml_dsa_65_avx2.ec

@@ -1,8 +1,14 @@
 namespace polynomial {
+    // 2 * gamma2 for each variant: a table is only used by the variant it
+    // belongs to, whatever the parameter set
+    param int ALPHA_GAMMA2_32 = 2 * ((MODULUS - 1) / 32);
+    param int ALPHA_GAMMA2_88 = 2 * ((MODULUS - 1) / 88);
+
     u256[5] CONSTANTS_TABLE_gamma2_32 = {
         (8u32)[15, 15, 15, 15, 15, 15, 15, 15],
         (8u32)[1025, 1025, 1025, 1025, 1025, 1025, 1025, 1025],
-        (8u32)[ALPHA, ALPHA, ALPHA, ALPHA, ALPHA, ALPHA, ALPHA, ALPHA],
+        (8u32)[ALPHA_GAMMA2_32, ALPHA_GAMMA2_32, ALPHA_GAMMA2_32, ALPHA_GAMMA2_32,
+               ALPHA_GAMMA2_32, ALPHA_GAMMA2_32, ALPHA_GAMMA2_32, ALPHA_GAMMA2_32],
         (8u32)[127, 127, 127, 127, 127, 127, 127, 127],
         (8u32)[512, 512, 512, 512, 512, 512, 512, 512]
     };
@@ -108,7 +114,8 @@ namespace polynomial {
 
     u256[5] CONSTANTS_TABLE_gamma2_88 = {
         (8u32)[11_275, 11_275, 11_275, 11_275, 11_275, 11_275, 11_275, 11_275],
-        (8u32)[ALPHA, ALPHA, ALPHA, ALPHA, ALPHA, ALPHA, ALPHA, ALPHA],
+        (8u32)[ALPHA_GAMMA2_88, ALPHA_GAMMA2_88, ALPHA_GAMMA2_88, ALPHA_GAMMA2_88,
+               ALPHA_GAMMA2_88, ALPHA_GAMMA2_88, ALPHA_GAMMA2_88, ALPHA_GAMMA2_88],
         (8u32)[127, 127, 127, 127, 127, 127, 127, 127],
         (8u32)[128, 128, 128, 128, 128, 128, 128, 128],
         (8u32)[43, 43, 43, 43, 43, 43, 43, 43]
