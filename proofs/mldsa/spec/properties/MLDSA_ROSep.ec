@@ -289,6 +289,19 @@ rewrite /p256 /dblock (_ : 64 = 32 + 32) // mu_dlist_drop_le //; 1: smt().
 by move=> w; rewrite DW8.mu1_dword.
 qed.
 
+(* one byte of a uniform block is a uniform byte *)
+lemma mu_dblock_nth (k : int) (P : W8.t -> bool) :
+  0 <= k < 64 => mu dblock (fun r => P (nth witness r k)) = mu W8.dword P.
+proof. by move=> rgk; rewrite /dblock mu_dlist_nth // W8.dword_ll. qed.
+
+lemma mu_dbytes64_nth (k : int) (P : W8.t -> bool) :
+  0 <= k < 64 => mu dbytes64 (fun o => P (nth witness (Bytes64.to_list o) k)) = mu W8.dword P.
+proof.
+move=> rgk; rewrite /dbytes64 dmapE /(\o) /=.
+rewrite -(mu_dlist_nth W8.dword 64 k witness P) // 1:W8.dword_ll.
+by apply mu_eq_support => l _ /=; rewrite Bytes64.get_of_list.
+qed.
+
 lemma mu1_dxi (e : Bytes32.t) : mu1 dxi e <= p256.
 proof.
 rewrite /dxi dmap1E /(\o) /=.

@@ -7,6 +7,7 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2.
+require import FMapExtra JWordExtra.
 
 (*************** G2: the scheme queries Htr, Hmu, Hct and XC directly ****************)
 
@@ -271,7 +272,21 @@ proof. by conseq (: ={rho, mu, glob RoutedH} ==> ={res, glob RoutedH}) _ (emask_
 
 (*************** Losslessness ****************)
 
-axiom sib_XC_ll : islossless SampleInBall_O(DS5.RO2.RO).sample.
+(* SampleInBall terminates over the random oracle (MLDSA_RO.SampleInBall_ll) *)
+lemma sib_XC_ll : islossless SampleInBall_O(DS5.RO2.RO).sample.
+proof.
+have RO2_get_ll : islossless DS5.RO2.RO.get.
+- by islossless; apply dlist_ll; apply W8.dword_ll.
+conseq (SampleInBall_ll DS5.RO2.RO (fun (m : (W8.t list * int, W8.t list) fmap) x => x \in m)
+          predT RO2_get_ll _ _ _) => //.
+- move=> g0 x _; proc; auto => />.
+  by move=> r _; split => hx c; rewrite ?mem_set; smt().
+- move=> g0 x k _ rgk hx; proc; rcondt 2; 1: by auto.
+  wp; rnd (fun r => nth witness r k = W8.zero); auto => />.
+  rewrite (mu_dblock_nth k (fun b => b = W8.zero)) // DW8.mu1_dword /=.
+  by move=> v _ h; rewrite get_set_sameE.
+by move=> g rho; apply fmap_bounded_snd.
+qed.
 
 lemma hctpad_ll : islossless HctPad.get.
 proof.

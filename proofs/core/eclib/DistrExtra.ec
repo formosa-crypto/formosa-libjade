@@ -1240,3 +1240,35 @@ have hm : mu d (fun r => b /\ E r) <= b2r b * p.
 rewrite EpD EpC dll Ep_mu /=.
 smt(mu_bounded).
 qed.
+
+(* marginals of a list of independent samples: a suffix, the head, and *)
+(* any coordinate                                                      *)
+lemma mu_dlist_suffix ['a] (d : 'a distr) (m l : int) (Q : 'a list -> bool) :
+  is_lossless d => 0 <= m => 0 <= l =>
+  mu (dlist d (m + l)) (fun xs => Q (drop m xs)) = mu (dlist d l) Q.
+proof.
+move=> d_ll ge0m ge0l; rewrite dlist_add // dmapE /(\o) /=.
+rewrite (mu_eq_support _ _ (fun (r : 'a list * 'a list) => predT r.`1 /\ Q r.`2)).
+- move=> [a b] /supp_dprod /= [+ _]; rewrite supp_dlist // => -[<- _].
+  by rewrite drop_size_cat.
+by rewrite dprodE dlist_ll.
+qed.
+
+lemma mu_dlist_head ['a] (d : 'a distr) (n : int) (x0 : 'a) (P : 'a -> bool) :
+  is_lossless d => 0 < n =>
+  mu (dlist d n) (fun xs => P (nth x0 xs 0)) = mu d P.
+proof.
+move=> d_ll gt0n; rewrite (_ : n = n - 1 + 1) 1:#ring dlistS 1:/# dmapE /(\o) /=.
+rewrite (mu_eq _ _ (fun (r : 'a * 'a list) => P r.`1 /\ predT r.`2)) 1:/#.
+by rewrite dprodE dlist_ll.
+qed.
+
+lemma mu_dlist_nth ['a] (d : 'a distr) (n k : int) (x0 : 'a) (P : 'a -> bool) :
+  is_lossless d => 0 <= k < n =>
+  mu (dlist d n) (fun xs => P (nth x0 xs k)) = mu d P.
+proof.
+move=> d_ll rgk; rewrite (_ : n = k + (n - k)) 1:#ring.
+rewrite (mu_eq _ _ (fun xs => (fun ys => P (nth x0 ys 0)) (drop k xs))) => [xs /= |].
+- by rewrite nth_drop 1:/#.
+by rewrite mu_dlist_suffix ?mu_dlist_head //#.
+qed.

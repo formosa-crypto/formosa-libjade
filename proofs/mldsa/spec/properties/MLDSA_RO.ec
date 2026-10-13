@@ -507,3 +507,132 @@ move=> hH; proc; while (v).
 wp; while (v); [by move=> &hr; apply xle_cxr_r | | by auto].
 by wp; call (RejBoundedPoly_e H v hH); auto => &hr; apply xle_cxr_r.
 qed.
+
+(* -------------------------------------------------------------------- *)
+(* SampleInBall terminates over any block oracle that only learns the   *)
+(* block it is asked for, knows finitely many blocks per input, and     *)
+(* answers an unknown block with a zero at any given position with      *)
+(* probability at least 1/256.  A zero byte is always accepted, and the *)
+(* reads walk past the known blocks, so the rejection loop stops with   *)
+(* probability 1.                                                       *)
+require import DistrExtra.
+
+(* the known blocks of r: below B, or already read (up to position p) *)
+op known_below ['g] (known : 'g -> W8.t list * int -> bool) (g : 'g) (r : W8.t list) (B p : int) =
+  forall c, known g (r, c) => c < B \/ c <= p %/ 64.
+
+(* the reads left before the next unknown block, 0 once the loop exits *)
+op sib_variant ['g] (known : 'g -> W8.t list * int -> bool) (g : 'g) (r : W8.t list)
+                    (B i : int) (j : W8.t) (p : int) =
+  if !(i < to_uint j) then 0
+  else if known g (r, p %/ 64) then 64 * (max B (p %/ 64 + 1) - p %/ 64) - p %% 64 + 1
+  else 1.
+
+(* reading the block of position p keeps the known blocks below B or read *)
+lemma known_below_step ['g] (known : 'g -> W8.t list * int -> bool) g g' r B p :
+     known_below known g r B p
+  => (forall c, known g' (r, c) <=> known g (r, c) \/ c = p %/ 64)
+  => known_below known g' r B (p + 1).
+proof. by move=> h hk c /hk [/h [| ] | ->]; smt(leq_div2r). qed.
+
+lemma SampleInBall_ll (H <: BlockOracle)
+  (known : glob H -> W8.t list * int -> bool) (ok : W8.t list -> bool) :
+     islossless H.get
+  => (forall (g0 : glob H) (x : W8.t list * int), ok x.`1 =>
+        hoare [H.get : glob H = g0 /\ arg = x ==>
+                 forall c, known (glob H) (x.`1, c) <=> known g0 (x.`1, c) \/ c = x.`2])
+  => (forall (g0 : glob H) (x : W8.t list * int) k,
+        ok x.`1 => 0 <= k < 64 => !known g0 x =>
+        phoare [H.get : glob H = g0 /\ arg = x ==> nth witness res k = W8.zero]
+        >= (1%r / 256%r))
+  => (forall (g : glob H) rho, exists B, forall c, known g (rho, c) => c < B)
+  => phoare [SampleInBall_O(H).sample : ok (BytesCT.to_list rho) ==> true] = 1%r.
+proof.
+move=> H_ll H_kn H_fr H_fin.
+have get_kn : forall (g0 : glob H) (x : W8.t list * int), ok x.`1 =>
+  phoare [H.get : glob H = g0 /\ arg = x ==>
+            forall c, known (glob H) (x.`1, c) <=> known g0 (x.`1, c) \/ c = x.`2] = 1%r.
+- by move=> g0 x hx; conseq H_ll (H_kn g0 x hx).
+proc.
+while (ok (BytesCT.to_list rho) /\ 0 <= pos /\ 0 <= i) (256 - i); last first.
+- by wp; call (Squeeze_ll H H_ll); auto => />; smt(tau_bound).
+move=> z.
+(* the first read of the round *)
+seq 2 : (ok (BytesCT.to_list rho) /\ 0 <= pos /\ 0 <= i /\ i < 256 /\ 256 - i = z).
+- by wp; inline ReadByte(H).read; wp; call (: true); auto.
+- by wp; inline ReadByte(H).read; wp; call H_ll; auto => /> /#.
+(* the rejection loop *)
+- wp; exlim (glob H), rho, i => g0 rho0 i0.
+  case @[ambient]: (ok (BytesCT.to_list rho0) /\ 0 <= i0) => [[hok hi0] | hn]; last first.
+  + by conseq (_ : false ==> _) => // &hr [[_ [<- <-]] [h [_ [hi _]]]]; apply hn.
+  have [B hB] := H_fin g0 (BytesCT.to_list rho0).
+  conseq (_ : 0 <= pos /\ rho = rho0 /\ i = i0 /\ i < 256 /\ 256 - i = z
+              /\ known_below known (glob H) (BytesCT.to_list rho) B pos ==> _).
+  + by move=> &hr [[<- [<- <-]] |>] *; left; apply hB.
+  while (0 <= pos /\ rho = rho0 /\ i = i0 /\ i < 256 /\ 256 - i = z
+         /\ known_below known (glob H) (BytesCT.to_list rho) B pos)
+        (sib_variant known (glob H) (BytesCT.to_list rho) B i j pos)
+        (64 * max B 0 + 65) (1%r / 256%r).
+  + by [].
+  + by move=> &hr H0 j0 pos0 [h1 [h2 [h3 [_ [h4 _]]]]] _; rewrite h2 hok h1 h3 /= /#.
+  + move=> &hr H0 j0 pos0 [hp _]; rewrite /sib_variant.
+    have [h0 h1] : 0 <= pos0 %% 64 < 64 by smt(modz_ge0 ltz_pmod).
+    have h2 : 0 <= pos0 %/ 64 by smt(divz_ge0).
+    case: (i{hr} < to_uint j0) => /= _; 2: smt().
+    by case: (known H0 (BytesCT.to_list rho{hr}, pos0 %/ 64)) => /= _; smt().
+  + move=> hw.
+    seq 3 : (0 <= pos /\ rho = rho0 /\ i = i0 /\ i < 256 /\ 256 - i = z
+             /\ known_below known (glob H) (BytesCT.to_list rho) B pos).
+    * by wp; inline ReadByte(H).read; wp; call (: true); auto.
+    * wp; inline ReadByte(H).read; wp; exlim (glob H), pos => gg pp.
+      call (get_kn gg (BytesCT.to_list rho0, pp %/ 64) hok).
+      auto => &hr [[-> ->] [[hp [-> [-> [hi [hz hinv]]]]] _]] /= H1 hk.
+      by do 3! (split; 1: smt()); apply (known_below_step _ _ _ _ _ _ hinv hk).
+    * by apply hw.
+    * hoare; wp; inline ReadByte(H).read; wp; exlim (glob H), pos => gg pp.
+      call (H_kn gg (BytesCT.to_list rho0, pp %/ 64) hok).
+      auto => &hr [[-> ->] [[hp [-> [-> [hi [hz hinv]]]]] _]] /= H1 hk.
+      by do 3! (split; 1: smt()); apply (known_below_step _ _ _ _ _ _ hinv hk).
+    by [].
+  + wp; inline ReadByte(H).read; wp; exlim (glob H), pos => gg pp.
+    call (get_kn gg (BytesCT.to_list rho0, pp %/ 64) hok).
+    auto => &hr [[-> ->] [[hp [-> [-> [hi [hz hinv]]]]] _]] /= H1 hk.
+    by do 3! (split; 1: smt()); apply (known_below_step _ _ _ _ _ _ hinv hk).
+  split; 1: smt().
+  move=> z0; case (known (glob H) (BytesCT.to_list rho, pos %/ 64)).
+  (* a known block: the read is deterministic and the variant drops by 1 *)
+  + conseq (_ : _ ==> _ : = 1%r); 1: by move=> &hr; smt().
+    wp; inline ReadByte(H).read; wp; exlim (glob H), pos => gg pp.
+    call (get_kn gg (BytesCT.to_list rho0, pp %/ 64) hok).
+    auto => &hr [[-> ->] [[[hp [-> [-> [hi [hz hinv]]]]] [hg hv]] hk0]] /=.
+    move=> rr H1 hk; move: hv; rewrite /sib_variant hg hk0 /= => <-.
+    pose b := pos{hr} %/ 64; pose o := pos{hr} %% 64.
+    have [h0 h1] : 0 <= o < 64 by smt(modz_ge0 ltz_pmod).
+    have hd : pos{hr} = b * 64 + o by apply divz_eq.
+    case: (i0 < to_uint (nth witness rr o)) => /= hj; last by smt().
+    case: (o = 63) => h63.
+    * (* the next read starts block b + 1 *)
+      rewrite (_ : pos{hr} + 1 = (b + 1) * 64 + 0) 1:/# divzMDl // modzMDl /=.
+      case: (known H1 (BytesCT.to_list rho0, b + 1)) => hk1; last by smt().
+      have : b + 1 < B by move: hk1; rewrite hk => -[/hinv /# | /#].
+      smt().
+    (* the next read stays in block b *)
+    rewrite (_ : pos{hr} + 1 = b * 64 + (o + 1)) 1:/# divzMDl // modzMDl.
+    rewrite (pdiv_small (o + 1)) 1:/# (pmod_small (o + 1)) 1:/# /=.
+    by rewrite (_ : known H1 (BytesCT.to_list rho0, b)) 1:hk //; smt().
+  (* an unknown block: a zero byte, read with probability >= 1/256, ends the loop *)
+  wp; inline ReadByte(H).read; wp; exlim (glob H), pos => gg pp.
+  case @[ambient]: (known gg (BytesCT.to_list rho0, pp %/ 64)) => hkn.
+  + conseq (_ : false ==> _) => //.
+    * by move=> &hr [[<- <-] [[[_ [-> _]] _]]]; rewrite hkn.
+    by exfalso => _; smt().
+  call (: glob H = gg /\ arg = (BytesCT.to_list rho0, pp %/ 64)
+          ==> nth witness res (pp %% 64) = W8.zero).
+  + apply (H_fr gg (BytesCT.to_list rho0, pp %/ 64) (pp %% 64) hok _ hkn).
+    by smt(modz_ge0 ltz_pmod).
+  auto => &hr [[-> ->] [[[hp [-> [-> [hi [hz hinv]]]]] [hg hv]] hk0]] /=.
+  move=> rr H1 hz0; move: hv; rewrite /sib_variant hg hk0 /= => <-.
+  by rewrite hz0 W8.to_uint0; smt().
+- by hoare; wp; inline ReadByte(H).read; wp; call (: true); auto => /> /#.
+by [].
+qed.

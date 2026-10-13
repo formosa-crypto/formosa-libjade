@@ -7,6 +7,7 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1.
+require import FMapExtra.
 require import JWordExtra.
 
 (*************** G1: SHAKE256 routed to separate random oracles ****************)
@@ -704,10 +705,72 @@ qed.
 lemma RO1_get_ll : islossless DS2.RO1.RO.get.
 proof. by islossless; apply dlist_ll; apply W8.dword_ll. qed.
 
-(* Termination of the rejection samplers over the random oracles is assumed *)
+(* Termination of ExpandA over the random oracle is assumed *)
 axiom expandA_ll : islossless ExpandA(XOFA_O(DS2.RO2.RO)).sample.
-axiom sib_RO1_ll : islossless SampleInBall_O(DS2.RO1.RO).sample.
-axiom sib_RoutedH_ll : islossless SampleInBall_O(RoutedH).sample.
+
+(* SampleInBall terminates over the random oracles (MLDSA_RO.SampleInBall_ll):
+   a block is known once queried, and an unknown block is a fresh uniform one *)
+lemma sib_RO1_ll : islossless SampleInBall_O(DS2.RO1.RO).sample.
+proof.
+conseq (SampleInBall_ll DS2.RO1.RO (fun (m : (W8.t list * int, W8.t list) fmap) x => x \in m)
+          predT RO1_get_ll _ _ _) => //.
+- move=> g0 x _; proc; auto => />.
+  by move=> r _; split => hx c; rewrite ?mem_set; smt().
+- move=> g0 x k _ rgk hx; proc; rcondt 2; 1: by auto.
+  wp; rnd (fun r => nth witness r k = W8.zero); auto => />.
+  rewrite (mu_dblock_nth k (fun b => b = W8.zero)) // DW8.mu1_dword /=.
+  by move=> v _ h; rewrite get_set_sameE.
+by move=> g rho; apply fmap_bounded_snd.
+qed.
+
+(* the blocks RoutedH reads for an input of SampleInBall's length *)
+op rh_known (g : glob RoutedH) (y : W8.t list * int) : bool =
+  if g.`3 /\ take 64 y.`1 = Bytes64.to_list g.`2
+  then (if y.`2 = 0 then (g.`2, drop 64 y.`1) \in g.`8 else y \in g.`5)
+  else y \in g.`6.
+
+lemma sib_RoutedH_ll : islossless SampleInBall_O(RoutedH).sample.
+proof.
+conseq (SampleInBall_ll RoutedH rh_known (fun l => size l = lambda %/ 4) RoutedH_get_ll _ _ _).
+- move=> g0 x /= hx; proc; inline *; sp.
+  if.
+  + if.
+    * auto => &hr [[[hb [hg hxx]] [htr htk]] h0] r hr'; rewrite -hg -hxx /rh_known /= htr htk h0 /=.
+      move=> _; case: (r \in DS5.RO4.RO.m{hr}) => /= hm c;
+        by case: (c = 0) => //= _; rewrite mem_set.
+    auto => &hr [[[hb [hg hxx]] [htr htk]] h0] r _; rewrite -hg -hxx /rh_known /= htr htk /=.
+    by case: (x{!hr} \in RO_rest.RO.m{hr}) => /= hm c; case: (c = 0) => //= hc; rewrite ?mem_set /#.
+  rcondf 1; 1: by auto => &hr [[_ [_ ->]] _]; rewrite hx; smt(ct_len_nrel).
+  rcondt 1; 1: by auto => &hr [[_ [_ ->]] _]; rewrite hx.
+  auto => &hr [[hb [hg hxx]] htr] r _; rewrite -hg -hxx /rh_known /=.
+  rewrite (negbTE _ htr) /=.
+  by case: (x{!hr} \in DS5.RO2.RO.m{hr}) => /= hm c; rewrite ?mem_set /#.
+- move=> [bad tr trset mpad mrest m2 m3 m4 m5] x k /= hx rgk; rewrite /rh_known /= => hkn.
+  proc; inline *; sp.
+  if.
+  + if.
+    * rcondt 3; 1: by auto => &hr /> htr htk h0 _ _; move: hkn; rewrite htr htk h0.
+      wp; rnd (fun o => nth witness (Bytes64.to_list o) k = W8.zero); auto => />.
+      move=> _ _ _; have /= -> := mu_dbytes64_nth k (fun b => b = W8.zero) rgk.
+      by rewrite DW8.mu1_dword /= => v _ hv; rewrite get_set_sameE.
+    rcondt 3; 1: by auto => &hr /> htr htk h0 _ _; move: hkn; rewrite htr htk h0.
+    wp; rnd (fun r => nth witness r k = W8.zero); auto => />.
+    move=> _ _ _; have /= -> := mu_dblock_nth k (fun b => b = W8.zero) rgk.
+    by rewrite DW8.mu1_dword /= => v _ hv; rewrite get_set_sameE.
+  rcondf 1; 1: by auto => &hr />; rewrite hx; smt(ct_len_nrel).
+  rcondt 1; 1: by auto => &hr />; rewrite hx.
+  rcondt 3; 1: by auto => &hr /> htr _ _; move: hkn; rewrite (negbTE _ htr).
+  wp; rnd (fun r => nth witness r k = W8.zero); auto => />.
+  move=> _; have /= -> := mu_dblock_nth k (fun b => b = W8.zero) rgk.
+  by rewrite DW8.mu1_dword /= => v _ hv; rewrite get_set_sameE.
+move=> [bad tr trset mpad mrest m2 m3 m4 m5] rho.
+have [B1 hB1] := fmap_bounded_snd mrest rho.
+have [B2 hB2] := fmap_bounded_snd m2 rho.
+exists (max 1 (max B1 B2)) => c; rewrite /rh_known /=.
+case: (trset /\ take 64 rho = Bytes64.to_list tr) => _ /=.
+- by case: (c = 0) => [-> | _ /hB1]; smt().
+by move=> /hB2; smt().
+qed.
 
 lemma sign_ll (H <: BlockOracle) :
   islossless H.get => islossless SampleInBall_O(H).sample =>
