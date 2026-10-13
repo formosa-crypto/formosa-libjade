@@ -214,3 +214,13 @@ rewrite {1}/LowBits (Decompose_unique 15 (t + 2 * gamma2 + 1) (a - cs2)) 1,2:/# 
 by smt().
 qed.
 
+from Jasmin require import JUtils.
+
+(* the low part of Power2Round is in (-2^(d-1), 2^(d-1)] *)
+lemma p2r_t0 (x : coeff) : -(2^(d-1) - 1) <= crepr (Power2Round x).`2 <= 2^(d-1).
+proof.
+rewrite /Power2Round /= /smodem /=.
+have h0 := modz_ge0 (asint x) 8192 _ => //.
+have h1 := ltz_pmod (asint x) 8192 _ => //.
+by case: (4096 < asint x %% 8192) => h; rewrite incoeffK_centered; smt().
+qed.

@@ -7,72 +7,12 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2 MLDSA_ROSep_Hop3.
+require import JWordList.
 require import MLDSA_ROSep_Hop4 MLDSA_ROSep_Hop5 MLDSA_ROSep_Hop6 MLDSA_ROSep_Hop7 MLDSA_ROSep_Hop8.
 require import MLDSA_ROSep_Hop9.
 require DS_ROM.
 
 (*************** G10: H_ct takes w1 ****************)
-
-lemma SimpleBitPackK (p : poly) (b : int) :
-  0 < b => (forall i, 0 <= i < n => asint p.[i] <= b) => SimpleBitUnpack (SimpleBitPack p b) b = p.
-proof.
-move=> hb hp; rewrite /SimpleBitUnpack /SimpleBitPack /=.
-have [_ hlt] := RealExp.ilogP 2 b _ _; 1,2: smt().
-have hc : 0 < RealExp.ilog 2 b + 1 by smt(RealExp.ilog_ge0).
-have hsz : forall x, x \in map (fun (wi : coeff) => IntegerToBits (asint wi) (RealExp.ilog 2 b + 1))
-                             (Array256.to_list p) =>
-                     size x = RealExp.ilog 2 b + 1
-  by move=> x /mapP [w [_ ->]]; rewrite /IntegerToBits BS2Int.size_int2bs /#.
-rewrite BitsToBytesK.
-+ by rewrite (size_flatten_ctt _ _ hsz) size_map Array256.size_to_list; apply dvdz_mull.
-rewrite BitChunking.flattenK // -map_comp; apply Array256.ext_eq => i hi.
-rewrite Array256.initiE //= (nth_map witness) ?Array256.size_to_list // /(\o) /= /BitsToInteger /IntegerToBits
-        BS2Int.int2bsK; 1,2: smt(Array256.get_to_list ge0_asint).
-by rewrite asintK.
-qed.
-
-lemma highbits_rng (r : coeff) : 0 <= HighBits r < (q - 1) %/ (2 * gamma2).
-proof.
-have hg : gamma2 = (q - 1) %/ 32 by have /= H := param_sets; smt().
-have hr := rg_asint r.
-rewrite /HighBits /Decompose /= /smodem hg /=.
-smt().
-qed.
-
-op w1rng (w1 : polykvec) : bool = forall i j, 0 <= i < kvec => 0 <= j < n => asint w1.[i].[j] <= 15.
-
-lemma hb_rng (w : polykvec) : w1rng (polykvec_HighBits w).
-proof.
-move=> i j hi hj; rewrite /polykvec_HighBits KArray.mapiE // /poly_HighBits Array256.initiE //= incoeffK.
-have hg : (q - 1) %/ (2 * gamma2) = 16 by have /= H := param_sets; smt().
-by have := highbits_rng w.[i].[j]; rewrite hg; smt().
-qed.
-
-lemma uh_rng (h r : polykvec) : w1rng (UseHint h r).
-proof.
-move=> i j hi hj; rewrite /UseHint KArray.map2iE // /poly_UseHint Array256.initiE //= /GFq.UseHint /=.
-have hg : (q - 1) %/ (2 * gamma2) = 16 by have /= H := param_sets; smt().
-have := highbits_rng r.[i].[j]; rewrite /HighBits hg => hr.
-case: (Decompose r.[i].[j]) hr => r1 r0 /= hr.
-by rewrite hg; smt(incoeffK).
-qed.
-
-op w1Dec (b : BytesW1.t) : polykvec =
-  KArray.init (fun i => SimpleBitUnpack (take (n * w1_bits %/ 8) (drop (n * w1_bits %/ 8 * i) (BytesW1.to_list b)))
-                                        ((q - 1) %/ (2 * gamma2) - 1)).
-
-lemma w1DecK (w1 : polykvec) : w1rng w1 => w1Dec (w1Encode w1) = w1.
-proof.
-move=> hw; have hm : (q - 1) %/ (2 * gamma2) - 1 = 15 by have /= H := param_sets; smt().
-have hsz : forall p, size (SimpleBitPack p ((q - 1) %/ (2 * gamma2) - 1)) = n * w1_bits %/ 8
-  by move=> p; rewrite hm size_SimpleBitPack' // (RealExp.ilog_eq 2 15 3).
-apply KArray.ext_eq => i hi; rewrite /w1Dec KArray.initiE //= /w1Encode BytesW1.of_listK.
-+ rewrite (size_flatten_ctt (n * w1_bits %/ 8)); 1: by move=> x /mapP [p [_ ->]]; rewrite hsz.
-  by rewrite size_map size_mkseq; have /= H := param_sets; smt().
-rewrite take_drop_flatten //; 1: by rewrite size_mkseq; smt(gt0_k).
-rewrite /= nth_mkseq //= (_ : 8380416 %/ (2 * gamma2) - 1 = 15); 1: by have /= H := param_sets; smt().
-by rewrite SimpleBitPackK // => j hj; apply hw.
-qed.
 
 clone DS_ROM.DS_ROM_x5 as DS10 with
   type pkey    <- BytesPK.t,

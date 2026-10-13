@@ -7,6 +7,7 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2 MLDSA_ROSep_Hop3.
+require import DistrExtra.
 require import MLDSA_ROSep_Hop4.
 
 (*************** G4: K, xi and rho' leave the scheme's data ****************)
@@ -141,18 +142,6 @@ rewrite !nth_cat !size_cat !size_take // BytesSK.size_to_list Bytes32.size_to_li
         (_ : 32 < sk_bytes) 1:/# (_ : 32 < size l) 1:/# /=.
 case: (i < 64) => h64 /=; 2: by rewrite !nth_drop 1..4:/# hL /#.
 by case: (i < 32) => h32 //=; rewrite !nth_take // hL /#.
-qed.
-
-lemma sk_K (rho k : Bytes32.t) (rest : W8.t list) :
-  take 32 (drop 32 (BytesSK.to_list (BytesSK.of_list (Bytes32.to_list rho ++ Bytes32.to_list k ++ rest)))) =
-  Bytes32.to_list k.
-proof.
-have hsk : 128 <= sk_bytes by have /= H := param_sets; smt(ge0_size BytesSK.ge0_size).
-apply (eq_from_nth witness);
-  1: by rewrite size_take // size_drop // BytesSK.size_to_list Bytes32.size_to_list /#.
-move=> i; rewrite size_take // size_drop // BytesSK.size_to_list => hi.
-by rewrite nth_take 1,2:/# nth_drop 1,2:/# BytesSK.get_to_list BytesSK.get_of_list 1:/# nth_cat size_cat
-     !Bytes32.size_to_list (_ : 32 + i < 64) 1:/# /= nth_cat Bytes32.size_to_list (_ : !(32 + i < 32)) 1:/#.
 qed.
 
 equiv skEncode_setK (k0 : Bytes32.t) : SkEncDec.skEncode ~ SkEncDec.skEncode :
@@ -779,51 +768,6 @@ move: hy he; rewrite mem_set get_setE => hy he; case: (y = k) => hyk.
 by move: he; rewrite hyk /= => he; left; right; right; exists y; smt().
 qed.
 
-lemma mu1_dlist32 (c : W8.t list) : mu1 (dlist W8.dword 32) c <= p256.
-proof.
-rewrite dlist1E //; case: (32 = size c) => hs; 2: smt(RealOrder.expr_ge0).
-rewrite (Bigreal.BRM.eq_bigr _ _ (fun _ => 1%r / 256%r)) /=; 1: by move=> w *; rewrite mu1_dword.
-by rewrite Bigreal.mulr_const -hs /p256.
-qed.
-
-lemma mu_dblock_take (c : W8.t list) : mu dblock (fun r => take 32 r = c) <= p256.
-proof.
-rewrite /dblock (dlist_add W8.dword 32 32) // dmapE /(\o) /=.
-apply (RealOrder.ler_trans (mu (dlist W8.dword 32 `*` dlist W8.dword 32)
-         (fun (p : W8.t list * W8.t list) => pred1 c p.`1 /\ predT p.`2))).
-+ apply mu_le => -[a b] /=; rewrite supp_dprod /= => -[ha hb] h.
-  by move: ha; rewrite supp_dlist // => -[hsa _]; move: h; rewrite (take_size_cat _ _ _ hsa).
-rewrite (dprodE (pred1 c) predT).
-have -> : mu (dlist W8.dword 32) predT = 1%r by apply dlist_ll; apply W8.dword_ll.
-by have := mu1_dlist32 c.
-qed.
-
-lemma mu_dblock_drop (c : W8.t list) : mu dblock (fun r => drop 32 r = c) <= p256.
-proof.
-rewrite /dblock (dlist_add W8.dword 32 32) // dmapE /(\o) /=.
-apply (RealOrder.ler_trans (mu (dlist W8.dword 32 `*` dlist W8.dword 32)
-         (fun (p : W8.t list * W8.t list) => predT p.`1 /\ pred1 c p.`2))).
-+ apply mu_le => -[a b] /=; rewrite supp_dprod /= => -[ha hb] h.
-  by move: ha; rewrite supp_dlist // => -[hsa _]; move: h; rewrite (drop_size_cat _ _ _ hsa) => ->.
-rewrite (dprodE predT (pred1 c)).
-have -> : mu (dlist W8.dword 32) predT = 1%r by apply dlist_ll; apply W8.dword_ll.
-by have := mu1_dlist32 c.
-qed.
-
-lemma mu1_dxi (e : Bytes32.t) : mu1 dxi e <= p256.
-proof.
-rewrite /dxi dmap1E /(\o) /=.
-apply (RealOrder.ler_trans (mu (dlist W8.dword 32) (pred1 (Bytes32.to_list e)))); 2: by apply mu1_dlist32.
-by apply mu_le => l hl /= h; rewrite /pred1 -h Bytes32.of_listK //; move: hl; rewrite supp_dlist //; smt().
-qed.
-
-lemma b2r_mono (a b : bool) : (a => b) => b2r a <= b2r b.
-proof. by case: a; case: b. qed.
-
-lemma mu_or_bnd ['a] (d : 'a distr) (p q : 'a -> bool) (a b : real) :
-  mu d p <= a => mu d q <= b => mu d (fun x => p x \/ q x) <= a + b.
-proof. by move=> hp hq; have h := mu_or d p q; move: h; rewrite /predU => ->; smt(mu_bounded). qed.
-
 (* A fresh rho'' hits an earlier rho'', a 64-byte prefix of an adversary query, or tr *)
 lemma mu_fresh_pp (t : Bytes64.t) (mrest mpp : (W8.t list * int, W8.t list) fmap) :
   mu dblock (fun v => (exists y, y \in mpp /\ v = oget mpp.[y]) \/
@@ -831,9 +775,9 @@ lemma mu_fresh_pp (t : Bytes64.t) (mrest mpp : (W8.t list * int, W8.t list) fmap
                       v = Bytes64.to_list t)
   <= (fsize mpp)%r * p512 + ((fsize mrest)%r * p512 + p512).
 proof.
-apply mu_or_bnd.
+apply mu_or_le.
 + by apply Mu_mem.mu_mem_le_fsize => u _ /=; rewrite (mu_eq _ _ (pred1 (oget mpp.[u]))) 1:/# mu1_dblock.
-apply mu_or_bnd; 2: by rewrite (mu_eq _ _ (pred1 (Bytes64.to_list t))) 1:/# mu1_dblock.
+apply mu_or_le; 2: by rewrite (mu_eq _ _ (pred1 (Bytes64.to_list t))) 1:/# mu1_dblock.
 apply Mu_mem.mu_mem_le_fsize => u _ /=.
 apply (RealOrder.ler_trans (mu dblock (pred1 (take 64 u.`1)))); 2: by apply mu1_dblock.
 by apply mu_le => v _ /= [_ ->].
@@ -859,15 +803,15 @@ lemma mu_r1_hit (t : Bytes64.t) (mrest mpp : (W8.t list * int, W8.t list) fmap) 
                       (exists y, y \in mpp /\ drop 32 (oget mpp.[y]) = take 32 r))
   <= (fsize mrest)%r * p256 + ((fsize mrest)%r * p256 + (p256 + (fsize mpp)%r * p256)).
 proof.
-apply mu_or_bnd.
+apply mu_or_le.
 + apply Mu_mem.mu_mem_le_fsize => u _ /=.
   apply (RealOrder.ler_trans (mu dblock (fun r => take 32 r = drop 32 (take 64 u.`1)))); 2: by apply mu_dblock_take.
   by apply mu_le => r _ /= [_ ->].
-apply mu_or_bnd.
+apply mu_or_le.
 + apply Mu_mem.mu_mem_le_fsize => u _ /=.
   apply (RealOrder.ler_trans (mu dblock (fun r => drop 32 r = take 32 u.`1))); 2: by apply mu_dblock_drop.
   by apply mu_le => r _ /= [_ ->].
-apply mu_or_bnd; 1: by apply mu_dblock_drop.
+apply mu_or_le; 1: by apply mu_dblock_drop.
 apply Mu_mem.mu_mem_le_fsize => u _ /=.
 apply (RealOrder.ler_trans (mu dblock (fun r => take 32 r = drop 32 (oget mpp.[u])))); 2: by apply mu_dblock_take.
 by apply mu_le => r _ /= ->.
@@ -1098,7 +1042,7 @@ seq 3 : ((fsize RO_rest.RO.m <= qH + 1 /\ fsize St7.vals <= qS /\ 0 <= qH) `|`
     * apply le_Ep => r0 _ /=; rewrite get_set_sameE /=; apply xle_cxr_l.
       + split; 1: by rewrite hv.
         by rewrite hR hqH hqS /= fsize_set hva /b2i /=; smt().
-      apply xle_rle; have hle := b2r_mono _ _ (badpp_set RoutedH.tr{hr} RO_rest.RO.m{hr} St7.vals{hr} a r0 hva).
+      apply xle_rle; have /le_b2r hle := (badpp_set RoutedH.tr{hr} RO_rest.RO.m{hr} St7.vals{hr} a r0 hva).
       split; 2: smt().
       have hl0 : 0%r <= (size l)%r * ((qS + qH + 1)%r * p512) by apply RealOrder.mulr_ge0; smt(size_ge0).
       by rewrite /b2r; smt().

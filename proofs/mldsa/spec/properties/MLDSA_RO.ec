@@ -436,3 +436,74 @@ wp; ecall{2} (Squeeze_SHAKE256_ph (BytesPK.to_list pk{2}) 64).
 call ExpandA_equiv.
 by auto => />; smt(param_sets).
 qed.
+
+(* -------------------------------------------------------------------- *)
+(* the block-oracle samplers are lossless, and keep any constant        *)
+(* potential, when the oracle is and does                               *)
+require import Xreal.
+
+lemma Squeeze_ll (H <: BlockOracle) : islossless H.get => islossless Squeeze(H).squeeze.
+proof.
+by move=> H_ll; proc; while true (len - 64 * j);
+   [by move=> z; wp; call H_ll; auto => /# | by auto => /#].
+qed.
+
+lemma emask_ll (H <: BlockOracle) : islossless H.get => islossless ExpandMask_O(H).sample.
+proof.
+by move=> H_ll; proc; while true (lvec - r);
+   [by move=> z; wp; call (Squeeze_ll H H_ll); auto => /# | by auto => /#].
+qed.
+
+lemma Squeeze_e (H <: BlockOracle) (v : xreal) :
+  (forall v, ehoare [H.get : v ==> v]) => ehoare [Squeeze(H).squeeze : v ==> v].
+proof.
+move=> hH; proc; while (v).
++ by move=> &hr; apply xle_cxr_r.
++ by wp; call (hH v); skip => &hr; apply xle_cxr_r.
+by auto.
+qed.
+
+lemma ReadByte_e (H <: BlockOracle) (v : xreal) :
+  (forall v, ehoare [H.get : v ==> v]) => ehoare [ReadByte(H).read : v ==> v].
+proof. by move=> hH; proc; call (hH v); auto. qed.
+
+lemma SampleInBall_e (H <: BlockOracle) (v : xreal) :
+  (forall v, ehoare [H.get : v ==> v]) => ehoare [SampleInBall_O(H).sample : v ==> v].
+proof.
+move=> hH; proc; while (v).
++ by move=> &hr; apply xle_cxr_r.
++ wp; while (v).
+  + by move=> &hr; apply xle_cxr_r.
+  + by wp; call (ReadByte_e H v hH); auto => &hr; apply xle_cxr_r.
+  by wp; call (ReadByte_e H v hH); auto => &hr; apply xle_cxr_r.
+by wp; call (Squeeze_e H v hH); auto.
+qed.
+
+lemma ExpandMask_e (H <: BlockOracle) (v : xreal) :
+  (forall v, ehoare [H.get : v ==> v]) => ehoare [ExpandMask_O(H).sample : v ==> v].
+proof.
+by move=> hH; proc; while (v);
+   [move=> &hr; apply xle_cxr_r | wp; call (Squeeze_e H v hH); auto => &hr; apply xle_cxr_r | auto].
+qed.
+
+lemma XOFS_next_e (H <: BlockOracle) (v : xreal) :
+  (forall v, ehoare [H.get : v ==> v]) => ehoare [XOFS_O(H).next : v ==> v].
+proof. by move=> hH; proc; wp; call (ReadByte_e H v hH); auto. qed.
+
+lemma RejBoundedPoly_e (H <: BlockOracle) (v : xreal) :
+  (forall v, ehoare [H.get : v ==> v]) => ehoare [RejBoundedPoly(XOFS_O(H)).sample : v ==> v].
+proof.
+move=> hH; proc; while (v); [by move=> &hr; apply xle_cxr_r | | by inline *; auto].
+seq 1 : v; 2: by auto.
+by call (XOFS_next_e H v hH); skip => &hr; apply xle_cxr_r.
+qed.
+
+lemma ExpandS_e (H <: BlockOracle) (v : xreal) :
+  (forall v, ehoare [H.get : v ==> v]) => ehoare [ExpandS(XOFS_O(H)).sample : v ==> v].
+proof.
+move=> hH; proc; while (v).
++ by move=> &hr; apply xle_cxr_r.
++ by wp; call (RejBoundedPoly_e H v hH); auto => &hr; apply xle_cxr_r.
+wp; while (v); [by move=> &hr; apply xle_cxr_r | | by auto].
+by wp; call (RejBoundedPoly_e H v hH); auto => &hr; apply xle_cxr_r.
+qed.

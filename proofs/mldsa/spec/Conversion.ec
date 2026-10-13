@@ -1,4 +1,5 @@
 require import AllCore BitEncoding List RealExp IntDiv.
+require JWordList.
 from Jasmin require import JWord.
 require import Array256.
 
@@ -54,6 +55,121 @@ op BitUnpack(v : W8.t list, a b : int) : poly =
    let c = ilog 2 (a + b) + 1 in
    let z = BytesToBits(v) in
      init (fun i => nth witness (map (fun co => incoeff (b - BitsToInteger co)) (BitChunking.chunk c z)) i).
+
+(* -------------------------------------------------------------------- *)
+(* sizes of the encodings                                               *)
+lemma size_BitsToBytes (l : bool list) : size (BitsToBytes l) = size l %/ 8.
+proof. by rewrite /BitsToBytes size_map BitChunking.size_chunk. qed.
+
+lemma size_IntegerToBytes (x a : int) : 0 <= a => size (IntegerToBytes x a) = a.
+proof.
+move=> ge0a; rewrite /IntegerToBytes /IntegerToBits size_take // size_BitsToBytes.
+by rewrite BS2Int.size_int2bs StdOrder.IntOrder.ler_maxr 1:/# mulzK.
+qed.
+
+lemma size_SimpleBitPack (p : poly) (b : int) :
+  1 <= b => size (SimpleBitPack p b) = (ilog 2 b + 1) * n %/ 8.
+proof.
+move=> hb; rewrite /SimpleBitPack /= size_BitsToBytes (size_flatten_ctt (ilog 2 b + 1)).
++ by move=> l /mapP [c [_ ->]]; rewrite /IntegerToBits BS2Int.size_int2bs; smt(ilog_ge0).
+by rewrite size_map size_to_list.
+qed.
+
+lemma size_BitPack (p : poly) (a b : int) :
+  1 <= a + b => size (BitPack p a b) = (ilog 2 (a + b) + 1) * n %/ 8.
+proof.
+move=> hab; rewrite /BitPack /= size_BitsToBytes (size_flatten_ctt (ilog 2 (a + b) + 1)).
++ by move=> l /mapP [c [_ ->]]; rewrite /IntegerToBits BS2Int.size_int2bs; smt(ilog_ge0).
+by rewrite size_map size_to_list.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* round trips                                                          *)
+lemma BitsToBytesK (y : bool list) : 8 %| size y => BytesToBits (BitsToBytes y) = y.
+proof.
+move=> h; rewrite /BytesToBits /BitsToBytes -map_comp; apply JWordList.map_chunkK => // l hl.
+by rewrite /(\o) W8.bits2wK.
+qed.
+
+lemma BytesToBitsK (x : W8.t list) : BitsToBytes (BytesToBits x) = x.
+proof.
+rewrite /BitsToBytes /BytesToBits BitChunking.flattenK //.
++ by move=> b /mapP [w [_ ->]]; rewrite W8.size_w2bits.
+rewrite -map_comp; apply (eq_from_nth witness); rewrite ?size_map // => i hi.
+by rewrite (nth_map witness) // /(\o) W8.w2bitsK.
+qed.
+
+lemma IntegerToBytesK (x a : int) :
+  0 <= a => 0 <= x < 2 ^ (8 * a) => BS2Int.bs2int (BytesToBits (IntegerToBytes x a)) = x.
+proof.
+move=> ge0a hx; rewrite /IntegerToBytes /IntegerToBits take_oversize.
++ by rewrite size_BitsToBytes BS2Int.size_int2bs StdOrder.IntOrder.ler_maxr 1:/# mulzK.
+rewrite BitsToBytesK ?BS2Int.size_int2bs; 1: by rewrite StdOrder.IntOrder.ler_maxr 1:/# dvdz_mull dvdzz.
+by rewrite (mulzC a) BS2Int.int2bsK /#.
+qed.
+
+lemma SimpleBitPackK (p : poly) (b : int) :
+  0 < b => (forall i, 0 <= i < n => asint p.[i] <= b) => SimpleBitUnpack (SimpleBitPack p b) b = p.
+proof.
+move=> hb hp; rewrite /SimpleBitUnpack /SimpleBitPack /=.
+have [_ hlt] := ilogP 2 b _ _; 1,2: smt().
+have hc : 0 < ilog 2 b + 1 by smt(ilog_ge0).
+have hsz : forall x, x \in map (fun (wi : coeff) => IntegerToBits (asint wi) (ilog 2 b + 1))
+                             (Array256.to_list p) =>
+                     size x = ilog 2 b + 1
+  by move=> x /mapP [w [_ ->]]; rewrite /IntegerToBits BS2Int.size_int2bs /#.
+rewrite BitsToBytesK.
++ by rewrite (size_flatten_ctt _ _ hsz) size_map Array256.size_to_list; apply dvdz_mull.
+rewrite BitChunking.flattenK // -map_comp; apply Array256.ext_eq => i hi.
+rewrite Array256.initiE //= (nth_map witness) ?Array256.size_to_list // /(\o) /= /BitsToInteger /IntegerToBits
+        BS2Int.int2bsK; 1,2: smt(Array256.get_to_list ge0_asint).
+by rewrite asintK.
+qed.
+
+lemma BitPackK (p : poly) (a b : int) :
+  0 < a + b => (forall i, 0 <= i < n => -a <= crepr p.[i] <= b) =>
+  BitUnpack (BitPack p a b) a b = p.
+proof.
+move=> hab hp; rewrite /BitUnpack /BitPack /=.
+have [_ hlt] := ilogP 2 (a + b) _ _; 1,2: smt().
+have hc : 0 < ilog 2 (a + b) + 1 by smt(ilog_ge0).
+have hsz : forall x, x \in map (fun (wi : coeff) => IntegerToBits (b - crepr wi) (ilog 2 (a + b) + 1))
+                             (Array256.to_list p) =>
+                     size x = ilog 2 (a + b) + 1
+  by move=> x /mapP [w [_ ->]]; rewrite /IntegerToBits BS2Int.size_int2bs /#.
+rewrite BitsToBytesK.
++ by rewrite (size_flatten_ctt _ _ hsz) size_map Array256.size_to_list; apply dvdz_mull.
+rewrite BitChunking.flattenK // -map_comp; apply Array256.ext_eq => i hi.
+rewrite Array256.initiE //= (nth_map witness) ?Array256.size_to_list // /(\o) /= /BitsToInteger /IntegerToBits
+        BS2Int.int2bsK; 1,2: smt(Array256.get_to_list).
+by rewrite (_ : b - (b - crepr p.[i]) = crepr p.[i]) 1:/# creprK.
+qed.
+
+lemma BitUnpackK (v : W8.t list) (a b : int) :
+  0 < a + b => 2 ^ (ilog 2 (a + b) + 1) = a + b + 1 =>
+  (q + 1) %/ 2 - q <= -a => b < (q + 1) %/ 2 =>
+  8 * size v = n * (ilog 2 (a + b) + 1) =>
+  BitPack (BitUnpack v a b) a b = v.
+proof.
+move=> hab hpow hlo hhi hsz; rewrite /BitPack /BitUnpack /=.
+have hc : 0 < ilog 2 (a + b) + 1 by smt(ilog_ge0).
+pose cs := BitChunking.chunk (ilog 2 (a + b) + 1) (BytesToBits v).
+have hcs : size cs = n by rewrite /cs BitChunking.size_chunk // size_BytesToBits hsz mulzK 1:/#.
+have -> : Array256.to_list (Array256.init (nth witness (map (fun (co : bool list) => incoeff (b - BitsToInteger co)) cs))) =
+          map (fun (co : bool list) => incoeff (b - BitsToInteger co)) cs.
++ apply (eq_from_nth witness); 1: by rewrite Array256.size_to_list size_map hcs.
+  by rewrite Array256.size_to_list => i hi; rewrite Array256.get_to_list Array256.initiE.
+have hmap : forall co, co \in cs =>
+              IntegerToBits (b - crepr (incoeff (b - BitsToInteger co))) (ilog 2 (a + b) + 1) = co.
++ move=> co hco; have hs := BitChunking.in_chunk_size _ _ _ hc hco.
+  rewrite /IntegerToBits /BitsToInteger incoeffK_centered; 1,2: smt(BS2Int.bs2int_ge0 BS2Int.bs2int_le2Xs).
+  by rewrite (_ : b - (b - BS2Int.bs2int co) = BS2Int.bs2int co) 1:/# -hs BS2Int.bs2intK.
+rewrite -map_comp (_ : map _ cs = cs).
++ apply (eq_from_nth witness); rewrite ?size_map // => i hi.
+  have hi' : 0 <= i < size cs by rewrite /cs BitChunking.size_chunk //; smt(size_iota).
+  by rewrite (nth_map witness) // /(\o) /=; apply hmap; exact mem_nth.
+rewrite /cs BitChunking.chunkK ?BytesToBitsK //; rewrite size_BytesToBits hsz; apply dvdz_mull; apply dvdzz.
+qed.
 
 (* Validity predicate for byte-encoded eta-bounded polynomials at the spec level.
    Each (ilog 2 (2*Eta) + 1)-bit chunk of v represents an integer in [0, 2*Eta],
@@ -155,3 +271,44 @@ module HintPackUnpack = {
 }.
 
 
+
+(* -------------------------------------------------------------------- *)
+(* BitUnpack maps uniform bytes to uniform coefficients in [-a, b] when *)
+(* a + b + 1 is a power of 2                                            *)
+require import Distr DList.
+
+lemma dmap_BitUnpack (a b : int) :
+  0 < a + b => 2 ^ (ilog 2 (a + b) + 1) = a + b + 1 =>
+  (q + 1) %/ 2 - q <= -a => b < (q + 1) %/ 2 =>
+  dmap (dlist W8.dword ((ilog 2 (a + b) + 1) * n %/ 8)) (fun v => BitUnpack v a b) = dpoly (-a) b.
+proof.
+move=> hab hpow hlo hhi.
+pose c := ilog 2 (a + b) + 1.
+have hc : 0 < c by smt(ilog_ge0).
+have hL : 8 * (c * n %/ 8) = n * c by smt().
+have hK : forall v, size v = c * n %/ 8 => BitPack (BitUnpack v a b) a b = v.
+- by move=> v hv; apply BitUnpackK => //; rewrite hv.
+have hu1 : is_uniform (dmap (dlist W8.dword (c * n %/ 8)) (fun v => BitUnpack v a b)).
+- apply dmap_uni_in_inj; last by apply dlist_uni; exact W8.dword_uni.
+  move=> x y; rewrite !supp_dlist 1,2:/# => -[hx _] [hy _] /= hxy.
+  by rewrite -(hK x hx) -(hK y hy) hxy.
+have hs : support (dmap (dlist W8.dword (c * n %/ 8)) (fun v => BitUnpack v a b)) = support (dpoly (-a) b).
+- apply fun_ext => z; apply eq_iff; rewrite (supp_dpoly (-a) b z hlo hhi); split.
+  + rewrite supp_dmap => -[v [hv ->]] i hi /=; move: hv; rewrite supp_dlist 1:/# => -[hv _].
+    have hn : 0 <= i < size (BytesToBits v) %/ c by rewrite size_BytesToBits hv hL mulzK 1:/#.
+    have hsz := BitChunking.size_nth_chunk witness (BytesToBits v) i c _ hn; 1: smt().
+    rewrite /BitUnpack /= -/c Array256.initiE //= (nth_map witness) /=; 1: by rewrite BitChunking.size_chunk.
+    have hb0 := BS2Int.bs2int_ge0 (nth witness (BitChunking.chunk c (BytesToBits v)) i).
+    have hb1 := BS2Int.bs2int_le2Xs (nth witness (BitChunking.chunk c (BytesToBits v)) i).
+    rewrite hsz hpow in hb1.
+    by rewrite /BitsToInteger incoeffK_centered; smt().
+  move=> h; rewrite supp_dmap; exists (BitPack z a b); split.
+  + rewrite supp_dlist 1:/# size_BitPack 1:/# /=.
+    by split; [done | apply/List.allP => x _; exact W8.dword_fu].
+  by rewrite /= BitPackK //; smt().
+have hl1 : is_lossless (dmap (dlist W8.dword (c * n %/ 8)) (fun v => BitUnpack v a b)).
+- by apply dmap_ll; apply dlist_ll; exact W8.dword_ll.
+have hu2 := dpoly_uni (-a) b hlo hhi.
+have hl2 := dpoly_ll (-a) b _; 1: smt().
+by apply eq_distr => y; rewrite (mu1_uni_ll _ _ hu1 hl1) (mu1_uni_ll _ _ hu2 hl2) hs.
+qed.

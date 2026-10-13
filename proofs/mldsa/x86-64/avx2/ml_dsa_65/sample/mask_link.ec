@@ -38,13 +38,6 @@ require Mexpand.
 lemma gamma1E : Parameters.gamma1 = Mexpand.gamma1.
 proof. by rewrite mldsa65_gamma1 /Mexpand.gamma1. qed.
 
-lemma blenE : ilog 2 (Parameters.gamma1 - 1 + Parameters.gamma1) + 1 = 20.
-proof.
-rewrite mldsa65_gamma1 (: 524288 - 1 + 524288 = 2 ^ 20 - 1) 1:/#.
-have -> // : ilog 2 (2 ^ 20 - 1) = 19.
-by rewrite (ilog_eq 2 (2 ^ 20 - 1) 19) // /#.
-qed.
-
 (* -------------------------------------------------------------------- *)
 (* The domain-separator encoding: the spec's 2-byte integer encoding    *)
 (* is the little-endian byte pair of the W16 counter.                   *)
@@ -104,7 +97,7 @@ lemma mdecode_BitUnpack (bs : W8.t list) :
   lifts_wpoly (Mexpand.mdecode bs)
   = BitUnpack bs (Parameters.gamma1 - 1) Parameters.gamma1.
 proof.
-move=> sz_bs; rewrite /BitUnpack /= blenE.
+move=> sz_bs; rewrite /BitUnpack /= ilog_gamma1 /=.
 apply Array256.tP => j rgj.
 rewrite /lifts_wpoly mapiE //= /Mexpand.mdecode Array256.initiE //=.
 rewrite Array256.initiE //= (nth_map witness) /=.

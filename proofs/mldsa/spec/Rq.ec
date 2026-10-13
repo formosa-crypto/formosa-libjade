@@ -503,3 +503,33 @@ rewrite (lt0_rcoeff _ (k - i)) 1:/# ZModpRing.mulr0 ZModpRing.sub0r -abs_zpN pol
 apply (StdOrder.IntOrder.ler_trans _ _ _ (abs_zp_prod _ _)).
 by apply StdOrder.IntOrder.ler_wpmul2l; [apply ge0_abs_zp | apply hb; smt()].
 qed.
+
+(* -------------------------------------------------------------------- *)
+(* polynomials with independent coefficients uniform in [a, b]          *)
+(* -------------------------------------------------------------------- *)
+require import Distr DInterval.
+require JArrayExtra.
+
+clone JArrayExtra.PAE as Array256E with op size <- 256, theory A <- Array256.
+
+op dpoly (a b : int) : poly distr = Array256E.darray (dmap (dinter a b) incoeff).
+
+lemma supp_dpoly (a b : int) (p : poly) :
+  (q + 1) %/ 2 - q <= a => b < (q + 1) %/ 2 =>
+  p \in dpoly a b <=> forall i, 0 <= i < n => a <= crepr p.[i] <= b.
+proof.
+move=> ha hb; rewrite /dpoly Array256E.supp_darray; split=> h i rgi.
+- by have /supp_dmap [x [/supp_dinter hx ->]] := h i _; rewrite // incoeffK_centered /#.
+by rewrite supp_dmap; exists (crepr p.[i]); rewrite supp_dinter creprK h.
+qed.
+
+lemma dpoly_uni (a b : int) :
+  (q + 1) %/ 2 - q <= a => b < (q + 1) %/ 2 => is_uniform (dpoly a b).
+proof.
+move=> ha hb; apply/Array256E.darray_uni/dmap_uni_in_inj/dinter_uni.
+move=> x y /supp_dinter hx /supp_dinter hy hxy.
+by rewrite -(incoeffK_centered x) 1,2:/# -(incoeffK_centered y) 1,2:/# hxy.
+qed.
+
+lemma dpoly_ll (a b : int) : a <= b => is_lossless (dpoly a b).
+proof. by move=> hab; apply/Array256E.darray_ll/dmap_ll/dinter_ll. qed.

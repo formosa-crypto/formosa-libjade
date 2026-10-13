@@ -1214,3 +1214,18 @@ lemma memread64S mem in_ i:
  = rcons (memread64 mem in_ i) (loadW64 mem (in_ + 8*i)).
 proof. by move=> Hi; rewrite memread64_add // memread64_1 cats1. qed.
 
+(* block i of a concatenation of blocks of the same size *)
+lemma take_drop_flatten ['a 'b] (f : 'a -> 'b list) (l : 'a list) (s i : int) :
+  0 < s => (forall x, size (f x) = s) => 0 <= i < size l =>
+  take s (drop (s * i) (flatten (map f l))) = f (nth witness l i).
+proof.
+move=> hs hf hi.
+have hsz : size (flatten (map f l)) = s * size l
+  by rewrite (size_flatten_ctt s) ?size_map // => b /mapP [x [_ ->]]; rewrite hf.
+have hle : s * i + s <= size (flatten (map f l)).
++ rewrite hsz (_ : s * i + s = s * (i + 1)); 1: by ring.
+  by apply StdOrder.IntOrder.ler_wpmul2l; smt().
+rewrite -nth_chunk //; 1: smt().
+rewrite BitEncoding.BitChunking.flattenK //; 1: by move=> b /mapP [x [_ ->]]; rewrite hf.
+by rewrite (nth_map witness).
+qed.

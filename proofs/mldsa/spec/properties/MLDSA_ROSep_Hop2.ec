@@ -7,6 +7,7 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1.
+require import JWordExtra.
 
 (*************** G1: SHAKE256 routed to separate random oracles ****************)
 
@@ -104,23 +105,6 @@ op inv_view (m0 : (W8.t list * int, W8.t list) fmap) (trset : bool) (tr : Bytes6
      (forall x, m0.[x] = view trset tr mtr mmu mct mxc mrest mpad x)
   /\ (forall l, size l = 64 + w1_bytes =>
         (l \in mpad <=> (Bytes64.of_list (take 64 l), BytesW1.of_list (drop 64 l)) \in mct)).
-
-lemma mu1_dbytes64 (o : Bytes64.t) : mu1 dbytes64 o = mu1 dblock (Bytes64.to_list o).
-proof.
-rewrite /dbytes64 /dblock (dmap1E_can _ _ Bytes64.to_list) //.
-by move=> l; rewrite supp_dlist // => -[hs _]; apply Bytes64.of_listK.
-qed.
-
-lemma dblock_split :
-  dblock = dmap (dbytesCT `*` dlist W8.dword (64 - lambda %/ 4))
-                (fun (p : BytesCT.t * W8.t list) => BytesCT.to_list p.`1 ++ p.`2).
-proof.
-have hl : 0 < lambda %/ 4 <= 64 by have /= H := param_sets; smt().
-rewrite /dbytesCT dmap_dprodL dmap_comp /(\o) /= /dblock
-        {1}(_ : 64 = lambda %/ 4 + (64 - lambda %/ 4)) 1:/# dlist_add 1,2:/#.
-by apply eq_dmap_in => -[a b]; rewrite supp_dprod /= supp_dlist 1:/# => -[[ha _] _];
-   rewrite BytesCT.of_listK.
-qed.
 
 (* Updating the map behind one routed input changes the view at that input only *)
 
@@ -254,7 +238,7 @@ if{2}; [if{2}; [inline * | ] | ].
     have hdl : forall n (xs : W8.t list), 0 <= n => size xs = n =>
                  mu1 (dlist W8.dword n) xs = (1%r / 256%r) ^ n.
     + move=> n xs hn hs; rewrite dlist1E // hs /= (Bigreal.BRM.eq_bigr _ _ (fun _ => 1%r / 256%r)) /=.
-      + by move=> w *; rewrite mu1_dword.
+      + by move=> w *; rewrite DW8.mu1_dword.
       by rewrite Bigreal.mulr_const hs.
     have hl : 0 < lambda %/ 4 <= 64 by have /= H := param_sets; smt().
     rewrite hd; split => [[c p] | hinv].
@@ -724,18 +708,6 @@ proof. by islossless; apply dlist_ll; apply W8.dword_ll. qed.
 axiom expandA_ll : islossless ExpandA(XOFA_O(DS2.RO2.RO)).sample.
 axiom sib_RO1_ll : islossless SampleInBall_O(DS2.RO1.RO).sample.
 axiom sib_RoutedH_ll : islossless SampleInBall_O(RoutedH).sample.
-
-lemma Squeeze_ll (H <: BlockOracle) : islossless H.get => islossless Squeeze(H).squeeze.
-proof.
-by move=> H_ll; proc; while true (len - 64 * j);
-   [by move=> z; wp; call H_ll; auto => /# | by auto => /#].
-qed.
-
-lemma emask_ll (H <: BlockOracle) : islossless H.get => islossless ExpandMask_O(H).sample.
-proof.
-by move=> H_ll; proc; while true (lvec - r);
-   [by move=> z; wp; call (Squeeze_ll H H_ll); auto => /# | by auto => /#].
-qed.
 
 lemma sign_ll (H <: BlockOracle) :
   islossless H.get => islossless SampleInBall_O(H).sample =>

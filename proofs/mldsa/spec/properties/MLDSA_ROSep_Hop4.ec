@@ -7,6 +7,7 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2 MLDSA_ROSep_Hop3.
+require import DistrExtra.
 
 (*************** G3: the hidden inputs leave the routed oracle ****************)
 
@@ -161,16 +162,6 @@ if => //; 1: by inline *; auto => />.
 by if => //; [inline *; auto => /> | call rest4; auto => />].
 qed.
 
-lemma pre66 (rh : Bytes64.t) r :
-  take 64 (Bytes66.to_list (Bytes66.of_list (Bytes64.to_list rh ++ IntegerToBytes r 2))) =
-  Bytes64.to_list rh.
-proof.
-have hitb : size (IntegerToBytes r 2) = 2
-  by rewrite /IntegerToBytes /BitsToBytes /IntegerToBits size_take // size_map
-       BitEncoding.BitChunking.size_chunk // BitEncoding.BS2Int.size_int2bs.
-by rewrite Bytes66.of_listK; [by rewrite size_cat Bytes64.size_to_list hitb | by rewrite take_size_cat].
-qed.
-
 equiv getv4 : RoutedH.get ~ RO_v.RO.get :
   ={x} /\
   ={RoutedH.tr, RoutedH.trset, RO_pad.RO.m, DS5.RO2.RO.m, DS5.RO3.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m} /\
@@ -251,7 +242,7 @@ proc; while (={r, s, rho, mu} /\
              !bad4 RoutedH.tr{2} RO_rest.RO.m{2} RO_seed.RO.m{2} RO_S.RO.m{2} RO_rhopp.RO.m{2} /\
              inv4 RO_rest.RO.m{1} RO_rest.RO.m{2} RO_seed.RO.m{2} RO_S.RO.m{2} RO_rhopp.RO.m{2}
                RO_v.RO.m{2}).
-+ by wp; call squeezev4; auto => />; smt(pre66 Bytes66.size_to_list).
++ by wp; call squeezev4; auto => />; smt(Bytes66.of_listK size_cat Bytes64.size_to_list size_IntegerToBytes take_size_cat Bytes66.size_to_list).
 by auto => />.
 qed.
 
@@ -724,35 +715,6 @@ qed.
 
 (*************** mapbad in G3: H_mu and H_ct outputs cost p512 each ****************)
 
-lemma Ep_hitE ['a] (d : 'a distr) (P b : bool) (Q E : 'a -> bool) (c p : real) :
-  is_lossless d => mu d E <= p => 0%r <= c =>
-  (forall r, Q r => P \/ (b /\ E r)) =>
-  Ep d (fun r => (b2r (Q r) + c)%xr) <= (b2r P + b2r b * p + c)%xr.
-proof.
-move=> dll hE hc hQ.
-apply (xle_trans (Ep d (fun r => (b2r P + c)%xr + (b /\ E r)%xr))).
-+ apply le_Ep => r _ /=; smt().
-have hm : mu d (fun r => b /\ E r) <= b2r b * p.
-+ case: b => _ /=; 2: by rewrite mu0.
-  by rewrite (mu_eq _ _ E) 1:/#.
-rewrite EpD EpC dll Ep_mu /=.
-smt(mu_bounded).
-qed.
-
-lemma mu_ct_tr (t : Bytes64.t) :
-  mu dbytesCT (fun y => BytesCT.to_list y = Bytes64.to_list t) <= p512.
-proof.
-have hl : 0 <= lambda %/ 4 by have /= H := param_sets; smt().
-rewrite /dbytesCT dmapE /(\o) /=.
-apply (RealOrder.ler_trans (mu (dlist W8.dword (lambda %/ 4)) (pred1 (Bytes64.to_list t)))).
-+ apply mu_le => l hl' /= h; rewrite /pred1 -h BytesCT.of_listK //.
-  by move: hl'; rewrite supp_dlist //; smt().
-rewrite dlist1E //; case: (lambda %/ 4 = size (Bytes64.to_list t)) => hs; 2: smt(RealOrder.expr_ge0).
-rewrite (Bigreal.BRM.eq_bigr _ _ (fun _ => 1%r / 256%r)) /=.
-+ by move=> w *; rewrite mu1_dword.
-by rewrite Bigreal.mulr_const Bytes64.size_to_list /p512.
-qed.
-
 lemma mapbad_get4 t m4 m5 k v : mapbad t m4.[k <- v] m5 => mapbad t m4 m5 \/ v = t.
 proof.
 rewrite /mapbad => -[[x hx] | [x y [hx hy]]].
@@ -805,62 +767,6 @@ apply (xle_trans _ _ _ (Ep_hitE dbytesCT (mapbad t0 DS5.RO4.RO.m{hr} DS5.RO5.RO.
 + by apply mu_ct_tr.
 + by move=> r0 /=.
 by rewrite /b2r /=.
-qed.
-
-(* Procedures that do not touch H_mu or H_ct keep any constant potential *)
-
-lemma Squeeze_e (H <: BlockOracle) (v : xreal) :
-  (forall v, ehoare [H.get : v ==> v]) => ehoare [Squeeze(H).squeeze : v ==> v].
-proof.
-move=> hH; proc; while (v).
-+ by move=> &hr; apply xle_cxr_r.
-+ by wp; call (hH v); skip => &hr; apply xle_cxr_r.
-by auto.
-qed.
-
-lemma ReadByte_e (H <: BlockOracle) (v : xreal) :
-  (forall v, ehoare [H.get : v ==> v]) => ehoare [ReadByte(H).read : v ==> v].
-proof. by move=> hH; proc; call (hH v); auto. qed.
-
-lemma SampleInBall_e (H <: BlockOracle) (v : xreal) :
-  (forall v, ehoare [H.get : v ==> v]) => ehoare [SampleInBall_O(H).sample : v ==> v].
-proof.
-move=> hH; proc; while (v).
-+ by move=> &hr; apply xle_cxr_r.
-+ wp; while (v).
-  + by move=> &hr; apply xle_cxr_r.
-  + by wp; call (ReadByte_e H v hH); auto => &hr; apply xle_cxr_r.
-  by wp; call (ReadByte_e H v hH); auto => &hr; apply xle_cxr_r.
-by wp; call (Squeeze_e H v hH); auto.
-qed.
-
-lemma ExpandMask_e (H <: BlockOracle) (v : xreal) :
-  (forall v, ehoare [H.get : v ==> v]) => ehoare [ExpandMask_O(H).sample : v ==> v].
-proof.
-by move=> hH; proc; while (v);
-   [move=> &hr; apply xle_cxr_r | wp; call (Squeeze_e H v hH); auto => &hr; apply xle_cxr_r | auto].
-qed.
-
-lemma XOFS_next_e (H <: BlockOracle) (v : xreal) :
-  (forall v, ehoare [H.get : v ==> v]) => ehoare [XOFS_O(H).next : v ==> v].
-proof. by move=> hH; proc; wp; call (ReadByte_e H v hH); auto. qed.
-
-lemma RejBoundedPoly_e (H <: BlockOracle) (v : xreal) :
-  (forall v, ehoare [H.get : v ==> v]) => ehoare [RejBoundedPoly(XOFS_O(H)).sample : v ==> v].
-proof.
-move=> hH; proc; while (v); [by move=> &hr; apply xle_cxr_r | | by inline *; auto].
-seq 1 : v; 2: by auto.
-by call (XOFS_next_e H v hH); skip => &hr; apply xle_cxr_r.
-qed.
-
-lemma ExpandS_e (H <: BlockOracle) (v : xreal) :
-  (forall v, ehoare [H.get : v ==> v]) => ehoare [ExpandS(XOFS_O(H)).sample : v ==> v].
-proof.
-move=> hH; proc; while (v).
-+ by move=> &hr; apply xle_cxr_r.
-+ by wp; call (RejBoundedPoly_e H v hH); auto => &hr; apply xle_cxr_r.
-wp; while (v); [by move=> &hr; apply xle_cxr_r | | by auto].
-by wp; call (RejBoundedPoly_e H v hH); auto => &hr; apply xle_cxr_r.
 qed.
 
 ehoare RO_seed_e (v : xreal) : RO_seed.RO.get : v ==> v.

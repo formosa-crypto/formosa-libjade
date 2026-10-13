@@ -1,4 +1,5 @@
 require import AllCore IntDiv List Ring.
+require StdOrder.
 
 (* ML-DSA parameters. Previously this file cloned [DParams] from the dilithium
    submodule; the DParams obligations are now inlined here as axioms on
@@ -55,6 +56,16 @@ proof.
 by rewrite /Beta;
  have  H /=:=param_sets;elim H => /=;rewrite /=;
   move => [#] ->?->??? -> * /=;do 18!(rewrite expr_pred //=);rewrite expr1 => /=.
+qed.
+
+lemma gamma1_E : gamma1 = 2 ^ 19 by smt(param_sets).
+
+(* a nonce k * lvec + r of the mask sampler fits in 16 bits *)
+lemma nonce_rng (k r : int) : 0 <= k < kappa_max => 0 <= r < lvec => 0 <= k * lvec + r < 65536.
+proof.
+move=> hk hr; have hb := kappa_max_bnd; have hl := gt0_l.
+have : (k + 1) * lvec <= kappa_max * lvec by apply StdOrder.IntOrder.ler_wpmul2r; smt().
+smt().
 qed.
 
 end MLDSAParams.

@@ -37,8 +37,6 @@ qed.
 
 (* Circuit spec *)
 
-lemma ilog_gamma1 : ilog 2 (gamma1 - 1 + gamma1) = 19 by rewrite mldsa65_gamma1 /=.
-
 op gamma1_encode_polynomial_lane(c : W32.t) : W20.t =
     BS_W32_W20_U.truncateu20 ((W32.of_int 524288) + (-c)).
 

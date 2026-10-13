@@ -255,9 +255,6 @@ op blkrel (mb : (W8.t list * int, W8.t list) fmap) (mw : (W8.t list * int, W8.t)
      (forall y j k, 0 <= k < 64 => mw.[(y, 64 * j + k)] = omap (fun b => nth witness b k) mb.[(y, j)])
   /\ (forall x b, mb.[x] = Some b => size b = 64).
 
-lemma blk_inj (j j' k k' : int) : 0 <= k < 64 => 0 <= k' < 64 => 64 * j + k = 64 * j' + k' => j = j' /\ k = k'.
-proof. smt(). qed.
-
 equiv blk_get (x0 : W8.t list * int) : DS5.RO2.RO.get ~ BlockOf(RO_xc.RO).get :
   ={x} /\ x{1} = x0 /\ blkrel DS5.RO2.RO.m{1} RO_xc.RO.m{2}
   ==> ={res} /\ blkrel DS5.RO2.RO.m{1} RO_xc.RO.m{2} /\ DS5.RO2.RO.m{1}.[x0] = Some res{1}.
@@ -308,7 +305,7 @@ while (={i} /\ n{1} = 64 /\ l{1} = bs{2} /\ size bs{2} = i{2} /\ 0 <= i{2} <= 64
   + rewrite get_setE nth_cat; case: (k = size bs{2}) => [-> /= | hk]; 1: smt().
     have -> /= : (x0.`1, 64 * x0.`2 + k) <> (x0.`1, 64 * x0.`2 + size bs{2}) by smt().
     by rewrite h1 //; smt().
-  have hne' : (y, 64 * j + k) <> (x0.`1, 64 * x0.`2 + size bs{2}) by smt(blk_inj).
+  have hne' : (y, 64 * j + k) <> (x0.`1, 64 * x0.`2 + size bs{2}) by smt(euclideU).
   by rewrite get_setE hne' /=; apply h2.
 auto => /> &1 &2 hr hs hn; split.
 + split => [k hk0 hk1 | y j k hk0 hk1 _]; 2: by apply hr.

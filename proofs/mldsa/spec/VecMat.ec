@@ -326,3 +326,22 @@ have : l1 c * Eta <= tau * Eta by apply StdOrder.IntOrder.ler_wpmul2r.
 by rewrite /Beta; smt().
 qed.
 
+(* -------------------------------------------------------------------- *)
+(* vectors of independent polynomials drawn from d                      *)
+require import Distr.
+require JArrayExtra.
+
+clone JArrayExtra.PAE as LArrayE with op size <- lvec, theory A <- LArray.
+clone JArrayExtra.PAE as KArrayE with op size <- kvec, theory A <- KArray.
+
+op dpolyl (d : poly distr) : polylvec distr = LArrayE.darray d.
+op dpolyk (d : poly distr) : polykvec distr = KArrayE.darray d.
+
+lemma supp_dpolyl (d : poly distr) (s : polylvec) :
+  s \in dpolyl d <=> forall i, 0 <= i < lvec => s.[i] \in d.
+proof. by apply LArrayE.supp_darray. qed.
+
+lemma supp_dpolyk (d : poly distr) (s : polykvec) :
+  s \in dpolyk d <=> forall i, 0 <= i < kvec => s.[i] \in d.
+proof. by apply KArrayE.supp_darray. qed.
+

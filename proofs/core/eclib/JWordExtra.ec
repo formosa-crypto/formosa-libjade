@@ -557,3 +557,24 @@ clone WE as WE128 with
 clone WE as WE256 with
   op     size <- 256,
   theory W    <- W256 { rename "_XX" as "_256" } .
+
+(* -------------------------------------------------------------------- *)
+(* the uniform distribution on words of any size                        *)
+require import Distr.
+
+abstract theory DWord.
+  op size : { int | 0 < size } as gt0_size.
+  clone import BitWord as W with op size <- size proof gt0_size by exact gt0_size.
+
+  lemma mu1_dword (w : W.t) : mu1 W.dword w = 1%r / W.modulus%r.
+  proof.
+  rewrite /W.dword duniform1E W.all_wordsP /= W.all_wordsE undup_id.
+  + apply map_inj_in_uniq; 2: by apply iota_uniq.
+    move=> a b; rewrite !mema_iota => ha hb /(congr1 W.to_uint).
+    by rewrite !W.to_uintK_small.
+  by rewrite size_map size_iota StdOrder.IntOrder.ler_maxr // StdOrder.IntOrder.ltrW W.gt0_modulus.
+  qed.
+end DWord.
+
+clone DWord as DW8 with op size <- 8, theory W <- W8 { rename "_XX" as "_8" }
+  proof gt0_size by done.

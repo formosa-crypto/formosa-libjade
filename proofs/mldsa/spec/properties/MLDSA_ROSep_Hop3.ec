@@ -273,13 +273,6 @@ proof. by conseq (: ={rho, mu, glob RoutedH} ==> ={res, glob RoutedH}) _ (emask_
 
 axiom sib_XC_ll : islossless SampleInBall_O(DS5.RO2.RO).sample.
 
-lemma sigEncode_ll : islossless SigEncDec.sigEncode.
-proof.
-proc; wp; call (: true); 2: by while true (lvec - i); [by move=> z; auto => /# | auto => /#].
-by while true (kvec - i);
-   [by move=> z; wp; while true (n - j); [by move=> z'; auto => /# | auto => /#] | auto => /#].
-qed.
-
 lemma hctpad_ll : islossless HctPad.get.
 proof.
 proc; inline *; auto => />.
@@ -481,20 +474,6 @@ by auto => />; smt(drnd_ll).
 qed.
 
 (*************** Verification ****************)
-
-lemma sigDecode_ll : islossless SigEncDec.sigDecode.
-proof.
-proc; call (: true); 2: by while true (lvec - i); [by move=> z'; auto => /# | auto => /#].
-while true (2 * (w_hint - index) + b2i (!error)); 1: by move=> z'; auto => /#.
-wp; while true (2 * (kvec - i) + b2i (!error)).
-+ move=> z'; sp; if; 1: by auto => /#.
-  by wp; while true (2 * (W8.to_uint (nth witness y (w_hint + i)) - index) + b2i (!error));
-     [by move=> z''; auto => /# | auto => /#].
-by auto => /#.
-qed.
-
-lemma pkDecode_ll : islossless PkEncDec.pkDecode.
-proof. by proc; while true (kvec - i); [by move=> z'; auto => /# | auto => /#]. qed.
 
 lemma verify2_ll : islossless MLDSA_RO_DS2(RoutedH, DS2.RO2.RO).verify.
 proof.
@@ -718,24 +697,6 @@ by wp; rnd; wp; call (: true);
 qed.
 
 (*************** Key generation ****************)
-
-lemma sk_tr (rho k : Bytes32.t) (tr : Bytes64.t) (rest : W8.t list) :
-  Bytes64.of_list (take 64 (drop 64 (BytesSK.to_list (BytesSK.of_list
-    (Bytes32.to_list rho ++ Bytes32.to_list k ++ Bytes64.to_list tr ++ rest))))) = tr.
-proof.
-have hsk : 128 <= sk_bytes by have /= H := param_sets; smt(ge0_size BytesSK.ge0_size).
-have -> : take 64 (drop 64 (BytesSK.to_list (BytesSK.of_list
-            (Bytes32.to_list rho ++ Bytes32.to_list k ++ Bytes64.to_list tr ++ rest)))) =
-          Bytes64.to_list tr;
-  last by rewrite Bytes64.to_listK.
-apply (eq_from_nth witness);
-  1: by rewrite size_take // size_drop // BytesSK.size_to_list Bytes64.size_to_list /#.
-move=> i; rewrite size_take // size_drop // BytesSK.size_to_list => hi.
-rewrite nth_take 1,2:/# nth_drop 1,2:/# BytesSK.get_to_list BytesSK.get_of_list 1:/#.
-rewrite nth_cat.
-by rewrite !size_cat !Bytes32.size_to_list Bytes64.size_to_list (_ : 64 + i < 32 + 32 + 64) 1:/# /=
-   nth_cat size_cat !Bytes32.size_to_list (_ : !(64 + i < 32 + 32)) 1:/#.
-qed.
 
 hoare skEncode_tr (t : Bytes64.t) : SkEncDec.skEncode :
   tr = t ==> Bytes64.of_list (take 64 (drop 64 (BytesSK.to_list res))) = t.

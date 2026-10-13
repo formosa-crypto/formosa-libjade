@@ -1,4 +1,4 @@
-require import AllCore List StdBigop StdOrder IntDiv Distr.
+require import AllCore List StdBigop StdOrder IntDiv Distr DList Xreal.
 require import Ring.
 import IntID.
 import IntOrder Bigint MUniform Range.
@@ -1163,3 +1163,80 @@ move => />*; split => /> *; first smt().
 by rewrite !size_cat; smt(size_take take_oversize).
 qed.
 
+(* -------------------------------------------------------------------- *)
+(* lists of independent samples: point, prefix and suffix bounds        *)
+lemma mu1_dlist_le ['a] (d : 'a distr) (n : int) (p : real) (xs : 'a list) :
+  0 <= n => 0%r <= p => (forall x, mu1 d x <= p) => mu1 (dlist d n) xs <= p ^ n.
+proof.
+move=> ge0n ge0p hp; rewrite dlist1E //; case: (n = size xs) => [-> {ge0n} | _]; last by rewrite RealOrder.expr_ge0.
+elim: xs => [|x xs ih] /=; first by rewrite Bigreal.BRM.big_nil RField.expr0.
+rewrite Bigreal.BRM.big_cons /predT /= addzC RField.exprS ?size_ge0.
+apply RealOrder.ler_pmul.
+- by apply/ge0_mu.
+- by apply Bigreal.prodr_ge0 => * /=; apply/ge0_mu.
+- by apply hp.
+by apply ih.
+qed.
+
+lemma mu_dlist_take_le ['a] (d : 'a distr) (m k : int) (p : real) (c : 'a list) :
+  0 <= m => 0 <= k => 0%r <= p => (forall x, mu1 d x <= p) =>
+  mu (dlist d (m + k)) (fun r => take m r = c) <= p ^ m.
+proof.
+move=> ge0m ge0k ge0p hp; rewrite (dlist_add d m k) // dmapE /(\o) /=.
+apply (RealOrder.ler_trans (mu (dlist d m `*` dlist d k)
+         (fun (r : 'a list * 'a list) => pred1 c r.`1 /\ predT r.`2))).
+- apply mu_le => -[a b] /=; rewrite supp_dprod /= => -[ha _] h.
+  by move: ha; rewrite supp_dlist // => -[hsa _]; move: h; rewrite (take_size_cat _ _ _ hsa).
+rewrite (dprodE (pred1 c) predT); apply (RealOrder.ler_trans (mu1 (dlist d m) c)).
+- by rewrite -{2}(RField.mulr1 (mu1 _ _)) RealOrder.ler_wpmul2l 1:ge0_mu le1_mu.
+exact mu1_dlist_le.
+qed.
+
+lemma mu_dlist_drop_le ['a] (d : 'a distr) (m k : int) (p : real) (c : 'a list) :
+  0 <= m => 0 <= k => 0%r <= p => (forall x, mu1 d x <= p) =>
+  mu (dlist d (m + k)) (fun r => drop m r = c) <= p ^ k.
+proof.
+move=> ge0m ge0k ge0p hp; rewrite (dlist_add d m k) // dmapE /(\o) /=.
+apply (RealOrder.ler_trans (mu (dlist d m `*` dlist d k)
+         (fun (r : 'a list * 'a list) => predT r.`1 /\ pred1 c r.`2))).
+- apply mu_le => -[a b] /=; rewrite supp_dprod /= => -[ha _] h.
+  by move: ha; rewrite supp_dlist // => -[hsa _]; move: h; rewrite (drop_size_cat _ _ _ hsa) => ->.
+rewrite (dprodE predT (pred1 c)); apply (RealOrder.ler_trans (mu1 (dlist d k) c)).
+- by rewrite -{2}(RField.mul1r (mu1 _ _)) RealOrder.ler_wpmul2r 1:ge0_mu le1_mu.
+exact mu1_dlist_le.
+qed.
+
+(* flattening k independent lists of length m *)
+lemma dlist_flatten ['a] (d : 'a distr) (m k : int) :
+  0 <= m => 0 <= k => dmap (dlist (dlist d m) k) flatten = dlist d (m * k).
+proof.
+move=> hm; elim: k => [| k hk ih]; 1: by rewrite !dlist0 // dmap_dunit flatten_nil.
+rewrite dlistSr //= dmap_comp.
+have -> : flatten \o (fun (xy : 'a list list * 'a list) => rcons xy.`1 xy.`2) =
+          (fun (p : 'a list * 'a list) => p.`1 ++ p.`2) \o
+          (fun (p : 'a list list * 'a list) => (flatten p.`1, p.`2)).
++ by apply fun_ext => p; rewrite /(\o) /= -cats1 flatten_cat flatten_seq1.
+by rewrite -dmap_comp -dmap_dprodL ih mulzDr mulz1 -dlist_add //; smt().
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mu_or_le ['a] (d : 'a distr) (p q : 'a -> bool) (a b : real) :
+  mu d p <= a => mu d q <= b => mu d (fun x => p x \/ q x) <= a + b.
+proof. by move=> hp hq; have := mu_or d p q; rewrite /predU => ->; smt(mu_bounded). qed.
+
+(* the expectation of a hit indicator: Q only holds when P does, or when *)
+(* b does and the sample lands in an event of probability at most p     *)
+lemma Ep_hitE ['a] (d : 'a distr) (P b : bool) (Q E : 'a -> bool) (c p : real) :
+  is_lossless d => mu d E <= p => 0%r <= c =>
+  (forall r, Q r => P \/ (b /\ E r)) =>
+  Ep d (fun r => (b2r (Q r) + c)%xr) <= (b2r P + b2r b * p + c)%xr.
+proof.
+move=> dll hE hc hQ.
+apply (xle_trans (Ep d (fun r => (b2r P + c)%xr + (b /\ E r)%xr))).
++ apply le_Ep => r _ /=; smt().
+have hm : mu d (fun r => b /\ E r) <= b2r b * p.
++ case: b => _ /=; 2: by rewrite mu0.
+  by rewrite (mu_eq _ _ E) 1:/#.
+rewrite EpD EpC dll Ep_mu /=.
+smt(mu_bounded).
+qed.

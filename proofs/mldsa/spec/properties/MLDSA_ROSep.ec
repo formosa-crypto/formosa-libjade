@@ -7,6 +7,7 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 require import MLDSA MLDSA_RO.
+require import DistrExtra JWordExtra StdBigop StdOrder.
 require DS_ROM.
 
 op dxi : Bytes32.t distr = dmap (dlist W8.dword 32) Bytes32.of_list.
@@ -268,6 +269,60 @@ module Router(A : DS2.Adversary)
 
 op p256 : real = (1%r / 256%r) ^ 32.
 op p512 : real = (1%r / 256%r) ^ 64.
+
+(* the uniform byte distributions: point and prefix/suffix masses *)
+lemma mu1_dlist32 (c : W8.t list) : mu1 (dlist W8.dword 32) c <= p256.
+proof. by rewrite /p256; apply mu1_dlist_le => //; [smt() | move=> w; rewrite DW8.mu1_dword]. qed.
+
+lemma mu1_dblock (v : W8.t list) : mu1 dblock v <= p512.
+proof. by rewrite /p512 /dblock; apply mu1_dlist_le => //; [smt() | move=> w; rewrite DW8.mu1_dword]. qed.
+
+lemma mu_dblock_take (c : W8.t list) : mu dblock (fun r => take 32 r = c) <= p256.
+proof.
+rewrite /p256 /dblock (_ : 64 = 32 + 32) // mu_dlist_take_le //; 1: smt().
+by move=> w; rewrite DW8.mu1_dword.
+qed.
+
+lemma mu_dblock_drop (c : W8.t list) : mu dblock (fun r => drop 32 r = c) <= p256.
+proof.
+rewrite /p256 /dblock (_ : 64 = 32 + 32) // mu_dlist_drop_le //; 1: smt().
+by move=> w; rewrite DW8.mu1_dword.
+qed.
+
+lemma mu1_dxi (e : Bytes32.t) : mu1 dxi e <= p256.
+proof.
+rewrite /dxi dmap1E /(\o) /=.
+apply (RealOrder.ler_trans (mu (dlist W8.dword 32) (pred1 (Bytes32.to_list e)))); 2: by apply mu1_dlist32.
+by apply mu_le => l hl /= h; rewrite /pred1 -h Bytes32.of_listK //; move: hl; rewrite supp_dlist //; smt().
+qed.
+
+lemma mu1_dbytes64 (o : Bytes64.t) : mu1 dbytes64 o = mu1 dblock (Bytes64.to_list o).
+proof.
+rewrite /dbytes64 /dblock (dmap1E_can _ _ Bytes64.to_list) //.
+by move=> l; rewrite supp_dlist // => -[hs _]; apply Bytes64.of_listK.
+qed.
+
+lemma mu_ct_tr (t : Bytes64.t) :
+  mu dbytesCT (fun y => BytesCT.to_list y = Bytes64.to_list t) <= p512.
+proof.
+have hl : 0 <= lambda %/ 4 by have /= H := param_sets; smt().
+rewrite /dbytesCT dmapE /(\o) /=.
+apply (RealOrder.ler_trans (mu (dlist W8.dword (lambda %/ 4)) (pred1 (Bytes64.to_list t)))).
++ apply mu_le => l hl' /= h; rewrite /pred1 -h BytesCT.of_listK //.
+  by move: hl'; rewrite supp_dlist //; smt().
+rewrite dlist1E //; case: (lambda %/ 4 = size (Bytes64.to_list t)) => hs; 2: smt(RealOrder.expr_ge0).
+rewrite (Bigreal.BRM.eq_bigr _ _ (fun _ => 1%r / 256%r)) /=.
++ by move=> w *; rewrite DW8.mu1_dword.
+by rewrite Bigreal.mulr_const Bytes64.size_to_list /p512.
+qed.
+
+lemma dblock_take : dmap dblock (fun r => Bytes32.of_list (take 32 r)) = dxi.
+proof.
+rewrite /dblock (_ : 64 = 32 + 32) // dlist_add // dmap_comp /(\o) /=.
+rewrite (eq_dmap_in _ _ (fun (p : W8.t list * W8.t list) => Bytes32.of_list p.`1)).
++ move=> [p1 p2] /supp_dprod /= [h1 _]; rewrite take_size_cat //; move: h1; rewrite supp_dlist //; case.
+by rewrite dprod_marginalL (dlist_ll W8.dword 32 W8.dword_ll) dscalar1.
+qed.
 
 (* qH: SHAKE256 block queries of the adversary, qS: signing queries.
    Output events (p512 unless stated):

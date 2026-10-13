@@ -7,6 +7,7 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 require import MLDSA MLDSA_RO MLDSA_ROSep.
+require import DistrExtra.
 
 (* G0': verify rejects c~ = tr *)
 module MLDSA_RO_DS1(H : BlockOracle, G : Oracle) = {
@@ -52,40 +53,6 @@ left; exists y; split => //; split; 1: smt(mem_set).
 by move: heq; rewrite !get_setE hney hne.
 qed.
 
-lemma mu1_dword (w : W8.t) : mu1 W8.dword w = 1%r / 256%r.
-proof.
-have hm : W8.modulus = 256 by done.
-rewrite /W8.dword duniform1E W8.all_wordsP /= W8.all_wordsE undup_id.
-+ apply map_inj_in_uniq; 2: by apply iota_uniq.
-  move=> a b; rewrite !mema_iota => ha hb /(congr1 W8.to_uint).
-  by rewrite !W8.to_uintK_small.
-by rewrite size_map size_iota hm.
-qed.
-
-lemma mu1_dblock (v : W8.t list) : mu1 dblock v <= p512.
-proof.
-rewrite /dblock dlist1E //.
-case: (64 = size v) => hs; last by smt(RealOrder.expr_ge0).
-rewrite (Bigreal.BRM.eq_bigr _ _ (fun _ => 1%r / 256%r)) /=.
-+ by move=> w *; rewrite mu1_dword.
-by rewrite Bigreal.mulr_const -hs /p512.
-qed.
-
-lemma Ep_hit ['a] (d : 'a distr) (P b : bool) (Q : 'a -> bool) (v : 'a) (c p : real) :
-  is_lossless d => mu1 d v <= p => 0%r <= c =>
-  (forall r, Q r => P \/ (b /\ r = v)) =>
-  Ep d (fun r => (b2r (Q r) + c)%xr) <= (b2r P + b2r b * p + c)%xr.
-proof.
-move=> dll hv hc hQ.
-apply (xle_trans (Ep d (fun r => (b2r P + c)%xr + (b /\ r = v)%xr))).
-+ apply le_Ep => r _ /=; smt().
-have hm : mu d (fun r => b /\ r = v) <= b2r b * p.
-+ case: b => _ /=; 2: by rewrite mu0.
-  by rewrite (mu_eq _ _ (pred1 v)) 1:/#.
-rewrite EpD EpC dll Ep_mu /=.
-smt(mu_bounded).
-qed.
-
 op allsize (m : (W8.t list * int, W8.t list) fmap) : bool =
   forall p, p \in m => size (oget m.[p]) = 64.
 
@@ -120,9 +87,9 @@ apply (xle_trans (Ep dblock (fun r =>
     by have hcs := coll_set _ pk0 _ r hin hx; apply le_pos; smt().
   have -> /= : inv_m DS2.RO1.RO.m{hr} pk0 /\ (x{hr} \in DS2.RO1.RO.m{hr}) by smt().
   by apply le_pos; smt().
-apply (Ep_hit dblock _ _ (fun r => coll DS2.RO1.RO.m{hr} pk0 \/
+apply (Ep_hitE dblock _ _ (fun r => coll DS2.RO1.RO.m{hr} pk0 \/
          (rel x{hr} /\ r = oget DS2.RO1.RO.m{hr}.[(BytesPK.to_list pk0, 0)]))
-         (oget DS2.RO1.RO.m{hr}.[(BytesPK.to_list pk0, 0)]) c p512) => //.
+         (pred1 (oget DS2.RO1.RO.m{hr}.[(BytesPK.to_list pk0, 0)])) c p512) => //.
 + by rewrite /dblock dlist_ll W8.dword_ll.
 by apply mu1_dblock.
 qed.
@@ -171,9 +138,6 @@ call /(fun y => (x = x0 /\ p = p0 /\ 0%r <= c) `|` y) (RO1_get_coll pk0 (x0, p0 
 by skip => &hr /=; apply xle_cxr => />.
 qed.
 
-lemma ct_len_nrel : lambda %/ 4 <> 64 + w1_bytes.
-proof. by have /= H := param_sets; smt(). qed.
-
 (* SampleInBall only reads inputs of length lambda/4, so it is free *)
 ehoare SampleInBall_coll (pk0 : BytesPK.t) (k : real) : SampleInBall_O(DS2.RO1.RO).sample :
   (inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k) `|` (b2r (coll DS2.RO1.RO.m pk0) + k)%xr
@@ -211,9 +175,6 @@ call /(fun y => (0%r <= k) `|` y)
 + by move=> &hr /=; apply xle_cxr => />.
 by skip => &hr /=; apply xle_cxr => /> *; apply le_pos; smt(RealOrder.expr_ge0).
 qed.
-
-lemma w1_bytes_big : 2 < w1_bytes.
-proof. by have /= H := param_sets; smt(). qed.
 
 (* ExpandMask squeezes 66-byte inputs, so it is free *)
 ehoare ExpandMask_coll (pk0 : BytesPK.t) (k : real) : ExpandMask_O(DS2.RO1.RO).sample :
@@ -381,9 +342,6 @@ call /(fun y => (DS2.RO1.RO.m = m0) `|` y)
 skip => &hr /=; apply xle_cxr_r => [#] hm _ hinv hk.
 by rewrite hm hinv.
 qed.
-
-lemma pk_len_nrel : pk_bytes <> 64 + w1_bytes.
-proof. by rewrite /pk_bytes; have /= H := param_sets; smt(). qed.
 
 ehoare sigDecode_ct (s0 : BytesSig.t) (v : xreal) : SigEncDec.sigDecode :
   (sigma = s0) `|` v ==> (res.`1 = BytesCT.init (fun ii => BytesSig."_.[_]" s0 ii)) `|` v.

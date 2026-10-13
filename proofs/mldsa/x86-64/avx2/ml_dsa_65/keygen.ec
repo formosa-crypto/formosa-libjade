@@ -22,17 +22,7 @@ import BitChunking.
 
 require import Row_vector Column_vector.
 
-lemma size_BitsToBytes l :  size (BitsToBytes l) = (size l) %/ 8.
-rewrite /BitsToBytes size_map size_chunk //. 
-qed.
 
-lemma size_SimpleBitPack _p b : 1 <= b => size (SimpleBitPack _p b) = (ilog 2 b + 1) * n %/ 8.
-move => Hb.
-rewrite /SimpleBitPack /=  size_BitsToBytes (size_flatten_ctt (ilog 2 b + 1)).
-+ move => l; rewrite mapP => He; elim He => c /= [# ?->].
-  rewrite /IntegerToBits BS2Int.size_int2bs;smt(ilog_ge0).
-by rewrite size_map size_to_list.
-qed.
 
 lemma size_kflatten_SimpleBitPack (v : W32.t Array1536.t) b:
    1 <= b =>
@@ -44,13 +34,6 @@ rewrite (size_flatten_ctt ((ilog 2 b + 1) * n %/ 8)).
 by rewrite size_map size_to_list mldsa65_kvec /= /#.
 qed.
 
-lemma size_BitPack _p b1 b2 : 1 <= (b1 + b2) => size (BitPack _p b1 b2) = (ilog 2 (b1 + b2) + 1) * n %/ 8.
-move => Hb.
-rewrite /BitPack /=  size_BitsToBytes (size_flatten_ctt (ilog 2 (b1 + b2) + 1)).
-+ move => l; rewrite mapP => He; elim He => c /= [# ?->].
-  rewrite /IntegerToBits BS2Int.size_int2bs. smt(ilog_ge0).
-by rewrite size_map size_to_list.
-qed.
 
 lemma size_lflatten_BitPack (v : W32.t Array1280.t) b1 b2:
   1 <= (b1 + b2) =>

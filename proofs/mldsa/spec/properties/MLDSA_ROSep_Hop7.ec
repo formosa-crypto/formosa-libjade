@@ -7,169 +7,11 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2 MLDSA_ROSep_Hop3.
+require import DistrExtra.
 require import MLDSA_ROSep_Hop4 MLDSA_ROSep_Hop5 MLDSA_ROSep_Hop6.
 require DMap.
 
 (*************** G7: the hidden samplers are replaced by distributions ****************)
-
-(* Polynomials with coefficients uniform in [a, b], and vectors of them *)
-op dpoly (a b : int) : poly distr = dmap (dlist (dmap (dinter a b) incoeff) n) (Array256.of_list witness).
-op dpolyl (d : poly distr) : polylvec distr = dmap (dlist d lvec) (LArray.of_list witness).
-op dpolyk (d : poly distr) : polykvec distr = dmap (dlist d kvec) (KArray.of_list witness).
-
-(*************** Encoding round trips ****************)
-
-lemma BitsToBytesK (y : bool list) : 8 %| size y => BytesToBits (BitsToBytes y) = y.
-proof.
-move=> h; rewrite /BytesToBits /BitsToBytes -map_comp; apply JWordList.map_chunkK => // l hl.
-by rewrite /(\o) W8.bits2wK.
-qed.
-
-lemma BytesToBitsK (x : W8.t list) : BitsToBytes (BytesToBits x) = x.
-proof.
-rewrite /BitsToBytes /BytesToBits BitChunking.flattenK //.
-+ by move=> b /mapP [w [_ ->]]; rewrite W8.size_w2bits.
-rewrite -map_comp; apply (eq_from_nth witness); rewrite ?size_map // => i hi.
-by rewrite (nth_map witness) // /(\o) W8.w2bitsK.
-qed.
-
-lemma BitPackK (p : poly) (a b : int) :
-  0 < a + b => (forall i, 0 <= i < n => -a <= crepr p.[i] <= b) =>
-  BitUnpack (BitPack p a b) a b = p.
-proof.
-move=> hab hp; rewrite /BitUnpack /BitPack /=.
-have [_ hlt] := RealExp.ilogP 2 (a + b) _ _; 1,2: smt().
-have hc : 0 < RealExp.ilog 2 (a + b) + 1 by smt(RealExp.ilog_ge0).
-have hsz : forall x, x \in map (fun (wi : coeff) => IntegerToBits (b - crepr wi) (RealExp.ilog 2 (a + b) + 1))
-                             (Array256.to_list p) =>
-                     size x = RealExp.ilog 2 (a + b) + 1
-  by move=> x /mapP [w [_ ->]]; rewrite /IntegerToBits BS2Int.size_int2bs /#.
-rewrite BitsToBytesK.
-+ by rewrite (size_flatten_ctt _ _ hsz) size_map Array256.size_to_list; apply dvdz_mull.
-rewrite BitChunking.flattenK // -map_comp; apply Array256.ext_eq => i hi.
-rewrite Array256.initiE //= (nth_map witness) ?Array256.size_to_list // /(\o) /= /BitsToInteger /IntegerToBits
-        BS2Int.int2bsK; 1,2: smt(Array256.get_to_list).
-by rewrite (_ : b - (b - crepr p.[i]) = crepr p.[i]) 1:/# creprK.
-qed.
-
-lemma BitUnpackK (v : W8.t list) (a b : int) :
-  0 < a + b => 2 ^ (RealExp.ilog 2 (a + b) + 1) = a + b + 1 =>
-  (q + 1) %/ 2 - q <= -a => b < (q + 1) %/ 2 =>
-  8 * size v = n * (RealExp.ilog 2 (a + b) + 1) =>
-  BitPack (BitUnpack v a b) a b = v.
-proof.
-move=> hab hpow hlo hhi hsz; rewrite /BitPack /BitUnpack /=.
-have hc : 0 < RealExp.ilog 2 (a + b) + 1 by smt(RealExp.ilog_ge0).
-pose cs := BitChunking.chunk (RealExp.ilog 2 (a + b) + 1) (BytesToBits v).
-have hcs : size cs = n by rewrite /cs BitChunking.size_chunk // size_BytesToBits hsz mulzK 1:/#.
-have -> : Array256.to_list (Array256.init (nth witness (map (fun (co : bool list) => incoeff (b - BitsToInteger co)) cs))) =
-          map (fun (co : bool list) => incoeff (b - BitsToInteger co)) cs.
-+ apply (eq_from_nth witness); 1: by rewrite Array256.size_to_list size_map hcs.
-  by rewrite Array256.size_to_list => i hi; rewrite Array256.get_to_list Array256.initiE.
-have hmap : forall co, co \in cs =>
-              IntegerToBits (b - crepr (incoeff (b - BitsToInteger co))) (RealExp.ilog 2 (a + b) + 1) = co.
-+ move=> co hco; have hs := BitChunking.in_chunk_size _ _ _ hc hco.
-  rewrite /IntegerToBits /BitsToInteger incoeffK_centered; 1,2: smt(BS2Int.bs2int_ge0 BS2Int.bs2int_le2Xs).
-  by rewrite (_ : b - (b - BS2Int.bs2int co) = BS2Int.bs2int co) 1:/# -hs BS2Int.bs2intK.
-rewrite -map_comp (_ : map _ cs = cs).
-+ apply (eq_from_nth witness); rewrite ?size_map // => i hi.
-  have hi' : 0 <= i < size cs by rewrite /cs BitChunking.size_chunk //; smt(size_iota).
-  by rewrite (nth_map witness) // /(\o) /=; apply hmap; exact mem_nth.
-rewrite /cs BitChunking.chunkK ?BytesToBitsK //; rewrite size_BytesToBits hsz; apply dvdz_mull; apply dvdzz.
-qed.
-
-lemma size_BitPack (p : poly) (a b : int) :
-  0 < a + b => size (BitPack p a b) = n * (RealExp.ilog 2 (a + b) + 1) %/ 8.
-proof.
-move=> hab; rewrite /BitPack /= size_BitsToBytes' (size_flatten_ctt (RealExp.ilog 2 (a + b) + 1)).
-+ by move=> x /mapP [w [_ ->]]; rewrite /IntegerToBits BS2Int.size_int2bs; smt(RealExp.ilog_ge0).
-by rewrite size_map Array256.size_to_list mulzC.
-qed.
-
-(*************** Uniform polynomials ****************)
-
-lemma supp_dpoly (a b : int) (p : poly) :
-  (q + 1) %/ 2 - q <= a => b < (q + 1) %/ 2 =>
-  p \in dpoly a b <=> forall i, 0 <= i < n => a <= crepr p.[i] <= b.
-proof.
-move=> ha hb; rewrite /dpoly supp_dmap; split.
-+ move=> [l [hl ->]] i hi; move: hl; rewrite supp_dlist // => -[hs /List.allP hall].
-  rewrite Array256.get_of_list //.
-  have /supp_dmap [x [/supp_dinter hx ->]] := hall (nth witness l i) (mem_nth witness l i _); 1: smt().
-  by rewrite incoeffK_centered /#.
-move=> h; exists (Array256.to_list p); split; last by rewrite Array256.to_listK.
-rewrite supp_dlist // Array256.size_to_list /=; apply/List.allP => x /mkseqP [i [hi ->]].
-by rewrite supp_dmap; exists (crepr p.[i]); rewrite supp_dinter creprK h.
-qed.
-
-lemma dpoly_uni (a b : int) : (q + 1) %/ 2 - q <= a => b < (q + 1) %/ 2 => is_uniform (dpoly a b).
-proof.
-move=> ha hb; rewrite /dpoly; apply dmap_uni_in_inj; last (apply dlist_uni; apply dmap_uni_in_inj; last by apply dinter_uni).
-+ move=> x y hx hy hxy; move: hx hy; rewrite !supp_dlist // => -[hx _] [hy _].
-  by rewrite -(Array256.of_listK witness x) // -(Array256.of_listK witness y) // hxy.
-move=> x y /supp_dinter hx /supp_dinter hy hxy.
-by rewrite -(incoeffK_centered x) 1,2:/# -(incoeffK_centered y) 1,2:/# hxy.
-qed.
-
-lemma dpoly_ll (a b : int) : a <= b => is_lossless (dpoly a b).
-proof. move=> hab; rewrite /dpoly; apply dmap_ll; apply dlist_ll; apply dmap_ll; exact dinter_ll. qed.
-
-lemma gamma1_E : gamma1 = 2 ^ 19 by have /= H := param_sets; smt().
-
-lemma ilog_gamma1 : RealExp.ilog 2 (gamma1 - 1 + gamma1) + 1 = 20.
-proof.
-have -> // : RealExp.ilog 2 (gamma1 - 1 + gamma1) = 19.
-by rewrite RealExp.ilog_eq // gamma1_E /=.
-qed.
-
-(* The ExpandMask encoding is a bijection onto [-gamma1 + 1, gamma1] *)
-lemma dmap_BitUnpack_gamma1 :
-  dmap (dlist W8.dword 640) (fun v => BitUnpack v (gamma1 - 1) gamma1) = dpoly (-gamma1 + 1) gamma1.
-proof.
-have hg := gamma1_E.
-have hc := ilog_gamma1.
-have hK : forall v, size v = 640 => BitPack (BitUnpack v (gamma1 - 1) gamma1) (gamma1 - 1) gamma1 = v
-  by move=> v hv; apply BitUnpackK; rewrite ?hc ?hv ?hg //=.
-have hu1 : is_uniform (dmap (dlist W8.dword 640) (fun v => BitUnpack v (gamma1 - 1) gamma1)).
-+ apply dmap_uni_in_inj; last by apply dlist_uni; exact W8.dword_uni.
-  move=> x y; rewrite !supp_dlist // => -[hx _] [hy _] /= hxy.
-  by rewrite -(hK x hx) -(hK y hy) hxy.
-have hs : support (dmap (dlist W8.dword 640) (fun v => BitUnpack v (gamma1 - 1) gamma1)) =
-          support (dpoly (-gamma1 + 1) gamma1).
-+ apply fun_ext => z; apply eq_iff.
-  have hsupp := supp_dpoly (-gamma1 + 1) gamma1 z _ _; 1,2: by rewrite hg.
-  rewrite hsupp; split.
-  - rewrite supp_dmap => -[v [hv ->]] i hi /=; move: hv; rewrite supp_dlist // => -[hv _].
-    have hn : 0 <= i < size (BytesToBits v) %/ 20 by rewrite size_BytesToBits hv.
-    have hsz := BitChunking.size_nth_chunk witness (BytesToBits v) i 20 _ hn => //.
-    rewrite /BitUnpack /= hc Array256.initiE //= (nth_map witness) /=; 1: by rewrite BitChunking.size_chunk.
-    have hb0 := BS2Int.bs2int_ge0 (nth witness (BitChunking.chunk 20 (BytesToBits v)) i).
-    have hb1 := BS2Int.bs2int_le2Xs (nth witness (BitChunking.chunk 20 (BytesToBits v)) i).
-    rewrite hsz /= in hb1.
-    have h19 : gamma1 = 524288 by rewrite hg.
-    by rewrite /BitsToInteger incoeffK_centered; smt().
-  move=> h; rewrite supp_dmap; exists (BitPack z (gamma1 - 1) gamma1); split.
-  - rewrite supp_dlist // size_BitPack; 1: by rewrite hg.
-    by rewrite hc /=; apply/List.allP => x _; exact W8.dword_fu.
-  by rewrite /= BitPackK //; [by rewrite hg | smt()].
-have hl1 : is_lossless (dmap (dlist W8.dword 640) (fun v => BitUnpack v (gamma1 - 1) gamma1))
-  by apply dmap_ll; apply dlist_ll; exact W8.dword_ll.
-have hu2 := dpoly_uni (-gamma1 + 1) gamma1 _ _; 1,2: by rewrite hg.
-have hl2 := dpoly_ll (-gamma1 + 1) gamma1 _; 1: by rewrite hg.
-by apply eq_distr => y; rewrite (mu1_uni_ll _ _ hu1 hl1) (mu1_uni_ll _ _ hu2 hl2) hs.
-qed.
-
-lemma dlist_flatten ['a] (d : 'a distr) (m k : int) :
-  0 <= m => 0 <= k => dmap (dlist (dlist d m) k) flatten = dlist d (m * k).
-proof.
-move=> hm; elim: k => [| k hk ih]; 1: by rewrite !dlist0 // dmap_dunit flatten_nil.
-rewrite dlistSr //= dmap_comp.
-have -> : flatten \o (fun (xy : 'a list list * 'a list) => rcons xy.`1 xy.`2) =
-          (fun (p : 'a list * 'a list) => p.`1 ++ p.`2) \o
-          (fun (p : 'a list list * 'a list) => (flatten p.`1, p.`2)).
-+ by apply fun_ext => p; rewrite /(\o) /= -cats1 flatten_cat flatten_seq1.
-by rewrite -dmap_comp -dmap_dprodL ih mulzDr mulz1 -dlist_add //; smt().
-qed.
 
 (*************** y from fresh blocks ****************)
 
@@ -419,14 +261,6 @@ module MLDSA_RO_DS7(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
   proc verify = MLDSA_ROSep(XA, XC, Htr, Hmu, Hct).verify
 }.
 
-lemma dblock_take : dmap dblock (fun r => Bytes32.of_list (take 32 r)) = dxi.
-proof.
-rewrite /dblock (_ : 64 = 32 + 32) // dlist_add // dmap_comp /(\o) /=.
-rewrite (eq_dmap_in _ _ (fun (p : W8.t list * W8.t list) => Bytes32.of_list p.`1)).
-+ move=> [p1 p2] /supp_dprod /= [h1 _]; rewrite take_size_cat //; move: h1; rewrite supp_dlist //; case.
-by rewrite dprod_marginalL (dlist_ll W8.dword 32 W8.dword_ll) dscalar1.
-qed.
-
 clone DMap.DMapSampling as DMS32 with
   type t1 <- W8.t list,
   type t2 <- Bytes32.t.
@@ -455,16 +289,6 @@ rcondf{2} 2; 1: by auto.
 auto => /> &2 _; rewrite /dpolyl; apply dmap_ll; apply dlist_ll; apply dpoly_ll.
 by rewrite gamma1_E.
 qed.
-
-lemma IntegerToBytes2K (x : int) : 0 <= x < 65536 => BS2Int.bs2int (BytesToBits (IntegerToBytes x 2)) = x.
-proof.
-move=> hx; rewrite /IntegerToBytes /IntegerToBits take_oversize.
-+ by rewrite size_BitsToBytes' BS2Int.size_int2bs.
-by rewrite BitsToBytesK ?BS2Int.size_int2bs // BS2Int.int2bsK.
-qed.
-
-lemma size_IntegerToBytes2 (x : int) : size (IntegerToBytes x 2) = 2.
-proof. by rewrite /IntegerToBytes /IntegerToBits take_oversize size_BitsToBytes' BS2Int.size_int2bs. qed.
 
 (* The RO_v key of block j of polynomial r of y: K || rnd || mu || nonce *)
 op ekey (k0 : Bytes32.t) (c : rnd_) (mu : Bytes64.t) (i : int) : W8.t list =
@@ -499,25 +323,7 @@ move: h12; rewrite eqseq_cat ?Bytes32.size_to_list //=.
 move=> [hkc hm]; move: hkc; rewrite eqseq_cat //= => hc.
 split; 1: by apply Bytes32.to_list_inj.
 split; 1: by apply Bytes64.to_list_inj.
-by rewrite -(IntegerToBytes2K i1) // hib IntegerToBytes2K.
-qed.
-
-lemma nonce_rng (k r : int) : 0 <= k < kappa_max => 0 <= r < lvec => 0 <= k * lvec + r < 65536.
-proof.
-move=> hk hr; have hb := kappa_max_bnd; have hl := gt0_l.
-have : (k + 1) * lvec <= kappa_max * lvec by apply StdOrder.IntOrder.ler_wpmul2r; smt().
-smt().
-qed.
-
-lemma nonce_inj (k1 r1 k2 r2 : int) :
-  0 <= r1 < lvec => 0 <= r2 < lvec => k1 * lvec + r1 = k2 * lvec + r2 => k1 = k2 /\ r1 = r2.
-proof.
-move=> hr1 hr2 he; have hl := gt0_l.
-have hk : k1 = k2.
-+ have h1 : (k1 * lvec + r1) %/ lvec = k1 by rewrite divzMDl 1:/# divz_small /#.
-  have h2 : (k2 * lvec + r2) %/ lvec = k2 by rewrite divzMDl 1:/# divz_small /#.
-  by rewrite -h1 -h2 he.
-by rewrite hk; smt().
+by rewrite -(IntegerToBytesK i1 2) // hib IntegerToBytesK.
 qed.
 
 lemma yblocks_eq (m1 m2 : (W8.t list * int, W8.t list) fmap) (x : W8.t list) :
@@ -658,7 +464,7 @@ move=> [ha [hb hc]] hk hn r j hr hj; apply/negP => hin.
 have [c' mu' k' r' [hk' [hr' [hj' [he hgp]]]]] := hc _ hin.
 have he' : ekey k0 c mu (k * lvec + r) = ekey k0 c' mu' (k' * lvec + r') by exact he.
 have [<<- [<<- hn']] := ekey_inj _ _ _ _ _ _ _ (nonce_rng _ _ hk hr) (nonce_rng _ _ hk' hr') he'.
-have [<<- _] := nonce_inj k r k' r' hr hr' hn'.
+have [<<- _] := euclideU lvec k k' r r' hn' _ _; 1,2: smt(gt0_l).
 by move: hn; rewrite ha hk hgp.
 qed.
 
@@ -675,7 +481,7 @@ have hgrp : forall c' mu' k', 0 <= k' < kappa_max => (c', mu', k') <> (c, mu, k)
 + move=> c' mu' k' hk' hne r j hr; apply hmv; apply/negP => -[r'' [hr'' [he _]]]; apply hne.
   have he' : ekey k0 c' mu' (k' * lvec + r) = ekey k0 c mu (k * lvec + r'') by exact he.
   have [<<- [<<- hn']] := ekey_inj _ _ _ _ _ _ _ (nonce_rng _ _ hk' hr) (nonce_rng _ _ hk hr'') he'.
-  by have [<<- _] := nonce_inj k' r k r'' hr hr'' hn'.
+  by have [<<- _] := euclideU lvec k' k r r'' hn' _ _; smt(gt0_l).
 have hgpeq : forall c' mu' k', 0 <= k' < kappa_max => (c', mu', k') <> (c, mu, k) =>
                gp mv' k0 c' mu' k' <=> gp mv k0 c' mu' k'.
 + move=> c' mu' k' hk' hne; rewrite /gp; split => h r j hr hj.
@@ -744,19 +550,6 @@ exact yt_ro.
 qed.
 
 (*************** G6 and G7 ****************)
-
-op k_of (s : BytesSK.t) : Bytes32.t = Bytes32.of_list (take 32 (drop 32 (BytesSK.to_list s))).
-
-equiv skdec_k (s0 : BytesSK.t) : SkEncDec.skDecode ~ SkEncDec.skDecode :
-  ={sk} /\ sk{1} = s0 ==> ={res} /\ res{1}.`2 = k_of s0.
-proof.
-proc*.
-call{2} (skDecode_corr s0); call{1} (skDecode_corr s0).
-skip => /> r2 h21 h22 h23 h24 h25 h26 r1 h11 h12 h13 h14 h15 h16.
-have e1 : r1 = (r1.`1, r1.`2, r1.`3, r1.`4, r1.`5, r1.`6) by smt().
-have e2 : r2 = (r2.`1, r2.`2, r2.`3, r2.`4, r2.`5, r2.`6) by smt().
-by rewrite e1 e2 h11 h12 h13 h14 h15 h16 h21 h22 h23 h24 h25 h26 /k_of.
-qed.
 
 equiv sign67 (s0 : BytesSK.t) :
   MLDSA_RO_DS6(DS5.RO1.RO, DS5.RO2.RO, DS5.RO3.RO, DS5.RO4.RO, DS5.RO5.RO).sign ~

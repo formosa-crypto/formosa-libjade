@@ -1,7 +1,6 @@
 require import AllCore BitEncoding List RealExp IntDiv.
 from Jasmin require import JWord JByte_array.
 
-
 require import Parameters GFq Rq VecMat Conversion.
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
@@ -26,7 +25,6 @@ abbrev w1_bits = 4.
 lemma w1_bitlen : 2^(w1_bits-1) < (q-1) %/ (2*gamma2) - 1 <= 2^(w1_bits)
   by  have/= H := param_sets; elim H => /> ???->???? /=.
 
-
 abbrev s1_bytes = (n * noise_bits * lvec) %/ 8.
 
 abbrev t_bytes = (n * (q_bits-d) * kvec) %/ 8.
@@ -45,23 +43,6 @@ abbrev sig_bytes = lambda %/ 4 + z_bytes + hint_bytes.
 
 abbrev w1_bytes = (n * w1_bits * kvec) %/ 8.
 
-
-(* Size of BitsToBytes / SimpleBitPack outputs (used by key-length proofs
-   and by the encode-pack correctness bridges in verify.ec / sign.ec). *)
-lemma size_BitsToBytes' (l : bool list) : size (BitsToBytes l) = size l %/ 8
-  by rewrite /BitsToBytes size_map size_chunk //.
-
-lemma size_SimpleBitPack' (_p : poly) (b : int) :
-  1 <= b => size (SimpleBitPack _p b) = (ilog 2 b + 1) * n %/ 8.
-proof.
-move => Hb.
-rewrite /SimpleBitPack /= size_BitsToBytes' (size_flatten_ctt (ilog 2 b + 1)).
-+ move => l; rewrite mapP => He; elim He => c /= [# ?->].
-  by rewrite /IntegerToBits BS2Int.size_int2bs; smt(ilog_ge0).
-by rewrite size_map size_to_list.
-qed.
-
-
 (*
 ML-DSA-44 2560 1312 2420
 ML-DSA-65 4032 1952 3309
@@ -72,7 +53,6 @@ lemma key_sizes : (sk_bytes, pk_bytes, sig_bytes) \in [ (* (2560,1312,2420); *)
                                                            (4032,1952,3309);
                                                            (4896,2592,4627)]
   by  have /= H:= param_sets;elim H =>  [#] ?->??-> ->->-> /=. 
-
 
 clone import JArray.MonoArray as Bytes32 with op size <= 32, type elem <= W8.t, op dfl <= witness.
 clone import JArray.MonoArray as Bytes64 with op size <= 64, type elem <= W8.t, op dfl <= witness.
@@ -450,3 +430,141 @@ op w1Encode(w1 : polykvec) : BytesW1.t =
   BytesW1.of_list (flatten (map
     (fun wi => SimpleBitPack wi ((q-1)%/(2*gamma2) - 1)) 
        (mkseq (fun ii => w1.[ii]) kvec))).
+
+require import Distr DList JWordList.
+
+(* -------------------------------------------------------------------- *)
+(* parameter facts on the encoding sizes                                *)
+
+lemma ilog_gamma1 : ilog 2 (gamma1 - 1 + gamma1) = 19.
+proof. by rewrite ilog_eq // gamma1_E. qed.
+
+(* the ExpandMask encoding maps uniform bytes to uniform coefficients in *)
+(* [-gamma1 + 1, gamma1]                                                *)
+lemma dmap_BitUnpack_gamma1 :
+  dmap (dlist W8.dword 640) (fun v => BitUnpack v (gamma1 - 1) gamma1) = dpoly (-gamma1 + 1) gamma1.
+proof.
+have := dmap_BitUnpack (gamma1 - 1) gamma1 _ _ _ _; rewrite ?ilog_gamma1 ?gamma1_E //=.
+qed.
+
+lemma size_bp_eta (p : poly) : size (BitPack p Eta Eta) = n * noise_bits %/ 8.
+proof. by rewrite size_BitPack ?noise_bits_eq; smt(gt0_eta). qed.
+
+lemma size_bp_t0 (p : poly) : size (BitPack p (2^(d-1)-1) (2^(d-1))) = n * d %/ 8.
+proof. by rewrite size_BitPack //= (ilog_eq 2 8191 12). qed.
+
+lemma ct_len_nrel : lambda %/ 4 <> 64 + w1_bytes.
+proof. by have /= H := param_sets; smt(). qed.
+
+lemma w1_bytes_big : 2 < w1_bytes.
+proof. by have /= H := param_sets; smt(). qed.
+
+lemma pk_len_nrel : pk_bytes <> 64 + w1_bytes.
+proof. by rewrite /pk_bytes; have /= H := param_sets; smt(). qed.
+
+(* -------------------------------------------------------------------- *)
+(* the secret-key layout: tr and K fields, and the K read by skDecode    *)
+
+lemma sk_tr (rho k : Bytes32.t) (tr : Bytes64.t) (rest : W8.t list) :
+  Bytes64.of_list (take 64 (drop 64 (BytesSK.to_list (BytesSK.of_list
+    (Bytes32.to_list rho ++ Bytes32.to_list k ++ Bytes64.to_list tr ++ rest))))) = tr.
+proof.
+have hsk : 128 <= sk_bytes by have /= H := param_sets; smt(ge0_size BytesSK.ge0_size).
+have -> : take 64 (drop 64 (BytesSK.to_list (BytesSK.of_list
+            (Bytes32.to_list rho ++ Bytes32.to_list k ++ Bytes64.to_list tr ++ rest)))) =
+          Bytes64.to_list tr;
+  last by rewrite Bytes64.to_listK.
+apply (eq_from_nth witness);
+  1: by rewrite size_take // size_drop // BytesSK.size_to_list Bytes64.size_to_list /#.
+move=> i; rewrite size_take // size_drop // BytesSK.size_to_list => hi.
+rewrite nth_take 1,2:/# nth_drop 1,2:/# BytesSK.get_to_list BytesSK.get_of_list 1:/#.
+rewrite nth_cat.
+by rewrite !size_cat !Bytes32.size_to_list Bytes64.size_to_list (_ : 64 + i < 32 + 32 + 64) 1:/# /=
+   nth_cat size_cat !Bytes32.size_to_list (_ : !(64 + i < 32 + 32)) 1:/#.
+qed.
+
+lemma sk_K (rho k : Bytes32.t) (rest : W8.t list) :
+  take 32 (drop 32 (BytesSK.to_list (BytesSK.of_list (Bytes32.to_list rho ++ Bytes32.to_list k ++ rest)))) =
+  Bytes32.to_list k.
+proof.
+have hsk : 128 <= sk_bytes by have /= H := param_sets; smt(ge0_size BytesSK.ge0_size).
+apply (eq_from_nth witness);
+  1: by rewrite size_take // size_drop // BytesSK.size_to_list Bytes32.size_to_list /#.
+move=> i; rewrite size_take // size_drop // BytesSK.size_to_list => hi.
+by rewrite nth_take 1,2:/# nth_drop 1,2:/# BytesSK.get_to_list BytesSK.get_of_list 1:/# nth_cat size_cat
+     !Bytes32.size_to_list (_ : 32 + i < 64) 1:/# /= nth_cat Bytes32.size_to_list (_ : !(32 + i < 32)) 1:/#.
+qed.
+
+op k_of (s : BytesSK.t) : Bytes32.t = Bytes32.of_list (take 32 (drop 32 (BytesSK.to_list s))).
+
+equiv skdec_k (s0 : BytesSK.t) : SkEncDec.skDecode ~ SkEncDec.skDecode :
+  ={sk} /\ sk{1} = s0 ==> ={res} /\ res{1}.`2 = k_of s0.
+proof.
+proc*.
+call{2} (skDecode_corr s0); call{1} (skDecode_corr s0).
+skip => /> r2 h21 h22 h23 h24 h25 h26 r1 h11 h12 h13 h14 h15 h16.
+have e1 : r1 = (r1.`1, r1.`2, r1.`3, r1.`4, r1.`5, r1.`6) by smt().
+have e2 : r2 = (r2.`1, r2.`2, r2.`3, r2.`4, r2.`5, r2.`6) by smt().
+by rewrite e1 e2 h11 h12 h13 h14 h15 h16 h21 h22 h23 h24 h25 h26 /k_of.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* the encoding modules are lossless                                    *)
+
+lemma pkDecode_ll : islossless PkEncDec.pkDecode.
+proof. by proc; while true (kvec - i); [by move=> z'; auto => /# | auto => /#]. qed.
+
+lemma sigEncode_ll : islossless SigEncDec.sigEncode.
+proof.
+proc; wp; call (: true); 2: by while true (lvec - i); [by move=> z; auto => /# | auto => /#].
+by while true (kvec - i);
+   [by move=> z; wp; while true (n - j); [by move=> z'; auto => /# | auto => /#] | auto => /#].
+qed.
+
+lemma sigDecode_ll : islossless SigEncDec.sigDecode.
+proof.
+proc; call (: true); 2: by while true (lvec - i); [by move=> z'; auto => /# | auto => /#].
+while true (2 * (w_hint - index) + b2i (!error)); 1: by move=> z'; auto => /#.
+wp; while true (2 * (kvec - i) + b2i (!error)).
++ move=> z'; sp; if; 1: by auto => /#.
+  by wp; while true (2 * (W8.to_uint (nth witness y (w_hint + i)) - index) + b2i (!error));
+     [by move=> z''; auto => /# | auto => /#].
+by auto => /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* w1: the HighBits / UseHint range, and a decoder for w1Encode          *)
+
+op w1rng (w1 : polykvec) : bool = forall i j, 0 <= i < kvec => 0 <= j < n => asint w1.[i].[j] <= 15.
+
+lemma hb_rng (w : polykvec) : w1rng (polykvec_HighBits w).
+proof.
+move=> i j hi hj; rewrite /polykvec_HighBits KArray.mapiE // /poly_HighBits Array256.initiE //= incoeffK.
+by have [h _] := Decompose_cases w.[i].[j]; smt().
+qed.
+
+lemma uh_rng (h r : polykvec) : w1rng (UseHint h r).
+proof.
+move=> i j hi hj; rewrite /UseHint KArray.map2iE // /poly_UseHint Array256.initiE //= /GFq.UseHint /=.
+have hg : (q - 1) %/ (2 * gamma2) = 16 by have /= H := param_sets; smt().
+have [hr _] := Decompose_cases r.[i].[j]; move: hr; rewrite /HighBits => hr.
+case: (Decompose r.[i].[j]) hr => r1 r0 /= hr.
+by rewrite hg; smt(incoeffK).
+qed.
+
+op w1Dec (b : BytesW1.t) : polykvec =
+  KArray.init (fun i => SimpleBitUnpack (take (n * w1_bits %/ 8) (drop (n * w1_bits %/ 8 * i) (BytesW1.to_list b)))
+                                        ((q - 1) %/ (2 * gamma2) - 1)).
+
+lemma w1DecK (w1 : polykvec) : w1rng w1 => w1Dec (w1Encode w1) = w1.
+proof.
+move=> hw; have hm : (q - 1) %/ (2 * gamma2) - 1 = 15 by have /= H := param_sets; smt().
+have hsz : forall p, size (SimpleBitPack p ((q - 1) %/ (2 * gamma2) - 1)) = n * w1_bits %/ 8
+  by move=> p; rewrite hm size_SimpleBitPack // (RealExp.ilog_eq 2 15 3).
+apply KArray.ext_eq => i hi; rewrite /w1Dec KArray.initiE //= /w1Encode BytesW1.of_listK.
++ rewrite (size_flatten_ctt (n * w1_bits %/ 8)); 1: by move=> x /mapP [p [_ ->]]; rewrite hsz.
+  by rewrite size_map size_mkseq; have /= H := param_sets; smt().
+rewrite take_drop_flatten //; 1: by rewrite size_mkseq; smt(gt0_k).
+rewrite /= nth_mkseq //= (_ : 8380416 %/ (2 * gamma2) - 1 = 15); 1: by have /= H := param_sets; smt().
+by rewrite SimpleBitPackK // => j hj; apply hw.
+qed.

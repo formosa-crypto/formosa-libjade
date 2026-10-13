@@ -588,7 +588,7 @@ while (
    rewrite KArray.mapiE; 1: smt(mldsa65_kvec).
    rewrite /= Array128.get_of_list 1:/# (BitChunking.nth_flatten witness 128).
    + rewrite allP => s /mapP [wi [_ ->]] /=.
-     by rewrite size_SimpleBitPack' /b_w1 /= /#.
+     by rewrite size_SimpleBitPack /b_w1 /= /#.
    rewrite (nth_map witness); 1: by rewrite size_mkseq; smt(mldsa65_kvec).
    rewrite nth_mkseq; 1: smt(mldsa65_kvec).
    by rewrite Hw1eq /= /#.

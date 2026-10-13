@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List Ring IntDiv.
+require import AllCore List Ring IntDiv Distr DList.
 require import StdRing StdOrder.
 
 from Jasmin require import JArray.
@@ -91,5 +91,28 @@ abstract theory PAE.
   proof.
   apply/ext_eq=> i *; rewrite /replace_ !filliE //=.
   by rewrite size_cat nth_cat /=; smt(size_ge0).
+  qed.
+  (* -------------------------------------------------------------------- *)
+  (* arrays with independent entries drawn from d                         *)
+  op darray ['a] (d : 'a distr) : 'a t distr = dmap (dlist d size) (of_list witness).
+
+  lemma supp_darray ['a] (d : 'a distr) (a : 'a t) :
+    a \in darray d <=> forall i, 0 <= i < size => a.[i] \in d.
+  proof.
+  rewrite /darray supp_dmap; split => [[l [hl ->]] i rgi | h].
+  - move: hl; rewrite supp_dlist 1:ge0_size => -[hs /List.allP hall].
+    by rewrite get_of_list // hall mem_nth /#.
+  exists (to_list a); rewrite to_listK /= supp_dlist 1:ge0_size size_to_list /=.
+  by apply/List.allP => x /mkseqP [i [rgi ->]]; apply h.
+  qed.
+
+  lemma darray_ll ['a] (d : 'a distr) : is_lossless d => is_lossless (darray d).
+  proof. by move=> d_ll; apply/dmap_ll/dlist_ll. qed.
+
+  lemma darray_uni ['a] (d : 'a distr) : is_uniform d => is_uniform (darray d).
+  proof.
+  move=> d_uni; apply/dmap_uni_in_inj/dlist_uni => // x y.
+  rewrite !supp_dlist 1,2:ge0_size => -[hx _] [hy _] hxy.
+  by rewrite -(of_listK witness x) // -(of_listK witness y) // hxy.
   qed.
 end PAE.

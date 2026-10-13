@@ -7,6 +7,7 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2 MLDSA_ROSep_Hop3.
+require import JWordList ListExtra.
 require import MLDSA_ROSep_Hop4 MLDSA_ROSep_Hop5 MLDSA_ROSep_Hop6 MLDSA_ROSep_Hop7.
 require DS_ROM.
 
@@ -104,41 +105,6 @@ module MLDSA_RO_DS8(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
 
 (*************** The secret key encoding ****************)
 
-lemma p2r_t0 (x : coeff) : -(2^(d-1) - 1) <= crepr (GFq.Power2Round x).`2 <= 2^(d-1).
-proof.
-rewrite /GFq.Power2Round /= /smodem /=.
-have h0 := modz_ge0 (asint x) 8192 _ => //.
-have h1 := ltz_pmod (asint x) 8192 _ => //.
-by case: (4096 < asint x %% 8192) => h; rewrite incoeffK_centered; smt().
-qed.
-
-lemma take_drop_flatten ['a 'b] (f : 'a -> 'b list) (l : 'a list) (s i : int) :
-  0 < s => (forall x, size (f x) = s) => 0 <= i < size l =>
-  take s (drop (s * i) (flatten (map f l))) = f (nth witness l i).
-proof.
-move=> hs hf hi.
-have hsz : size (flatten (map f l)) = s * size l
-  by rewrite (size_flatten_ctt s) ?size_map // => b /mapP [x [_ ->]]; rewrite hf.
-have hle : s * i + s <= size (flatten (map f l)).
-+ rewrite hsz (_ : s * i + s = s * (i + 1)); 1: by ring.
-  by apply StdOrder.IntOrder.ler_wpmul2l; smt().
-rewrite -JWordList.nth_chunk //; 1: smt().
-rewrite BitChunking.flattenK //; 1: by move=> b /mapP [x [_ ->]]; rewrite hf.
-by rewrite (nth_map witness).
-qed.
-
-lemma take_drop_cat ['a] (s1 s2 : 'a list) (m k : int) :
-  0 <= m => 0 <= k => m + k <= size s1 => take k (drop m (s1 ++ s2)) = take k (drop m s1).
-proof.
-move=> hm hk hs; rewrite drop_cat.
-case: (m < size s1) => h; last first.
-+ have ->> : k = 0 by smt().
-  by rewrite !take_le0.
-rewrite take_cat size_drop //; case: (k < max 0 (size s1 - m)) => // hk'.
-have -> : k - max 0 (size s1 - m) = 0 by smt().
-by rewrite take0 cats0 take_oversize // size_drop //; smt().
-qed.
-
 op skEnc (sk : Bytes32.t * Bytes64.t * polylvec * polykvec * polykvec) : BytesSK.t =
   BytesSK.of_list (Bytes32.to_list sk.`1 ++ Bytes32.to_list cK ++ Bytes64.to_list sk.`2 ++
                    flatten (map (fun p => BitPack p Eta Eta) (LArray.to_list sk.`3)) ++
@@ -149,12 +115,6 @@ op skrange (sk : Bytes32.t * Bytes64.t * polylvec * polykvec * polykvec) : bool 
      (forall i j, 0 <= i < lvec => 0 <= j < n => -Eta <= crepr sk.`3.[i].[j] <= Eta)
   /\ (forall i j, 0 <= i < kvec => 0 <= j < n => -Eta <= crepr sk.`4.[i].[j] <= Eta)
   /\ (forall i j, 0 <= i < kvec => 0 <= j < n => -(2^(d-1) - 1) <= crepr sk.`5.[i].[j] <= 2^(d-1)).
-
-lemma size_bp_eta (p : poly) : size (BitPack p Eta Eta) = n * noise_bits %/ 8.
-proof. by rewrite size_BitPack ?noise_bits_eq //; smt(gt0_eta). qed.
-
-lemma size_bp_t0 (p : poly) : size (BitPack p (2^(d-1)-1) (2^(d-1))) = n * d %/ 8.
-proof. rewrite size_BitPack //=; congr; congr; by rewrite (RealExp.ilog_eq 2 8191 12). qed.
 
 lemma skEnc_list (sk : Bytes32.t * Bytes64.t * polylvec * polykvec * polykvec) :
   BytesSK.to_list (skEnc sk) =
@@ -266,18 +226,6 @@ have /= ht0 := skdec_t0 s hs.
 by rewrite h1 h3 h4 h5 h6 skdec_rho skdec_tr skdec_s1 // skdec_s2 // ht0.
 qed.
 
-lemma supp_dpolyl (d0 : poly distr) (s : polylvec) : s \in dpolyl d0 => forall i, 0 <= i < lvec => s.[i] \in d0.
-proof.
-rewrite /dpolyl supp_dmap => -[l [hl ->]] i hi; move: hl; rewrite supp_dlist; 1: smt(gt0_l).
-move=> -[hs /List.allP hall]; rewrite LArray.get_of_list //; apply hall; apply mem_nth; smt().
-qed.
-
-lemma supp_dpolyk (d0 : poly distr) (s : polykvec) : s \in dpolyk d0 => forall i, 0 <= i < kvec => s.[i] \in d0.
-proof.
-rewrite /dpolyk supp_dmap => -[l [hl ->]] i hi; move: hl; rewrite supp_dlist; 1: smt(gt0_k).
-move=> -[hs /List.allP hall]; rewrite KArray.get_of_list //; apply hall; apply mem_nth; smt().
-qed.
-
 (*************** G7 and G8 ****************)
 
 equiv keygen78 :
@@ -300,10 +248,10 @@ call{1} (skEncode_corr r0 cK tr0 s10 s20 t00).
 auto => /> &2 h1 h2.
 have hEta : (q + 1) %/ 2 - q <= -Eta /\ Eta < (q + 1) %/ 2 by have /= H := param_sets; smt().
 split.
-+ move=> i j hi0 hi1 hj0 hj1; have := supp_dpolyl _ _ h1 i _; 1: done.
++ move=> i j hi0 hi1 hj0 hj1; move: h1 => /supp_dpolyl /(_ i _); 1: done.
   by rewrite supp_dpoly; smt().
 split.
-+ move=> i j hi0 hi1 hj0 hj1; have := supp_dpolyk _ _ h2 i _; 1: done.
++ move=> i j hi0 hi1 hj0 hj1; move: h2 => /supp_dpolyk /(_ i _); 1: done.
   by rewrite supp_dpoly; smt().
 move=> i j hi0 hi1 hj0 hj1.
 rewrite /Power2Round /= KArray.mapiE 1:/# /= /poly_Power2Round /= Array256.initiE 1:/# /=.

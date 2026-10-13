@@ -37,3 +37,16 @@ move=> ?; apply/eq_sym/(eq_from_nth x0).
 rewrite size_mkseq lez_maxr 1:/# => j rgj.
 by rewrite nth_mkseq //= nth_drop //#.
 qed.
+
+(* a window inside the first list of a concatenation *)
+lemma take_drop_cat ['a] (s1 s2 : 'a list) (m k : int) :
+  0 <= m => 0 <= k => m + k <= size s1 => take k (drop m (s1 ++ s2)) = take k (drop m s1).
+proof.
+move=> hm hk hs; rewrite drop_cat.
+case: (m < size s1) => h; last first.
++ have ->> : k = 0 by smt().
+  by rewrite !take_le0.
+rewrite take_cat size_drop //; case: (k < max 0 (size s1 - m)) => // hk'.
+have -> : k - max 0 (size s1 - m) = 0 by smt().
+by rewrite take0 cats0 take_oversize // size_drop //; smt().
+qed.

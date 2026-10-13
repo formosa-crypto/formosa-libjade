@@ -201,7 +201,7 @@ while (0 <= i <= 6 /\ t1_encoded = _t1enc /\ challenge_as_ntt = _ch /\
   rewrite KArray.mapiE; 1: smt(mldsa65_kvec).
   rewrite /= Array128.Array128.get_of_list 1:/# (BitChunking.nth_flatten witness 128).
   + rewrite allP => s /mapP [wi [_ ->]] /=.
-    by rewrite size_SimpleBitPack' /b_w1 /= /#.
+    by rewrite size_SimpleBitPack /b_w1 /= /#.
   rewrite (nth_map witness); 1: by rewrite size_mkseq; smt(mldsa65_kvec).
   by rewrite nth_mkseq; 1: smt(mldsa65_kvec).
 (* Loop body: 9-call chain (t1_decode → shift → ntt → pmmar → subtract → reduce32 →    *)
