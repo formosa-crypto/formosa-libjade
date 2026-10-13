@@ -9,6 +9,7 @@ import Round ZModQ Zq MLDSAParams.
 require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2 MLDSA_ROSep_Hop3.
 require import DistrExtra.
 require import MLDSA_ROSep_Hop4 MLDSA_ROSep_Hop5 MLDSA_ROSep_Hop6.
+require import MLDSA_ExpandS.
 require DMap.
 
 (*************** G7: the hidden samplers are replaced by distributions ****************)
@@ -588,6 +589,97 @@ equiv verify67 :
   ==> ={res}.
 proof. by sim. qed.
 
+(*************** s1 and s2 from fresh blocks ****************)
+
+(* the current block of the seed x is cached, and equal to the fresh    *)
+(* XOF's buffer; the blocks from the position on are not; the other     *)
+(* seeds are untouched                                                  *)
+op sfresh_inv (x : W8.t list) (m0 m : (W8.t list * int, W8.t list) fmap) (pos : int)
+              (buf : W8.t list) =
+  0 <= pos /\ (pos %% 64 <> 0 => m.[(x, pos %/ 64)] = Some buf) /\
+  (forall c, pos <= 64 * c => (x, c) \notin m) /\
+  (forall (y : W8.t list * int), y.`1 <> x => m.[y] = m0.[y]).
+
+equiv next_ro_fresh (x : W8.t list) (m0 : (W8.t list * int, W8.t list) fmap) :
+  XOFS_O(RO_S.RO).next ~ XOFS_F.next :
+  Bytes66.to_list XOFS_O.seed{1} = x /\ XOFS_O.pos{1} = XOFS_F.pos{2} /\
+  sfresh_inv x m0 RO_S.RO.m{1} XOFS_F.pos{2} XOFS_F.buf{2}
+  ==> ={res} /\ Bytes66.to_list XOFS_O.seed{1} = x /\ XOFS_O.pos{1} = XOFS_F.pos{2} /\
+      sfresh_inv x m0 RO_S.RO.m{1} XOFS_F.pos{2} XOFS_F.buf{2}.
+proof.
+proc; inline ReadByte(RO_S.RO).read RO_S.RO.get; wp.
+case (XOFS_F.pos{2} %% 64 = 0).
+- (* a fresh block: the oracle samples it as the fresh XOF does *)
+  rcondt{2} 1; 1: by auto.
+  wp; rnd; wp; skip => /> &1 &2 h0 hc hn hf hp _ r _ _.
+  pose s := Bytes66.to_list XOFS_O.seed{1}; pose p := XOFS_F.pos{2}.
+  have hpd : p = 64 * (p %/ 64) by rewrite {1}(divz_eq p 64) hp /= mulzC.
+  have hp1 : (p + 1) %/ 64 = p %/ 64 by rewrite {1}hpd mulzC divzMDl.
+  have hni : (s, p %/ 64) \notin RO_S.RO.m{1} by apply hn; smt().
+  rewrite hni /= get_set_sameE /=; split; 1: smt().
+  split; 1: by rewrite hp1 get_set_sameE.
+  split; 1: by move=> c hc'; rewrite mem_set negb_or /=; split; [apply hn | ]; smt().
+  by move=> y hy; rewrite get_set_neqE 1:/# hf.
+(* inside a block: the oracle answers from the cached block *)
+rcondf{2} 1; 1: by auto.
+wp; rnd{1}; wp; skip => /> &1 &2 h0 hc hn hf hp.
+pose s := Bytes66.to_list XOFS_O.seed{1}; pose p := XOFS_F.pos{2}.
+have hin : RO_S.RO.m{1}.[s, p %/ 64] = Some XOFS_F.buf{2} by apply hc.
+move=> r _; rewrite domE hin /=; split; 1: smt().
+split; 2: by move=> c hc'; apply hn; smt().
+move=> hp'; rewrite -hin; congr; congr.
+move: hp'; rewrite {1 2}(divz_eq p 64) -addzA modzMDl divzMDl // => hm.
+rewrite (divz_small (p %% 64 + 1)) //.
+have := modz_ge0 p 64 _ => //; have := ltz_pmod p 64 _ => //.
+by move=> h1 h2; case: (p %% 64 + 1 = 64) => [h | /#]; move: hm; rewrite h.
+qed.
+
+equiv rbp_ro_fresh (x : W8.t list) (m0 : (W8.t list * int, W8.t list) fmap) :
+  RejBoundedPoly(XOFS_O(RO_S.RO)).sample ~ RejBoundedPoly(XOFS_F).sample :
+  ={rho} /\ Bytes66.to_list rho{1} = x /\ RO_S.RO.m{1} = m0 /\ (forall c, (x, c) \notin m0)
+  ==> ={res} /\ forall (y : W8.t list * int), y.`1 <> x => RO_S.RO.m{1}.[y] = m0.[y].
+proof.
+proc; inline XOFS_O(RO_S.RO).init XOFS_F.init.
+while (={j, a} /\ Bytes66.to_list XOFS_O.seed{1} = x /\ XOFS_O.pos{1} = XOFS_F.pos{2} /\
+       sfresh_inv x m0 RO_S.RO.m{1} XOFS_F.pos{2} XOFS_F.buf{2}).
+- by wp; call (next_ro_fresh x m0); auto.
+by auto => /> &2 hn; rewrite /sfresh_inv /= => />; smt().
+qed.
+
+(* the blocks of the seeds of the polynomials from r on are not cached *)
+op sfresh_from (rho : Bytes64.t) (m : (W8.t list * int, W8.t list) fmap) (r : int) =
+  forall r' c, r <= r' < 65536 => (Bytes66.to_list (sseed rho r'), c) \notin m.
+
+lemma sfresh_from_step rho m m' r : 0 <= r =>
+  sfresh_from rho m r =>
+  (forall (y : W8.t list * int), y.`1 <> Bytes66.to_list (sseed rho r) => m'.[y] = m.[y]) =>
+  sfresh_from rho m' (r + 1).
+proof.
+move=> ge0r hm hf r' c hr; rewrite domE hf; 2: by apply hm => /#.
+by have := sseed_inj rho r' r _ _; smt().
+qed.
+
+equiv expandS_ro_fresh : ExpandS(XOFS_O(RO_S.RO)).sample ~ ExpandS(XOFS_F).sample :
+  ={rho} /\ RO_S.RO.m{1} = empty ==> ={res}.
+proof.
+have hlk : lvec + kvec <= 65536 by smt(param_sets).
+proc.
+while (={r, s2, rho} /\ 0 <= r{1} /\ sfresh_from rho{1} RO_S.RO.m{1} (r{1} + lvec)).
+- wp; exlim rho{1}, r{1}, RO_S.RO.m{1} => rho0 r0 m0.
+  call (rbp_ro_fresh (Bytes66.to_list (sseed rho0 (r0 + lvec))) m0).
+  auto => /> hr hm hk; split; 1: by move=> c; apply hm; smt(gt0_l).
+  move=> _ _ m' hf; split; 1: smt().
+  rewrite (_ : r0 + 1 + lvec = r0 + lvec + 1) 1:/#.
+  by apply (sfresh_from_step _ _ _ _ _ hm hf); smt(gt0_l).
+wp; while (={r, s1, s2, rho} /\ 0 <= r{1} <= lvec /\ sfresh_from rho{1} RO_S.RO.m{1} r{1}).
+- wp; exlim rho{1}, r{1}, RO_S.RO.m{1} => rho0 r0 m0.
+  call (rbp_ro_fresh (Bytes66.to_list (sseed rho0 r0)) m0).
+  auto => /> hr hr' hm hl; split; 1: by move=> c; apply hm; smt(gt0_k).
+  by move=> _ _ m' hf; split; [smt() | apply (sfresh_from_step _ _ _ _ _ hm hf)].
+auto => /> &2; split; 1: by split; [smt(gt0_l) | move=> r' c _; rewrite mem_empty].
+by move=> m r _ h1 h2 h3; rewrite (_ : r = lvec) 1:/#.
+qed.
+
 module SS7 = {
   proc sample() : polylvec * polykvec = {
     var s1, s2;
@@ -598,7 +690,16 @@ module SS7 = {
 }.
 
 (* ExpandS on a fresh oracle: s1 and s2 have coefficients uniform in [-Eta, Eta] *)
-axiom expandS_fresh : equiv[ExpandS(XOFS_O(RO_S.RO)).sample ~ SS7.sample : RO_S.RO.m{1} = empty ==> ={res}].
+lemma expandS_fresh :
+  equiv[ExpandS(XOFS_O(RO_S.RO)).sample ~ SS7.sample : RO_S.RO.m{1} = empty ==> ={res}].
+proof.
+transitivity ExpandS(XOFS_F).sample
+  (={rho} /\ RO_S.RO.m{1} = empty ==> ={res}) (true ==> ={res}) => //.
+- by move=> &1 _ h; exists arg{1}.
+- exact expandS_ro_fresh.
+transitivity SampleS.sample (true ==> ={res}) (true ==> ={res}) => //; 1: exact ExpandS_fresh.
+by proc; inline *; auto.
+qed.
 
 module SR7 = {
   proc a() : Bytes32.t = {
