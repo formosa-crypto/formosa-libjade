@@ -1,7 +1,12 @@
 require import AllCore IntDiv List.
 from Jasmin require import JByte_array JWord.
+require import Parameters GFq Rq.
+require Sampling.
 
-require import Parameters GFq Rq VecMat Conversion Serialization Symmetric Sampling.
+abstract theory MLDSAT.
+
+clone include Sampling.SamplingT.
+
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
@@ -231,3 +236,5 @@ seq 1 1 : (#pre); 1: by auto.
 if; 1,3: by auto => />.
 by auto => />.
 qed.
+
+end MLDSAT.

@@ -14,8 +14,9 @@ from Jasmin require import JModel_x86.
 
 from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude.
 
-from Spec require import GFq Rq Serialization Conversion Parameters VecMat
-                         Symmetric Sampling MLDSA_W32_Rep MLDSA.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 from CryptoSpecs require import Keccak1600_Spec.
 
@@ -392,7 +393,7 @@ seq 12 : (true) 1%r 1%r 0%r 0%r
         + by rewrite /m -hl /lifts_wpoly Array256.mapiE.
         split.
         + rewrite !lifts_wpoly_set // 1:/# hcj /m -hl -/m hs0'.
-          case: ((sib_signs ct).[i0 + tau - 256]) => _.
+          rewrite (_ : i0 + tau - 256 = m) 1:/#; case: ((sib_signs ct).[m]) => _.
           * by rewrite W32.of_sintK /smod.
           by rewrite W32.to_sintE /smod.
         apply srng_set => //; 2: by case: (signs{hr}.[0]) => _; [rewrite W32.of_sintK /smod | rewrite W32.to_sintE /smod].

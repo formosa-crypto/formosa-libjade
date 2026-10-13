@@ -313,21 +313,6 @@ op poly_Power2Round(p : poly) : poly * poly =
      (init (fun i => (Power2Round p.[i]).`1), 
       init (fun i => (Power2Round p.[i]).`2)).
 
-op poly_UseHint(h : poly, r : poly) : poly = 
-     init (fun ii => UseHint (!h.[ii] = Zq.zero) r.[ii]).
-
-op poly_MakeHint(p1 : poly, p2 : poly) : poly =
-     init (fun ii => incoeff (b2i (MakeHint p1.[ii] p2.[ii]))).
-
-op poly_MakeHintImpl(p1 : poly, p2 : poly) : poly =
-     init (fun ii => incoeff (b2i (MakeHintImpl p1.[ii] p2.[ii]))).
-
-op poly_HighBits(p : poly) : poly = 
-     init (fun ii => incoeff (HighBits p.[ii])).
-
-op poly_LowBits(p : poly) : poly =
-     init (fun ii => incoeff (LowBits p.[ii])).
-
 op infnorm_lt (p : poly) (bound : int) : bool =
   all (fun j => `|p.[j]| < bound) (iota_ 0 256).
 

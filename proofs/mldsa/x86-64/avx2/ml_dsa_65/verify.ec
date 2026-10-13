@@ -8,8 +8,9 @@ from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Matrix_A Hashing
 
 require import CircuitBindings Bindings XArray48.
 
-from Spec require import GFq Rq Serialization Conversion Parameters VecMat
-                         Symmetric Sampling MLDSA_W32_Rep MLDSA.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq.
@@ -230,8 +231,7 @@ move => result Hliftu_t1 Hurng_t1 Hurng_t1_1024 result0 Hto_sint_shift Hsrng_shi
 move => _ result1 Hlifts_ntt Horng_ntt _ _ result2 Hlifts_pmmar Hsrng_pmmar.
 (* subtract's pre: wpoly_srng on az slice + arithmetic bound *)
 split.
-+ split; last by smt(mldsa65_lvec).
-  have /= Hslice := kvec_slice_eq _az (i{hr} * n) _ _; 1,2: smt().
++ have /= Hslice := kvec_slice_eq _az (i{hr} * n) _ _; 1,2: smt().
   have Hdiv : i{hr} * n %/ n = i{hr} by smt().
   move: Hslice; rewrite Hdiv => Hslice.
   rewrite -Hslice.

@@ -8,8 +8,9 @@ from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Matrix_A Hashing
 
 require import Column_vector.
 
-from Spec require import GFq Rq Serialization Conversion Parameters VecMat
-                         Symmetric Sampling MLDSA_W32_Rep MLDSA.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq.
@@ -573,9 +574,7 @@ while (
    (* Step 1: commitment_encode bridge. Flatten/map algebra tying
       commitment_encode's output to w1Encode — pattern from verify.ec:200-219. *)
    ecall{2} (commitment_encode_ph w1{2}).
-   auto => |> &1 &2 *.
-   split; first by smt(mldsa65_gamma2).
-   move => _ result1 Hunflat.
+   auto => |> &1 &2 17? result1 Hunflat.
    rewrite /w1Encode.
    have Hw1eq : liftu_wpolykvec (kvec_unflatten256 w1{2}) =
                 lifts_wpolykvec (kvec_unflatten256 w1{2}).

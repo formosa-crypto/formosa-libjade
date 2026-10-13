@@ -4,7 +4,9 @@ from Jasmin require import JModel_x86.
 
 from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Gamma1.
 from JazzEC require import Array256 Array61 Array1536 Array3309.
-from Spec require import GFq Rq Serialization Conversion Parameters VecMat MLDSA_W32_Rep.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 import BitEncoding BitChunking.
 
 import Round ZModQ Zq.
@@ -101,8 +103,8 @@ while (0 <= i{1} <= kvec /\
      forall k, 0 <= k < i{1} =>
        (liftu_wpolykvec (kvec_unflatten256 hints{2})).[k] = h{1}.[k] /\
        wpoly_urng 2 (kvec_unflatten256 hints{2}).[k])); last first.
-+ auto => /> &1 &2 *;do split;1..3:smt().
-  move => e1 h1 d12 eo2 h2 if2 ?????????H H0;split.
++ auto => /> &1 &2 *; split; 1: smt().
+  move => e1 h1 d12 eo2 h2 if2 nd p ??????? H H0; split.
   + rewrite tP => k kb.
     have := H H0 k _;smt().
   rewrite /wpolykvec_urng allP => k kb.
@@ -398,7 +400,7 @@ seq 1 2 : (#{/~i{1}}{i{2}}{index{1}}{hints_written{2}}pre
     touch_hint _signature signature{2} /\
     condition1{2} = (i{2} < 6)
   ); last first.
- + auto => /> &1 &2 ??;do split;1..3,5..6:smt(size_mkseq).
+ + auto => /> &1 &2 ??; do split; 1,3: smt(size_mkseq).
     + by rewrite /count_nonzero_prefix /= !take0 big_nil /#. 
   wp. (* Inner while loop *)
   while (
@@ -418,7 +420,7 @@ seq 1 2 : (#{/~i{1}}{i{2}}{index{1}}{hints_written{2}}pre
         touch_hint _signature signature{2} /\
         condition2{2} = (j{2} < 256)
   ); last first.
-  + auto => /> &1 &2 Hrng ???????? c1 j2 s2 *; do split;1..3,7..:smt(size_put).
+  + auto => /> &1 &2 Hrng ???????? c1 j2 s2 *; do split; 1..3: smt(size_put).
     + rewrite /count_nonzero_prefix ifT 1:/#.
       case (i{1} + 1 = kvec) => ?. 
       + rewrite ifF 1:/# /= (take_nth witness) /=;1:smt(KArray.size_to_list).
@@ -549,7 +551,7 @@ while{1} (#{/~sigbytes{1}}pre /\
 + by smt().
 
 wp;ecall {2} (gamma1_encode_ph signer_response{2}).
-auto => /> &2 ???Hc?rr1 Hrr1;do split; 1,2:smt(mkseq0 cats0).
+auto => /> &2 ???Hc?rr1 Hrr1;do split; 1:smt(mkseq0 cats0).
 
 move => i1;split;1:smt().
 move => ????rr2 Hrr2.

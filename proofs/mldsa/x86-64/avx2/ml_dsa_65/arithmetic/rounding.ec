@@ -5,6 +5,8 @@ from Jasmin require import JModel_x86.
 from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude.
 
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 import Round ZModQ Zq.
 
@@ -406,9 +408,8 @@ seq 5 : (commitment = _commitment /\ hint_polynomial = _hints /\
          (forall i, 0 <= i < 256 =>
             to_uint highs.[i] = HighBits ((liftu_wpoly _commitment).[i])) /\
          wpoly_urng 16 highs);
-  first (call (polynomial__decompose_gamma2_32_correct witness witness _commitment);
-         auto => />; have Hm : 8380416 %/ (2 * gamma2) = 16 by smt(param_sets));
-  first by rewrite Hm.
+  first by call (polynomial__decompose_gamma2_32_correct witness witness _commitment);
+           auto => />.
 unroll for ^while; wp -1.
 conseq (: hint_polynomial = _hints /\ zeros = W256.zero /\
           mask = Array5.Array5."_.[_]" polynomial__CONSTANTS_TABLE_gamma2_32 0 /\

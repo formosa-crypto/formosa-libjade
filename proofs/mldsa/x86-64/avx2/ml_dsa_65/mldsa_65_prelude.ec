@@ -1,19 +1,21 @@
 require import AllCore List IntDiv RealExp StdBigop.
 
-from Spec require import GFq Rq Serialization Conversion Parameters VecMat MLDSA_W32_Rep.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 from JazzEC require import Array320 Array416 Array1280 Array640 Array1536 Array768 Array256 Array128 Array1920 Array3200 Array7680 Array2496.
 
 import LArray KArray.
 
-axiom mldsa65_lvec: lvec = 5.
-axiom mldsa65_kvec: kvec = 6.
-axiom mldsa65_w_hint : w_hint = 55.
-axiom mldsa65_lambda : lambda = 192.
-axiom mldsa65_gamma1 : gamma1 = 524288. (* 2**19 *)
-axiom mldsa65_gamma2 : gamma2 = 261888. (* (q-1)/32 *)
-axiom mldsa65_Eta : Eta = 4.
-axiom mldsa65_tau : tau = 49.
+lemma mldsa65_lvec : lvec = 5 by done.
+lemma mldsa65_kvec : kvec = 6 by done.
+lemma mldsa65_w_hint : w_hint = 55 by done.
+lemma mldsa65_lambda : lambda = 192 by done.
+lemma mldsa65_gamma1 : gamma1 = 524288 by done. (* 2**19 *)
+lemma mldsa65_gamma2 : gamma2 = 261888 by done. (* (q-1)/32 *)
+lemma mldsa65_Eta : Eta = 4 by done.
+lemma mldsa65_tau : tau = 49 by done.
 
 op  lvec_unflatten640(a : 'a Array3200.t) =
      LArray.init (fun i => Array640.of_list witness (sub a (640*i) 640)).

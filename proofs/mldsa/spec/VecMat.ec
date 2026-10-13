@@ -1,6 +1,14 @@
 require import AllCore List StdBigop.
 require import Parameters GFq Rq.
 require import Array256.
+from Jasmin require import JArray.
+require import Distr.
+require JArrayExtra.
+require Decompose.
+
+abstract theory VecMatT.
+
+clone include Decompose.DecomposeT.
 
 import Round ZModQ Zq MLDSAParams.
 
@@ -8,7 +16,6 @@ import Round ZModQ Zq MLDSAParams.
 (* (Previously these came from cloning [DVect] in the dilithium submodule.) *)
 import VM VM.Vectors VM.Matrices.
 
-from Jasmin require import JArray. 
 clone export PolyArray as LArray  with
         op size <- lvec
         proof ge0_size by smt(gt0_l).
@@ -328,8 +335,6 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 (* vectors of independent polynomials drawn from d                      *)
-require import Distr.
-require JArrayExtra.
 
 clone JArrayExtra.PAE as LArrayE with op size <- lvec, theory A <- LArray.
 clone JArrayExtra.PAE as KArrayE with op size <- kvec, theory A <- KArray.
@@ -345,3 +350,4 @@ lemma supp_dpolyk (d : poly distr) (s : polykvec) :
   s \in dpolyk d <=> forall i, 0 <= i < kvec => s.[i] \in d.
 proof. by apply KArrayE.supp_darray. qed.
 
+end VecMatT.

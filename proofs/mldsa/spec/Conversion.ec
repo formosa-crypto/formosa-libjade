@@ -2,12 +2,17 @@ require import AllCore BitEncoding List RealExp IntDiv.
 require JWordList.
 from Jasmin require import JWord.
 require import Array256.
-
 require import Parameters.
 require import GFq.
-import Round ZModQ Zq MLDSAParams.
 require import Rq.
-require import VecMat.
+require import Distr DList.
+require MLDSA_W32_Vec.
+
+abstract theory ConversionT.
+
+clone include MLDSA_W32_Vec.W32VecT.
+
+import Round ZModQ Zq MLDSAParams.
 import PolyLVec.
 import PolyKVec.
 import PolyMat.
@@ -282,7 +287,6 @@ module HintPackUnpack = {
 (* -------------------------------------------------------------------- *)
 (* BitUnpack maps uniform bytes to uniform coefficients in [-a, b] when *)
 (* a + b + 1 is a power of 2                                            *)
-require import Distr DList.
 
 lemma dmap_BitUnpack (a b : int) :
   0 < a + b => 2 ^ (ilog 2 (a + b) + 1) = a + b + 1 =>
@@ -319,3 +323,5 @@ have hu2 := dpoly_uni (-a) b hlo hhi.
 have hl2 := dpoly_ll (-a) b _; 1: smt().
 by apply eq_distr => y; rewrite (mu1_uni_ll _ _ hu1 hl1) (mu1_uni_ll _ _ hu2 hl2) hs.
 qed.
+
+end ConversionT.

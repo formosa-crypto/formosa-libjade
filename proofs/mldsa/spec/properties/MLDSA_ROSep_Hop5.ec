@@ -2,11 +2,13 @@ require import AllCore IntDiv List Distr DList PROM FMap Xreal StdBigop StdOrder
 from Jasmin require import JByte_array JWord.
 require import Array256.
 
-require import Parameters GFq Rq VecMat Conversion Serialization Symmetric Sampling.
+require import Parameters GFq Rq.
+require import Spec65.
+import MLDSA65.
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
-require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2 MLDSA_ROSep_Hop3.
+require import MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2 MLDSA_ROSep_Hop3.
 require import DistrExtra.
 require import MLDSA_ROSep_Hop4.
 
@@ -125,8 +127,7 @@ proc; do 3! (wp; while (={i, rho, tr, s1, s2, t0} /\ k{2} = cK /\ sk{1} = s /\ s
                         0 <= i{1});
                1: by auto => /> &1 &2 *; rewrite setK_drop; [have /= H := param_sets; smt() | smt()]).
 auto => />; have [h1 h2] := setK_take s cK.
-rewrite h1 h2 Bytes32.to_listK setK_drop //= Bytes32.of_listK // size_take // size_drop // BytesSK.size_to_list.
-by have /= H := param_sets; smt(ge0_size BytesSK.ge0_size).
+by rewrite h1 h2 Bytes32.to_listK setK_drop //= Bytes32.of_listK // size_take // size_drop // BytesSK.size_to_list.
 qed.
 
 lemma setK_of_list (l : W8.t list) (c : Bytes32.t) :

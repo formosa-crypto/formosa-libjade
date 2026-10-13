@@ -6,7 +6,9 @@ from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude.
 
 require import CircuitBindings Bindings.
 
-from Spec require import GFq Rq Parameters MLDSA_W32_Rep Symmetric Serialization.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 import Round ZModQ Zq.
 

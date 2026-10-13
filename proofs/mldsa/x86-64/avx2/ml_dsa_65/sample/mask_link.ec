@@ -18,8 +18,9 @@ from Jasmin require import JModel_x86.
 
 from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude.
 
-from Spec require import GFq Rq Serialization Conversion Parameters VecMat
-                         Symmetric Sampling MLDSA_W32_Rep MLDSA.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 from CryptoSpecs require import Keccak1600_Spec.
 
@@ -35,7 +36,7 @@ require Mexpand.
 
 (* -------------------------------------------------------------------- *)
 (* Parameters of the ML-DSA-65 instance                                 *)
-lemma gamma1E : Parameters.gamma1 = Mexpand.gamma1.
+lemma gamma1E : gamma1 = Mexpand.gamma1.
 proof. by rewrite mldsa65_gamma1 /Mexpand.gamma1. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -95,7 +96,7 @@ qed.
 lemma mdecode_BitUnpack (bs : W8.t list) :
   size bs = 640 =>
   lifts_wpoly (Mexpand.mdecode bs)
-  = BitUnpack bs (Parameters.gamma1 - 1) Parameters.gamma1.
+  = BitUnpack bs (gamma1 - 1) gamma1.
 proof.
 move=> sz_bs; rewrite /BitUnpack /= ilog_gamma1 /=.
 apply Array256.tP => j rgj.
@@ -112,7 +113,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 (* Coefficient range of the decoder output                              *)
 lemma mdecode_srng (bs : W8.t list) :
-  wpoly_srng (Parameters.gamma1 - 1) Parameters.gamma1 (Mexpand.mdecode bs).
+  wpoly_srng (gamma1 - 1) gamma1 (Mexpand.mdecode bs).
 proof.
 rewrite /wpoly_srng Array256.allP => i rgi /=.
 rewrite /Mexpand.mdecode Array256.initiE //= to_sint_mcoeffE.
@@ -130,7 +131,7 @@ lemma ExpandMask_sampleP (rho_ : Bytes64.t) (mu_ : int) :
       = BitUnpack
           (BytesV.to_list (H_v (Bytes66.of_list
              (Bytes64.to_list rho_ ++ IntegerToBytes (mu_ + r) 2))))
-          (Parameters.gamma1 - 1) Parameters.gamma1 ].
+          (gamma1 - 1) gamma1 ].
 proof.
 proc.
 while (rho = rho_ /\ mu = mu_ /\ 0 <= r <= lvec
@@ -139,7 +140,7 @@ while (rho = rho_ /\ mu = mu_ /\ 0 <= r <= lvec
        = BitUnpack
            (BytesV.to_list (H_v (Bytes66.of_list
               (Bytes64.to_list rho_ ++ IntegerToBytes (mu_ + i) 2))))
-           (Parameters.gamma1 - 1) Parameters.gamma1).
+           (gamma1 - 1) gamma1).
 - auto=> |> &hr ge0_r _ hs lt_r; do! split; 1,2: smt().
   move=> i rgi rgir; rewrite LArray.get_setE 1:/#.
   by case: (i = r{hr}) => [->|ne]; [done | rewrite hs /#].
@@ -167,7 +168,7 @@ lemma Mpoly_specE (rho_ : W8.t Array64.t) (sep : W16.t) :
   = BitUnpack
       (BytesV.to_list (H_v (Bytes66.of_list
          (to_list rho_ ++ IntegerToBytes (W16.to_uint sep) 2))))
-      (Parameters.gamma1 - 1) Parameters.gamma1.
+      (gamma1 - 1) gamma1.
 proof.
 have hb : 0 <= W16.to_uint sep < 65536.
 - by have := W16.to_uint_cmp sep; have -> : W16.modulus = 65536 by done.
@@ -181,7 +182,7 @@ qed.
 
 (* the coefficient range of the isolation op, at the spec's bounds      *)
 lemma Mpoly_srng (rho_ : W8.t Array64.t) (sep : W16.t) :
-  wpoly_srng (Parameters.gamma1 - 1) Parameters.gamma1
+  wpoly_srng (gamma1 - 1) gamma1
     (Mexpand.Mpoly rho_ sep).
 proof. by rewrite Mexpand.MpolyP mdecode_srng. qed.
 
@@ -193,7 +194,7 @@ lemma Mpoly_ExpandMask_entry (rho_ : W8.t Array64.t) (ds0 : W16.t) (r : int) :
   = BitUnpack
       (BytesV.to_list (H_v (Bytes66.of_list
          (to_list rho_ ++ IntegerToBytes (W16.to_uint ds0 + r) 2))))
-      (Parameters.gamma1 - 1) Parameters.gamma1.
+      (gamma1 - 1) gamma1.
 proof.
 move=> ge0_r hbound.
 have hM : W16.modulus = 65536 by done.

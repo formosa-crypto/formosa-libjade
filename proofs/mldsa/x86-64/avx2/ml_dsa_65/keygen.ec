@@ -5,8 +5,9 @@ from Jasmin require import JModel_x86.
 from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Matrix_A Error_vectors T0 T1 S1 S2 Hashing.
 (* from JazzEC require import Array32. *)
 
-from Spec require import GFq Rq Serialization Conversion Parameters VecMat
-                         Symmetric Sampling MLDSA_W32_Rep MLDSA.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq.
@@ -122,7 +123,6 @@ move => _ result0 Hlifts_red Hsrng_red.
 split; first by apply wpolykvec_bmul_orng_intt_irng;
   apply (wpolykvec_srng_widen _ 6283009 6283008 (q-1) (q-1)); smt().
 move => _ result1 Hlifts_invntt Hsrng_invntt.
-split; 1: smt().
 move => _ result2 Hlifts_add Hsrng_add.
 split;
   first by apply (wpolykvec_srng_widen _ (invntt_obound + Eta) (invntt_obound + Eta) (q-1) (q-1)); smt().

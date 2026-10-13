@@ -7,6 +7,8 @@ from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude.
 require import CircuitBindings Bindings.
 
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 import Round ZModQ Zq.
 
@@ -58,19 +60,19 @@ unroll for ^while.
 wp 194.
 conseq (: polynomial = _a /\ wpoly_srng 2143289343 2143289343 _a ==> polynomial = BSWA_256u32.init (fun (i:int) => _a.[i] - ((_a.[i] + W32.of_int 4194304) `|>>>` 23) * W32.of_int 8380417)); last by circuit.
 move => &hr [# _ Hrng] p0 ->; move: Hrng; rewrite /wpoly_srng !allP => Hrng.
-have key : forall (i:int), 0 <= i < n => to_sint (_a.[i] - ((_a.[i] + W32.of_int 4194304) `|>>>` Serialization.q_bits) * W32.of_int q) = to_sint _a.[i] - ((to_sint _a.[i] + 4194304) %/ 2^23) * q.
+have key : forall (i:int), 0 <= i < n => to_sint (_a.[i] - ((_a.[i] + W32.of_int 4194304) `|>>>` q_bits) * W32.of_int q) = to_sint _a.[i] - ((to_sint _a.[i] + 4194304) %/ 2^23) * q.
 + move => i Hi; have /= Hs := Hrng i Hi.
   have H22 : to_sint (W32.of_int 4194304) = 4194304 by rewrite W32.to_sintE W32.of_uintK /smod /=.
   have H23 : 2 ^ 23 = 8388608 by done.
   have Hadd : to_sint (_a.[i] + W32.of_int 4194304) = to_sint _a.[i] + 4194304.
   + rewrite W32.to_sintD_small; first (rewrite H22 /=; smt()).
     by rewrite H22.
-  have Hsar : to_sint ((_a.[i] + W32.of_int 4194304) `|>>>` Serialization.q_bits) = (to_sint _a.[i] + 4194304) %/ 8388608 by rewrite JWordExtra.WE32.to_sint_sar 1:/# Hadd H23.
+  have Hsar : to_sint ((_a.[i] + W32.of_int 4194304) `|>>>` q_bits) = (to_sint _a.[i] + 4194304) %/ 8388608 by rewrite JWordExtra.WE32.to_sint_sar 1:/# Hadd H23.
   have Hk : -255 <= (to_sint _a.[i] + 4194304) %/ 8388608 <= 255 by smt().
-  have Hush : to_uint ((_a.[i] + W32.of_int 4194304) `|>>>` Serialization.q_bits) = ((to_sint _a.[i] + 4194304) %/ 8388608) %% 4294967296.
+  have Hush : to_uint ((_a.[i] + W32.of_int 4194304) `|>>>` q_bits) = ((to_sint _a.[i] + 4194304) %/ 8388608) %% 4294967296.
   + have Hmod : W32.modulus = 4294967296 by done.
-    rewrite -Hsar; move: (W32.to_uint_cmp ((_a.[i] + W32.of_int 4194304) `|>>>` Serialization.q_bits)); rewrite Hmod => Hub; case (msb ((_a.[i] + W32.of_int 4194304) `|>>>` Serialization.q_bits)) => Hm; [ rewrite (JWordExtra.W32_to_sint_neg _ Hm) | rewrite (JWordExtra.W32_to_sint_pos _ Hm) ]; smt().
-  have Hprod : ((_a.[i] + W32.of_int 4194304) `|>>>` Serialization.q_bits) * W32.of_int q = W32.of_int (((to_sint _a.[i] + 4194304) %/ 8388608) * q).
+    rewrite -Hsar; move: (W32.to_uint_cmp ((_a.[i] + W32.of_int 4194304) `|>>>` q_bits)); rewrite Hmod => Hub; case (msb ((_a.[i] + W32.of_int 4194304) `|>>>` q_bits)) => Hm; [ rewrite (JWordExtra.W32_to_sint_neg _ Hm) | rewrite (JWordExtra.W32_to_sint_pos _ Hm) ]; smt().
+  have Hprod : ((_a.[i] + W32.of_int 4194304) `|>>>` q_bits) * W32.of_int q = W32.of_int (((to_sint _a.[i] + 4194304) %/ 8388608) * q).
   + rewrite W32.to_uint_eq W32.to_uintM !W32.of_uintK Hush /=; smt().
   have Hqv : q = 8380417 by done.
   have Hrange : -6283009 <= to_sint _a.[i] - ((to_sint _a.[i] + 4194304) %/ 8388608) * q <= 6283008.

@@ -5,6 +5,8 @@ from Jasmin require import JModel_x86.
 from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Common_modular.
 
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 require Inttcorrect.
 require import Nttlink.

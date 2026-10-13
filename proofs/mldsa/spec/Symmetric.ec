@@ -1,14 +1,19 @@
 require import AllCore List IntDiv.
 from Jasmin require import JByte_array JWord.
+require import Parameters GFq Rq.
+from CryptoSpecs require import Keccak1600_Spec.
+require Serialization.
 
-require import Parameters GFq Rq VecMat Conversion Serialization.
+abstract theory SymmetricT.
+
+clone include Serialization.SerializationT.
+
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
-from CryptoSpecs require import Keccak1600_Spec.
 
 abbrev gamma1m1_bits = 19.
-lemma gamma1_bitlen :  2^(gamma1m1_bits-1) < gamma1-1 (* signed range *) <= 2^(gamma1m1_bits)
+lemma gamma1m1_bitlen :  2^(gamma1m1_bits-1) < gamma1-1 (* signed range *) <= 2^(gamma1m1_bits)
   by  have/= H := param_sets; elim H => /> ??->???? /=.
 
 clone import JArray.MonoArray as Bytes66 with op size <= 66, type elem <= W8.t, op dfl <= witness.
@@ -137,3 +142,5 @@ module MLDSA_XOFS : XOF_RejBPoly = {
   a pk such that HashPK is a prefix of PK.
   For Hct vs Hmu one can argue that game would need to sample 
   a pk such that Hash(HashPK) = HashPK.  *)
+
+end SymmetricT.

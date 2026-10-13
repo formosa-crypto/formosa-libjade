@@ -1,7 +1,13 @@
 require import AllCore BitEncoding List RealExp IntDiv.
 from Jasmin require import JWord JByte_array.
+require import Parameters GFq Rq.
+require import Distr DList JWordList.
+require Conversion.
 
-require import Parameters GFq Rq VecMat Conversion.
+abstract theory SerializationT.
+
+clone include Conversion.ConversionT.
+
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 import BitChunking Array256.
@@ -431,7 +437,6 @@ op w1Encode(w1 : polykvec) : BytesW1.t =
     (fun wi => SimpleBitPack wi ((q-1)%/(2*gamma2) - 1)) 
        (mkseq (fun ii => w1.[ii]) kvec))).
 
-require import Distr DList JWordList.
 
 (* -------------------------------------------------------------------- *)
 (* parameter facts on the encoding sizes                                *)
@@ -545,7 +550,7 @@ qed.
 
 lemma uh_rng (h r : polykvec) : w1rng (UseHint h r).
 proof.
-move=> i j hi hj; rewrite /UseHint KArray.map2iE // /poly_UseHint Array256.initiE //= /GFq.UseHint /=.
+move=> i j hi hj; rewrite /UseHint KArray.map2iE // /poly_UseHint Array256.initiE //= /UseHint /=.
 have hg : (q - 1) %/ (2 * gamma2) = 16 by have /= H := param_sets; smt().
 have [hr _] := Decompose_cases r.[i].[j]; move: hr; rewrite /HighBits => hr.
 case: (Decompose r.[i].[j]) hr => r1 r0 /= hr.
@@ -568,3 +573,5 @@ rewrite take_drop_flatten //; 1: by rewrite size_mkseq; smt(gt0_k).
 rewrite /= nth_mkseq //= (_ : 8380416 %/ (2 * gamma2) - 1 = 15); 1: by have /= H := param_sets; smt().
 by rewrite SimpleBitPackK // => j hj; apply hw.
 qed.
+
+end SerializationT.

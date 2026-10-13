@@ -2,11 +2,13 @@ require import AllCore IntDiv List Distr DList PROM FMap Xreal StdBigop StdOrder
 from Jasmin require import JByte_array JWord.
 require import Array256.
 
-require import Parameters GFq Rq VecMat Conversion Serialization Symmetric Sampling.
+require import Parameters GFq Rq.
+require import Spec65.
+import MLDSA65.
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
-require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1.
+require import MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1.
 require import FMapExtra.
 require import JWordExtra.
 
@@ -474,8 +476,7 @@ equiv next_unset : XOFS_O(DS2.RO1.RO).next ~ XOFS_O(RoutedH).next :
       inv_pre DS2.RO1.RO.m{1} DS5.RO3.RO.m{2} DS5.RO4.RO.m{2} DS5.RO5.RO.m{2} DS5.RO2.RO.m{2}
               RO_rest.RO.m{2} RO_pad.RO.m{2}.
 proof.
-proc; inline ReadByte(DS2.RO1.RO).read ReadByte(RoutedH).read; wp; call get_unset; auto => />.
-by have /= H := param_sets; smt(w1_bytes_big).
+by proc; inline ReadByte(DS2.RO1.RO).read ReadByte(RoutedH).read; wp; call get_unset; auto => />.
 qed.
 
 equiv rbp_unset : RejBoundedPoly(XOFS_O(DS2.RO1.RO)).sample ~ RejBoundedPoly(XOFS_O(RoutedH)).sample :
@@ -523,8 +524,7 @@ proc; inline MLDSA_RO(DS2.RO1.RO, DS2.RO2.RO).keygen_derand MLDSA_RO(RoutedH, DS
 wp; call (: true); 1: by sim.
 wp; call squeeze_tr; call (: true); 1: by sim.
 wp; call expandS_unset; call (: ={glob DS2.RO2.RO, glob XOFA_O}); 1: by sim.
-wp; call squeeze_unset; wp; rnd; auto => />.
-by have /= H := param_sets; smt(w1_bytes_big).
+by wp; call squeeze_unset; wp; rnd; auto => />.
 qed.
 
 (*************** Signing and verification ****************)
@@ -861,8 +861,7 @@ hoare next_pre (rho0 : Bytes64.t) : XOFS_O(RoutedH).next :
   ==> !RoutedH.trset /\ !RoutedH.bad /\ DS5.RO3.RO.m = empty /\ pre_ok rho0 RO_rest.RO.m /\
       take 64 (Bytes66.to_list XOFS_O.seed) = Bytes64.to_list rho0.
 proof.
-proc; inline ReadByte(RoutedH).read; wp; call (get_pre rho0); auto => />.
-by have /= H := param_sets; smt(w1_bytes_big).
+by proc; inline ReadByte(RoutedH).read; wp; call (get_pre rho0); auto => />.
 qed.
 
 hoare rbp_pre (rho0 : Bytes64.t) : RejBoundedPoly(XOFS_O(RoutedH)).sample :

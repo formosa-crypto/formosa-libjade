@@ -3,7 +3,13 @@ from Jasmin require import JByte_array JWord.
 require import Array256.
 from CryptoSpecs require import Keccak1600_Spec.
 from CryptoSpecs require import Keccak1600_Orbit.
-require import Parameters GFq Rq VecMat Conversion Serialization Symmetric.
+require import Parameters GFq Rq.
+require Symmetric.
+
+abstract theory SamplingT.
+
+clone include Symmetric.SymmetricT.
+
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
@@ -834,3 +840,4 @@ qed.
    
 (*************** End ExpandMask CORRECTNESS BRIDGE ****************)
 
+end SamplingT.

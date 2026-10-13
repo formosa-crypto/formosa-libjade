@@ -2,11 +2,13 @@ require import AllCore IntDiv List Distr DList PROM FMap Xreal StdBigop StdOrder
 from Jasmin require import JByte_array JWord.
 require import Array256.
 
-require import Parameters GFq Rq VecMat Conversion Serialization Symmetric Sampling.
+require import Parameters GFq Rq.
+require import Spec65.
+import MLDSA65.
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
-require import MLDSA MLDSA_RO MLDSA_ROSep.
+require import MLDSA_RO MLDSA_ROSep.
 require import DistrExtra.
 
 (* G0': verify rejects c~ = tr *)
@@ -160,8 +162,7 @@ proc; while ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k) `|` (b2r (coll DS2.RO1.RO.m pk
 wp; exlim rho => rho_.
 call /(fun y => (0%r <= k) `|` y) (Squeeze_coll pk0 (BytesCT.to_list rho_) 8 k).
 + by move=> &hr /=; apply xle_cxr => />.
-auto => &hr /=; apply xle_cxr => /> *.
-by apply le_pos; smt(ct_len_nrel BytesCT.size_to_list).
+by auto => &hr /=; apply xle_cxr => /> *.
 qed.
 
 (* The H_ct squeeze costs p512, SampleInBall is free *)
@@ -189,8 +190,7 @@ proc; while ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k) `|` (b2r (coll DS2.RO1.RO.m pk
   call /(fun y => (0%r <= k) `|` y)
        (Squeeze_coll pk0 (Bytes66.to_list rhop_) (n * (gamma1m1_bits + 1) %/ 8) k).
   + by move=> &hr /=; apply xle_cxr => />.
-  skip => &hr /=; apply xle_cxr => /> *.
-  by apply le_pos; smt(w1_bytes_big).
+  by skip => &hr /=; apply xle_cxr => /> *.
 by auto.
 qed.
 

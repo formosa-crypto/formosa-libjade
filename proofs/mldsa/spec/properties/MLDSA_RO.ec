@@ -2,13 +2,14 @@ require import AllCore IntDiv List.
 from Jasmin require import JByte_array JWord.
 require import Array256.
 
-require import Parameters GFq Rq VecMat Conversion Serialization Symmetric Sampling.
+require import Parameters GFq Rq.
+require import Spec65.
+import MLDSA65.
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 from CryptoSpecs require import Keccak1600_Spec.
 
-require import MLDSA.
 
 (* H = SHAKE256, as an oracle returning the 64-byte block j of the output stream on x;
    G = SHAKE128, as an oracle returning byte i of the output stream on x *)

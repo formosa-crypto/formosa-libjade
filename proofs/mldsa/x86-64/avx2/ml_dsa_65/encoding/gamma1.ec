@@ -5,7 +5,9 @@ require import CircuitBindings Bindings JWordExtra.
 
 from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude.
 from JazzEC require import Array256 Array640.
-from Spec require import GFq Rq Serialization Conversion Parameters MLDSA_W32_Rep.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 import BitEncoding BitChunking.
 
 import Round ZModQ Zq.
@@ -430,7 +432,8 @@ case(0<=k<i{hr}) => *.
         (fun (i_0 : int) => if i{hr} * n <= i_0 < i{hr} * n + n then rr.[i_0 - i{hr} * n] else decoded{hr}.[i_0]))).[k] =
     (lvec_unflatten256 decoded{hr}).[k]; last by (apply Hrng; smt()).
   rewrite initiE 1:/# /= tP => ii iib.
-  rewrite initiE 1:/# /= get_of_list // nth_sub 1:/# initiE 1:/# /= get_of_list 1:/# nth_sub /#.
+  rewrite initiE 1:/# /= nth_sub 1:/# initiE 1:/# /=.
+  by rewrite /lvec_unflatten256 LArray.initiE 1:/# /= Array256.get_of_list 1:/# nth_sub /#.
 have -> : k = i{hr} by smt().
 have -> : (lvec_unflatten256
      (Array1280.init

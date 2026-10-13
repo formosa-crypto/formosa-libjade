@@ -2,11 +2,13 @@ require import AllCore IntDiv List Distr DList DInterval PROM FMap BitEncoding.
 from Jasmin require import JByte_array JWord.
 require import Array256.
 
-require import Parameters GFq Rq VecMat Conversion Serialization Symmetric Sampling.
+require import Parameters GFq Rq.
+require import Spec65.
+import MLDSA65.
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
-require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2 MLDSA_ROSep_Hop3.
+require import MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2 MLDSA_ROSep_Hop3.
 require import DistrExtra.
 require import MLDSA_ROSep_Hop4 MLDSA_ROSep_Hop5 MLDSA_ROSep_Hop6.
 require import MLDSA_ExpandS.
@@ -676,7 +678,7 @@ wp; while (={r, s1, s2, rho} /\ 0 <= r{1} <= lvec /\ sfresh_from rho{1} RO_S.RO.
   call (rbp_ro_fresh (Bytes66.to_list (sseed rho0 r0)) m0).
   auto => /> hr hr' hm hl; split; 1: by move=> c; apply hm; smt(gt0_k).
   by move=> _ _ m' hf; split; [smt() | apply (sfresh_from_step _ _ _ _ _ hm hf)].
-auto => /> &2; split; 1: by split; [smt(gt0_l) | move=> r' c _; rewrite mem_empty].
+auto => /> &2; split; 1: by move=> r' c _; rewrite mem_empty.
 by move=> m r _ h1 h2 h3; rewrite (_ : r = lvec) 1:/#.
 qed.
 

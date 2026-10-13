@@ -2,11 +2,13 @@ require import AllCore IntDiv List Distr DList PROM FMap Xreal StdBigop StdOrder
 from Jasmin require import JByte_array JWord.
 require import Array256.
 
-require import Parameters GFq Rq VecMat Conversion Serialization Symmetric Sampling.
+require import Parameters GFq Rq.
+require import Spec65.
+import MLDSA65.
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
-require import MLDSA MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2.
+require import MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2.
 require import FMapExtra JWordExtra.
 
 (*************** G2: the scheme queries Htr, Hmu, Hct and XC directly ****************)

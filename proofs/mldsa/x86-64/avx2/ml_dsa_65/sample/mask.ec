@@ -4,8 +4,9 @@ from Jasmin require import JModel_x86.
 
 from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude.
 
-from Spec require import GFq Rq Serialization Conversion Parameters VecMat
-                         Symmetric Sampling MLDSA_W32_Rep MLDSA.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq.
@@ -58,7 +59,7 @@ lemma ExpandMask_sample_ph (rho_ : Bytes64.t) (mu_ : int) :
     forall r, 0 <= r < lvec =>
       res.[r] = BitUnpack (BytesV.to_list (H_v (Bytes66.of_list
                   (Bytes64.to_list rho_ ++ IntegerToBytes (mu_ + r) 2))))
-                (Parameters.gamma1 - 1) Parameters.gamma1 ] = 1%r.
+                (gamma1 - 1) gamma1 ] = 1%r.
 proof. by conseq ExpandMask_sample_ll (ExpandMask_sampleP rho_ mu_). qed.
 
 lemma sample____mask_ph (rho_ : W8.t Array64.t) (ds0 : W16.t) :

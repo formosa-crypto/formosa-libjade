@@ -2,11 +2,13 @@ require import AllCore IntDiv List Distr DList PROM.
 from Jasmin require import JByte_array JWord.
 require import Array256.
 
-require import Parameters GFq Rq VecMat Conversion Serialization Symmetric Sampling.
+require import Parameters GFq Rq.
+require import Spec65.
+import MLDSA65.
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
-require import MLDSA MLDSA_RO.
+require import MLDSA_RO.
 require import DistrExtra JWordExtra StdBigop StdOrder.
 require DS_ROM.
 

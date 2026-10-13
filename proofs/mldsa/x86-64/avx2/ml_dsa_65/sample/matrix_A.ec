@@ -5,8 +5,9 @@ from Jasmin require import JModel_x86.
 from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude.
 (* from JazzEC require import Array32. *)
 
-from Spec require import GFq Rq Serialization Conversion Parameters VecMat
-                         Symmetric Sampling MLDSA_W32_Rep MLDSA.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq.

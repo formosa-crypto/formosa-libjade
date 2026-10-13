@@ -3,7 +3,9 @@ from Jasmin require import JWord.
 require import Array256.
 
 require import DistrExtra JWordExtra.
-require import Parameters GFq Rq Conversion Serialization Symmetric Sampling.
+require import Parameters GFq Rq.
+require import Spec65.
+import MLDSA65.
 import Round ZModQ Zq MLDSAParams Bigreal.
 
 lemma eta_cases : Eta = 2 \/ Eta = 4 by smt(param_sets).
@@ -278,7 +280,7 @@ proof. by rewrite /rbp_pot /agree mu1_dpoly /= /#. qed.
 lemma rbp_pot256 t (a : poly) : rbp_pot t (256, a) = b2r (a = t).
 proof.
 rewrite /rbp_pot /rbp_tail BRM.big_geq //= /agree /=.
-by congr; rewrite eq_iff; split => [h | -> //]; apply ext_eq.
+by congr; rewrite eq_iff; split => [h | -> //]; apply Array256.ext_eq.
 qed.
 
 lemma RejBoundedPoly_fresh_le t &m rho :
@@ -376,7 +378,6 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 (* over the fresh XOF, ExpandS samples s1 and s2 coefficient-wise       *)
-require import VecMat.
 import PolyLVec PolyKVec.
 
 clone DList.Program as PS with

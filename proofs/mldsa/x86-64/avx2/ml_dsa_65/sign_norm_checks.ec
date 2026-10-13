@@ -5,7 +5,9 @@ from Jasmin require import JModel_x86.
 from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Signature
                            Common_modular Common_invert_ntt Common_rounding.
 
-from Spec require import GFq Rq Parameters VecMat MLDSA_W32_Rep.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 import PolyLVec PolyKVec.
 import Round ZModQ Zq.
 import StdBigop.Bigint BIA.
@@ -270,7 +272,7 @@ seq 6 : (#pre /\
   + rewrite -Heq_w0; move: Hw0_srng; rewrite /wpolykvec_srng allP => H.
     move: (H (base{hr} %/ n) _); 1: smt(mldsa65_kvec).
     rewrite /wpoly_srng !allP => H2 j Hj; have := H2 j Hj; smt(mldsa65_gamma2).
-  split; first by do split; [ exact Hw0_slice | smt(invntt_obound_fits_for_caddq mldsa65_gamma2 mldsa65_Eta) ].
+  split; first by exact Hw0_slice.
   move => _ _ result1 Hr1s Hr1v.
   split.
   + have -> : (Array256.init (fun (i : int) => (Array1536.init (fun (i0 : int) => if base{hr} <= i0 < base{hr} + n then result1.[i0 - base{hr}] else w0_minus_cs2{hr}.[i0])).[base{hr} + i])) = result1.
@@ -353,8 +355,7 @@ ecall (polynomial____check_infinity_norm_correct
         (Array256.init (fun i => w0_minus_cs2.[base + i]))
         (gamma2 - Beta)).
 
-auto => |> &hr  ??????? ?H H0 H1 H2 H3; split;1:smt().
-move => ?? rr Ht Hf.
+auto => |> &hr ??????? ?H H0 H1 H2 H3 ?? rr Ht Hf.
 case (rr = W64.zero) => Hrr /=.
 + (* norm passed: rr = zero, new_incr = zero, update invariant *)
   do split; 1..3: smt().
@@ -640,8 +641,7 @@ seq 2 : (
 - (* ── Goal 1: { pre } check_infnorm(ct0, gamma2); no-op { intermediate_cond } ── *)
   wp. (* absorb no-op backward *)
   ecall (polynomial____check_infinity_norm_correct ct0 gamma2).
-  auto => |> &hr *; split;1: by smt(mldsa65_gamma2).
-  move => ??rr  Hpass Hfail.
+  auto => |> &hr *.
   (* wpolykvec_infnorm_lt is now a direct invariant conjunct, absorbed by |> into context.
      do split produces 3 forall goals (wpoly_srng, infnorm_lt, algebra for k < base/n).
      All closed by smt() from the unnamed (infnorm=zero => ...) invariant hypothesis:
@@ -681,7 +681,6 @@ seq 2 : (
       rewrite /wpoly_srng allP => j jb.
       move: Hct0_infnorm; rewrite /wpoly_infnorm_lt /wpoly_srng allP => H.
       by have := H j _; 1: smt(); smt().
-    - by smt(mldsa65_gamma2).  (* overflow: (gamma2-Beta-1) + (gamma2-1) < 2^31 *)
     move => _ _ _ add_result Hadd_eq Hadd_rng.
     do split; 1..3: by smt().
     + (* range of w0mc_plus_ct0 for all k < (base+n)/n *)
@@ -999,10 +998,7 @@ wp.
 ecall (polynomial____check_infinity_norm_correct
         (Array256.init (fun i => signer_response.[base + i]))
         (gamma1 - Beta)).
-auto => |> &hr *; do split.
-+ rewrite /(`<<`) mldsa65_gamma1 /= /#.
-+ rewrite /(`<<`) mldsa65_gamma1 /= /#.
-move => ?? rr Hpass Hfail.
+auto => |> &hr 15? rr Hpass Hfail.
 case (rr = W64.zero) => Hrr /=.
 + (* norm passed: rr = zero, update invariant *)
   do split; 1..3: by smt().

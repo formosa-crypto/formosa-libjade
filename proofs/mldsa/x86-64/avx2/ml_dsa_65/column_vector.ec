@@ -7,7 +7,9 @@ from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Common_modular
 
 require import Polynomial.
 
-from Spec require import GFq Rq Parameters MLDSA_W32_Rep VecMat.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from Spec require import Spec65.
+import MLDSA65.
 
 import Round ZModQ Zq PolyKVec.
 

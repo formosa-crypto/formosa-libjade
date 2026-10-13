@@ -1,15 +1,21 @@
 require import AllCore IntDiv List Ring.
 require StdOrder.
 
-(* ML-DSA parameters. Previously this file cloned [DParams] from the dilithium
-   submodule; the DParams obligations are now inlined here as axioms on
-   concrete parameter ops, scoped under the [MLDSAParams] theory for source
-   compatibility with the prior `import MLDSAParams.` convention. *)
+(* ML-DSA parameters. The constants shared by every parameter set are
+   top-level; the parameters of a set are the operators of the abstract
+   theory ParamsT, on which the rest of the specification is built and
+   which each parameter-set instance realizes. *)
 
 abbrev q : int = 8380417.
 abbrev n : int = 256.
 axiom prime_q : prime q.
 abbrev d : int = 13.
+
+lemma gt0_n : 0 < n by auto.
+lemma gt0_d : 0 < d by auto.
+
+abstract theory ParamsT.
+
 op tau : int.                (*    39             49           60      : exact number of 1s in c *)
 op lambda : int.             (*   128            192          256      : collision strength of ctilde *)
 op gamma1 : int.             (*   2^17           2^19         2^19     : coefficient range of y*)
@@ -32,14 +38,11 @@ axiom kappa_max_bnd : 0 <= kappa_max /\ kappa_max * lvec <= 65536.
 
 theory MLDSAParams.
 
-(* Parameter axioms — inlined from the former DParams clone. *)
-lemma gt0_n  : 0 < n   by auto.
 lemma gt0_eta : 0 < Eta by smt(param_sets).
 lemma gt0_k   : 0 < kvec by smt(param_sets).
 lemma gt0_l   : 0 < lvec by smt(param_sets).
 lemma gt0_beta : 0 < Beta by smt(param_sets).
 lemma tau_bound : 1 <= tau <= n /\ tau <= 64 by smt(param_sets).
-lemma gt0_d : 0 < d by auto.
 lemma eta_tau_leq_b : Eta * tau <= Beta by smt(param_sets).
 lemma gamma2_bound  : 2 <= gamma2 <= q %/ 4 by smt(param_sets).
 lemma gamma2_div : 2 * gamma2 %| (q - 1) by smt(param_sets).
@@ -69,3 +72,5 @@ smt().
 qed.
 
 end MLDSAParams.
+
+end ParamsT.
