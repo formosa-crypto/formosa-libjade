@@ -42,6 +42,22 @@ lemma invnttv_ntt_smul_k (c : poly) (sv : polylvec) (k : int) :
   (invnttv (ntt_smul c sv)).[k] = invntt (basemul sv.[k] c).
 proof. by move => hk; rewrite /invnttv /ntt_smul !mapiE 1:/# /=. qed.
 
+(* multiplication by a polynomial, componentwise *)
+op psmul (c : poly) (v : polylvec) : polylvec = map (fun p => p &* c) v.
+
+lemma invnttv_ntt_smul (c : poly) (v : polylvec) :
+  invnttv (ntt_smul (ntt c) (nttv v)) = psmul c v.
+proof.
+apply LArray.ext_eq => i rgi.
+by rewrite /invnttv /ntt_smul /nttv /psmul !mapiE //= conv.
+qed.
+
+lemma invnttv_add (v1 v2 : polylvec) : invnttv (v1 + v2) = invnttv v1 + invnttv v2.
+proof.
+apply LArray.ext_eq => i rgi; rewrite (polylvec_add_iE (invnttv v1)) // /invnttv.
+by rewrite !mapiE // polylvec_add_iE // invnttD.
+qed.
+
 op infnorm_lt(v : polylvec, bound : int) : bool =
   all (fun ii => all (fun jj => `|v.[ii].[jj]| < bound) (iota_ 0 256)) (iota_ 0 lvec).
 
@@ -81,6 +97,28 @@ proof. by move=> rgk; rewrite /(-) map2iE. qed.
 lemma polykvec_add_iE (v1 v2 : polykvec) k :
   0 <= k < kvec => (v1 + v2).[k] = v1.[k] &+ v2.[k].
 proof. by move=> rgk; rewrite /(+) map2iE. qed.
+
+(* multiplication by a polynomial, componentwise *)
+op psmul (c : poly) (v : polykvec) : polykvec = map (fun p => p &* c) v.
+
+lemma invnttv_ntt_smul (c : poly) (v : polykvec) :
+  invnttv (ntt_smul (ntt c) (nttv v)) = psmul c v.
+proof.
+apply KArray.ext_eq => i rgi.
+by rewrite /invnttv /ntt_smul /nttv /psmul !mapiE //= conv.
+qed.
+
+lemma invnttv_add (v1 v2 : polykvec) : invnttv (v1 + v2) = invnttv v1 + invnttv v2.
+proof.
+apply KArray.ext_eq => i rgi; rewrite (polykvec_add_iE (invnttv v1)) // /invnttv.
+by rewrite !mapiE // polykvec_add_iE // invnttD.
+qed.
+
+lemma invnttv_sub (v1 v2 : polykvec) : invnttv (v1 - v2) = invnttv v1 - invnttv v2.
+proof.
+apply KArray.ext_eq => i rgi; rewrite (polykvec_sub_iE (invnttv v1)) // /invnttv.
+by rewrite !mapiE // polykvec_sub_iE // invnttD invnttN.
+qed.
 
 op smul(v : polykvec, c : coeff) : polykvec =
    KArray.map (fun (vi : poly) => map (fun ci => c*ci) vi) v.
@@ -235,6 +273,36 @@ qed.
 lemma dotp_partial_ntt_dotp (v1 v2 : polylvec) :
   dotp_partial v1 v2 lvec = ntt_dotp v1 v2.
 proof. by rewrite /dotp_partial /ntt_dotp. qed.
+
+(* the products in the normal domain *)
+op dotp (v1 v2 : polylvec) : poly =
+  foldr (fun (i : int) (a : poly) => v1.[i] &* v2.[i] &+ a) poly_zero (iota_ 0 lvec).
+
+op mulmxv (m : polymat) (v : polylvec) : polykvec =
+  KArray.init (fun i => dotp (row m i) v).
+
+lemma invntt_ntt_dotp (v1 v2 : polylvec) :
+  invntt (ntt_dotp v1 (PolyLVec.nttv v2)) = dotp (PolyLVec.invnttv v1) v2.
+proof.
+rewrite /ntt_dotp /dotp.
+have : forall i, i \in iota_ 0 lvec => 0 <= i < lvec by move=> i /mem_iota.
+elim: (iota_ 0 lvec) => [_ | x l ih hl] /=; 1: exact invntt0.
+rewrite invnttD ih; 1: by move=> i hi; apply hl; rewrite in_cons hi.
+have hx : 0 <= x < lvec by apply hl; rewrite in_cons.
+congr; rewrite /PolyLVec.invnttv /PolyLVec.nttv !LArray.mapiE //.
+by rewrite -{1}(nttK v1.[x]) conv.
+qed.
+
+lemma invnttv_ntt_mulmxv (m : polymat) (v : polylvec) :
+  PolyKVec.invnttv (ntt_mulmxv m (PolyLVec.nttv v)) = mulmxv (invnttm m) v.
+proof.
+apply KArray.ext_eq => i hi; rewrite /PolyKVec.invnttv /ntt_mulmxv /mulmxv KArray.mapiE // !KArray.initiE //=.
+rewrite invntt_ntt_dotp; congr; apply LArray.ext_eq => j hj.
+rewrite /row /PolyLVec.invnttv LArray.mapiE // !LArray.initiE //= /invnttm KLMatrix.mapiE //.
+have : i * lvec + lvec <= kvec * lvec
+  by rewrite -(mulzDl i 1); apply StdOrder.IntOrder.ler_wpmul2r; smt(gt0_l).
+smt(gt0_l).
+qed.
 
 (* NTT/INTT cancellation + polynomial multiplication norm bound:
    invnttv(ntt_smul(ntt c)(nttv s2)) = c * s2 componentwise (convolution

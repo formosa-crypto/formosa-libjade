@@ -206,15 +206,15 @@ module MLDSA_RO_DS10(XA : DS10.POracle1, XC : DS10.POracle2, Htr : DS10.POracle3
        (c, sl) <@ SampleInBall_O(XC).sample(ct);
        ctl <- ((ct, c), sl);
        leakage <- leakage ++ [ RO ctl.`2] ;
-       cs1 <- smulvl c s1;
-       cs2 <- smulvk c s2;
+       cs1 <- psmul c s1;
+       cs2 <- psmul c s2;
        z <- y + cs1;
        r0 <- polykvec_LowBits (w - cs2);
        bz <- infnorm_lt z (gamma1 - Beta) &&
                   infnorm_lt r0 (gamma2 - Beta);
        leakage <- leakage ++ [ CheckZ bz ];
        if (bz) {
-          ct0 <- smulvk c t0;
+          ct0 <- psmul c t0;
           h <- MakeHint (PolyKVec.zerov-ct0) (w - cs2 + ct0);
           bh <- infnorm_lt ct0 gamma2 && hammw h w_hint;
           leakage <- leakage ++ [ CheckH bh ];
@@ -239,7 +239,7 @@ module MLDSA_RO_DS10(XA : DS10.POracle1, XC : DS10.POracle2, Htr : DS10.POracle3
       tr <@ Htr.get(pk);
       mu <@ Hmu.get(tr, m);
       (c,l) <@ SampleInBall_O(XC).sample(ct);
-      wapprox <- mulmxv (invnttm _A) z - smulvk c (smul t1 (incoeff (2^d)));
+      wapprox <- mulmxv (invnttm _A) z - psmul c (smul t1 (incoeff (2^d)));
       w1 <- UseHint (oget h) wapprox;
       ctp <@ Hct.get(w1, mu);
       rb <- infnorm_lt z (gamma1 - Beta);

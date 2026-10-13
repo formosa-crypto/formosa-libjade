@@ -11,83 +11,6 @@ require import MLDSA_ROSep_Hop4 MLDSA_ROSep_Hop5 MLDSA_ROSep_Hop6 MLDSA_ROSep_Ho
 
 (*************** G9: the scheme computes without the NTT ****************)
 
-(* NTT facts, pending the NTT formalization *)
-axiom ntt_invntt (p : poly) : ntt (invntt p) = p.
-axiom invntt_basemul (a b : poly) : invntt (basemul (ntt a) (ntt b)) = a &* b.
-axiom invntt_add (a b : poly) : invntt (a &+ b) = invntt a &+ invntt b.
-
-lemma invntt_zero : invntt poly_zero = poly_zero.
-proof.
-have hz : poly_zero &+ poly_zero = poly_zero
-  by apply Array256.ext_eq => i hi; rewrite poly_addE // poly_zeroE //; smt(@Zq).
-have h := invntt_add poly_zero poly_zero; rewrite hz in h.
-apply Array256.ext_eq => i hi; rewrite poly_zeroE //.
-have := congr1 (fun p : poly => p.[i]) _ _ h; rewrite /= poly_addE //.
-smt(@Zq).
-qed.
-
-lemma invntt_neg (a : poly) : invntt ((&-) a) = (&-) (invntt a).
-proof.
-have hz : a &+ (&-) a = poly_zero
-  by apply Array256.ext_eq => i hi; rewrite poly_addE // poly_negE // poly_zeroE //; smt(@Zq).
-have h := invntt_add a ((&-) a); rewrite hz invntt_zero in h.
-apply Array256.ext_eq => i hi; rewrite poly_negE //.
-have := congr1 (fun p : poly => p.[i]) _ _ h; rewrite /= poly_addE // poly_zeroE //.
-smt(@Zq).
-qed.
-
-op dotp (v1 v2 : polylvec) : poly = foldr (fun i a => v1.[i] &* v2.[i] &+ a) poly_zero (iota_ 0 lvec).
-op mulmxv (m : polymat) (v : polylvec) : polykvec = KArray.init (fun i => dotp (row m i) v).
-op smulvl (c : poly) (v : polylvec) : polylvec = LArray.map (fun p => p &* c) v.
-op smulvk (c : poly) (v : polykvec) : polykvec = KArray.map (fun p => p &* c) v.
-
-lemma invntt_foldr (v1 v2 : polylvec) (l : int list) :
-  (forall i, i \in l => 0 <= i < lvec) =>
-  invntt (foldr (fun i a => basemul v1.[i] (PolyLVec.nttv v2).[i] &+ a) poly_zero l) =
-  foldr (fun i a => (PolyLVec.invnttv v1).[i] &* v2.[i] &+ a) poly_zero l.
-proof.
-elim: l => [_ | x l ih hl] /=; 1: exact invntt_zero.
-rewrite invntt_add ih; 1: by move=> i hi; apply hl; rewrite in_cons hi.
-have hx : 0 <= x < lvec by apply hl; rewrite in_cons.
-congr; rewrite /PolyLVec.invnttv /PolyLVec.nttv !LArray.mapiE //.
-by rewrite -{1}(ntt_invntt v1.[x]) invntt_basemul.
-qed.
-
-lemma invntt_dotp (v1 v2 : polylvec) :
-  invntt (ntt_dotp v1 (PolyLVec.nttv v2)) = dotp (PolyLVec.invnttv v1) v2.
-proof. by rewrite /ntt_dotp /dotp invntt_foldr //; smt(mem_iota). qed.
-
-lemma invnttv_mulmxv (m : polymat) (v : polylvec) :
-  PolyKVec.invnttv (ntt_mulmxv m (PolyLVec.nttv v)) = mulmxv (invnttm m) v.
-proof.
-apply KArray.ext_eq => i hi; rewrite /PolyKVec.invnttv /ntt_mulmxv /mulmxv KArray.mapiE // !KArray.initiE //=.
-rewrite invntt_dotp; congr; apply LArray.ext_eq => j hj.
-rewrite /row /PolyLVec.invnttv LArray.mapiE // !LArray.initiE //= /invnttm KLMatrix.mapiE //.
-have : i * lvec + lvec <= kvec * lvec
-  by rewrite -(mulzDl i 1); apply StdOrder.IntOrder.ler_wpmul2r; smt(gt0_l).
-smt(gt0_l).
-qed.
-
-lemma invnttv_smull (c : poly) (v : polylvec) :
-  PolyLVec.invnttv (PolyLVec.ntt_smul (ntt c) (PolyLVec.nttv v)) = smulvl c v.
-proof.
-apply LArray.ext_eq => i hi.
-by rewrite /PolyLVec.invnttv /PolyLVec.ntt_smul /PolyLVec.nttv /smulvl !LArray.mapiE //= invntt_basemul.
-qed.
-
-lemma invnttv_smulk (c : poly) (v : polykvec) :
-  PolyKVec.invnttv (PolyKVec.ntt_smul (ntt c) (PolyKVec.nttv v)) = smulvk c v.
-proof.
-apply KArray.ext_eq => i hi.
-by rewrite /PolyKVec.invnttv /PolyKVec.ntt_smul /PolyKVec.nttv /smulvk !KArray.mapiE //= invntt_basemul.
-qed.
-
-lemma invnttv_sub (x y : polykvec) : PolyKVec.invnttv (x - y) = PolyKVec.invnttv x - PolyKVec.invnttv y.
-proof.
-apply KArray.ext_eq => i hi; rewrite (polykvec_sub_iE (PolyKVec.invnttv x)) // /PolyKVec.invnttv.
-by rewrite !KArray.mapiE // polykvec_sub_iE // invntt_add invntt_neg.
-qed.
-
 module MLDSA_RO_DS9(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hmu : DS5.POracle4,
                     Hct : DS5.POracle5) = {
   proc keygen() : BytesPK.t * (Bytes32.t * Bytes64.t * polylvec * polykvec * polykvec) = {
@@ -126,15 +49,15 @@ module MLDSA_RO_DS9(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
        (c, sl) <@ SampleInBall_O(XC).sample(ct);
        ctl <- ((ct, c), sl);
        leakage <- leakage ++ [ RO ctl.`2] ;
-       cs1 <- smulvl c s1;
-       cs2 <- smulvk c s2;
+       cs1 <- psmul c s1;
+       cs2 <- psmul c s2;
        z <- y + cs1;
        r0 <- polykvec_LowBits (w - cs2);
        bz <- infnorm_lt z (gamma1 - Beta) &&
                   infnorm_lt r0 (gamma2 - Beta);
        leakage <- leakage ++ [ CheckZ bz ];
        if (bz) {
-          ct0 <- smulvk c t0;
+          ct0 <- psmul c t0;
           h <- MakeHint (PolyKVec.zerov-ct0) (w - cs2 + ct0);
           bh <- infnorm_lt ct0 gamma2 && hammw h w_hint;
           leakage <- leakage ++ [ CheckH bh ];
@@ -159,7 +82,7 @@ module MLDSA_RO_DS9(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
       tr <@ Htr.get(pk);
       mu <@ Hmu.get(tr, m);
       (c,l) <@ SampleInBall_O(XC).sample(ct);
-      wapprox <- mulmxv (invnttm _A) z - smulvk c (smul t1 (incoeff (2^d)));
+      wapprox <- mulmxv (invnttm _A) z - psmul c (smul t1 (incoeff (2^d)));
       w1 <- UseHint (oget h) wapprox;
       ctp <@ Hct.get(mu, w1Encode w1);
       rb <- infnorm_lt z (gamma1 - Beta);
@@ -181,7 +104,7 @@ proc.
 call (: ={DS5.RO3.RO.m}); 1: by sim.
 wp; call (: true); 1: by sim.
 wp; rnd; rnd; call (: ={glob DS5.RO1.RO, glob XOFA_O}); 1: by sim.
-by inline *; auto => />; smt(invnttv_mulmxv).
+by inline *; auto => />; smt(invnttv_ntt_mulmxv).
 qed.
 
 equiv sign89 :
@@ -205,8 +128,8 @@ seq 1 1 : (={zh, ct, sigma, leakage, glob DS5.RO1.RO, DS5.RO2.RO.m, DS5.RO4.RO.m
   - wp; call (: ={DS5.RO2.RO.m}); 1: by sim.
     wp; call (: ={DS5.RO5.RO.m}); 1: by sim.
     wp; call (: ={RO_y.RO.m}); 1: by sim.
-    auto => /> &2 _ y; rewrite !invnttv_mulmxv /= => cl.
-    by rewrite !invnttv_smull !invnttv_smulk /=; smt().
+    auto => /> &2 _ y; rewrite !invnttv_ntt_mulmxv /= => cl.
+    by rewrite !PolyLVec.invnttv_ntt_smul !PolyKVec.invnttv_ntt_smul /=; smt().
   by auto => />.
 by if => //; wp; call (: true); [by sim | auto].
 qed.
@@ -227,7 +150,7 @@ call (: ={DS5.RO4.RO.m}); 1: by sim.
 call (: ={DS5.RO3.RO.m}); 1: by sim.
 call (: ={glob DS5.RO1.RO, glob XOFA_O}); 1: by sim.
 auto => /> &2 _ a cl.
-by rewrite invnttv_sub invnttv_mulmxv invnttv_smulk.
+by rewrite PolyKVec.invnttv_sub invnttv_ntt_mulmxv PolyKVec.invnttv_ntt_smul.
 qed.
 
 section.

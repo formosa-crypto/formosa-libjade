@@ -373,6 +373,48 @@ proof.
 by apply/Array256.ext_eq => i rgi; rewrite scaleE // poly_zeroE // ZModpRing.mulr0.
 qed.
 
+lemma Rq_addN (a : poly) : a &+ (&-) a = poly_zero.
+proof.
+by apply/Array256.ext_eq => i rgi; rewrite poly_addE // poly_negE // poly_zeroE // ZModpRing.addrN.
+qed.
+
+(* ntt and invntt are additive *)
+lemma nttD (a b : poly) : ntt (a &+ b) = ntt a &+ ntt b.
+proof.
+apply/Array256.ext_eq => j rgj; rewrite poly_addE // /ntt !initiE //= -big_split.
+by apply eq_big_int => s rgs /=; rewrite poly_addE // ZModpRing.mulrDl.
+qed.
+
+lemma invnttD (a b : poly) : invntt (a &+ b) = invntt a &+ invntt b.
+proof.
+apply/Array256.ext_eq => s rgs; rewrite poly_addE // /invntt !initiE //= -ZModpRing.mulrDr -big_split.
+by congr; apply eq_big_int => j rgj /=; rewrite poly_addE // ZModpRing.mulrDl.
+qed.
+
+lemma nttN (a : poly) : ntt ((&-) a) = (&-) (ntt a).
+proof.
+apply/Array256.ext_eq => j rgj; rewrite poly_negE // /ntt !initiE //= sumrN.
+by apply eq_big_int => s rgs /=; rewrite poly_negE // ZModpRing.mulNr.
+qed.
+
+lemma invnttN (a : poly) : invntt ((&-) a) = (&-) (invntt a).
+proof.
+apply/Array256.ext_eq => s rgs; rewrite poly_negE // /invntt !initiE //= -ZModpRing.mulrN sumrN.
+by congr; apply eq_big_int => j rgj /=; rewrite poly_negE // ZModpRing.mulNr.
+qed.
+
+lemma ntt0 : ntt poly_zero = poly_zero.
+proof.
+rewrite -{1}(scale0 zero) ntt_scale; apply/Array256.ext_eq => j rgj.
+by rewrite scaleE // poly_zeroE // ZModpRing.mul0r.
+qed.
+
+lemma invntt0 : invntt poly_zero = poly_zero.
+proof.
+rewrite -{1}(scale0 zero) invntt_scale; apply/Array256.ext_eq => j rgj.
+by rewrite scaleE // poly_zeroE // ZModpRing.mul0r.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (* The residue view of the NTT: slot j is the evaluation at             *)
 (* x_j = zroot^(nttexp j), a root of X^256 + 1, which is a ring          *)
