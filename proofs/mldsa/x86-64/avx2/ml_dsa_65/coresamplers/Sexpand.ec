@@ -366,6 +366,8 @@ hoare[ M.error_4x____write_out_8_coefficients :
   /\ to_uint res.`3 = bs2int (map saccept zs') ].
 proof.
 proc.
+(* the reduction modulo 5 is for ETA = 2 *)
+rcondf ^if; 1: by auto.
 wp; skip => &hr |> hcb szzs hnib hgo szold hbf hag.
 have szmap : size (map saccept zs) = 8 by rewrite size_map szzs.
 have hand : to_uint (good_overall{hr} `&` W64.of_int 255)
@@ -570,6 +572,8 @@ lemma error_4x__rejection_sample_multiple_blocksP (buf : W8.t Array272.t)
   ].
 proof.
 proc => /=.
+(* the reduction modulo 5, for ETA = 2, is under false conditions *)
+inline M.error_4x____reduce_coefficient.
 seq 7 : (randombytes = buf
   /\ eta_0 = VPBROADCAST_32u8 (W8.of_int 4)
   /\ bound = VPBROADCAST_32u8 (W8.of_int 9)).
@@ -906,6 +910,8 @@ lemma error_4x__rejection_sample_one_blockP (S : W8.t list) (blk : W8.t Array136
    /\ to_uint res.`2 = min 256 (size (sreject (S ++ Array136.to_list blk))) ].
 proof.
 proc.
+(* the reduction modulo 5, for ETA = 2, is under false conditions *)
+inline M.error_4x____reduce_coefficient.
 seq < ^while : (
      randombytes = blk
   /\ to_uint xof_offset <= 136
@@ -1054,7 +1060,7 @@ qed.
 lemma error_4x__rejection_sample_one_block_ll :
   islossless M.error_4x__rejection_sample_one_block.
 proof.
-proc.
+proc; inline M.error_4x____reduce_coefficient.
 while (   to_uint xof_offset <= 136
        /\ (condition_loop => to_uint xof_offset < 136))
       (136 - to_uint xof_offset).
@@ -1068,7 +1074,7 @@ qed.
 lemma error_4x__rejection_sample_multiple_blocks_ll :
   islossless M.error_4x__rejection_sample_multiple_blocks.
 proof.
-proc.
+proc; inline M.error_4x____reduce_coefficient.
 while (   to_uint xof_offset <= 272
        /\ (condition_loop => to_uint xof_offset < 272))
       (272 - to_uint xof_offset).
@@ -1552,6 +1558,9 @@ hoare[ M.sample____error_vectors :
 proof.
 move=> hok; proc.
 sp.
+(* the ML-DSA-65 layout: L = 5 *)
+rcondt 1; 1: by auto.
+rcondf ^if; 1: by conseq (: true ==> true).
 seq 5 : (rho_prime = rho_
   /\ forall r, 0 <= r < 4 => poly_of_s1 s1 r = Spoly rho_ (W16.of_int r)).
 - wp; ecall (error_4x____sample_polynomialsH rho_ (W16.of_int 0) hok).
@@ -1583,5 +1592,7 @@ lemma sample____error_vectors_ll :
   islossless M.sample____error_vectors.
 proof.
 move=> hok; have hll := error_4x____sample_polynomials_ll hok.
-by proc; wp; do 3! (call hll; wp); auto.
+proc; rcondt ^if; 1: by auto.
+rcondf ^if; 1: by conseq (: true ==> true).
+by wp; do 3! (call hll; wp); auto.
 qed.

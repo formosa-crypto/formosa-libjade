@@ -99,10 +99,8 @@ qed.
 
 lemma s1_encode_ll : islossless M.s1____encode.
 proof.
-proc.
-inline *;while (0<=i<=6) (6-i);auto; last by smt().
-conseq(_: _ ==> true);1:smt().
-while (0 <= output_offset <=  128 /\ output_offset %% 32 = 0) (128 - output_offset);  auto => /> /#.
+proc; while (0 <= i <= 6) (6 - i); 2: by auto => /#.
+by move=> z; wp; call error_polynomial_encode_ll; auto => /#.
 qed.
 
 lemma s1_encode_ph _a :
@@ -182,11 +180,8 @@ qed.
 
 lemma s1_decode_ll : islossless M.s1____decode.
 proof.
-proc.
-inline *;while (0<=i<=6) (6-i);auto; last by smt().
-conseq(_: _ ==> true);1:smt().
-while (0 <= input_offset <=  128 /\ input_offset %% 16 = 0) (128 - input_offset); 2: by auto => /> /#.
-by move => *;unroll for ^while; auto => /> /#.
+proc; while (0 <= i <= 6) (6 - i); 2: by auto => /#.
+by move=> z; wp; call error_polynomial_decode_ll; auto => /#.
 qed.
 
 lemma s1_decode_ph _a :

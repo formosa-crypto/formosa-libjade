@@ -556,14 +556,17 @@ hoare[ M.sample____mask :
 proof.
 proc.
 (* the 4x batch fills windows 0-3 and advances the separator to ds0+4 *)
-seq 7 : (rho_prime = rho_ /\ domain_separator = ds0 + W16.of_int 4
+seq 8 : (rho_prime = rho_ /\ domain_separator = ds0 + W16.of_int 4
   /\ forall r, 0 <= r < 4 =>
        poly_of_mask mask r = Mpoly rho_ (ds0 + W16.of_int r)).
 - wp; ecall (sample_mask_polynomial_4xP rho_ ds0).
   auto=> &hr |> result hres r rgr rgr2.
   do 4! (rewrite PW_1280_256.winof_write ~-1:/#).
   by move: (hres 0 _) (hres 1 _) (hres 2 _) (hres 3 _) => //#.
-(* the single lane fills window 4 and advances the separator to ds0+5 *)
+(* L = 1 (mod 4): the single lane fills window 4 and advances the separator
+   to ds0+5 *)
+rcondt 1; 1: by auto.
+rcondf ^if; 1: by auto.
 wp; ecall (sample_mask_polynomial_1xP rho_ (ds0 + W16.of_int 4)).
 auto=> &hr |> hmask r rgr rgr2.
 rewrite PW_1280_256.winof_write ~-1:/#.

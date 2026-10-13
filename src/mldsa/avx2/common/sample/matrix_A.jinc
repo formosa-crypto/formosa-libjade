@@ -34,22 +34,25 @@ namespace sample {
                 );
         }
 
-        // Fill last two elements
-        index = 28;
+        // When K * L = 2 (mod 4), one more 4-way call samples the last two
+        // elements
+        if ((ROWS_IN_MATRIX_A * COLUMNS_IN_MATRIX_A) % 4 == 2) {
+            index = ROWS_IN_MATRIX_A * COLUMNS_IN_MATRIX_A - 2;
 
-        for lane = 0 to 2 {
-            row = (index + lane) / COLUMNS_IN_MATRIX_A;
-            column = (index + lane) % COLUMNS_IN_MATRIX_A;
-            domain_separators[lane] = (row << 8) | column;
+            for lane = 0 to 2 {
+                row = (index + lane) / COLUMNS_IN_MATRIX_A;
+                column = (index + lane) % COLUMNS_IN_MATRIX_A;
+                domain_separators[lane] = (row << 8) | column;
+            }
+
+            matrix_A[(index + 0) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
+            matrix_A[(index + 1) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
+            _, _ 
+            = matrix_A::__sample_4_polynomials(
+                seed,
+                domain_separators
+            );
         }
-
-        matrix_A[(index + 0) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
-        matrix_A[(index + 1) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
-        _, _ 
-        = matrix_A::__sample_4_polynomials(
-            seed,
-            domain_separators
-        );
 
         return matrix_A;
     }

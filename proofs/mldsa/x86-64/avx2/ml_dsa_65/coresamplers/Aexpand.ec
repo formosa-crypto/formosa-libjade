@@ -1530,6 +1530,8 @@ seq  2 : (rho = rho_ /\ seed = rho).
 - auto => &hr |>; apply Array32.tP => i hi; rewrite initiE //= hi /=.
   rewrite WArray32.WArray32.get256E pack32bE 1:/# W32u8.Pack.initiE 1:/# /=.
   by rewrite /init8 WArray32.WArray32.initiE 1:/#.
+(* the two-polynomial tail: K * L = 2 (mod 4) *)
+rcondt ^if; 1: by conseq (: true ==> true).
 seq -2 : # post; last  by auto.
 cfold 1; kill -1; [by auto | sp].
 
@@ -1646,7 +1648,8 @@ lemma sample____matrix_A_ll :
   islossless M.sample____matrix_A.
 proof.
 move=> hok; have hll := matrix_A____sample_4_polynomials_ll hok.
-proc; wp; call hll.
+proc; rcondt ^if; 1: by conseq (: true ==> true).
+wp; call hll.
 while true (2 - lane); first by move=> z; auto=> /#.
 wp; while true (inc - chunk).
 - move=> z; wp; call hll.

@@ -18,9 +18,9 @@ BUILD   ?= _build
 # Jasmin emits OS-specific assembly: the .s produced here matches the host
 # (Mach-O on macOS, ELF on Linux). The x86-64 AVX2 code therefore runs on an
 # x86-64 host of the SAME OS as the one that generated the .s. On an Apple
-# Silicon Mac we can cross-assemble/link (clang -arch x86_64) but NOT execute
-# it (Rosetta lacks AVX2); the `libs` target verifies the build there, while
-# the `test-*` targets must run on an x86-64 + AVX2 host.
+# Silicon Mac the code is cross-assembled/linked (clang -arch x86_64); it
+# runs under Rosetta, which executes AVX2, from an x86-64 process (e.g. an
+# x86-64 Python for the KAT driver: `arch -x86_64 <python> tests/kat.py ...`).
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
   XARCH ?= -arch x86_64

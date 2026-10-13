@@ -18,6 +18,40 @@ fn __bytestream_to_coefficients(reg u128 bytestream) -> reg u256 {
     return coefficients;
 }
 
+// ETA = 2: the candidates 0 <= c < 15 are reduced modulo 5, eight lanes at
+// a time (the lanes hold 2 - c) or one at a time (c itself)
+inline fn __reduce_coefficients(reg u256 coefficients) -> reg u256 {
+    reg u256 multiplier quotient;
+    reg u64 temp;
+
+    temp = -6560;
+    multiplier = (256u)#VMOV(temp);
+    multiplier = #VPBROADCAST_8u32(multiplier);
+
+    quotient = #VPMULHRS_16u16(coefficients, multiplier);
+
+    temp = 5;
+    multiplier = (256u)#VMOV(temp);
+    multiplier = #VPBROADCAST_8u32(multiplier);
+    quotient = #VPMULL_16u16(quotient, multiplier);
+
+    coefficients = #VPADD_8u32(coefficients, quotient);
+
+    return coefficients;
+}
+
+inline fn __reduce_coefficient(reg u32 coefficient) -> reg u32 {
+    reg u32 quotient;
+
+    quotient = coefficient;
+    quotient *= 205;
+    quotient >>= 10;
+    quotient *= 5;
+    coefficient -= quotient;
+
+    return coefficient;
+}
+
 inline fn
 __write_out_8_coefficients(
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] error,
@@ -48,6 +82,9 @@ __write_out_8_coefficients(
 
     error_coefficients_128 = #VPSHUFB_128(coefficient_block, shuffles);
     error_coefficients = #VPMOVSX_8u8_8u32(error_coefficients_128);
+    #[inline] if (ETA == 2) {
+        error_coefficients = __reduce_coefficients(error_coefficients);
+    }
 
     error.[:u256 bytes_filled] = error_coefficients;
 
@@ -89,7 +126,7 @@ fn rejection_sample_multiple_blocks(
     eta = (256u)#VMOV(temp);
     eta = #VPBROADCAST_32u8(eta);
 
-    temp = 9;
+    temp = ERROR_REJECTION_BOUND;
     bound = (256u)#VMOV(temp);
     bound = #VPBROADCAST_32u8(bound);
 
@@ -196,9 +233,12 @@ fn rejection_sample_multiple_blocks(
         () = #declassify(coefficient);
         coefficient = #protect_32(coefficient, ms);
 
-        condition = coefficient < 9;
+        condition = coefficient < ERROR_REJECTION_BOUND;
         if (condition) {
             ms = #update_msf(condition, ms);
+            #[inline] if (ETA == 2) {
+                coefficient = __reduce_coefficient(coefficient);
+            }
             coefficient -= ETA;
             coefficient = -coefficient;
 
@@ -216,9 +256,12 @@ fn rejection_sample_multiple_blocks(
             () = #declassify(coefficient);
             coefficient = #protect_32(coefficient, ms);
 
-            condition = coefficient < 9;
+            condition = coefficient < ERROR_REJECTION_BOUND;
             if (condition) {
                 ms = #update_msf(condition, ms);
+                #[inline] if (ETA == 2) {
+                    coefficient = __reduce_coefficient(coefficient);
+                }
                 coefficient -= ETA;
                 coefficient = -coefficient;
 
@@ -278,9 +321,12 @@ fn rejection_sample_one_block(
         () = #declassify(coefficient);
         coefficient = #protect_32(coefficient, ms);
 
-        condition = coefficient < 9;
+        condition = coefficient < ERROR_REJECTION_BOUND;
         if (condition) {
             ms = #update_msf(condition, ms);
+            #[inline] if (ETA == 2) {
+                coefficient = __reduce_coefficient(coefficient);
+            }
             coefficient -= ETA;
             coefficient = -coefficient;
 
@@ -298,9 +344,12 @@ fn rejection_sample_one_block(
             () = #declassify(coefficient);
             coefficient = #protect_32(coefficient, ms);
 
-            condition = coefficient < 9;
+            condition = coefficient < ERROR_REJECTION_BOUND;
             if (condition) {
                 ms = #update_msf(condition, ms);
+                #[inline] if (ETA == 2) {
+                    coefficient = __reduce_coefficient(coefficient);
+                }
                 coefficient -= ETA;
                 coefficient = -coefficient;
 

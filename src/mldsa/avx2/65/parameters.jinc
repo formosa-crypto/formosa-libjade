@@ -9,6 +9,10 @@ param int ETA = 4;
 // For ML-DSA-44, BITS_PER_ERROR_COEFFICIENT is 4.
 param int ENCODED_ERROR_POLYNOMIAL_SIZE = 128;
 
+// Rejection sampling of the error coefficients accepts the half-bytes
+// below this bound (FIPS 204, CoeffFromHalfByte).
+param int ERROR_REJECTION_BOUND = 9;
+
 param int GAMMA1 = (1 << 19);
 param int BITS_TO_ENCODE_GAMMA1_COEFFICIENT = 20;
 

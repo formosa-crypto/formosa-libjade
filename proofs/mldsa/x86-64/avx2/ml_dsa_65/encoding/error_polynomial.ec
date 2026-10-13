@@ -94,8 +94,8 @@ qed.
 
 require import WArray1024 WArray128.
 
-lemma error_polynomial_encode _a :
-   hoare [ M.error_polynomial__encode :
+lemma error_polynomial_encode_eta4 _a :
+   hoare [ M.error_polynomial__encode_eta4 :
        polynomial = _a /\ wpoly_srng 4 4 _a
      ==>
        to_list res = BitPack (lifts_wpoly _a) Eta Eta
@@ -199,6 +199,15 @@ conseq (:
   by rewrite /(\ule) /= mldsa65_Eta /=.
 qed.
 
+lemma error_polynomial_encode _a :
+   hoare [ M.error_polynomial__encode :
+       polynomial = _a /\ wpoly_srng 4 4 _a
+     ==>
+       to_list res = BitPack (lifts_wpoly _a) Eta Eta
+       /\ valid_eta_bytes res
+   ].
+proof. by proc; rcondf 1; [auto | ecall (error_polynomial_encode_eta4 _a); auto]. qed.
+
 op error_polynomial_decode_lane(c : W4.t) : W32.t =
     ((W32.of_int 4) + (-(BS_W32_W4_U.zeroextu32 c))).
 
@@ -259,8 +268,8 @@ by rewrite initiE 1:/# /=.
 qed.
 
 
-lemma error_polynomial_decode _a :
-   hoare [ M.error_polynomial__decode :
+lemma error_polynomial_decode_eta4 _a :
+   hoare [ M.error_polynomial__decode_eta4 :
        encoded = _a /\ valid_eta_bytes _a
      ==>
        lifts_wpoly res = BitUnpack (to_list _a) Eta Eta
@@ -327,4 +336,28 @@ move=> &hr [# <- Hvalid decoded [H Hdecoded]]; split.
   rewrite /wpoly_srng allP mldsa65_Eta => w Hw /=.
   have := H; rewrite iotaredE allP => HH; have /= := HH w _; 1: by smt(mem_iota).
   by rewrite /(\sle) /= !of_sintK /smod /= /#.
+qed.
+
+lemma error_polynomial_decode _a :
+   hoare [ M.error_polynomial__decode :
+       encoded = _a /\ valid_eta_bytes _a
+     ==>
+       lifts_wpoly res = BitUnpack (to_list _a) Eta Eta
+       /\ wpoly_srng Eta Eta res
+   ].
+proof. by proc; rcondf 1; [auto | ecall (error_polynomial_decode_eta4 _a); auto]. qed.
+
+lemma error_polynomial_encode_ll : islossless M.error_polynomial__encode.
+proof.
+proc; rcondf 1; 1: by auto.
+inline *; wp.
+while (0 <= output_offset <= 128 /\ output_offset %% 32 = 0) (128 - output_offset); auto => /> /#.
+qed.
+
+lemma error_polynomial_decode_ll : islossless M.error_polynomial__decode.
+proof.
+proc; rcondf 1; 1: by auto.
+inline *; wp.
+while (0 <= input_offset <= 128 /\ input_offset %% 16 = 0) (128 - input_offset); 2: by auto => /> /#.
+by move => *; unroll for ^while; auto => /> /#.
 qed.

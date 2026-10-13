@@ -43,7 +43,8 @@ continue in a fresh session (e.g. after moving to an x86-64 + AVX2 host).
   `require "../../common/avx2/X"`→`"../common/X"`; ML-DSA `keygen`/`sign` files
   use the non-`_new` names.
 - **Architecture**: all AVX2 builds cross-compile on Apple Silicon but only
-  *run* on an x86-64 + AVX2 host (Rosetta lacks AVX2). Build locally, run there.
+  *run* on an x86-64 + AVX2 host, or under Rosetta (which executes AVX2) from
+  an x86-64 process.
 
 ## Building / running
 

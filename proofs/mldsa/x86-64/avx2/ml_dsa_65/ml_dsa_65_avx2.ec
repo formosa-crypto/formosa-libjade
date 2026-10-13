@@ -993,6 +993,21 @@ abbrev gamma1__ENCODING_SHIFTS_TABLE =
 (W256.of_int
 (-392023588615790074933092468460461382420127193604147098349862656))]).
 
+abbrev error_polynomial__ETA2_ENCODING_CONSTANTS =
+((Array5.of_list witness)
+[(W256.of_int
+ 3620324877504553054442617659003609112555889197831655080748433503200030558209
+ );
+(W256.of_int
+6809477063014005108496892811167092228318171255968858956394831878370493989120);
+(W256.of_int
+28950230901860469398263684891544233923488650320386368227458800854042216054785
+);
+(W256.of_int
+7237005605977205554490161940277891572388892260029238943406101674466895462401);
+(W256.of_int
+(-25480207347730548941657020188721492090752456717537638033530380222208))]).
+
 abbrev error_polynomial__SHIFTS =
 (W256.of_int
 107839786668602559184514066897402134367680229671084479353429526839296).
@@ -1014,8 +1029,9 @@ abbrev mODULUS_VECTOR =
 225935595421087293402315996791205668696012104344015382954355885915737415681).
 
 module M = {
-  proc error_polynomial__encode (encoded:W8.t Array128.t,
-                                 polynomial:W32.t Array256.t) : W8.t Array128.t = {
+  proc error_polynomial__encode_eta4 (encoded:W8.t Array128.t,
+                                      polynomial:W32.t Array256.t) : 
+  W8.t Array128.t = {
     var temp:W64.t;
     var shift:W256.t;
     var eta_0:W256.t;
@@ -1100,8 +1116,8 @@ module M = {
     }
     return encoded;
   }
-  proc error_polynomial__decode (decoded:W32.t Array256.t,
-                                 encoded:W8.t Array128.t) : W32.t Array256.t = {
+  proc error_polynomial__decode_eta4 (decoded:W32.t Array256.t,
+                                      encoded:W8.t Array128.t) : W32.t Array256.t = {
     var temp:W64.t;
     var mask:W256.t;
     var eta_0:W256.t;
@@ -1144,6 +1160,283 @@ module M = {
         byte_group <- (byte_group + 1);
       }
       input_offset <- (input_offset + 16);
+    }
+    return decoded;
+  }
+  proc error_polynomial__encode_eta2 (encoded:W8.t Array128.t,
+                                      polynomial:W32.t Array256.t) : 
+  W8.t Array128.t = {
+    var temp:W64.t;
+    var eta_0:W256.t;
+    var input_offset:W64.t;
+    var output_offset:W64.t;
+    var c0:W256.t;
+    var c1:W256.t;
+    var c2:W256.t;
+    var c3:W256.t;
+    var c4:W256.t;
+    var c5:W256.t;
+    var c6:W256.t;
+    var c7:W256.t;
+    var encoding_constants:W256.t;
+    var final_encoded_bytes:W8.t Array16.t;
+    final_encoded_bytes <- witness;
+    temp <- (W64.of_int 4);
+    eta_0 <- (zeroextu256 (VMOV_64 temp));
+    eta_0 <- (VPBROADCAST_8u32 (truncateu32 eta_0));
+    input_offset <- (W64.of_int 0);
+    output_offset <- (W64.of_int 0);
+    while ((input_offset \ult (W64.of_int (((256 * 32) %/ 8) - 256)))) {
+      c0 <-
+      (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+      (W64.to_uint input_offset));
+      c0 <- (VPSUB_8u32 eta_0 c0);
+      input_offset <- (input_offset + (W64.of_int 32));
+      c1 <-
+      (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+      (W64.to_uint input_offset));
+      c1 <- (VPSUB_8u32 eta_0 c1);
+      input_offset <- (input_offset + (W64.of_int 32));
+      c2 <-
+      (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+      (W64.to_uint input_offset));
+      c2 <- (VPSUB_8u32 eta_0 c2);
+      input_offset <- (input_offset + (W64.of_int 32));
+      c3 <-
+      (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+      (W64.to_uint input_offset));
+      c3 <- (VPSUB_8u32 eta_0 c3);
+      input_offset <- (input_offset + (W64.of_int 32));
+      c4 <-
+      (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+      (W64.to_uint input_offset));
+      c4 <- (VPSUB_8u32 eta_0 c4);
+      input_offset <- (input_offset + (W64.of_int 32));
+      c5 <-
+      (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+      (W64.to_uint input_offset));
+      c5 <- (VPSUB_8u32 eta_0 c5);
+      input_offset <- (input_offset + (W64.of_int 32));
+      c6 <-
+      (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+      (W64.to_uint input_offset));
+      c6 <- (VPSUB_8u32 eta_0 c6);
+      input_offset <- (input_offset + (W64.of_int 32));
+      c7 <-
+      (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+      (W64.to_uint input_offset));
+      c7 <- (VPSUB_8u32 eta_0 c7);
+      input_offset <- (input_offset + (W64.of_int 32));
+      c0 <- (VPACKUS_8u32 c0 c1);
+      c1 <- (VPACKUS_8u32 c2 c3);
+      c2 <- (VPACKUS_8u32 c4 c5);
+      c3 <- (VPACKUS_8u32 c6 c7);
+      c0 <- (VPACKUS_16u16 c0 c1);
+      c1 <- (VPACKUS_16u16 c2 c3);
+      encoding_constants <- error_polynomial__ETA2_ENCODING_CONSTANTS.[0];
+      c0 <- (VPMADDUBSW_256 c0 encoding_constants);
+      c1 <- (VPMADDUBSW_256 c1 encoding_constants);
+      c0 <- (VPACKUS_16u16 c0 c1);
+      c0 <- (VPERMQ c0 (W8.of_int 216));
+      encoding_constants <- error_polynomial__ETA2_ENCODING_CONSTANTS.[1];
+      c0 <- (VPSHUFB_256 c0 encoding_constants);
+      encoding_constants <- error_polynomial__ETA2_ENCODING_CONSTANTS.[2];
+      c0 <- (VPMADDUBSW_256 c0 encoding_constants);
+      encoding_constants <- error_polynomial__ETA2_ENCODING_CONSTANTS.[3];
+      c0 <- (VPMADDWD_256 c0 encoding_constants);
+      encoding_constants <- error_polynomial__ETA2_ENCODING_CONSTANTS.[4];
+      c0 <- (VPSHUFB_256 c0 encoding_constants);
+      encoded <-
+      (Array128.init
+      (WArray128.get8
+      (WArray128.set128_direct (WArray128.init8 (fun i => encoded.[i]))
+      (W64.to_uint output_offset) (truncateu128 c0))));
+      output_offset <- (output_offset + (W64.of_int 12));
+      encoded <-
+      (Array128.init
+      (WArray128.get8
+      (WArray128.set128_direct (WArray128.init8 (fun i => encoded.[i]))
+      (W64.to_uint output_offset) (VEXTRACTI128 c0 (W8.of_int 1)))));
+      output_offset <- (output_offset + (W64.of_int 12));
+    }
+    c0 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (W64.to_uint input_offset));
+    c0 <- (VPSUB_8u32 eta_0 c0);
+    input_offset <- (input_offset + (W64.of_int 32));
+    c1 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (W64.to_uint input_offset));
+    c1 <- (VPSUB_8u32 eta_0 c1);
+    input_offset <- (input_offset + (W64.of_int 32));
+    c2 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (W64.to_uint input_offset));
+    c2 <- (VPSUB_8u32 eta_0 c2);
+    input_offset <- (input_offset + (W64.of_int 32));
+    c3 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (W64.to_uint input_offset));
+    c3 <- (VPSUB_8u32 eta_0 c3);
+    input_offset <- (input_offset + (W64.of_int 32));
+    c4 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (W64.to_uint input_offset));
+    c4 <- (VPSUB_8u32 eta_0 c4);
+    input_offset <- (input_offset + (W64.of_int 32));
+    c5 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (W64.to_uint input_offset));
+    c5 <- (VPSUB_8u32 eta_0 c5);
+    input_offset <- (input_offset + (W64.of_int 32));
+    c6 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (W64.to_uint input_offset));
+    c6 <- (VPSUB_8u32 eta_0 c6);
+    input_offset <- (input_offset + (W64.of_int 32));
+    c7 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (W64.to_uint input_offset));
+    c7 <- (VPSUB_8u32 eta_0 c7);
+    c0 <- (VPACKUS_8u32 c0 c1);
+    c1 <- (VPACKUS_8u32 c2 c3);
+    c2 <- (VPACKUS_8u32 c4 c5);
+    c3 <- (VPACKUS_8u32 c6 c7);
+    c0 <- (VPACKUS_16u16 c0 c1);
+    c1 <- (VPACKUS_16u16 c2 c3);
+    encoding_constants <- error_polynomial__ETA2_ENCODING_CONSTANTS.[0];
+    c0 <- (VPMADDUBSW_256 c0 encoding_constants);
+    c1 <- (VPMADDUBSW_256 c1 encoding_constants);
+    c0 <- (VPACKUS_16u16 c0 c1);
+    c0 <- (VPERMQ c0 (W8.of_int 216));
+    encoding_constants <- error_polynomial__ETA2_ENCODING_CONSTANTS.[1];
+    c0 <- (VPSHUFB_256 c0 encoding_constants);
+    encoding_constants <- error_polynomial__ETA2_ENCODING_CONSTANTS.[2];
+    c0 <- (VPMADDUBSW_256 c0 encoding_constants);
+    encoding_constants <- error_polynomial__ETA2_ENCODING_CONSTANTS.[3];
+    c0 <- (VPMADDWD_256 c0 encoding_constants);
+    encoding_constants <- error_polynomial__ETA2_ENCODING_CONSTANTS.[4];
+    c0 <- (VPSHUFB_256 c0 encoding_constants);
+    encoded <-
+    (Array128.init
+    (WArray128.get8
+    (WArray128.set128_direct (WArray128.init8 (fun i => encoded.[i]))
+    (W64.to_uint output_offset) (truncateu128 c0))));
+    output_offset <- (output_offset + (W64.of_int 12));
+    final_encoded_bytes <-
+    (Array16.init
+    (WArray16.get8
+    (WArray16.set128_direct
+    (WArray16.init8 (fun i => final_encoded_bytes.[i])) 0
+    (VEXTRACTI128 c0 (W8.of_int 1)))));
+    input_offset <- (W64.of_int 0);
+    while ((input_offset \ult (W64.of_int 12))) {
+      encoded <-
+      (Array128.init
+      (WArray128.get8
+      (WArray128.set8_direct (WArray128.init8 (fun i => encoded.[i]))
+      (W64.to_uint output_offset)
+      final_encoded_bytes.[(W64.to_uint input_offset)])));
+      input_offset <- (input_offset + (W64.of_int 1));
+      output_offset <- (output_offset + (W64.of_int 1));
+    }
+    return encoded;
+  }
+  proc error_polynomial__decode_eta2 (polynomial:W32.t Array256.t,
+                                      encoded:W8.t Array128.t) : W32.t Array256.t = {
+    var eTA_BITS_MASK:int;
+    var input_offset:W64.t;
+    var out_offset:W64.t;
+    var t0:W32.t;
+    var t1:W32.t;
+    var t2:W32.t;
+    var temp:W32.t;
+    var coefficient:W32.t;
+    eTA_BITS_MASK <- ((1 `<<` 3) - 1);
+    input_offset <- (W64.of_int 0);
+    out_offset <- (W64.of_int 0);
+    while ((input_offset \ult (W64.of_int 128))) {
+      t0 <-
+      (zeroextu32 encoded.[(W64.to_uint (input_offset + (W64.of_int 0)))]);
+      t1 <-
+      (zeroextu32 encoded.[(W64.to_uint (input_offset + (W64.of_int 1)))]);
+      t2 <-
+      (zeroextu32 encoded.[(W64.to_uint (input_offset + (W64.of_int 2)))]);
+      temp <- t0;
+      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
+      coefficient <- (W32.of_int 4);
+      coefficient <- (coefficient - temp);
+      polynomial.[(W64.to_uint out_offset)] <- coefficient;
+      temp <- t0;
+      temp <- (temp `>>` (W8.of_int 3));
+      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
+      coefficient <- (W32.of_int 4);
+      coefficient <- (coefficient - temp);
+      polynomial.[(W64.to_uint (out_offset + (W64.of_int 1)))] <-
+      coefficient;
+      temp <- (t0 `>>` (W8.of_int 6));
+      temp <- (LEA_32 (((W32.of_int 4) * t1) + temp));
+      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
+      coefficient <- (W32.of_int 4);
+      coefficient <- (coefficient - temp);
+      polynomial.[(W64.to_uint (out_offset + (W64.of_int 2)))] <-
+      coefficient;
+      temp <- t1;
+      temp <- (temp `>>` (W8.of_int 1));
+      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
+      coefficient <- (W32.of_int 4);
+      coefficient <- (coefficient - temp);
+      polynomial.[(W64.to_uint (out_offset + (W64.of_int 3)))] <-
+      coefficient;
+      temp <- t1;
+      temp <- (temp `>>` (W8.of_int 4));
+      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
+      coefficient <- (W32.of_int 4);
+      coefficient <- (coefficient - temp);
+      polynomial.[(W64.to_uint (out_offset + (W64.of_int 4)))] <-
+      coefficient;
+      temp <- (t1 `>>` (W8.of_int 7));
+      temp <- (LEA_32 (((W32.of_int 2) * t2) + temp));
+      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
+      coefficient <- (W32.of_int 4);
+      coefficient <- (coefficient - temp);
+      polynomial.[(W64.to_uint (out_offset + (W64.of_int 5)))] <-
+      coefficient;
+      temp <- t2;
+      temp <- (temp `>>` (W8.of_int 2));
+      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
+      coefficient <- (W32.of_int 4);
+      coefficient <- (coefficient - temp);
+      polynomial.[(W64.to_uint (out_offset + (W64.of_int 6)))] <-
+      coefficient;
+      temp <- (t2 `>>` (W8.of_int 5));
+      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
+      coefficient <- (W32.of_int 4);
+      coefficient <- (coefficient - temp);
+      polynomial.[(W64.to_uint (out_offset + (W64.of_int 7)))] <-
+      coefficient;
+      input_offset <- (input_offset + (W64.of_int 3));
+      out_offset <- (out_offset + (W64.of_int 8));
+    }
+    return polynomial;
+  }
+  proc error_polynomial__encode (encoded:W8.t Array128.t,
+                                 polynomial:W32.t Array256.t) : W8.t Array128.t = {
+    
+    if ((4 = 2)) {
+      encoded <@ error_polynomial__encode_eta2 (encoded, polynomial);
+    } else {
+      encoded <@ error_polynomial__encode_eta4 (encoded, polynomial);
+    }
+    return encoded;
+  }
+  proc error_polynomial__decode (decoded:W32.t Array256.t,
+                                 encoded:W8.t Array128.t) : W32.t Array256.t = {
+    
+    if ((4 = 2)) {
+      decoded <@ error_polynomial__decode_eta2 (decoded, encoded);
+    } else {
+      decoded <@ error_polynomial__decode_eta4 (decoded, encoded);
     }
     return decoded;
   }
@@ -14884,6 +15177,30 @@ module M = {
     coefficients <- (VPAND_256 coefficients mask);
     return coefficients;
   }
+  proc error_4x____reduce_coefficients (coefficients:W256.t) : W256.t = {
+    var temp:W64.t;
+    var multiplier:W256.t;
+    var quotient:W256.t;
+    temp <- (W64.of_int (- 6560));
+    multiplier <- (zeroextu256 (VMOV_64 temp));
+    multiplier <- (VPBROADCAST_8u32 (truncateu32 multiplier));
+    quotient <- (VPMULHRS_16u16 coefficients multiplier);
+    temp <- (W64.of_int 5);
+    multiplier <- (zeroextu256 (VMOV_64 temp));
+    multiplier <- (VPBROADCAST_8u32 (truncateu32 multiplier));
+    quotient <- (VPMULL_16u16 quotient multiplier);
+    coefficients <- (VPADD_8u32 coefficients quotient);
+    return coefficients;
+  }
+  proc error_4x____reduce_coefficient (coefficient:W32.t) : W32.t = {
+    var quotient:W32.t;
+    quotient <- coefficient;
+    quotient <- (quotient * (W32.of_int 205));
+    quotient <- (quotient `>>` (W8.of_int 10));
+    quotient <- (quotient * (W32.of_int 5));
+    coefficient <- (coefficient - quotient);
+    return coefficient;
+  }
   proc error_4x____write_out_8_coefficients (error:W32.t Array256.t,
                                              bytes_filled:W64.t,
                                              good_overall:W64.t,
@@ -14914,6 +15231,11 @@ module M = {
     error_coefficients_128 <- (VPSHUFB_128 coefficient_block shuffles);
     error_coefficients <-
     (VPMOVSX_8u8_8u32 (truncateu64 error_coefficients_128));
+    if ((4 = 2)) {
+      error_coefficients <@ error_4x____reduce_coefficients (error_coefficients);
+    } else {
+      
+    }
     error <-
     (Array256.init
     (WArray1024.get32
@@ -15045,6 +15367,11 @@ module M = {
       condition <- (coefficient \ult (W32.of_int 9));
       if (condition) {
         ms <- (update_msf condition ms);
+        if ((4 = 2)) {
+          coefficient <@ error_4x____reduce_coefficient (coefficient);
+        } else {
+          
+        }
         coefficient <- (coefficient - (W32.of_int 4));
         coefficient <- (- coefficient);
         error.[(W64.to_uint filled)] <- coefficient;
@@ -15062,6 +15389,11 @@ module M = {
         condition <- (coefficient \ult (W32.of_int 9));
         if (condition) {
           ms <- (update_msf condition ms);
+          if ((4 = 2)) {
+            coefficient <@ error_4x____reduce_coefficient (coefficient);
+          } else {
+            
+          }
           coefficient <- (coefficient - (W32.of_int 4));
           coefficient <- (- coefficient);
           error.[(W64.to_uint filled)] <- coefficient;
@@ -15114,6 +15446,11 @@ module M = {
       condition <- (coefficient \ult (W32.of_int 9));
       if (condition) {
         ms <- (update_msf condition ms);
+        if ((4 = 2)) {
+          coefficient <@ error_4x____reduce_coefficient (coefficient);
+        } else {
+          
+        }
         coefficient <- (coefficient - (W32.of_int 4));
         coefficient <- (- coefficient);
         error.[(W64.to_uint filled)] <- coefficient;
@@ -15131,6 +15468,11 @@ module M = {
         condition <- (coefficient \ult (W32.of_int 9));
         if (condition) {
           ms <- (update_msf condition ms);
+          if ((4 = 2)) {
+            coefficient <@ error_4x____reduce_coefficient (coefficient);
+          } else {
+            
+          }
           coefficient <- (coefficient - (W32.of_int 4));
           coefficient <- (- coefficient);
           error.[(W64.to_uint filled)] <- coefficient;
@@ -15368,82 +15710,191 @@ module M = {
     var s1:W32.t Array1280.t;
     var s2:W32.t Array1536.t;
     var  _0:W32.t Array256.t;
+    var  _1:W32.t Array256.t;
      _0 <- witness;
+     _1 <- witness;
     s1 <- witness;
     s2 <- witness;
-    (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
-    (W16.of_int 0));
-    s1 <-
-    (Array1280.init
-    (fun i => (if ((256 * 0) <= i < ((256 * 0) + 256)) then aux.[(i -
-                                                                 (256 * 0))] else 
-              s1.[i]))
-    );
-    s1 <-
-    (Array1280.init
-    (fun i => (if ((256 * 1) <= i < ((256 * 1) + 256)) then aux_0.[(i -
-                                                                   (256 * 1))] else 
-              s1.[i]))
-    );
-    s1 <-
-    (Array1280.init
-    (fun i => (if ((256 * 2) <= i < ((256 * 2) + 256)) then aux_1.[(i -
-                                                                   (256 * 2))] else 
-              s1.[i]))
-    );
-    s1 <-
-    (Array1280.init
-    (fun i => (if ((256 * 3) <= i < ((256 * 3) + 256)) then aux_2.[(i -
-                                                                   (256 * 3))] else 
-              s1.[i]))
-    );
-    (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
-    (W16.of_int 4));
-    s1 <-
-    (Array1280.init
-    (fun i => (if ((256 * 4) <= i < ((256 * 4) + 256)) then aux.[(i -
-                                                                 (256 * 4))] else 
-              s1.[i]))
-    );
-    s2 <-
-    (Array1536.init
-    (fun i => (if ((256 * 0) <= i < ((256 * 0) + 256)) then aux_0.[(i -
+    if ((5 = 5)) {
+      (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
+      (W16.of_int 0));
+      s1 <-
+      (Array1280.init
+      (fun i => (if ((256 * 0) <= i < ((256 * 0) + 256)) then aux.[(i -
                                                                    (256 * 0))] else 
-              s2.[i]))
-    );
-    s2 <-
-    (Array1536.init
-    (fun i => (if ((256 * 1) <= i < ((256 * 1) + 256)) then aux_1.[(i -
-                                                                   (256 * 1))] else 
-              s2.[i]))
-    );
-    s2 <-
-    (Array1536.init
-    (fun i => (if ((256 * 2) <= i < ((256 * 2) + 256)) then aux_2.[(i -
-                                                                   (256 * 2))] else 
-              s2.[i]))
-    );
-    (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
-    (W16.of_int 8));
-    s2 <-
-    (Array1536.init
-    (fun i => (if ((256 * 3) <= i < ((256 * 3) + 256)) then aux.[(i -
-                                                                 (256 * 3))] else 
-              s2.[i]))
-    );
-    s2 <-
-    (Array1536.init
-    (fun i => (if ((256 * 4) <= i < ((256 * 4) + 256)) then aux_0.[(i -
+                s1.[i]))
+      );
+      s1 <-
+      (Array1280.init
+      (fun i => (if ((256 * 1) <= i < ((256 * 1) + 256)) then aux_0.[
+                                                              (i - (256 * 1))] else 
+                s1.[i]))
+      );
+      s1 <-
+      (Array1280.init
+      (fun i => (if ((256 * 2) <= i < ((256 * 2) + 256)) then aux_1.[
+                                                              (i - (256 * 2))] else 
+                s1.[i]))
+      );
+      s1 <-
+      (Array1280.init
+      (fun i => (if ((256 * 3) <= i < ((256 * 3) + 256)) then aux_2.[
+                                                              (i - (256 * 3))] else 
+                s1.[i]))
+      );
+      (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
+      (W16.of_int 4));
+      s1 <-
+      (Array1280.init
+      (fun i => (if ((256 * 4) <= i < ((256 * 4) + 256)) then aux.[(i -
                                                                    (256 * 4))] else 
-              s2.[i]))
-    );
-    s2 <-
-    (Array1536.init
-    (fun i => (if ((256 * 5) <= i < ((256 * 5) + 256)) then aux_1.[(i -
+                s1.[i]))
+      );
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 0) <= i < ((256 * 0) + 256)) then aux_0.[
+                                                              (i - (256 * 0))] else 
+                s2.[i]))
+      );
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 1) <= i < ((256 * 1) + 256)) then aux_1.[
+                                                              (i - (256 * 1))] else 
+                s2.[i]))
+      );
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 2) <= i < ((256 * 2) + 256)) then aux_2.[
+                                                              (i - (256 * 2))] else 
+                s2.[i]))
+      );
+      (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
+      (W16.of_int 8));
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 3) <= i < ((256 * 3) + 256)) then aux.[(i -
+                                                                   (256 * 3))] else 
+                s2.[i]))
+      );
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 4) <= i < ((256 * 4) + 256)) then aux_0.[
+                                                              (i - (256 * 4))] else 
+                s2.[i]))
+      );
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 5) <= i < ((256 * 5) + 256)) then aux_1.[
+                                                              (i - (256 * 5))] else 
+                s2.[i]))
+      );
+       _0 <- aux_2;
+    } else {
+      
+    }
+    if ((5 = 7)) {
+      (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
+      (W16.of_int 0));
+      s1 <-
+      (Array1280.init
+      (fun i => (if ((256 * 0) <= i < ((256 * 0) + 256)) then aux.[(i -
+                                                                   (256 * 0))] else 
+                s1.[i]))
+      );
+      s1 <-
+      (Array1280.init
+      (fun i => (if ((256 * 1) <= i < ((256 * 1) + 256)) then aux_0.[
+                                                              (i - (256 * 1))] else 
+                s1.[i]))
+      );
+      s1 <-
+      (Array1280.init
+      (fun i => (if ((256 * 2) <= i < ((256 * 2) + 256)) then aux_1.[
+                                                              (i - (256 * 2))] else 
+                s1.[i]))
+      );
+      s1 <-
+      (Array1280.init
+      (fun i => (if ((256 * 3) <= i < ((256 * 3) + 256)) then aux_2.[
+                                                              (i - (256 * 3))] else 
+                s1.[i]))
+      );
+      (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
+      (W16.of_int 4));
+      s1 <-
+      (Array1280.init
+      (fun i => (if ((256 * 4) <= i < ((256 * 4) + 256)) then aux.[(i -
+                                                                   (256 * 4))] else 
+                s1.[i]))
+      );
+      s1 <-
+      (Array1280.init
+      (fun i => (if ((256 * 5) <= i < ((256 * 5) + 256)) then aux_0.[
+                                                              (i - (256 * 5))] else 
+                s1.[i]))
+      );
+      s1 <-
+      (Array1280.init
+      (fun i => (if ((256 * 6) <= i < ((256 * 6) + 256)) then aux_1.[
+                                                              (i - (256 * 6))] else 
+                s1.[i]))
+      );
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 0) <= i < ((256 * 0) + 256)) then aux_2.[
+                                                              (i - (256 * 0))] else 
+                s2.[i]))
+      );
+      (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
+      (W16.of_int 8));
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 1) <= i < ((256 * 1) + 256)) then aux.[(i -
+                                                                   (256 * 1))] else 
+                s2.[i]))
+      );
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 2) <= i < ((256 * 2) + 256)) then aux_0.[
+                                                              (i - (256 * 2))] else 
+                s2.[i]))
+      );
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 3) <= i < ((256 * 3) + 256)) then aux_1.[
+                                                              (i - (256 * 3))] else 
+                s2.[i]))
+      );
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 4) <= i < ((256 * 4) + 256)) then aux_2.[
+                                                              (i - (256 * 4))] else 
+                s2.[i]))
+      );
+      (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
+      (W16.of_int 12));
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 5) <= i < ((256 * 5) + 256)) then aux.[(i -
                                                                    (256 * 5))] else 
-              s2.[i]))
-    );
-     _0 <- aux_2;
+                s2.[i]))
+      );
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 6) <= i < ((256 * 6) + 256)) then aux_0.[
+                                                              (i - (256 * 6))] else 
+                s2.[i]))
+      );
+      s2 <-
+      (Array1536.init
+      (fun i => (if ((256 * 7) <= i < ((256 * 7) + 256)) then aux_1.[
+                                                              (i - (256 * 7))] else 
+                s2.[i]))
+      );
+       _1 <- aux_2;
+    } else {
+      
+    }
     return (s1, s2);
   }
   proc sample____matrix_A (rho:W8.t Array32.t) : W32.t Array7680.t = {
@@ -15510,29 +15961,33 @@ module M = {
       );
       chunk <- (chunk + 1);
     }
-    index <- 28;
-    lane <- 0;
-    while ((lane < 2)) {
-      row <- ((index + lane) %/ 5);
-      column <- ((index + lane) %% 5);
-      domain_separators.[lane] <-
-      (truncateu16 ((W256.of_int (row `<<` 8)) `|` (W256.of_int column)));
-      lane <- (lane + 1);
+    if ((((6 * 5) %% 4) = 2)) {
+      index <- ((6 * 5) - 2);
+      lane <- 0;
+      while ((lane < 2)) {
+        row <- ((index + lane) %/ 5);
+        column <- ((index + lane) %% 5);
+        domain_separators.[lane] <-
+        (truncateu16 ((W256.of_int (row `<<` 8)) `|` (W256.of_int column)));
+        lane <- (lane + 1);
+      }
+      (aux, aux_0, aux_1, aux_2) <@ matrix_A____sample_4_polynomials (
+      seed, domain_separators);
+      matrix_A <-
+      (Array7680.init
+      (fun i => (if (((index + 0) * 256) <= i < (((index + 0) * 256) + 256)) then 
+                aux.[(i - ((index + 0) * 256))] else matrix_A.[i]))
+      );
+      matrix_A <-
+      (Array7680.init
+      (fun i => (if (((index + 1) * 256) <= i < (((index + 1) * 256) + 256)) then 
+                aux_0.[(i - ((index + 1) * 256))] else matrix_A.[i]))
+      );
+       _0 <- aux_1;
+       _1 <- aux_2;
+    } else {
+      
     }
-    (aux, aux_0, aux_1, aux_2) <@ matrix_A____sample_4_polynomials (seed,
-    domain_separators);
-    matrix_A <-
-    (Array7680.init
-    (fun i => (if (((index + 0) * 256) <= i < (((index + 0) * 256) + 256)) then 
-              aux.[(i - ((index + 0) * 256))] else matrix_A.[i]))
-    );
-    matrix_A <-
-    (Array7680.init
-    (fun i => (if (((index + 1) * 256) <= i < (((index + 1) * 256) + 256)) then 
-              aux_0.[(i - ((index + 1) * 256))] else matrix_A.[i]))
-    );
-     _0 <- aux_1;
-     _1 <- aux_2;
     return matrix_A;
   }
   proc __keygen_prf (prf_output:W8.t Array128.t, randomness:W8.t Array32.t) : 
@@ -15706,6 +16161,8 @@ module M = {
     var aux_1:W32.t Array256.t;
     var aux_2:W32.t Array256.t;
     var mask:W32.t Array1280.t;
+    var  _0:W32.t Array256.t;
+     _0 <- witness;
     mask <- witness;
     (aux, aux_0, aux_1, aux_2) <@ __sample_mask_polynomial_4x (rho_prime,
     domain_separator);
@@ -15734,17 +16191,47 @@ module M = {
               mask.[i]))
     );
     domain_separator <- (domain_separator + (W16.of_int 4));
-    aux <@ __sample_mask_polynomial_1x ((Array256.init
-                                        (fun i => mask.[(((256 * 32) %/ 8) +
-                                                        i)])
-                                        ),
-    rho_prime, domain_separator);
-    mask <-
-    (Array1280.init
-    (fun i => (if (((256 * 32) %/ 8) <= i < (((256 * 32) %/ 8) + 256)) then 
-              aux.[(i - ((256 * 32) %/ 8))] else mask.[i]))
-    );
-    domain_separator <- (domain_separator + (W16.of_int 1));
+    if (((5 %% 4) = 1)) {
+      aux <@ __sample_mask_polynomial_1x ((Array256.init
+                                          (fun i => mask.[(((256 * 32) %/ 8) +
+                                                          i)])
+                                          ),
+      rho_prime, domain_separator);
+      mask <-
+      (Array1280.init
+      (fun i => (if (((256 * 32) %/ 8) <= i < (((256 * 32) %/ 8) + 256)) then 
+                aux.[(i - ((256 * 32) %/ 8))] else mask.[i]))
+      );
+      domain_separator <- (domain_separator + (W16.of_int 1));
+    } else {
+      
+    }
+    if (((5 %% 4) = 3)) {
+      (aux, aux_0, aux_1, aux_2) <@ __sample_mask_polynomial_4x (rho_prime,
+      domain_separator);
+      mask <-
+      (Array1280.init
+      (fun i => (if ((256 * 4) <= i < ((256 * 4) + 256)) then aux.[(i -
+                                                                   (256 * 4))] else 
+                mask.[i]))
+      );
+      mask <-
+      (Array1280.init
+      (fun i => (if ((256 * 5) <= i < ((256 * 5) + 256)) then aux_0.[
+                                                              (i - (256 * 5))] else 
+                mask.[i]))
+      );
+      mask <-
+      (Array1280.init
+      (fun i => (if ((256 * 6) <= i < ((256 * 6) + 256)) then aux_1.[
+                                                              (i - (256 * 6))] else 
+                mask.[i]))
+      );
+       _0 <- aux_2;
+      domain_separator <- (domain_separator + (W16.of_int 3));
+    } else {
+      
+    }
     return (mask, domain_separator);
   }
   proc commitment____encode_polynomial (encoded:W8.t Array128.t,
