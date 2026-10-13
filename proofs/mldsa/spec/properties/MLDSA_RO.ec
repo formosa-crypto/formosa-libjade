@@ -636,3 +636,173 @@ seq 2 : (ok (BytesCT.to_list rho) /\ 0 <= pos /\ 0 <= i /\ i < 256 /\ 256 - i = 
 - by hoare; wp; inline ReadByte(H).read; wp; call (: true); auto => /> /#.
 by [].
 qed.
+
+(* -------------------------------------------------------------------- *)
+(* RejNTTPoly and ExpandA terminate over any byte oracle with the same   *)
+(* three properties.  A candidate whose third byte is zero is accepted   *)
+(* (CoeffFromThreeBytes_hi0), and an unknown third byte is zero with     *)
+(* probability at least 1/256.                                           *)
+
+(* the known bytes of r: below B, or already read (before position p) *)
+op known_before ['g] (known : 'g -> W8.t list * int -> bool) (g : 'g) (r : W8.t list)
+                     (B p : int) =
+  forall c, known g (r, c) => c < B \/ c < p.
+
+(* acceptances left, weighted, plus the candidates left before the next *)
+(* unknown third byte                                                   *)
+op rej_variant ['g] (known : 'g -> W8.t list * int -> bool) (g : 'g) (r : W8.t list)
+                    (B j p : int) =
+  if 256 <= j then 0
+  else (256 - j) * (max B 3 + 1)
+       + (if known g (r, p + 2) then max B (p + 3) - p else 0).
+
+lemma RejNTTPoly_ll (G <: Oracle {-XOFA_O}) (known : glob G -> W8.t list * int -> bool) :
+     islossless G.get
+  => (forall (g0 : glob G) (x : W8.t list * int),
+        hoare [G.get : glob G = g0 /\ arg = x ==>
+                 forall c, known (glob G) (x.`1, c) <=> known g0 (x.`1, c) \/ c = x.`2])
+  => (forall (g0 : glob G) (x : W8.t list * int), !known g0 x =>
+        phoare [G.get : glob G = g0 /\ arg = x ==> res = W8.zero] >= (1%r / 256%r))
+  => (forall (g : glob G) r, exists B, forall c, known g (r, c) => c < B)
+  => islossless RejNTTPoly(XOFA_O(G)).sample.
+proof.
+move=> G_ll G_kn G_fr G_fin.
+(* next reads the three bytes at pos, pos + 1 and pos + 2 *)
+have next_h : forall (g0 : glob G) s p,
+  hoare [XOFA_O(G).next : glob G = g0 /\ XOFA_O.seed = s /\ XOFA_O.pos = p ==>
+           XOFA_O.seed = s /\ XOFA_O.pos = p + 3 /\
+           forall c, known (glob G) (Bytes34.to_list s, c) <=>
+                     known g0 (Bytes34.to_list s, c) \/ p <= c < p + 3].
+- move=> g0 s p; proc; wp.
+  seq 1 : (XOFA_O.seed = s /\ XOFA_O.pos = p /\
+           forall c, known (glob G) (Bytes34.to_list s, c) <=>
+                     known g0 (Bytes34.to_list s, c) \/ c = p).
+  + by ecall (G_kn g0 (Bytes34.to_list s, p)); skip => />.
+  seq 1 : (XOFA_O.seed = s /\ XOFA_O.pos = p /\
+           forall c, known (glob G) (Bytes34.to_list s, c) <=>
+                     known g0 (Bytes34.to_list s, c) \/ p <= c < p + 2).
+  + exlim (glob G) => g1; ecall (G_kn g1 (Bytes34.to_list s, p + 1)).
+    by skip => &hr [<- [-> [-> hk]]] /= G1 hk1 c; rewrite hk1 hk /#.
+  exlim (glob G) => g2; ecall (G_kn g2 (Bytes34.to_list s, p + 2)).
+  by skip => &hr [<- [-> [-> hk]]] /= G2 hk2 c; rewrite hk2 hk /#.
+have next_ll : islossless XOFA_O(G).next by proc; wp; do 3! call G_ll; auto.
+have next_ph : forall (g0 : glob G) s p,
+  phoare [XOFA_O(G).next : glob G = g0 /\ XOFA_O.seed = s /\ XOFA_O.pos = p ==>
+           XOFA_O.seed = s /\ XOFA_O.pos = p + 3 /\
+           forall c, known (glob G) (Bytes34.to_list s, c) <=>
+                     known g0 (Bytes34.to_list s, c) \/ p <= c < p + 3] = 1%r.
+- by move=> g0 s p; conseq next_ll (next_h g0 s p).
+(* an unknown third byte is zero with probability at least 1/256 *)
+have next_fr : forall (g0 : glob G) s p, !known g0 (Bytes34.to_list s, p + 2) =>
+  phoare [XOFA_O(G).next : glob G = g0 /\ XOFA_O.seed = s /\ XOFA_O.pos = p ==>
+            Bytes3."_.[_]" res 2 = W8.zero] >= (1%r / 256%r).
+- move=> g0 s p hkn; proc; wp.
+  seq 2 : (XOFA_O.seed = s /\ XOFA_O.pos = p /\ !known (glob G) (Bytes34.to_list s, p + 2))
+          1%r (1%r / 256%r) 0%r 0%r.
+  + by call (: true); call (: true); auto.
+  + have keep : forall (x : W8.t list * int) c, x.`2 <> c =>
+      phoare [G.get : arg = x /\ !known (glob G) (x.`1, c) ==> !known (glob G) (x.`1, c)]
+      = 1%r.
+    * move=> x c hc; exlim (glob G) => g.
+      conseq G_ll (_ : g = glob G /\ arg = x /\ !known (glob G) (x.`1, c)
+                       ==> !known (glob G) (x.`1, c)) => //.
+      conseq (G_kn g x) => // &hr [<- [_ hk]] G1 h.
+      by move: (h c); rewrite (negbTE _ hk) /#.
+    conseq (_ : _ ==> _ : = 1%r) => //.
+    call (keep (Bytes34.to_list s, p + 1) (p + 2) _); 1: smt().
+    call (keep (Bytes34.to_list s, p) (p + 2) _); 1: smt().
+    by skip => &hr [-> [-> ->]] /=; rewrite hkn.
+  + exlim (glob G) => g2.
+    case @[ambient]: (known g2 (Bytes34.to_list s, p + 2)) => hk2.
+    * conseq (_ : false ==> _) => //; 1: by move=> &hr [<- [_ [_ h]]].
+      by exfalso => _; smt().
+    call (: glob G = g2 /\ arg = (Bytes34.to_list s, p + 2) ==> res = W8.zero).
+    * by apply (G_fr g2 _ hk2).
+    by skip => &hr [<- [-> [-> _]]].
+  + by conseq (_ : _ ==> _ : >= 0%r) => //; exfalso => _; smt().
+  by move=> &hr _; smt().
+have next_fr' : forall (g0 : glob G) s p, !known g0 (Bytes34.to_list s, p + 2) =>
+  phoare [XOFA_O(G).next : glob G = g0 /\ XOFA_O.seed = s /\ XOFA_O.pos = p ==>
+           Bytes3."_.[_]" res 2 = W8.zero /\ XOFA_O.seed = s /\ XOFA_O.pos = p + 3 /\
+           forall c, known (glob G) (Bytes34.to_list s, c) <=>
+                     known g0 (Bytes34.to_list s, c) \/ p <= c < p + 3]
+  >= (1%r / 256%r).
+- by move=> g0 s p hk; conseq (next_fr g0 s p hk) (next_h g0 s p).
+proc; inline XOFA_O(G).init; sp.
+exlim (glob G), XOFA_O.seed => g0 s0.
+have [B hB] := G_fin g0 (Bytes34.to_list s0).
+(* reading a candidate keeps the known bytes below B or read *)
+have kb_step : forall (g g' : glob G) p,
+     known_before known g (Bytes34.to_list s0) B p
+  => (forall c, known g' (Bytes34.to_list s0, c) <=>
+                known g (Bytes34.to_list s0, c) \/ p <= c < p + 3)
+  => known_before known g' (Bytes34.to_list s0) B (p + 3).
+- by move=> g g' p h hk c /hk [/h /# | /#].
+conseq (_ : XOFA_O.seed = s0 /\ 0 <= XOFA_O.pos /\ 0 <= j
+            /\ known_before known (glob G) (Bytes34.to_list s0) B XOFA_O.pos ==> _).
+- by move=> &hr /> *; left; apply hB.
+while (XOFA_O.seed = s0 /\ 0 <= XOFA_O.pos /\ 0 <= j
+       /\ known_before known (glob G) (Bytes34.to_list s0) B XOFA_O.pos)
+      (rej_variant known (glob G) (Bytes34.to_list s0) B j XOFA_O.pos)
+      (256 * (max B 3 + 1) + max B 3) (1%r / 256%r).
+- by [].
+- by [].
+- move=> &hr G0 pos j0 [_ [hp [hj hkb]]]; rewrite /rej_variant.
+  case: (256 <= j0) => /= hj0; 1: smt().
+  case: (known G0 (Bytes34.to_list s0, pos + 2)) => hk; 2: smt().
+  by have := hkb _ hk; smt().
+- move=> hw.
+  seq 3 : (XOFA_O.seed = s0 /\ 0 <= XOFA_O.pos /\ 0 <= j
+           /\ known_before known (glob G) (Bytes34.to_list s0) B XOFA_O.pos).
+  + by wp; call (: true); auto.
+  + wp; exlim (glob G), XOFA_O.pos => gg pp; call (next_ph gg s0 pp).
+    auto => &hr [[-> ->] [[-> [hp [hj hkb]]] _]] /= r G1 p' [-> hk].
+    by have h := kb_step _ _ _ hkb hk; smt().
+  + by apply hw.
+  + hoare; wp; exlim (glob G), XOFA_O.pos => gg pp; call (next_h gg s0 pp).
+    auto => &hr [[-> ->] [[-> [hp [hj hkb]]] _]] /= r G1 p' [-> hk].
+    by have h := kb_step _ _ _ hkb hk; smt().
+  by [].
+- wp; exlim (glob G), XOFA_O.pos => gg pp; call (next_ph gg s0 pp).
+  auto => &hr [[-> ->] [[-> [hp [hj hkb]]] _]] /= r G1 p' [-> hk].
+  by have h := kb_step _ _ _ hkb hk; smt().
+split; 1: smt().
+move=> z; case (known (glob G) (Bytes34.to_list s0, XOFA_O.pos + 2)).
+(* a known third byte: the candidate is deterministic, and either it is *)
+(* accepted or the next candidate is one step closer to unknown bytes   *)
+- conseq (_ : _ ==> _ : = 1%r); 1: by move=> &hr; smt().
+  wp; exlim (glob G), XOFA_O.pos => gg pp; call (next_ph gg s0 pp).
+  auto => &hr [[-> ->] [[[-> [hp [hj hkb]]] [hj256 hv]] hk2]] /= r G1 p' [-> hk].
+  have hB2 : XOFA_O.pos{hr} + 2 < B by have := hkb _ hk2; smt().
+  have h5 : known G1 (Bytes34.to_list s0, XOFA_O.pos{hr} + 3 + 2) => XOFA_O.pos{hr} + 5 < B.
+  + by move=> /hk [/hkb | ]; smt().
+  by move: hv; rewrite /rej_variant hk2 /= ifF 1:/# => <-; smt().
+(* an unknown third byte: zero with probability >= 1/256, then accepted *)
+wp; exlim (glob G), XOFA_O.pos => gg pp.
+case @[ambient]: (known gg (Bytes34.to_list s0, pp + 2)) => hkn.
+- conseq (_ : false ==> _) => //.
+  + by move=> &hr [[<- <-] [_ h]]; move: h; rewrite hkn.
+  by exfalso => _; smt().
+call (next_fr' gg s0 pp hkn).
+auto => &hr [[-> ->] [[[-> [hp [hj hkb]]] [hj256 hv]] hk2]] /= r G1 p' [hr2 [-> hk]].
+rewrite hr2 ifT; 1: by apply CoeffFromThreeBytes_hi0.
+have h5 : known G1 (Bytes34.to_list s0, XOFA_O.pos{hr} + 3 + 2) => XOFA_O.pos{hr} + 5 < B.
+- by move=> /hk [/hkb | ]; smt().
+by move: hv; rewrite /rej_variant (negbTE _ hk2) /= => <-; smt().
+qed.
+
+lemma ExpandA_ll (G <: Oracle {-XOFA_O}) (known : glob G -> W8.t list * int -> bool) :
+     islossless G.get
+  => (forall (g0 : glob G) (x : W8.t list * int),
+        hoare [G.get : glob G = g0 /\ arg = x ==>
+                 forall c, known (glob G) (x.`1, c) <=> known g0 (x.`1, c) \/ c = x.`2])
+  => (forall (g0 : glob G) (x : W8.t list * int), !known g0 x =>
+        phoare [G.get : glob G = g0 /\ arg = x ==> res = W8.zero] >= (1%r / 256%r))
+  => (forall (g : glob G) r, exists B, forall c, known g (r, c) => c < B)
+  => islossless ExpandA(XOFA_O(G)).sample.
+proof.
+move=> G_ll G_kn G_fr G_fin; have rej_ll := RejNTTPoly_ll G known G_ll G_kn G_fr G_fin.
+proc; while true (kvec - r); 2: by auto => /#.
+move=> z; wp; while true (lvec - s); 2: by auto => /#.
+by move=> z'; wp; call rej_ll; auto => /#.
+qed.

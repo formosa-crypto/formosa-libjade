@@ -31,6 +31,13 @@ op CoeffFromThreeBytes(b0 b1 b2 : W8.t) : int option =
    let z = 2^16*to_uint b2 + 2^8 * to_uint b1 + to_uint b0 in
    if z < q then Some z else None.
 
+(* a candidate with a zero high byte is below 2^16 < q, hence accepted *)
+lemma CoeffFromThreeBytes_hi0 (b0 b1 : W8.t) : CoeffFromThreeBytes b0 b1 W8.zero <> None.
+proof.
+rewrite /CoeffFromThreeBytes /=.
+by rewrite ifT //; have := W8.to_uint_cmp b0; have := W8.to_uint_cmp b1; smt().
+qed.
+
 op CoeffFromHalfByte(b : int) : int option =
    if Eta = 2 && b < 15 
    then Some (2 - (b %% 5))

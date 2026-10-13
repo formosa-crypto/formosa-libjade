@@ -705,8 +705,19 @@ qed.
 lemma RO1_get_ll : islossless DS2.RO1.RO.get.
 proof. by islossless; apply dlist_ll; apply W8.dword_ll. qed.
 
-(* Termination of ExpandA over the random oracle is assumed *)
-axiom expandA_ll : islossless ExpandA(XOFA_O(DS2.RO2.RO)).sample.
+(* ExpandA terminates over the random oracle (MLDSA_RO.ExpandA_ll): a byte
+   is known once queried, and an unknown byte is a fresh uniform one *)
+lemma expandA_ll : islossless ExpandA(XOFA_O(DS2.RO2.RO)).sample.
+proof.
+have RO2_get_ll : islossless DS2.RO2.RO.get by islossless; apply W8.dword_ll.
+apply (ExpandA_ll DS2.RO2.RO (fun (m : (W8.t list * int, W8.t) fmap) x => x \in m) RO2_get_ll).
+- move=> g0 x; proc; auto => />.
+  by move=> r _; split => hx c; rewrite ?mem_set; smt().
+- move=> g0 x hx; proc; rcondt 2; 1: by auto.
+  wp; rnd (pred1 W8.zero); auto => />.
+  by rewrite DW8.mu1_dword /= => v _ ->; rewrite get_set_sameE.
+by move=> g r; apply fmap_bounded_snd.
+qed.
 
 (* SampleInBall terminates over the random oracles (MLDSA_RO.SampleInBall_ll):
    a block is known once queried, and an unknown block is a fresh uniform one *)
