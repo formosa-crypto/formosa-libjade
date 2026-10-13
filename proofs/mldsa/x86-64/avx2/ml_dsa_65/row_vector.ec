@@ -192,7 +192,7 @@ lemma row_vector____dot_product_correct
         wpolylvec_bmul_irng (lvec_unflatten256 _lhs) /\
         wpolylvec_bmul_irng (lvec_unflatten256 _rhs)
         ==>
-        lifts_wpoly res = ntt_dotp (lifts_wpolylvec (lvec_unflatten256 _lhs))
+        liftm_wpoly res = ntt_dotp (lifts_wpolylvec (lvec_unflatten256 _lhs))
                                     (lifts_wpolylvec (lvec_unflatten256 _rhs)) /\
         wpoly_srng (lvec * (q-1)) (lvec * (q-1)) res
     ].
@@ -202,7 +202,7 @@ proc.
 while (0 <= i <= 5 /\ lhs = _lhs /\ rhs = _rhs /\
        wpolylvec_bmul_irng (lvec_unflatten256 _lhs) /\
        wpolylvec_bmul_irng (lvec_unflatten256 _rhs) /\
-       lifts_wpoly output =
+       liftm_wpoly output =
          dotp_partial (lifts_wpolylvec (lvec_unflatten256 _lhs))
                       (lifts_wpolylvec (lvec_unflatten256 _rhs)) i /\
        wpoly_srng (i * (q-1)) (i * (q-1)) output
@@ -211,11 +211,13 @@ while (0 <= i <= 5 /\ lhs = _lhs /\ rhs = _rhs /\
   wp; ecall (polynomial____zero_correct output). wp.
   auto => /> Hbmul_lhs Hbmul_rhs result Hzero Hsrng; split.
   + (* Initial invariant at i=0: lifts of zero = dotp_partial 0 *)
-    rewrite /dotp_partial /= /lifts_wpoly /poly_zero.
-    apply Array256.tP => j jb.
-    rewrite mapiE; 1: smt().
-    rewrite /= Hzero; 1: smt().
-    by rewrite (iota0 0 0) //= /create initiE 1:/# /= /to_sint /= /smod /= /zero.
+    rewrite /liftm_wpoly; have -> : lifts_wpoly result = poly_zero.
+    + rewrite /lifts_wpoly /poly_zero.
+      apply Array256.tP => j jb.
+      rewrite mapiE; 1: smt().
+      rewrite /= Hzero; 1: smt().
+      by rewrite /create initiE 1:/# /= /to_sint /= /smod /= /zero.
+    by rewrite /dotp_partial (iota0 0 0) //= scale0.
   + (* Exit: i=5, dotp_partial 5 = ntt_dotp *)
     move => i0 out0 Hng Hi1 Hi2 Hlifts Hsrng0.
     have Hi0 : i0 = lvec by smt(mldsa65_lvec).
@@ -251,7 +253,9 @@ split.
         (lifts_wpolylvec (lvec_unflatten256 _rhs)).[i{hr}].
     + rewrite /lifts_wpolylvec mapiE; 1: smt(mldsa65_lvec).
       by rewrite -lvec_slice_eq; smt().
-    rewrite Hadd_eq Hlifts Hbmul_eq Hlhs_slice Hrhs_slice dotp_partialS; 1: smt().
+    have -> : liftm_wpoly result0 = liftm_wpoly output{hr} &+ liftm_wpoly product.
+    + by rewrite /liftm_wpoly Hadd_eq scaleD.
+    rewrite Hlifts Hbmul_eq Hlhs_slice Hrhs_slice dotp_partialS; 1: smt().
     pose a := dotp_partial _ _.
     pose b := basemul _ _.
     by rewrite Rq_addC.
@@ -267,7 +271,7 @@ lemma row_vector____dot_product_ph
         wpolylvec_bmul_irng (lvec_unflatten256 _lhs) /\
         wpolylvec_bmul_irng (lvec_unflatten256 _rhs)
         ==>
-        lifts_wpoly res = ntt_dotp (lifts_wpolylvec (lvec_unflatten256 _lhs))
+        liftm_wpoly res = ntt_dotp (lifts_wpolylvec (lvec_unflatten256 _lhs))
                                     (lifts_wpolylvec (lvec_unflatten256 _rhs)) /\
         wpoly_srng (lvec * (q-1)) (lvec * (q-1)) res
     ] = 1%r
@@ -298,7 +302,7 @@ lemma row_vector____multiply_with_matrix_A_correct
         wpolymat_urng (mat_unflatten256 _mat) q /\
         wpolylvec_bmul_irng (lvec_unflatten256 _vec)
         ==>
-        lifts_wpolykvec (kvec_unflatten256 res) =
+        liftm_wpolykvec (kvec_unflatten256 res) =
           ntt_mulmxv (liftu_wpolymat (mat_unflatten256 _mat))
                      (lifts_wpolylvec (lvec_unflatten256 _vec)) /\
         wpolykvec_srng (kvec_unflatten256 res) (lvec * (q-1)) (lvec * (q-1))
@@ -311,7 +315,7 @@ while (0 <= i <= 6 /\ matrix_A = _mat /\ vector = _vec /\
        wpolymat_urng (mat_unflatten256 _mat) q /\
        wpolylvec_bmul_irng (lvec_unflatten256 _vec) /\
        (forall k, 0 <= k < i =>
-          (lifts_wpolykvec (kvec_unflatten256 out)).[k] =
+          (liftm_wpolykvec (kvec_unflatten256 out)).[k] =
           ntt_dotp (row (lifts_wpolymat (mat_unflatten256 _mat)) k)
                    (lifts_wpolylvec (lvec_unflatten256 _vec)) /\
           wpoly_srng (lvec * (q-1)) (lvec * (q-1)) (kvec_unflatten256 out).[k])
@@ -357,7 +361,7 @@ split.
     kvec_unflatten256_writeback_iE out{hr} aux (256 * i{hr}) k _ _; 1,2: smt().
   split.
   + (* Lifts equality *)
-    rewrite /lifts_wpolykvec mapiE; 1: smt(mldsa65_kvec).
+    rewrite /liftm_wpolykvec mapiE; 1: smt(mldsa65_kvec).
     rewrite Hwb.
     case (k = i{hr}) => Hki.
     + subst k.
@@ -375,7 +379,7 @@ split.
     + have -> : (k = 256 * i{hr} %/ 256) = false by smt().
       rewrite /=.
       have /= [Heq _] := Hinv k _; 1: smt().
-      move: Heq; rewrite /lifts_wpolykvec mapiE 1:/# /=.
+      move: Heq; rewrite /liftm_wpolykvec mapiE 1:/# /=.
       by move => ->.
   + (* Range *)
     rewrite Hwb.
@@ -393,7 +397,7 @@ lemma row_vector____multiply_with_matrix_A_ph
         wpolymat_urng (mat_unflatten256 _mat) q /\
         wpolylvec_bmul_irng (lvec_unflatten256 _vec)
         ==>
-        lifts_wpolykvec (kvec_unflatten256 res) =
+        liftm_wpolykvec (kvec_unflatten256 res) =
           ntt_mulmxv (liftu_wpolymat (mat_unflatten256 _mat))
                      (lifts_wpolylvec (lvec_unflatten256 _vec)) /\
         wpolykvec_srng (kvec_unflatten256 res) (lvec * (q-1)) (lvec * (q-1))

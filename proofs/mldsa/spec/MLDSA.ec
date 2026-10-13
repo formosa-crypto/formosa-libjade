@@ -218,9 +218,13 @@ seq 1 1 : #pre; 1: by auto.
 if;1,3: by auto => />.
 sp 2 2; seq 1 1 : (#pre /\ ={bh} /\ ={h} /\
           bh{1} = (infnorm_lt ct0{1} gamma2 && hammw h{1} w_hint)).
-+ auto => /> &1 &2 *.
++ auto => /> &1 Hs2 Hcs2 Hz Hr0.
+  (* the rejection test bounds the low bits: |LowBits w - cs2| < gamma2 - Beta *)
+  have Hlow : infnorm_lt (polykvec_LowBits w{1} - cs2{1}) gamma2.
+  - apply (infnorm_lt_le _ (gamma2 - Beta)); 1: smt(Beta_bnd).
+    by rewrite -(bz_sync w{1} cs2{1} Hcs2).
   by rewrite (polykvec_MakeHintImpl_MakeHint_equiv w{1} cs2{1}
-                (invnttv (ntt_smul ch{1} t0h{1})) _) 1:/#.
+                (invnttv (ntt_smul ch{1} t0h{1})) Hcs2 Hlow).
 
 seq 1 1 : (#pre); 1: by auto.
 

@@ -12,6 +12,9 @@ import Round ZModQ Zq.
 
 require import XArray256 Array256.
 
+require Nttspec.
+require import Nttlink.
+
 (* ================================================================== *)
 (* montgomery_multiply_and_reduce                                       *)
 (* AVX2 vectorised Montgomery multiplication (8 lanes in parallel).    *)
@@ -22,23 +25,6 @@ require import XArray256 Array256.
 
 lemma montgomery_multiply_and_reduce_ll : islossless M.montgomery_multiply_and_reduce.
 proof. by proc; islossless. qed.
-
-lemma montgomery_multiply_and_reduce_correct (u v : W256.t) :
-    hoare [ M.montgomery_multiply_and_reduce :
-        arg = (u, v)
-        ==>
-        true (* TODO: state word-level correctness in terms of Zq multiplication *)
-    ].
-proof. admitted. (* montgomery multiply and reduce *)
-
-lemma montgomery_multiply_and_reduce_ph (u v : W256.t) :
-    phoare [ M.montgomery_multiply_and_reduce :
-        arg = (u, v)
-        ==>
-        true
-    ] = 1%r
-  by conseq montgomery_multiply_and_reduce_ll
-            (montgomery_multiply_and_reduce_correct u v).
 
 (* ================================================================== *)
 (* polynomial__reduce32                                                 *)
@@ -120,7 +106,9 @@ lemma polynomial__reduce32_ph (_a : W32.t Array256.t) :
 (* Computes lhs[i] * rhs[i] in Zq via Montgomery reduction.           *)
 (* Input:  wpoly_bmul_irng on both operands                            *)
 (*         (NTT outputs satisfy this: wpoly_ntt_orng => wpoly_bmul_irng)*)
-(* Output: lifts_wpoly res = basemul (lifts_wpoly lhs) (lifts_wpoly rhs)*)
+(* Output: liftm_wpoly res = basemul (lifts_wpoly lhs) (lifts_wpoly rhs)*)
+(*           the product carries the Montgomery factor 2^-32: it is    *)
+(*           read in Montgomery form (liftm), as invert_ntt consumes it *)
 (*         wpoly_srng (q-1) (q-1) res  (from final Montgomery reduction) *)
 (* ================================================================== *)
 
@@ -136,30 +124,6 @@ wp; call (: true ==> true); 1: by islossless. (* second call *)
 wp; call (: true ==> true); 1: by islossless. (* first call *)
 by auto => /#.
 qed.
-
-lemma polynomial__pointwise_montgomery_multiply_and_reduce_correct
-      (_prod : W32.t Array256.t) (_lhs : W32.t Array256.t) (_rhs : W32.t Array256.t) :
-    hoare [ M.polynomial__pointwise_montgomery_multiply_and_reduce :
-        product = _prod /\ lhs = _lhs /\ rhs = _rhs /\
-        wpoly_bmul_irng _lhs /\ wpoly_bmul_irng _rhs
-        ==>
-        lifts_wpoly res = basemul (lifts_wpoly _lhs) (lifts_wpoly _rhs) /\ (* TODO: may need Montgomery factor correction *)
-        wpoly_srng (q-1) (q-1) res
-    ].
-proof.
-admitted. (* pointwise mont mul and reduce *)
-
-lemma polynomial__pointwise_montgomery_multiply_and_reduce_ph
-      (_prod : W32.t Array256.t) (_lhs : W32.t Array256.t) (_rhs : W32.t Array256.t) :
-    phoare [ M.polynomial__pointwise_montgomery_multiply_and_reduce :
-        product = _prod /\ lhs = _lhs /\ rhs = _rhs /\
-        wpoly_bmul_irng _lhs /\ wpoly_bmul_irng _rhs
-        ==>
-        lifts_wpoly res = basemul (lifts_wpoly _lhs) (lifts_wpoly _rhs) /\ (* TODO: may need Montgomery factor correction *)
-        wpoly_srng (q-1) (q-1) res
-    ] = 1%r
-  by conseq polynomial__pointwise_montgomery_multiply_and_reduce_ll
-            (polynomial__pointwise_montgomery_multiply_and_reduce_correct _prod _lhs _rhs).
 
 (* ================================================================== *)
 (* polynomial__conditionally_add_modulus                                 *)
@@ -222,3 +186,57 @@ lemma polynomial__conditionally_add_modulus_ph (_a : W32.t Array256.t) :
     ] = 1%r
   by conseq polynomial__conditionally_add_modulus_ll
             (polynomial__conditionally_add_modulus_correct _a).
+
+(* ================================================================== *)
+(* The Montgomery multiplications, lane- and polynomial-wise.          *)
+(*                                                                      *)
+(* NB: their code-level proofs (Avx2red, Pwmulcorrect) are required    *)
+(* here, after every `circuit` proof of this file: requiring Avx2red   *)
+(* makes `circuit` fail on the reduce32 / caddq goals ("Missing type   *)
+(* binding for type W8u32.Pack.pack_t").                               *)
+(* ================================================================== *)
+require Avx2red Pwmulcorrect.
+
+(* every lane is the Montgomery product of the matching lanes          *)
+lemma montgomery_multiply_and_reduce_correct (u v : W256.t) :
+    hoare [ M.montgomery_multiply_and_reduce :
+        arg = (u, v)
+        ==>
+        res = W8u32.pack8_t (W8u32.Pack.map2 Nttspec.mmr (W8u32.unpack32 u) (W8u32.unpack32 v))
+    ].
+proof. exact Avx2red.mmrP. qed.
+
+lemma montgomery_multiply_and_reduce_ph (u v : W256.t) :
+    phoare [ M.montgomery_multiply_and_reduce :
+        arg = (u, v)
+        ==>
+        res = W8u32.pack8_t (W8u32.Pack.map2 Nttspec.mmr (W8u32.unpack32 u) (W8u32.unpack32 v))
+    ] = 1%r
+  by conseq montgomery_multiply_and_reduce_ll
+            (montgomery_multiply_and_reduce_correct u v).
+
+lemma polynomial__pointwise_montgomery_multiply_and_reduce_correct
+      (_prod : W32.t Array256.t) (_lhs : W32.t Array256.t) (_rhs : W32.t Array256.t) :
+    hoare [ M.polynomial__pointwise_montgomery_multiply_and_reduce :
+        product = _prod /\ lhs = _lhs /\ rhs = _rhs /\
+        wpoly_bmul_irng _lhs /\ wpoly_bmul_irng _rhs
+        ==>
+        liftm_wpoly res = basemul (lifts_wpoly _lhs) (lifts_wpoly _rhs) /\
+        wpoly_srng (q-1) (q-1) res
+    ].
+proof.
+conseq (Pwmulcorrect.pwmulP _prod _lhs _rhs); 1: by move=> &hr /> /#.
+by move=> &hr /> hl hr; rewrite pwmul_link /=; exact pwmul_rng.
+qed.
+
+lemma polynomial__pointwise_montgomery_multiply_and_reduce_ph
+      (_prod : W32.t Array256.t) (_lhs : W32.t Array256.t) (_rhs : W32.t Array256.t) :
+    phoare [ M.polynomial__pointwise_montgomery_multiply_and_reduce :
+        product = _prod /\ lhs = _lhs /\ rhs = _rhs /\
+        wpoly_bmul_irng _lhs /\ wpoly_bmul_irng _rhs
+        ==>
+        liftm_wpoly res = basemul (lifts_wpoly _lhs) (lifts_wpoly _rhs) /\
+        wpoly_srng (q-1) (q-1) res
+    ] = 1%r
+  by conseq polynomial__pointwise_montgomery_multiply_and_reduce_ll
+            (polynomial__pointwise_montgomery_multiply_and_reduce_correct _prod _lhs _rhs).

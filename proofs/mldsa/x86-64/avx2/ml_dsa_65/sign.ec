@@ -486,7 +486,10 @@ while (
      + rewrite of_listK; 1: by rewrite Bytes64.size_to_list /=.
        by rewrite Bytes64.to_listK. 
    + by smt().
-   + by move => _ _ result_R _ Hdom; smt().
+   + (* the 16-bit separator does not wrap: kappa < kappa_max = 13106 *)
+     have hk : kappa_max = 13106 by rewrite Hkappa_max Hlvec.
+     by smt().
+   + by move => _ _ _ result_R _ Hdom; smt().
 
  sp 3 0.
  seq 0 8 : (#pre /\
@@ -522,7 +525,6 @@ while (
    split; first by apply wpolylvec_srng_ntt_irng;
      apply (wpolylvec_srng_widen _ (gamma1-1) gamma1 (q-1) (q-1)); smt(mldsa65_gamma1).
    move => _ result Hntt_eq Hntt_orng.
-   split; first exact (wpolylvec_ntt_orng_bmul_irng _ Hntt_orng).
    move => _ result0 Hmul_eq Hmul_srng.
    split; first by apply (wpolykvec_srng_widen _ (lvec * 8380416) (lvec * 8380416) 2143289343 2143289343); smt(mldsa65_lvec).
    move => _ result1 Hred_eq Hred_srng.
@@ -540,7 +542,7 @@ while (
    have Hreachable : lifts_wpolykvec (kvec_unflatten256 result3) =
                      invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2}))
                                          (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2})))).
-   + by rewrite Hcond_eq Hinvntt_eq Hred_eq Hmul_eq Hntt_eq.
+   + by rewrite Hcond_eq Hinvntt_eq (liftm_wpolykvec_lifts _ _ Hred_eq) Hmul_eq Hntt_eq.
    have Heq_liftu_lifts := wpolykvec_urng_lifts_eq_liftu _ Hcond_urng.
    have Hw1_lifts : lifts_wpolykvec (kvec_unflatten256 result4.`2) =
                     liftu_wpolykvec (kvec_unflatten256 result4.`2).

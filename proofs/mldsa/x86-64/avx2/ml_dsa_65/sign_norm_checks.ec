@@ -86,10 +86,7 @@ ecall (polynomial__add_correct signer_response_element cs1 mask_element (q-1) ga
 ecall (polynomial__invert_ntt_montgomery_correct cs1).
 ecall (polynomial__pointwise_montgomery_multiply_and_reduce_correct cs1 s1_element verifier_challenge).
 auto => |> [#] Hs1e Hc Hmask.
-do split => /=.
-- by exact (wpoly_ntt_orng_bmul_irng _s1e).
-- by exact (wpoly_ntt_orng_bmul_irng _c).
-move => Hbmul_s1 Hbmul_c result [# Hbmul_eq Hbmul_rng].
+move => Hbmul_s1 Hbmul_c result Hbmul_eq Hbmul_rng.
 split; 1: by  exact (wpoly_bmul_orng_intt_irng result Hbmul_rng).
 move => ?result0 [# Hintt_eq Hintt_rng].
 have Hintt_rng_wide : wpoly_srng (q-1) (q-1) result0.
@@ -263,9 +260,7 @@ seq 6 : (#pre /\
     + by apply kvec_slice_eq; smt(mldsa65_kvec).
     rewrite -Heq_s2.
     move: Hs2_bmul; rewrite /wpolykvec_bmul_irng allP => H; apply H; smt(mldsa65_kvec).
-  (* ── bmul pre: verifier challenge ── *)
-  - by smt(wpoly_ntt_orng_bmul_irng).
-  move => Hbmul_s2 Hbmul_c result [# Hbmul_eq Hbmul_rng].
+  move => Hbmul_s2 Hbmul_c result Hbmul_eq Hbmul_rng.
   split; 1: by exact (wpoly_bmul_orng_intt_irng result Hbmul_rng).
   move => ?result0 [# Hintt_eq Hintt_rng].
   (* ── subtract pre: w0 slice range — kvec_slice_eq replaces Heq_w0 + allP chain ── *)
@@ -593,8 +588,7 @@ seq 3 : (#pre /\
     + by apply kvec_slice_eq; smt(mldsa65_kvec).
     rewrite -Heq_t0.
     move: (wpolykvec_ntt_orng_bmul_irng _ Ht0_ntt); rewrite /wpolykvec_bmul_irng allP => H; apply H; smt(mldsa65_kvec).
-  - by smt(wpoly_ntt_orng_bmul_irng).
-  move => Hbmul_t0 Hbmul_c result [# Hbmul_eq Hbmul_rng].
+  move => Hbmul_t0 Hbmul_c result Hbmul_eq Hbmul_rng.
   split; 1: by exact (wpoly_bmul_orng_intt_irng result Hbmul_rng).
   move => ?result0 [# Hintt_eq Hintt_rng].
   split; first by apply (wpoly_srng_widen result0 invntt_obound invntt_obound 2143289343 2143289343); [ smt(invntt_obound_fits_for_caddq mldsa65_Eta) | smt(invntt_obound_fits_for_caddq mldsa65_Eta) | exact Hintt_rng ].

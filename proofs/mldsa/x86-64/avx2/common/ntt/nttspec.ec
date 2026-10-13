@@ -56,8 +56,44 @@ op mmr_alt (u w : W32.t) =
   (W2u32.truncateu32 (a `>>>` 32)) - (W2u32.truncateu32 (t `>>>` 32)).
 
 (* -------------------------------------------------------------------- *)
+(* no borrow: when a and t agree on their low words, the high word of   *)
+(* a - t is the difference of the high words                            *)
+lemma high32_sub (a t : W64.t) :
+  W64.to_uint a %% 2^32 = W64.to_uint t %% 2^32 =>
+  W2u32.truncateu32 ((a - t) `>>>` 32)
+  = W2u32.truncateu32 (a `>>>` 32) - W2u32.truncateu32 (t `>>>` 32).
+proof.
+move=> hlow; apply W32.to_uint_eq.
+rewrite W32.to_uintD W32.to_uintN !W2u32.to_uint_truncateu32 !W64.to_uint_shr //.
+rewrite W64.to_uintD W64.to_uintN /= modzDmr.
+have -> : to_uint a - to_uint t = (to_uint a %/ 4294967296 - to_uint t %/ 4294967296) * 4294967296.
++ have := divz_eq (to_uint a) 4294967296; have := divz_eq (to_uint t) 4294967296.
+  by move: hlow; rewrite (_ : W32.modulus = 4294967296) 1://; smt().
+rewrite (_ : 18446744073709551616 = 4294967296 * 4294967296) 1:// -mulz_modl // mulzK // modz_mod.
+by rewrite modzDmr modzDml -(modzDmr _ (- (to_uint t %/ 4294967296 %% 4294967296))) modzNm modzDmr.
+qed.
+
+(* the Montgomery multiplier t agrees with the product a on the low     *)
+(* word (q * qinv = 1 mod 2^32), so the subtraction may be done on the  *)
+(* high words                                                           *)
 lemma mmr_altE : mmr_alt = mmr.
-proof. admitted.
+proof.
+apply/fun_ext2 => u w; rewrite /mmr_alt /mmr /= high32_sub //.
+pose t := W2u32.truncateu32 ((u \sx w) * W64.of_int 58728449).
+have hA : W64.to_uint (u \sx w) = (W32.to_sint u * W32.to_sint w) %% W64.modulus.
+- by rewrite /(\sx) W64.to_uintM /sigextu64 !W64.of_uintK modzMml modzMmr.
+have hT : W64.to_uint (t \sx W32.of_int 8380417) = (W32.to_sint t * 8380417) %% W64.modulus.
+- rewrite /(\sx) W64.to_uintM /sigextu64 !W64.of_uintK modzMml modzMmr.
+  have -> // : W32.to_sint (W32.of_int 8380417) = 8380417 by rewrite W32.to_sintK_small.
+have ht : W32.to_sint t %% 2^32 = (W32.to_sint u * W32.to_sint w * 58728449) %% 2^32.
+- rewrite /t W32.to_sintE /W32.smod /= W2u32.to_uint_truncateu32 W64.to_uintM hA W64.of_uintK.
+  rewrite modzMml modzMmr (: W64.modulus = 2^64) 1:// (: W32.modulus = 2^32) 1:// modz_dvd_pow 1://.
+  by case (2147483648 <= (W32.to_sint u * W32.to_sint w * 58728449) %% 2^32) => _; smt().
+rewrite hA hT (: JModel_x86.ptr_modulus = 2^64) 1:// (: W32.modulus = 2^32) 1:// !modz_dvd_pow 1,2://.
+rewrite -(modzMml (to_sint t)) ht modzMml.
+rewrite (_ : to_sint u * to_sint w * 58728449 * 8380417 = to_sint u * to_sint w * (58728449 * 8380417)) 1:#ring.
+by rewrite -(modzMmr _ (58728449 * 8380417)) (: W32.modulus = 2^32) 1:// /=.
+qed.
 
 (* ==================================================================== *)
 op reduce_coeff (p : wpoly) (base len plen : int) (z_ : W32.t) =

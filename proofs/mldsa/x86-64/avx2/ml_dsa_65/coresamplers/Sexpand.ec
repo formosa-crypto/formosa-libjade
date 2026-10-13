@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore CoreUtils List List_extra IntDiv BitEncoding.
+require import AllCore CoreUtils List List_extra IntDiv IntMin BitEncoding.
 import BS2Int.
 
 (* -------------------------------------------------------------------- *)
@@ -1032,278 +1032,487 @@ by rewrite /sreject_ok -hcat.
 qed.
 
 (* ==================================================================== *)
-(* The staged four-lane sampler and the Spoly isolation axiom           *)
+(* The staged four-lane sampler and the Spoly stream polynomial         *)
 (* ==================================================================== *)
 hint simplify b2i0, b2i1.
 
 (* -------------------------------------------------------------------- *)
-op Spoly (rho' : W8.t Array64.t) (sep : W16.t) : wpoly.
+(* losslessness of the sampler's building blocks                        *)
+lemma shake256_squeezeblock4x_ll : islossless M.shake256_squeezeblock4x.
+proof. by proc; islossless. qed.
 
-(* the error polynomial is the first 256 accepted candidates of the     *)
-(* lane's XOF stream; well-defined across slice lengths by              *)
-(* shake256_slice_cat                                                   *)
-axiom SpolyP (rho' : W8.t Array64.t) (sep : W16.t) (m j : int) :
+lemma shake256_absorb_66_4x_ll : islossless M.shake256_absorb_66_4x.
+proof. by proc; islossless. qed.
+
+lemma error_4x____shake256_squeeze_multiple_blocks_4x_ll :
+  islossless M.error_4x____shake256_squeeze_multiple_blocks_4x.
+proof.
+proc; while true (2 - i); last by auto=> /#.
+by move=> z; wp; call shake256_squeezeblock4x_ll; auto=> /#.
+qed.
+
+lemma error_4x__rejection_sample_one_block_ll :
+  islossless M.error_4x__rejection_sample_one_block.
+proof.
+proc.
+while (   to_uint xof_offset <= 136
+       /\ (condition_loop => to_uint xof_offset < 136))
+      (136 - to_uint xof_offset).
+- move=> z; auto=> &hr |> hle hlt hc.
+  have h1 : to_uint (xof_offset{hr} + W64.one) = to_uint xof_offset{hr} + 1.
+  - by rewrite to_uintD_small /= /#.
+  by rewrite !W64.uleE h1 /=; smt().
+by auto=> &hr |>; smt().
+qed.
+
+lemma error_4x__rejection_sample_multiple_blocks_ll :
+  islossless M.error_4x__rejection_sample_multiple_blocks.
+proof.
+proc.
+while (   to_uint xof_offset <= 272
+       /\ (condition_loop => to_uint xof_offset < 272))
+      (272 - to_uint xof_offset).
+- move=> z; auto=> &hr |> hle hlt hc.
+  have h1 : to_uint (xof_offset{hr} + W64.one) = to_uint xof_offset{hr} + 1.
+  - by rewrite to_uintD_small /= /#.
+  by rewrite !W64.uleE h1 /=; smt().
+wp.
+(* the vectorized loop consumes 4 to 16 bytes per iteration *)
+while (   to_uint xof_offset < 272 /\ 4 %| to_uint xof_offset
+       /\ (condition_loop => to_uint xof_offset < 256))
+      (272 - to_uint xof_offset).
+- move=> z; exlim xof_offset => o.
+  seq 12 : (true) 1%r 1%r 0%r 0%r
+    (to_uint o < 256 /\ 4 %| to_uint o /\ 272 - to_uint o = z /\
+     exists j, 1 <= j <= 4 /\ to_uint xof_offset = to_uint o + 4 * j).
+  + seq 10 : (to_uint o < 256 /\ 4 %| to_uint o /\ 272 - to_uint o = z /\
+              to_uint xof_offset = to_uint o + 4).
+    - wp; call (: true); 1: by auto.
+      wp; call (: true); 1: by auto.
+      auto=> &hr |> h272 hdvd hlt hc.
+      by rewrite to_uintD_small /= /#.
+    sp; if; last by auto=> &hr |> *; exists 1.
+    seq 4 : (to_uint o < 256 /\ 4 %| to_uint o /\ 272 - to_uint o = z /\
+             to_uint xof_offset = to_uint o + 8).
+    - wp; call (: true); 1: by auto.
+      auto=> &hr |> h256 hdvd ho _.
+      by rewrite to_uintD_small /= /#.
+    sp; if; last by auto=> &hr |> *; exists 2.
+    seq 4 : (to_uint o < 256 /\ 4 %| to_uint o /\ 272 - to_uint o = z /\
+             to_uint xof_offset = to_uint o + 12).
+    - wp; call (: true); 1: by auto.
+      auto=> &hr |> h256 hdvd ho _.
+      by rewrite to_uintD_small /= /#.
+    sp; if; last by auto=> &hr |> *; exists 3.
+    wp; call (: true); 1: by auto.
+    auto=> &hr |> h256 hdvd ho _.
+    by exists 4; rewrite to_uintD_small /= /#.
+  + by islossless.
+  + auto=> &hr [h256 [hdvd [<- [j [rgj ho]]]]].
+    have h252 : to_uint o <= 252 by move: hdvd h256 => /dvdzP [q ->] /#.
+    have hd : 4 %| (to_uint o + 4 * j) by rewrite dvdzD // dvdz_mulr.
+    rewrite !W64.uleE ho /= hd /=; smt().
+  + by hoare; conseq (: _ ==> true).
+  + by [].
+by auto=> />; smt().
+qed.
+
+hint solve 0 lossless : shake256_squeezeblock4x_ll error_4x__rejection_sample_one_block_ll.
+
+(* -------------------------------------------------------------------- *)
+(* the error polynomial: the first 256 accepted candidates of the     *)
+(* lane's XOF stream                                                    *)
+op Spoly (rho' : W8.t Array64.t) (sep : W16.t) : wpoly =
+  rpoly (to_list rho' ++ W2u8.to_list sep).
+
+lemma SpolyP (rho' : W8.t Array64.t) (sep : W16.t) (m j : int) :
+  0 <= m =>
   256 <= size (sreject (shake256_slice
                  (to_list rho' ++ W2u8.to_list sep) 0 m)) =>
   0 <= j < 256 =>
   (Spoly rho' sep).[j]
   = nth W32.zero
       (sreject (shake256_slice (to_list rho' ++ W2u8.to_list sep) 0 m)) j.
+proof. by move=> *; rewrite /Spoly (rpolyP _ m). qed.
 
 (* -------------------------------------------------------------------- *)
+
+(* -------------------------------------------------------------------- *)
+(* -------------------------------------------------------------------- *)
+(* Termination of the four-lane sampler (as in Aexpand): the loop       *)
+(* variant is [K - kmax], kmax the largest block count <= K consistent  *)
+(* with the state                                                       *)
+op s_stop (fs : W64.t list) : W64.t =
+  W64.of_int (b2i (!has (fun (w : W64.t) => w \ult W64.of_int 256) fs)).
+
+(* the sampling-loop invariant after k squeezed blocks *)
+op s_inv (nonce : int -> W8.t list) (k : int) (st : sha3x4)
+         (ps : wpoly list) (fs : W64.t list) =
+     st \sha3for Array4.init (mk_read (136 * k) \o nonce)
+  /\ (forall i, 0 <= i < 4 =>
+        let p = nth witness ps i in
+        let f = nth witness fs i in
+        sreject_ok (Array4.init nonce).[i] (136 * k) p (to_uint f)).
+
+(* past every lane's fuel, all lanes are full and the loop stops *)
+lemma s_inv_full (nonce : int -> W8.t list) (k : int) st (ps : wpoly list)
+  (f0 f1 f2 f3 : W64.t) :
+  (forall i, 0 <= i < 4 => stream_ok (nonce i)) =>
+  (forall i, 0 <= i < 4 => stream_fuel (nonce i) <= k) =>
+  s_inv nonce k st ps [f0; f1; f2; f3] =>
+  s_stop [f0; f1; f2; f3] = W64.one.
+proof.
+move=> hok hfuel [_ hinv].
+have hall : forall i, 0 <= i < 4 => 256 <= to_uint (nth witness [f0; f1; f2; f3] i).
+- move=> i rgi; have [_ hf] := hinv i rgi; rewrite /= in hf.
+  by rewrite hf Array4.initiE //=; smt(stream_fuelP).
+move: (hall 0 _) (hall 1 _) (hall 2 _) (hall 3 _) => //=.
+by rewrite /s_stop /= !W64.ultE /= => 4?; rewrite !ltzNge /#.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma error_4x____sample_polynomialsP (rho_ : W8.t Array64.t) (ds0 : W16.t) :
+  (forall ds, stream_ok (to_list rho_ ++ W2u8.to_list ds)) =>
+phoare[ M.error_4x____sample_polynomials :
+     rho_prime = rho_ /\ starting_domain_separator = ds0
+  ==>
+     forall i, 0 <= i < 4 =>
+       nth witness [res.`1; res.`2; res.`3; res.`4] i
+       = Spoly rho_ (ds0 + W16.of_int i) ] = 1%r.
+proof.
+move=> hok.
+hint +listred -delta nth.
+proc=> /=.
+proc change [^stop_sampling<- .. ^stop_sampling<- & +1] : {
+  stop_sampling <- s_stop [filled0; filled1; filled2; filled3];
+}; first by auto=> &hr @/s_stop |> *.
+pose nonce (i : int) := to_list rho_ ++ W2u8.to_list (ds0 + W16.of_int i).
+pose data := Array4.init nonce.
+
+(* up to the loop: partial correctness, then losslessness              *)
+seq ^while : (true) 1%r 1%r 0%r 0%r
+  (s_inv nonce 2 xof_state [polynomial0; polynomial1; polynomial2; polynomial3]
+                           [filled0; filled1; filled2; filled3]
+   /\ stop_sampling = s_stop [filled0; filled1; filled2; filled3]).
+- (* initial absorption *)
+  sp.
+  seq 1 : (xof_state \sha3for Array4.init (mk_absorbed \o nonce)).
+  - ecall (shake256_absorb_66_4xP rho_ ds0) => /=.
+    auto=> &hr |> rst; apply/sha3for_eqR/Array4.ext_eq=> i ?.
+    by rewrite mapiE -1:initiE //= initiE.
+
+  (* squeeze the first two blocks *)
+  seq 1 : (
+       xof_state \sha3for Array4.init (mk_read (136 * 2) \o nonce)
+    /\ (forall i, 0 <= i < 4 =>
+          let b = nth witness [buf0; buf1; buf2; buf3] i in
+          Array272.sub b 0 272 = shake256_slice data.[i] 0 272)).
+  - ecall ->> (error_4x____shake256_squeeze_multiple_blocks_4xP data) => /=.
+    - move=> &hr |>; apply: sha3for_eqR.
+      by apply: Array4.ext_eq; smt(Array4.mapiE Array4.initiE).
+    auto=> |> &hr + ?; apply/sha3for_eqR/Array4.ext_eq.
+    by move=> i rgi; rewrite mapiE // !initiE.
+
+  (* the four vectorized passes *)
+  seq ^stop_sampling<- : (#{/~{buf0, buf1, buf2, buf3}}pre /\
+    (forall i, 0 <= i < 4 =>
+       let p = nth witness [polynomial0; polynomial1; polynomial2; polynomial3] i in
+       let f = nth witness [filled0; filled1; filled2; filled3] i in
+          sreject_ok data.[i] (136 * 2) p (to_uint f))).
+  - hoare split; last by conseq |>.
+    exlim buf0, buf1, buf2, buf3 => buf0_ buf1_ buf2_ buf3_.
+    ecall ->> (error_4x__rejection_sample_multiple_blocksP buf0_) => /= [|>|]; sp.
+    seq 0 : (#{/~{filled}}pre /\ to_uint filled0 = min 256 (size (sreject (Array272.sub buf0_ 0 272)))).
+    - by auto.
+    ecall ->> (error_4x__rejection_sample_multiple_blocksP buf1_) => /= [|>|]; sp.
+    seq 0 : (#{/~{filled}}pre /\ to_uint filled1 = min 256 (size (sreject (Array272.sub buf1_ 0 272)))).
+    - by auto.
+    ecall ->> (error_4x__rejection_sample_multiple_blocksP buf2_) => /= [|>|]; sp.
+    seq 0 : (#{/~{filled}}pre /\ to_uint filled2 = min 256 (size (sreject (Array272.sub buf2_ 0 272)))).
+    - by auto.
+    ecall ->> (error_4x__rejection_sample_multiple_blocksP buf3_) => /= [|>|]; sp.
+    seq 0 : (#{/~{filled}}pre /\ to_uint filled3 = min 256 (size (sreject (Array272.sub buf3_ 0 272)))).
+    - by auto.
+    auto=> &hr |> 5? h 4? i ile ilt; have: 0 <= i < 4 by smt().
+    move=> {ile ilt}; apply: allP_range i => /=.
+    by with hint +listred (rewrite /= /sreject_ok -!h /=).
+  by auto=> &hr |> hxf h; rewrite /s_inv hxf /=.
+- wp; do 4! (call error_4x__rejection_sample_multiple_blocks_ll; wp).
+  call error_4x____shake256_squeeze_multiple_blocks_4x_ll.
+  by call shake256_absorb_66_4x_ll; auto.
+
+(* the sampling loop                                                    *)
+- pose K := max 2 (max (max (stream_fuel (nonce 0)) (stream_fuel (nonce 1)))
+                       (max (stream_fuel (nonce 2)) (stream_fuel (nonce 3)))).
+  have hK : forall i, 0 <= i < 4 => stream_fuel (nonce i) <= K.
+  - move=> i rgi; have hi : i = 0 \/ i = 1 \/ i = 2 \/ i = 3 by smt().
+    by rewrite /K; case: hi => [->|[->|[->|->]]]; smt().
+  have hoks : forall i, 0 <= i < 4 => stream_ok (nonce i) by move=> i _; apply hok.
+  while (   (exists k, 2 <= k <= K /\ s_inv nonce k xof_state
+                 [polynomial0; polynomial1; polynomial2; polynomial3]
+                 [filled0; filled1; filled2; filled3])
+         /\ stop_sampling = s_stop [filled0; filled1; filled2; filled3])
+        (K - argmax idfun (fun k => k <= K /\ s_inv nonce k xof_state
+                 [polynomial0; polynomial1; polynomial2; polynomial3]
+                 [filled0; filled1; filled2; filled3])); last first.
+  - auto=> &hr [hinv hstop]; split.
+    - by split=> //; exists 2; rewrite hinv /=; smt().
+    move=> f0 f1 f2 f3 p0 p1 p2 p3 st xf; split.
+    (* the variant is exhausted: every lane is full *)
+    - move=> [[k [rgk hk]] ->] hv.
+      have := argmax_bounded (fun k => s_inv nonce k xf [p0; p1; p2; p3] [f0; f1; f2; f3]) K k _ hk; 1: smt().
+      move=> /= [rgm [hm _]].
+      have hmK : argmax idfun (fun k => k <= K /\ s_inv nonce k xf [p0; p1; p2; p3] [f0; f1; f2; f3]) = K by smt().
+      move: hm; rewrite hmK => hm.
+      by apply (s_inv_full nonce K xf [p0; p1; p2; p3]) => // i rgi; apply hK.
+    clear hinv hstop; move=> -> [[k [rgk [hxf h]]] hstop].
+    (* the stop flag forces every lane to 256 coefficients *)
+    have {hstop} hfull : forall f, f \in [f0; f1; f2; f3] => 256 <= to_uint f.
+    - move=> f hf; rewrite lezNgt; apply/negP => hlt.
+      have hhas : has (fun (w : W64.t) => w \ult W64.of_int 256) [f0; f1; f2; f3].
+      - by apply/hasP; exists f; rewrite hf /= ultE of_uintK /=.
+      by move: hstop => @/s_stop; rewrite hhas /=.
+    (* a full lane holds the first 256 accepted candidates: Spoly      *)
+    have hbridge : forall (p : wpoly) (f : W64.t) (i : int),
+      0 <= i < 4 =>
+      agree p 0 (sreject (shake256_slice data.[i] 0 (136 * k))) =>
+      to_uint f = min 256 (size (sreject (shake256_slice data.[i] 0 (136 * k)))) =>
+      256 <= to_uint f =>
+      p = Spoly rho_ (ds0 + W16.of_int i).
+    - move=> p f i rgi hag hf hf256.
+      have hdata : data.[i] = to_list rho_ ++ W2u8.to_list (ds0 + W16.of_int i).
+      - by rewrite /data initiE ~-1://= /nonce.
+      have hsz : 256 <= size (sreject (shake256_slice data.[i] 0 (136 * k))) by smt().
+      apply Array256.ext_eq => j rgj.
+      rewrite (SpolyP rho_ (ds0 + W16.of_int i) (136 * k) j) //; 1: smt(); 1: by move: hsz; rewrite hdata.
+      rewrite -hdata.
+      by move: hag => @/agree hag; smt().
+    move=> i rgi.
+    have /= := h i rgi.
+    rewrite /sreject_ok => -[hag hf].
+    by apply (hbridge (nth witness [p0; p1; p2; p3] i)
+                      (nth witness [f0; f1; f2; f3] i) i) => //; 1: smt().
+
+  (* one iteration: fix the largest consistent block count k           *)
+  move=> z.
+  exlim (argmax idfun (fun k => k <= K /\ s_inv nonce k xof_state
+            [polynomial0; polynomial1; polynomial2; polynomial3]
+            [filled0; filled1; filled2; filled3])) => k.
+  case @[ambient]: (2 <= k < K /\ z = K - k) => hkz; last first.
+  - conseq (_ : false ==> _) => // &hr [->> [[[[k0 [rgk0 hk0]] hstop] hne] hz]].
+    apply: hkz; have := argmax_bounded (fun k => s_inv nonce k xof_state{hr}
+       [polynomial0{hr}; polynomial1{hr}; polynomial2{hr}; polynomial3{hr}]
+       [filled0{hr}; filled1{hr}; filled2{hr}; filled3{hr}]) K k0 _ hk0; 1: smt().
+    move=> /= [rgm [hm hle]]; split; 2: smt().
+    split; 1: smt().
+    move=> _; rewrite ltz_def; split; 2: smt().
+    apply/negP => hmK; apply: hne; rewrite hstop.
+    apply (s_inv_full nonce K xof_state{hr}
+      [polynomial0{hr}; polynomial1{hr}; polynomial2{hr}; polynomial3{hr}]) => //.
+    by move: hm; rewrite -hmK.
+  seq 13 : (true) 1%r 1%r 0%r 0%r
+    (s_inv nonce (k + 1) xof_state
+       [polynomial0; polynomial1; polynomial2; polynomial3]
+       [filled0; filled1; filled2; filled3]
+     /\ stop_sampling = s_stop [filled0; filled1; filled2; filled3]).
+  - conseq (_ : (2 <= k
+        /\ xof_state \sha3for Array4.init (mk_read (136 * k) \o nonce)
+        /\ (forall i, 0 <= i < 4 =>
+              let p = nth witness [polynomial0; polynomial1; polynomial2; polynomial3] i in
+              let f = nth witness [filled0; filled1; filled2; filled3] i in
+              sreject_ok data.[i] (136 * k) p (to_uint f))
+        /\ stop_sampling = s_stop [filled0; filled1; filled2; filled3])
+        /\ stop_sampling <> W64.one ==> _).
+    - move=> &hr [->> [[[[k0 [rgk0 hk0]] hstop] hne] _]].
+      have := argmax_bounded (fun k => s_inv nonce k xof_state{hr}
+         [polynomial0{hr}; polynomial1{hr}; polynomial2{hr}; polynomial3{hr}]
+         [filled0{hr}; filled1{hr}; filled2{hr}; filled3{hr}]) K k0 _ hk0; 1: smt().
+      by move=> /= [rgm [[hxf h] _]]; do! split => //; smt().
+    clear hok hoks hK hkz.
+    proc rewrite 3 PA_272_136.injecta_272E.
+    proc rewrite 4 PA_272_136.injecta_272E.
+    proc rewrite 5 PA_272_136.injecta_272E.
+    proc rewrite 6 PA_272_136.injecta_272E.
+    proc change [^stop_sampling<- .. ^stop_sampling<- & +1] : {
+      stop_sampling <- s_stop [filled0; filled1; filled2; filled3];
+    }; first by auto=> &hr @/s_stop |>.
+
+    (* squeeze one more 136-byte block into each lane *)
+    seq ^xof_state<- : (
+         2 <= k
+      /\ (forall i, 0 <= i < 4 =>
+            sreject_ok data.[i] (136 * k)
+              (nth witness [polynomial0; polynomial1; polynomial2; polynomial3] i)
+              (to_uint (nth witness [filled0; filled1; filled2; filled3] i)))
+      /\ aux \sha3for Array4.init (mk_read (136 * (k + 1)) \o nonce)
+      /\ (forall i, 0 <= i < 4 =>
+            Array136.to_list (nth witness [aux_0; aux_1; aux_2; aux_3] i)
+            = shake256_slice data.[i] (136 * k) 136)
+    ).
+    - ecall (shake256_squeezeblock4xP data k).
+      auto=> &hr |> hk hxf h hne.
+      split.
+      - split; 1: smt().
+        apply (sha3for_eqR xof_state{hr} (Array4.init (mk_read (136 * k) \o nonce))) => //.
+        by apply Array4.ext_eq => i rgi; rewrite mapiE // initiE //= /data initiE.
+      move=> _ _ result hr1 hr2.
+      apply (sha3for_eqR result.`1 (Array4.map (mk_read (136 * (k + 1))) data)) => //.
+      by apply Array4.ext_eq => i rgi; rewrite mapiE // initiE //= /data initiE.
+
+    (* install the squeezed blocks *)
+    seq > ^buf3<- : (
+         2 <= k
+      /\ slanes_ok data k 0 [polynomial0; polynomial1; polynomial2; polynomial3] [filled0; filled1; filled2; filled3]
+      /\ xof_state \sha3for Array4.init (mk_read (136 * (k + 1)) \o nonce)
+      /\ sblocks_ok data k [buf0; buf1; buf2; buf3]
+    ).
+    - auto=> &hr |> hk h hxf hblk; split; first by smt().
+      move: (hblk 0) (hblk 1) (hblk 2) (hblk 3) => /= 4?.
+      by with hint +listred (rewrite /sblocks_ok; apply/allP_range => /=; rewrite !trunc_inject).
+      sp 1.
+
+      (* lane 0 *)
+      exlim buf0 => b0_.
+      seq 1 : (
+           2 <= k
+        /\ slanes_ok data k 1 [polynomial0; polynomial1; polynomial2; polynomial3] [filled0; filled1; filled2; filled3]
+        /\ xof_state \sha3for Array4.init (mk_read (136 * (k + 1)) \o nonce)
+        /\ sblocks_ok data k [buf0; buf1; buf2; buf3]
+      ).
+      - if.
+        - sp 1; wp.
+          ecall (one_block_laneP data.[0] k (PA_272_136.truncatea_136 b0_)).
+          auto=> &hr |> hk2 hln hxf hblk hlt.
+          move: hlt; rewrite ultE of_uintK /= => hlt.
+          move: (hblk 0 _) (hln 0 _) => // /= hb0 h0.
+          move: h0 => @/sreject_ok /= [hag hf].
+          do ! split => //; 1: smt().
+          move=> _ _ _ _ _ result hok.
+          apply slanes_okP => /=.
+          - by move: hok => //#.
+          - by move: (hln 1 _) => //#.
+          - by move: (hln 2 _) => //#.
+          by move: (hln 3 _) => //#.
+        auto=> &hr |> hk2 hln hxf hblk hge.
+        move: hge; rewrite ultE of_uintK /= => hge.
+        apply (slanes_ok_advance_full data k 0) => //=; 1:smt().
+        by move: (hln 0 _) => // @/sreject_ok /=; smt().
+
+      (* lane 1 *)
+      exlim buf1 => b1_.
+      seq 1 : (
+           2 <= k
+        /\ slanes_ok data k 2 [polynomial0; polynomial1; polynomial2; polynomial3] [filled0; filled1; filled2; filled3]
+        /\ xof_state \sha3for Array4.init (mk_read (136 * (k + 1)) \o nonce)
+        /\ sblocks_ok data k [buf0; buf1; buf2; buf3]
+      ).
+      - if.
+        - sp 1; wp.
+          ecall (one_block_laneP data.[1] k (PA_272_136.truncatea_136 b1_)).
+          auto=> &hr |> hk2 hln hxf hblk hlt.
+          move: hlt; rewrite ultE of_uintK /= => hlt.
+          move: (hblk 1 _) (hln 1 _) => // /= hb1 h1.
+          move: h1 => @/sreject_ok /= [hag hf].
+          do ! split => //; 1: smt().
+          move=> _ _ _ _ _ result hok.
+          apply slanes_okP => /=.
+          - by move: (hln 0 _) => //#.
+          - by move: hok => //#.
+          - by move: (hln 2 _) => //#.
+          by move: (hln 3 _) => //#.
+        auto=> &hr |> hk2 hln hxf hblk hge.
+        move: hge; rewrite ultE of_uintK /= => hge.
+        apply (slanes_ok_advance_full data k 1) => //=; 1:smt().
+        by move: (hln 1 _) => // @/sreject_ok /=; smt().
+
+      (* lane 2 *)
+      exlim buf2 => b2_.
+      seq 1 : (
+           2 <= k
+        /\ slanes_ok data k 3 [polynomial0; polynomial1; polynomial2; polynomial3] [filled0; filled1; filled2; filled3]
+        /\ xof_state \sha3for Array4.init (mk_read (136 * (k + 1)) \o nonce)
+        /\ sblocks_ok data k [buf0; buf1; buf2; buf3]
+      ).
+      - if.
+        - sp 1; wp.
+          ecall (one_block_laneP data.[2] k (PA_272_136.truncatea_136 b2_)).
+          auto=> &hr |> hk2 hln hxf hblk hlt.
+          move: hlt; rewrite ultE of_uintK /= => hlt.
+          move: (hblk 2 _) (hln 2 _) => // /= hb2 h2.
+          move: h2 => @/sreject_ok /= [hag hf].
+          do ! split => //; 1: smt().
+          move=> _ _ _ _ _ result hok.
+          apply slanes_okP => /=.
+          - by move: (hln 0 _) => //#.
+          - by move: (hln 1 _) => //#.
+          - by move: hok => //#.
+          by move: (hln 3 _) => //#.
+        auto=> &hr |> hk2 hln hxf hblk hge.
+        move: hge; rewrite ultE of_uintK /= => hge.
+        apply (slanes_ok_advance_full data k 2) => //=; 1:smt().
+        by move: (hln 2 _) => // @/sreject_ok /=; smt().
+
+      (* lane 3 *)
+      exlim buf3 => b3_.
+      seq 1 : (
+           2 <= k
+        /\ slanes_ok data k 4 [polynomial0; polynomial1; polynomial2; polynomial3] [filled0; filled1; filled2; filled3]
+        /\ xof_state \sha3for Array4.init (mk_read (136 * (k + 1)) \o nonce)
+        /\ sblocks_ok data k [buf0; buf1; buf2; buf3]
+      ).
+      - if.
+        - sp 1; wp.
+          ecall (one_block_laneP data.[3] k (PA_272_136.truncatea_136 b3_)).
+          auto=> &hr |> hk2 hln hxf hblk hlt.
+          move: hlt; rewrite ultE of_uintK /= => hlt.
+          move: (hblk 3 _) (hln 3 _) => // /= hb3 h3.
+          move: h3 => @/sreject_ok /= [hag hf].
+          do ! split => //; 1: smt().
+          move=> _ _ _ _ _ result hok.
+          apply slanes_okP => /=.
+          - by move: (hln 0 _) => //#.
+          - by move: (hln 1 _) => //#.
+          - by move: (hln 2 _) => //#.
+          by move: hok => //#.
+        auto=> &hr |> hk2 hln hxf hblk hge.
+        move: hge; rewrite ultE of_uintK /= => hge.
+        apply (slanes_ok_advance_full data k 3) => //=; 1:smt().
+        by move: (hln 3 _) => // @/sreject_ok /=; smt().
+    (* the flag re-encodes; the invariant advances to k + 1 *)
+    auto=> &hr |> hk2 hln hxf hblk.
+    rewrite /s_inv hxf /= => i rgi.
+    by move: (slanes_ok_wrap data k _ _ hln i rgi) => /#.
+  - by islossless.
+  (* the variant decreases: k + 1 is consistent *)
+  - skip=> &hr [hinv hstop]; split; 1: by split=> //; exists (k + 1); smt().
+    have := argmax_bounded (fun k => s_inv nonce k xof_state{hr}
+       [polynomial0{hr}; polynomial1{hr}; polynomial2{hr}; polynomial3{hr}]
+       [filled0{hr}; filled1{hr}; filled2{hr}; filled3{hr}]) K (k + 1) _ hinv; 1: smt().
+    by move=> /= [_ [_ hle]]; smt().
+  - by hoare; conseq (: _ ==> true).
+  by [].
+- by hoare; conseq (: _ ==> true).
+by [].
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma error_4x____sample_polynomialsH (rho_ : W8.t Array64.t) (ds0 : W16.t) :
+  (forall ds, stream_ok (to_list rho_ ++ W2u8.to_list ds)) =>
 hoare[ M.error_4x____sample_polynomials :
      rho_prime = rho_ /\ starting_domain_separator = ds0
   ==>
      forall i, 0 <= i < 4 =>
        nth witness [res.`1; res.`2; res.`3; res.`4] i
        = Spoly rho_ (ds0 + W16.of_int i) ].
+proof. by move=> hok; conseq (error_4x____sample_polynomialsP rho_ ds0 hok). qed.
+
+lemma error_4x____sample_polynomials_ll :
+  (forall (rho_ : W8.t Array64.t) ds, stream_ok (to_list rho_ ++ W2u8.to_list ds)) =>
+  islossless M.error_4x____sample_polynomials.
 proof.
-hint +listred -delta nth.
-proc=> /=.
-pose stop fs := W64.of_int (b2i (!has (fun (w : W64.t) => w \ult W64.of_int 256) fs)).
-proc change [^stop_sampling<- .. ^stop_sampling<- & +1] : {
-  stop_sampling <- stop [filled0; filled1; filled2; filled3];
-}; first by auto=> &hr @/stop |> *.
-pose nonce (i : int) := to_list rho_ ++ W2u8.to_list (ds0 + W16.of_int i).
-pose data := Array4.init nonce.
-
-(* initial absorption *)
-sp.
-seq 1 : (xof_state \sha3for Array4.init (mk_absorbed \o nonce)).
-- ecall (shake256_absorb_66_4xP rho_ ds0) => /=.
-  auto=> &hr |> rst; apply/sha3for_eqR/Array4.ext_eq=> i ?.
-  by rewrite mapiE -1:initiE //= initiE.
-
-(* squeeze the first two blocks *)
-seq 1 : (
-     xof_state \sha3for Array4.init (mk_read (136 * 2) \o nonce)
-  /\ (forall i, 0 <= i < 4 =>
-        let b = nth witness [buf0; buf1; buf2; buf3] i in
-        Array272.sub b 0 272 = shake256_slice data.[i] 0 272)).
-- ecall ->> (error_4x____shake256_squeeze_multiple_blocks_4xP data) => /=.
-  - move=> &hr |>; apply: sha3for_eqR.
-    by apply: Array4.ext_eq; smt(Array4.mapiE Array4.initiE).
-  auto=> |> &hr + ?; apply/sha3for_eqR/Array4.ext_eq.
-  by move=> i rgi; rewrite mapiE // !initiE.
-
-(* the four vectorized passes *)
-seq ^stop_sampling<- : (#{/~{buf0, buf1, buf2, buf3}}pre /\
-  (forall i, 0 <= i < 4 =>
-     let p = nth witness [polynomial0; polynomial1; polynomial2; polynomial3] i in
-     let f = nth witness [filled0; filled1; filled2; filled3] i in
-        sreject_ok data.[i] (136 * 2) p (to_uint f))).
-- hoare split; last by conseq |>.
-  exlim buf0, buf1, buf2, buf3 => buf0_ buf1_ buf2_ buf3_.
-  ecall ->> (error_4x__rejection_sample_multiple_blocksP buf0_) => /= [|>|]; sp.
-  seq 0 : (#{/~{filled}}pre /\ to_uint filled0 = min 256 (size (sreject (Array272.sub buf0_ 0 272)))).
-  - by auto.
-  ecall ->> (error_4x__rejection_sample_multiple_blocksP buf1_) => /= [|>|]; sp.
-  seq 0 : (#{/~{filled}}pre /\ to_uint filled1 = min 256 (size (sreject (Array272.sub buf1_ 0 272)))).
-  - by auto.
-  ecall ->> (error_4x__rejection_sample_multiple_blocksP buf2_) => /= [|>|]; sp.
-  seq 0 : (#{/~{filled}}pre /\ to_uint filled2 = min 256 (size (sreject (Array272.sub buf2_ 0 272)))).
-  - by auto.
-  ecall ->> (error_4x__rejection_sample_multiple_blocksP buf3_) => /= [|>|]; sp.
-  seq 0 : (#{/~{filled}}pre /\ to_uint filled3 = min 256 (size (sreject (Array272.sub buf3_ 0 272)))).
-  - by auto.
-  auto=> &hr |> 5? h 4? i ile ilt; have: 0 <= i < 4 by smt().
-  move=> {ile ilt}; apply: allP_range i => /=.
-  by with hint +listred (rewrite /= /sreject_ok -!h /=).
-
-while (exists (k : int), (
-     2 <= k
-  /\ xof_state \sha3for Array4.init (mk_read (136 * k) \o nonce)
-  /\ (forall i, 0 <= i < 4 =>
-        let p = nth witness [polynomial0; polynomial1; polynomial2; polynomial3] i in
-        let f = nth witness [filled0; filled1; filled2; filled3] i in
-        sreject_ok data.[i] (136 * k) p (to_uint f))
-  /\ (stop_sampling = stop [filled0; filled1; filled2; filled3])
-)); last first.
-- auto=> &hr |> *; split.
-  - by exists 2 => /=.
-  move=> f0 f1 f2 f3 p0 p1 p2 p3 xf k hk hxf h hstop.
-  have {hstop} hfull : forall f, f \in [f0; f1; f2; f3] => 256 <= to_uint f.
-  - move=> f hf; rewrite lezNgt; apply/negP => hlt.
-    have hhas : has (fun (w : W64.t) => w \ult W64.of_int 256) [f0; f1; f2; f3].
-    - by apply/hasP; exists f; rewrite hf /= ultE of_uintK /=.
-    by move: hstop => @/stop; rewrite hhas /=.
-  have hbridge : forall (p : wpoly) (f : W64.t) (i : int),
-    0 <= i < 4 =>
-    agree p 0 (sreject (shake256_slice data.[i] 0 (136 * k))) =>
-    to_uint f = min 256 (size (sreject (shake256_slice data.[i] 0 (136 * k)))) =>
-    256 <= to_uint f =>
-    p = Spoly rho_ (ds0 + W16.of_int i).
-  - move=> p f i rgi hag hf hf256.
-    have hdata : data.[i] = to_list rho_ ++ W2u8.to_list (ds0 + W16.of_int i).
-    - by rewrite /data initiE ~-1://= /nonce.
-    have hsz : 256 <= size (sreject (shake256_slice data.[i] 0 (136 * k))) by smt().
-    apply Array256.ext_eq => j rgj.
-    rewrite (SpolyP rho_ (ds0 + W16.of_int i) (136 * k) j) //; 1: by move: hsz; rewrite hdata.
-    rewrite -hdata.
-    by move: hag => @/agree hag; smt().
-  move=> i ile ilt.
-  have /= := h i _; 1: smt().
-  rewrite /sreject_ok => -[hag hf].
-  by apply (hbridge (nth witness [p0; p1; p2; p3] i)
-                    (nth witness [f0; f1; f2; f3] i) i) => //; 1: smt().
-elim* => k.
-proc rewrite 3 PA_272_136.injecta_272E.
-proc rewrite 4 PA_272_136.injecta_272E.
-proc rewrite 5 PA_272_136.injecta_272E.
-proc rewrite 6 PA_272_136.injecta_272E.
-proc change [^stop_sampling<- .. ^stop_sampling<- & +1] : {
-  stop_sampling <- stop [filled0; filled1; filled2; filled3];
-}; first by auto=> &hr @/stop |>.
-
-(* squeeze one more 136-byte block into each lane *)
-seq ^xof_state<- : (
-     2 <= k
-  /\ (forall i, 0 <= i < 4 =>
-        sreject_ok data.[i] (136 * k)
-          (nth witness [polynomial0; polynomial1; polynomial2; polynomial3] i)
-          (to_uint (nth witness [filled0; filled1; filled2; filled3] i)))
-  /\ aux \sha3for Array4.init (mk_read (136 * (k + 1)) \o nonce)
-  /\ (forall i, 0 <= i < 4 =>
-        Array136.to_list (nth witness [aux_0; aux_1; aux_2; aux_3] i)
-        = shake256_slice data.[i] (136 * k) 136)
-).
-- ecall (shake256_squeezeblock4xP data k).
-  auto=> &hr |> hk hxf h hne.
-  split.
-  - split; 1: smt().
-    apply (sha3for_eqR xof_state{hr} (Array4.init (mk_read (136 * k) \o nonce))) => //.
-    by apply Array4.ext_eq => i rgi; rewrite mapiE // initiE //= /data initiE.
-  move=> _ _ result hr1 hr2.
-  apply (sha3for_eqR result.`1 (Array4.map (mk_read (136 * (k + 1))) data)) => //.
-  by apply Array4.ext_eq => i rgi; rewrite mapiE // initiE //= /data initiE.
-
-(* install the squeezed blocks *)
-seq > ^buf3<- : (
-     2 <= k
-  /\ slanes_ok data k 0 [polynomial0; polynomial1; polynomial2; polynomial3] [filled0; filled1; filled2; filled3]
-  /\ xof_state \sha3for Array4.init (mk_read (136 * (k + 1)) \o nonce)
-  /\ sblocks_ok data k [buf0; buf1; buf2; buf3]
-).
-- auto=> &hr |> hk h hxf hblk; split; first by smt().
-  move: (hblk 0) (hblk 1) (hblk 2) (hblk 3) => /= 4?.
-  by with hint +listred (rewrite /sblocks_ok; apply/allP_range => /=; rewrite !trunc_inject).
-  sp 1.
-
-  (* lane 0 *)
-  exlim buf0 => b0_.
-  seq 1 : (
-       2 <= k
-    /\ slanes_ok data k 1 [polynomial0; polynomial1; polynomial2; polynomial3] [filled0; filled1; filled2; filled3]
-    /\ xof_state \sha3for Array4.init (mk_read (136 * (k + 1)) \o nonce)
-    /\ sblocks_ok data k [buf0; buf1; buf2; buf3]
-  ).
-  - if.
-    - sp 1; wp.
-      ecall (one_block_laneP data.[0] k (PA_272_136.truncatea_136 b0_)).
-      auto=> &hr |> hk2 hln hxf hblk hlt.
-      move: hlt; rewrite ultE of_uintK /= => hlt.
-      move: (hblk 0 _) (hln 0 _) => // /= hb0 h0.
-      move: h0 => @/sreject_ok /= [hag hf].
-      do ! split => //; 1: smt().
-      move=> _ _ _ _ _ result hok.
-      apply slanes_okP => /=.
-      - by move: hok => //#.
-      - by move: (hln 1 _) => //#.
-      - by move: (hln 2 _) => //#.
-      by move: (hln 3 _) => //#.
-    auto=> &hr |> hk2 hln hxf hblk hge.
-    move: hge; rewrite ultE of_uintK /= => hge.
-    apply (slanes_ok_advance_full data k 0) => //=; 1:smt().
-    by move: (hln 0 _) => // @/sreject_ok /=; smt().
-
-  (* lane 1 *)
-  exlim buf1 => b1_.
-  seq 1 : (
-       2 <= k
-    /\ slanes_ok data k 2 [polynomial0; polynomial1; polynomial2; polynomial3] [filled0; filled1; filled2; filled3]
-    /\ xof_state \sha3for Array4.init (mk_read (136 * (k + 1)) \o nonce)
-    /\ sblocks_ok data k [buf0; buf1; buf2; buf3]
-  ).
-  - if.
-    - sp 1; wp.
-      ecall (one_block_laneP data.[1] k (PA_272_136.truncatea_136 b1_)).
-      auto=> &hr |> hk2 hln hxf hblk hlt.
-      move: hlt; rewrite ultE of_uintK /= => hlt.
-      move: (hblk 1 _) (hln 1 _) => // /= hb1 h1.
-      move: h1 => @/sreject_ok /= [hag hf].
-      do ! split => //; 1: smt().
-      move=> _ _ _ _ _ result hok.
-      apply slanes_okP => /=.
-      - by move: (hln 0 _) => //#.
-      - by move: hok => //#.
-      - by move: (hln 2 _) => //#.
-      by move: (hln 3 _) => //#.
-    auto=> &hr |> hk2 hln hxf hblk hge.
-    move: hge; rewrite ultE of_uintK /= => hge.
-    apply (slanes_ok_advance_full data k 1) => //=; 1:smt().
-    by move: (hln 1 _) => // @/sreject_ok /=; smt().
-
-  (* lane 2 *)
-  exlim buf2 => b2_.
-  seq 1 : (
-       2 <= k
-    /\ slanes_ok data k 3 [polynomial0; polynomial1; polynomial2; polynomial3] [filled0; filled1; filled2; filled3]
-    /\ xof_state \sha3for Array4.init (mk_read (136 * (k + 1)) \o nonce)
-    /\ sblocks_ok data k [buf0; buf1; buf2; buf3]
-  ).
-  - if.
-    - sp 1; wp.
-      ecall (one_block_laneP data.[2] k (PA_272_136.truncatea_136 b2_)).
-      auto=> &hr |> hk2 hln hxf hblk hlt.
-      move: hlt; rewrite ultE of_uintK /= => hlt.
-      move: (hblk 2 _) (hln 2 _) => // /= hb2 h2.
-      move: h2 => @/sreject_ok /= [hag hf].
-      do ! split => //; 1: smt().
-      move=> _ _ _ _ _ result hok.
-      apply slanes_okP => /=.
-      - by move: (hln 0 _) => //#.
-      - by move: (hln 1 _) => //#.
-      - by move: hok => //#.
-      by move: (hln 3 _) => //#.
-    auto=> &hr |> hk2 hln hxf hblk hge.
-    move: hge; rewrite ultE of_uintK /= => hge.
-    apply (slanes_ok_advance_full data k 2) => //=; 1:smt().
-    by move: (hln 2 _) => // @/sreject_ok /=; smt().
-
-  (* lane 3 *)
-  exlim buf3 => b3_.
-  seq 1 : (
-       2 <= k
-    /\ slanes_ok data k 4 [polynomial0; polynomial1; polynomial2; polynomial3] [filled0; filled1; filled2; filled3]
-    /\ xof_state \sha3for Array4.init (mk_read (136 * (k + 1)) \o nonce)
-    /\ sblocks_ok data k [buf0; buf1; buf2; buf3]
-  ).
-  - if.
-    - sp 1; wp.
-      ecall (one_block_laneP data.[3] k (PA_272_136.truncatea_136 b3_)).
-      auto=> &hr |> hk2 hln hxf hblk hlt.
-      move: hlt; rewrite ultE of_uintK /= => hlt.
-      move: (hblk 3 _) (hln 3 _) => // /= hb3 h3.
-      move: h3 => @/sreject_ok /= [hag hf].
-      do ! split => //; 1: smt().
-      move=> _ _ _ _ _ result hok.
-      apply slanes_okP => /=.
-      - by move: (hln 0 _) => //#.
-      - by move: (hln 1 _) => //#.
-      - by move: (hln 2 _) => //#.
-      by move: hok => //#.
-    auto=> &hr |> hk2 hln hxf hblk hge.
-    move: hge; rewrite ultE of_uintK /= => hge.
-    apply (slanes_ok_advance_full data k 3) => //=; 1:smt().
-    by move: (hln 3 _) => // @/sreject_ok /=; smt().
-
-(* the flag re-encodes; the invariant advances to k + 1 *)
-auto=> &hr |> hk2 hln hxf hblk.
-exists (k + 1); do ! split => //; 1: smt().
-by move=> i rgi; move: (slanes_ok_wrap data k _ _ hln i rgi) => /#.
+move=> hok; proc*; exlim rho_prime, starting_domain_separator => rho_ ds0.
+call (error_4x____sample_polynomialsP rho_ ds0 (hok rho_)).
+by auto.
 qed.
 
 (* ==================================================================== *)
@@ -1332,6 +1541,7 @@ abbrev poly_of_s2 (s : W32.t Array1536.t) (r : int) : wpoly =
 
 (* -------------------------------------------------------------------- *)
 lemma sample____error_vectorsP (rho_ : W8.t Array64.t) :
+  (forall ds, stream_ok (to_list rho_ ++ W2u8.to_list ds)) =>
 hoare[ M.sample____error_vectors :
     rho_prime = rho_
   ==>
@@ -1340,18 +1550,18 @@ hoare[ M.sample____error_vectors :
   /\ (forall r, 0 <= r < 6 =>
         poly_of_s2 res.`2 r = Spoly rho_ (W16.of_int (5 + r))) ].
 proof.
-proc.
+move=> hok; proc.
 sp.
 seq 5 : (rho_prime = rho_
   /\ forall r, 0 <= r < 4 => poly_of_s1 s1 r = Spoly rho_ (W16.of_int r)).
-- wp; ecall (error_4x____sample_polynomialsP rho_ (W16.of_int 0)).
+- wp; ecall (error_4x____sample_polynomialsH rho_ (W16.of_int 0) hok).
   auto=> &hr |> result hres r rgr rgr2.
   do 4! (rewrite PW_1280_256.winof_write ~-1:/#).
   by move: (hres 0 _) (hres 1 _) (hres 2 _) (hres 3 _) => //#.
 seq 5 : (rho_prime = rho_
   /\ (forall r, 0 <= r < 5 => poly_of_s1 s1 r = Spoly rho_ (W16.of_int r))
   /\ (forall r, 0 <= r < 3 => poly_of_s2 s2 r = Spoly rho_ (W16.of_int (5 + r)))).
-- wp; ecall (error_4x____sample_polynomialsP rho_ (W16.of_int 4)).
+- wp; ecall (error_4x____sample_polynomialsH rho_ (W16.of_int 4) hok).
   auto=> &hr |> h1s result hres.
   split.
   - move=> r rgr rgr2.
@@ -1360,9 +1570,18 @@ seq 5 : (rho_prime = rho_
   move=> r rgr rgr2.
   do 3! (rewrite PW_1536_256.winof_write ~-1:/#).
   by move: (hres 1 _) (hres 2 _) (hres 3 _) => //#.
-wp; ecall (error_4x____sample_polynomialsP rho_ (W16.of_int 8)).
+wp; ecall (error_4x____sample_polynomialsH rho_ (W16.of_int 8) hok).
 auto=> &hr |> h1s h2s result hres.
 move=> r rgr rgr2.
 do 3! (rewrite PW_1536_256.winof_write ~-1:/#).
 by move: (hres 0 _) (hres 1 _) (hres 2 _) => //#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma sample____error_vectors_ll :
+  (forall (rho_ : W8.t Array64.t) ds, stream_ok (to_list rho_ ++ W2u8.to_list ds)) =>
+  islossless M.sample____error_vectors.
+proof.
+move=> hok; have hll := error_4x____sample_polynomials_ll hok.
+by proc; wp; do 3! (call hll; wp); auto.
 qed.

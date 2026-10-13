@@ -11,6 +11,7 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq.
 
 require import Array48 Array256.
+require import Challenge_link.
 
 (* Equiv between the spec SampleInBall (with concrete MLDSA_XOF_SIB) and the
    Jasmin sample____challenge. The seed is the 48-byte commitment hash.
@@ -25,5 +26,8 @@ lemma sample_challenge_correct :
        lifts_wpoly res{2} = res{1}.`1 /\
        wpoly_srng 1 1 res{2}
     ].
-proc.
-admitted. (* sample challenge *)
+proof.
+proc*; exlim rho{1}, seed{2} => ct s.
+ecall{2} (sample____challengeP s); ecall{1} (SampleInBall_correct ct).
+by auto=> />.
+qed.

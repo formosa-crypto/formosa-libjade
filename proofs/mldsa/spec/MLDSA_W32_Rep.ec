@@ -37,58 +37,67 @@ by have := H x Hx; smt().
 qed.
 
 (* ------------------------------------------------------------------ *)
-(* Abstract range predicates for the three word-level polynomial ops.  *)
+(* Range predicates of the word-level NTT-domain operations.           *)
 (*                                                                      *)
-(* Each operation has an input range and an output range that may      *)
-(* differ from each other and from the other operations' ranges.       *)
-(* All six are left abstract here and will be made concrete once the   *)
-(* NTT bridge lemmas are fully worked out.                             *)
-(*                                                                      *)
-(* Expected instantiation path:                                        *)
-(*   ntt_orng  => bmul_irng   (NTT output is valid basemul input)      *)
-(*   bmul_orng => intt_irng   (basemul output is valid INTT input)     *)
-(*   intt_orng => wpoly_srng B_lo B_hi  (INTT output has concrete rng) *)
+(*   ntt_irng  : |x| < q    every caller feeds the NTT reduced inputs  *)
+(*   ntt_orng  : |x| < 9q   each of the eight layers costs q           *)
+(*   bmul_irng : |x| < 9q   two operands that wide keep the 64-bit     *)
+(*                          Montgomery product below 2^31 q, so the    *)
+(*                          product is reduced (|x| < q)               *)
+(*   intt_irng : |x| <= q   the inverse tree doubles the bound at each *)
+(*                          of its eight levels, and 2^8 q < 2^31      *)
 (* ------------------------------------------------------------------ *)
-op wpoly_ntt_irng  : wpoly -> bool.  (* valid input  to   NTT   *)
-op wpoly_ntt_orng  : wpoly -> bool.  (* valid output from NTT   *)
-op wpoly_intt_irng : wpoly -> bool.  (* valid input  to   INTT  *)
-op wpoly_bmul_irng : wpoly -> bool.  (* valid input  to   basemul *)
+op wpoly_ntt_irng  (p : wpoly) = wpoly_srng (q-1) (q-1) p.
+op wpoly_ntt_orng  (p : wpoly) = wpoly_srng (9*q-1) (9*q-1) p.
+op wpoly_bmul_irng (p : wpoly) = wpoly_srng (9*q-1) (9*q-1) p.
+op wpoly_intt_irng (p : wpoly) = wpoly_srng q q p.
 
 (* ------------------------------------------------------------------ *)
-(* Abstract output bound of polynomial__invert_ntt_montgomery.          *)
+(* Output bound of polynomial__invert_ntt_montgomery: the last          *)
+(* operation on every coefficient is a Montgomery multiplication by     *)
+(* 41978 = 2^64/256 mod q, whence |x| <= (41978 + q)/2.                 *)
 (*                                                                      *)
-(* The concrete value depends on the specific Montgomery-NTT impl;      *)
-(* the correctness of the keygen/sign chain depends only on the         *)
-(* compatibility axiom below, which expresses the design invariant      *)
-(* that invNTT's output is tight enough that add(_, s2) stays within    *)
-(* conditionally_add_modulus's physical tolerance [-q+1, q-1].          *)
-(*                                                                      *)
-(* Matches the comment in mldsa-native sign.c (mld_compute_t0_t1_tr...):*)
+(* It is tight enough that add(_, s2) stays within the tolerance        *)
+(* [-q+1, q-1] of conditionally_add_modulus -- as the comment in        *)
+(* mldsa-native sign.c (mld_compute_t0_t1_tr...) requires:              *)
 (*   "the output of the invntt [must be] small enough such that the     *)
 (*    addition of s2 does not result in absolute values >= MLDSA_Q"     *)
 (* ------------------------------------------------------------------ *)
-op invntt_obound : int.
-(* Claude says this is provable: PY's invNTT bound (iscale_bnd: |coeff| < q) is Eta too loose,
-   but the code produces |coeff| <= q-1-Eta, which discharges this. *)
-axiom invntt_obound_fits_for_caddq :
+op invntt_obound : int = 4211197.
+
+lemma invntt_obound_fits_for_caddq :
   0 <= invntt_obound /\ invntt_obound + Eta <= q - 1.
+proof. by have := param_sets; rewrite /invntt_obound /=; smt(). qed.
 
 (* ------------------------------------------------------------------ *)
-(* Bridge lemmas: relations between abstract range predicates.         *)
-(* Admitted pending concrete instantiation of the abstract ops.        *)
+(* Bridge lemmas between the range predicates                          *)
 (* ------------------------------------------------------------------ *)
 lemma wpoly_ntt_orng_bmul_irng (p : wpoly) : wpoly_ntt_orng p => wpoly_bmul_irng p.
-admitted. (* bridge ntt orng bmul irng *)
-(* basemul outputs satisfy |to_sint coeff| < q (Barrett/Montgomery final step),
-   which is sufficient input range for invNTT *)
+proof. done. qed.
+
 lemma wpoly_bmul_orng_intt_irng (p : wpoly) : wpoly_srng (q-1) (q-1) p => wpoly_intt_irng p.
-admitted. (* bridge bmul orng intt irng *)
-(* Fully reduced coefficients (in [0,q)) are valid basemul inputs *)
+proof. by apply wpoly_srng_widen. qed.
+
 lemma wpoly_urng_bmul_irng (p : wpoly) : wpoly_urng q p => wpoly_bmul_irng p.
-admitted. (* bmul accepts fully reduced coeffs (redundant) *)
-(* Coefficients with |x| < q (signed, centered or not) are valid NTT inputs *)
+proof.
+rewrite /wpoly_urng /wpoly_bmul_irng /wpoly_srng !allP => H x /H /= rgx.
+by rewrite W32.to_sintE /smod; smt().
+qed.
+
 lemma wpoly_srng_ntt_irng (p : wpoly) : wpoly_srng (q-1) (q-1) p => wpoly_ntt_irng p.
-admitted. (* ntt accepts -(q-1) .. q-1 (probably redundant) *)
+proof. done. qed.
+
+(* ------------------------------------------------------------------ *)
+(* Montgomery-form reading of a word polynomial.  The NTT-domain        *)
+(* products (pointwise multiplication, dot products) return their      *)
+(* result times 2^-32; the inverse NTT multiplies by 2^32.  Reading    *)
+(* the former through liftm makes the two factors cancel by           *)
+(* construction: liftm res = basemul ..., lifts res' = invntt (liftm *)
+(* res).                                                              *)
+(* ------------------------------------------------------------------ *)
+op mont : coeff = incoeff (2^32).
+
+op liftm_wpoly (pw : wpoly) : poly = scale mont (lifts_wpoly pw).
 
 lemma wpoly_urng_lifts_eq_liftu (p : wpoly) :
   wpoly_urng q p => lifts_wpoly p = liftu_wpoly p.
@@ -138,6 +147,9 @@ op liftu_wpolylvec(wv : wpolylvec) : polylvec =
 
 op lifts_wpolylvec (wv : wpolylvec) : polylvec =
   map lifts_wpoly wv.
+
+op liftm_wpolylvec (wv : wpolylvec) : polylvec =
+  map liftm_wpoly wv.
 
 op unlift_polylvec (v : polylvec) : wpolylvec = map unlift_poly v.
 
@@ -227,6 +239,18 @@ op liftu_wpolykvec(wv : wpolykvec) : polykvec =
 
 op lifts_wpolykvec (wv : wpolykvec) : polykvec =
   map lifts_wpoly wv.
+
+op liftm_wpolykvec (wv : wpolykvec) : polykvec =
+  map liftm_wpoly wv.
+
+(* representatives with the same value have the same Montgomery reading *)
+lemma liftm_wpolykvec_lifts (v1 v2 : wpolykvec) :
+  lifts_wpolykvec v1 = lifts_wpolykvec v2 => liftm_wpolykvec v1 = liftm_wpolykvec v2.
+proof.
+move=> h; apply KArray.tP => k rgk; rewrite /liftm_wpolykvec !KArray.mapiE //.
+have := congr1 (fun v : polykvec => v.[k]) _ _ h.
+by rewrite /lifts_wpolykvec /= !KArray.mapiE // /liftm_wpoly => ->.
+qed.
 
 op unlift_polykvec (v : polykvec) : wpolykvec = map unlift_poly v.
 

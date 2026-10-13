@@ -122,10 +122,12 @@ op t1_from_t1enc (_t1enc : W8.t Array1920.t) : polykvec =
 
 (* The reconstructed signer commitment at the spec level: the wapprox that the proc *)
 (* computes internally, reused by the verify proof after algebra bridging.           *)
+(* _az is row_vector____multiply_with_matrix_A's output, a sum of Montgomery         *)
+(* products: it is read in Montgomery form (liftm), as invert_ntt consumes it.       *)
 op signer_commitment_spec
      (_t1enc : W8.t Array1920.t) (_ch : W32.t Array256.t) (_az : W32.t Array1536.t)
    : polykvec =
-   invnttv (lifts_wpolykvec (kvec_unflatten256 _az)
+   invnttv (liftm_wpolykvec (kvec_unflatten256 _az)
              - ntt_smul (lifts_wpoly _ch)
                         (nttv (smul (t1_from_t1enc _t1enc) (incoeff (2^d))))).
 
@@ -223,13 +225,9 @@ ecall (t1_decode_polynomial
             (fun j => t1_encoded.[(q_bits - d) * n %/ 8 * i + j]))).
 auto => /> &hr Hi1 Hi2 Hch_rng Hhints_rng Haz_rng Hdone Hguard.
 move => result Hliftu_t1 Hurng_t1 Hurng_t1_1024 result0 Hto_sint_shift Hsrng_shift.
-(* ntt's pre: wpoly_ntt_irng result0 via bridge from wpoly_srng (q-1) (q-1) *)
-split; first by apply wpoly_srng_ntt_irng.
-move => _ result1 Hlifts_ntt Horng_ntt.
-(* pmmar's pre: wpoly_bmul_irng on _ch and result1 via wpoly_ntt_orng_bmul_irng *)
-split; first split; [exact (wpoly_ntt_orng_bmul_irng _ Hch_rng)
-                    | exact (wpoly_ntt_orng_bmul_irng _ Horng_ntt)].
-move => _ _ result2 Hlifts_pmmar Hsrng_pmmar.
+(* ntt's and pmmar's pres are the ranges at hand (ntt_irng = srng (q-1); *)
+(* ntt_orng = bmul_irng): discharged by auto                              *)
+move => _ result1 Hlifts_ntt Horng_ntt _ _ result2 Hlifts_pmmar Hsrng_pmmar.
 (* subtract's pre: wpoly_srng on az slice + arithmetic bound *)
 split.
 + split; last by smt(mldsa65_lvec).
@@ -280,14 +278,18 @@ case (k = i{hr}) => Hki.
   (* Algebraic chain: liftu result6 = (signer_commitment_spec ...).[i] *)
   have Hliftu_eq : liftu_wpoly result6 = lifts_wpoly result6
     by rewrite -wpoly_urng_lifts_eq_liftu.
-  rewrite Hliftu_eq Hlifts_caddq Hlifts_invntt Hlifts_red Hlifts_sub
-          Hlifts_pmmar Hlifts_ntt.
+  (* the inverse NTT consumes Montgomery form: read the subtraction through liftm *)
+  have Hm : liftm_wpoly result4 =
+      liftm_wpoly (init (fun (i_0 : int) => _az.[i{hr} * n + i_0])) &+
+      (&-) (basemul (lifts_wpoly _ch) (lifts_wpoly result1)).
+  + by rewrite -Hlifts_pmmar /liftm_wpoly Hlifts_red Hlifts_sub scaleD scaleN.
+  rewrite Hliftu_eq Hlifts_caddq Hlifts_invntt Hm Hlifts_ntt.
   (* Unfold signer_commitment_spec + decompose the kvec ops *)
   rewrite /signer_commitment_spec /invnttv KArray.mapiE; 1: smt(mldsa65_kvec).
   rewrite polykvec_sub_iE; 1: smt(mldsa65_kvec).
   congr; congr.
-  + (* lifts_wpoly az_slice = (lifts_wpolykvec ...).[i] *)
-    rewrite /lifts_wpolykvec mapiE; 1: smt(mldsa65_kvec).
+  + (* liftm_wpoly az_slice = (liftm_wpolykvec ...).[i] *)
+    rewrite /liftm_wpolykvec mapiE; 1: smt(mldsa65_kvec).
     congr; by rewrite -kvec_slice_eq; smt().
   (* Remaining: basemul _ch (ntt (lifts result0))
        = (&-) ((ntt_smul _ch (nttv (smul t1_spec (incoeff 2^d)))).[i])  *)
@@ -558,7 +560,6 @@ move => _ result0 Hlift_chal Horng_chal.
 split; first by apply wpolylvec_srng_ntt_irng;
   apply (wpolylvec_srng_widen _ (gamma1-1) gamma1 (q-1) (q-1)); smt(mldsa65_gamma1).
 move => _ result3 Hlift_s_ntt Horng_s.
-split; first exact (wpolylvec_ntt_orng_bmul_irng _ Horng_s).
 move => _ result4 Hlift_amulz Hsrng_amulz.
 have [Hr1z [Hh_lift Hh_urng]] := Hh_some_case Hh_some.
 split; first exact Hh_urng.

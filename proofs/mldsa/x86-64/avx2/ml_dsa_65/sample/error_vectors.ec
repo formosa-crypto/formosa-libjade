@@ -14,6 +14,8 @@ import Round ZModQ Zq.
 (* require import ArrayExtra JWord_extra EclibExtra JWordList. *)
 
 require import Array32 Array64 Array128 Array256 Array1280 Array1952 Array4032 Array7680.
+require Sexpand.
+require import Error_vectors_link.
 
 phoare error_vectors_correct _rho :
     [ M.sample____error_vectors : arg = _rho ==>
@@ -22,4 +24,9 @@ phoare error_vectors_correct _rho :
      /\ lifts_wpolykvec (kvec_unflatten256 res.`2) = (expandS (Bytes64.of_list (to_list _rho))).`2
      /\ wpolykvec_srng (kvec_unflatten256 res.`2) Eta Eta
     ] = 1%r.
-admitted. (* sample error vectors *)
+proof.
+conseq (Sexpand.sample____error_vectors_ll stream_ok_all)
+       (Sexpand.sample____error_vectorsP _rho (stream_ok_all _rho)) => //.
+move=> &hr _ r; split=> [[_ //] | [_ [h1 h2]]].
+by split => //; apply error_vectors_specE.
+qed.

@@ -222,7 +222,7 @@ lemma column_vector__invert_ntt_montgomery_correct (_v : W32.t Array1536.t) :
         wpolykvec_intt_irng (kvec_unflatten256 _v)
         ==>
         lifts_wpolykvec (kvec_unflatten256 res) =
-          invnttv (lifts_wpolykvec (kvec_unflatten256 _v)) /\
+          invnttv (liftm_wpolykvec (kvec_unflatten256 _v)) /\
         wpolykvec_srng (kvec_unflatten256 res) invntt_obound invntt_obound
     ].
 proof.
@@ -232,7 +232,7 @@ while (0 <= i <= 6 /\
        wpolykvec_intt_irng (kvec_unflatten256 _v) /\
        (forall k, 0 <= k < i =>
          lifts_wpoly (kvec_unflatten256 vector).[k] =
-           invntt (lifts_wpoly (kvec_unflatten256 _v).[k]) /\
+           invntt (liftm_wpoly (kvec_unflatten256 _v).[k]) /\
          wpoly_srng invntt_obound invntt_obound (kvec_unflatten256 vector).[k]) /\
        (forall k, i <= k < 6 =>
          (kvec_unflatten256 vector).[k] = (kvec_unflatten256 _v).[k])
@@ -242,7 +242,7 @@ while (0 <= i <= 6 /\
   + apply KArray.tP => k kb.
     rewrite /lifts_wpolykvec mapiE; 1: smt(mldsa65_kvec).
     rewrite /invnttv mapiE; 1: smt(mldsa65_kvec).
-    rewrite mapiE; 1: smt(mldsa65_kvec).
+    rewrite /liftm_wpolykvec mapiE; 1: smt(mldsa65_kvec).
     by have /= [-> _] := Hdone k _; smt().
   + by rewrite /wpolykvec_srng allP => k kb; have [_ ?] := Hdone k _; smt().
 wp; ecall (polynomial__invert_ntt_montgomery_correct
@@ -277,7 +277,7 @@ lemma column_vector__invert_ntt_montgomery_ph (_v : W32.t Array1536.t) :
         wpolykvec_intt_irng (kvec_unflatten256 _v)
         ==>
         lifts_wpolykvec (kvec_unflatten256 res) =
-          invnttv (lifts_wpolykvec (kvec_unflatten256 _v)) /\
+          invnttv (liftm_wpolykvec (kvec_unflatten256 _v)) /\
         wpolykvec_srng (kvec_unflatten256 res) invntt_obound invntt_obound
     ] = 1%r
   by conseq column_vector__invert_ntt_montgomery_ll

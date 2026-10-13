@@ -3,8 +3,8 @@
 (* each mask polynomial is the 20-bit gamma1-decode of the first 640    *)
 (* bytes of its lane's SHAKE256 stream -- no rejection.  Four lanes are *)
 (* sampled SIMD-interleaved, the fifth by the single-lane sponge.       *)
-(* Worked in isolation against the [Mpoly]/[MpolyP] axiom, mirroring   *)
-(* Aexpand/Sexpand.                                                     *)
+(* [Mpoly] is that decode, by definition; the stream is the spec's      *)
+(* SHAKE256 (Sha3x4.shake256_sliceE).                                   *)
 (* -------------------------------------------------------------------- *)
 require import AllCore CoreUtils List List_extra IntDiv StdOrder BitEncoding.
 import BS2Int.
@@ -193,13 +193,15 @@ by rewrite drop_drop ~-1:/# (_ : 8 * c + s = s + 8 * c) 1:#ring.
 qed.
 
 (* ==================================================================== *)
-(* The mask polynomial oracle: the isolation axiom, to be realized      *)
-(* against the crypto-spec in the linking phase                         *)
-op Mpoly : rho' -> W16.t -> wpoly.
+(* The mask polynomial: the decoding of the first 640 bytes of the      *)
+(* lane's SHAKE256 stream (no rejection)                                *)
+op Mpoly (rho_ : rho') (sep : W16.t) : wpoly =
+  mdecode (shake256_slice (to_list rho_ ++ W2u8.to_list sep) 0 640).
 
-axiom MpolyP (rho_ : rho') (sep : W16.t) :
+lemma MpolyP (rho_ : rho') (sep : W16.t) :
   Mpoly rho_ sep
   = mdecode (shake256_slice (to_list rho_ ++ W2u8.to_list sep) 0 640).
+proof. by done. qed.
 
 (* -------------------------------------------------------------------- *)
 (* the SIMD decoder gathers only 3 bytes per slot (a shifted 20-bit     *)

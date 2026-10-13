@@ -288,6 +288,42 @@ move=> _.
 by apply hup.
 qed.
 
+(* the exact reading: the low-word multiplier t makes u*z - t*q        *)
+(* divisible by 2^32, and mmr is the exact quotient                     *)
+lemma mmr_exact (u z : W32.t) : exists t,
+  -2^31 <= t < 2^31 /\ 2^32 * sval (mmr u z) = sval u * sval z - t * q.
+proof.
+pose t := sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)).
+exists t; split; first by have := W32.to_sint_cmp (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) => /#.
+have hA : W64.to_uint (u \sx z) = (sval u * sval z) %% W64.modulus.
+- by rewrite /(\sx) W64.to_uintM /sigextu64 !W64.of_uintK modzMml modzMmr.
+have hu : W32.to_uint (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449))
+    = (sval u * sval z * 58728449) %% 2^32.
+- rewrite W2u32.to_uint_truncateu32 W64.to_uintM hA W64.of_uintK.
+  rewrite modzMml modzMmr (: W64.modulus = 2^64) 1:// (: W32.modulus = 2^32) 1://.
+  by rewrite modz_dvd_pow 1://.
+have hT : t %% 2^32 = (sval u * sval z * 58728449) %% 2^32.
+- rewrite /t W32.to_sintE /W32.smod /=.
+  by case (2147483648 <= W32.to_uint (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449))) => _;
+       rewrite hu; smt().
+have hdvd : 2^32 %| (sval u * sval z - t * q).
+- rewrite dvdzE -modzBm -(modzMml t q) hT (modzMml (sval u * sval z * 58728449) q) modzBm.
+  have -> : sval u * sval z - sval u * sval z * 58728449 * q
+          = (sval u * sval z) * (1 - 58728449 * q) by ring.
+  by rewrite -modzMmr (: (1 - 58728449 * q) %% W32.modulus = 0) 1:/q.
+by rewrite mmr_svalE -/t mulzC divzK.
+qed.
+
+(* the product bound: wide operands are fine as long as their product  *)
+(* is; with |u*z| <= P, |mmr u z| <= (P + 2^31 q) / 2^32                *)
+lemma mmr_bnd_prod (u z : W32.t) (P : int) :
+  `|sval u * sval z| <= P => 2^32 * `|sval (mmr u z)| <= P + 2^31 * q.
+proof.
+move=> hP; have [t [rgt E]] := mmr_exact u z.
+have -> : 2^32 * `|sval (mmr u z)| = `|sval u * sval z - t * q| by rewrite -E normrM.
+by move: hP rgt; rewrite /q /=; smt().
+qed.
+
 (* 2^32 is invertible mod q (q odd): cancellation *)
 lemma cgr_pow2_cancel (a b : int) :
   (2^32 * a) %% q = (2^32 * b) %% q => a %% q = b %% q.

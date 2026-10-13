@@ -133,7 +133,6 @@ ecall (column_vector__invert_ntt_montgomery_correct t).
 ecall (column_vector__reduce32_correct t).
 ecall (row_vector____multiply_with_matrix_A_correct _mat _s1).
 auto => /> Hurng_mat Horng_s1 Hsrng_s2.
-split; first exact (wpolylvec_ntt_orng_bmul_irng (lvec_unflatten256 _s1) Horng_s1).
 move => _ result Hlifts_mul Hsrng_mul.
 split; first by apply (wpolykvec_srng_widen _ (lvec * 8380416) (lvec * 8380416) 2143289343 2143289343); smt(mldsa65_lvec).
 move => _ result0 Hlifts_red Hsrng_red.
@@ -152,7 +151,7 @@ have Hchain :
                       (lifts_wpolylvec (lvec_unflatten256 _s1)))
   + lifts_wpolykvec (kvec_unflatten256 _s2)
   = liftu_wpolykvec (kvec_unflatten256 result3).
-+ by rewrite -Hlifts_mul -Hlifts_red -Hlifts_invntt -Hlifts_add -Hlifts_cond Heq3.
++ by rewrite -Hlifts_mul -(liftm_wpolykvec_lifts _ _ Hlifts_red) -Hlifts_invntt -Hlifts_add -Hlifts_cond Heq3.
 rewrite Hchain.
 rewrite /Power2Round /=.
 by split; [exact Ht1_eq | exact Hurng_t1].
