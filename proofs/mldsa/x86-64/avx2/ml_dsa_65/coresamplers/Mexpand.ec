@@ -322,8 +322,8 @@ proof. by rewrite W8u32.of_uint_pack8 -iotaredE /=. qed.
 (* -------------------------------------------------------------------- *)
 (* the SIMD decoder: 32 iterations, each turning a 20-byte input group  *)
 (* into eight coefficients                                              *)
-lemma gamma1____decode_to_polynomialP (bytes_ : W8.t Array640.t) :
-hoare[ M.gamma1____decode_to_polynomial :
+lemma gamma1____decode_to_polynomialP_bits20 (bytes_ : W8.t Array640.t) :
+hoare[ M.gamma1____decode_to_polynomial_bits20 :
     bytes = bytes_
   ==> res = mdecode (Array640.to_list bytes_) ].
 proof.
@@ -400,6 +400,12 @@ by rewrite W8u32.pack8bE // -!Array640.get_to_list
    (mcoeff_slotE (to_list bytes{hr}) (8 * k + 7) (20 * k + 17) 4)
    ~-1:#smt:(Array640.size_to_list).
 qed.
+
+lemma gamma1____decode_to_polynomialP (bytes_ : W8.t Array640.t) :
+hoare[ M.gamma1____decode_to_polynomial :
+    bytes = bytes_
+  ==> res = mdecode (Array640.to_list bytes_) ].
+proof. by proc; rcondf 1; [auto | call (gamma1____decode_to_polynomialP_bits20 bytes_); auto]. qed.
 
 (* ==================================================================== *)
 (* The lane samplers against the Mpoly oracle                           *)

@@ -20,7 +20,10 @@ require import Mask_link.
 (* load/store and the squeeze-blocks loops.                              *)
 (* -------------------------------------------------------------------- *)
 lemma gamma1____decode_to_polynomial_ll : islossless M.gamma1____decode_to_polynomial.
-proof. proc; while true (1024 - output_offset); auto => /#. qed.
+proof.
+proc; rcondf 1; 1: by auto.
+inline *; wp; while true (1024 - output_offset); auto => /#.
+qed.
 hint solve 0 lossless : gamma1____decode_to_polynomial_ll.
 
 lemma __load_shake256_state_ll : islossless M.__load_shake256_state.

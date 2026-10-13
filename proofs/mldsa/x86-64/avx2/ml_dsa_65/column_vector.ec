@@ -485,10 +485,7 @@ proof.
 proc.
 while (0 <= i <= 6) (6 - i); last by auto => /#.
 move => *.
-wp; call (: true ==> true).
-+ proc; wp; while (0 <= offset <= (256 * 32) %/ 8 /\ offset %% 32 = 0)
-           ((256 * 32) %/ 8 - offset); last by auto => /#.
-  by move => *; auto => /#.
+wp; call polynomial__decompose_ll.
 by auto => /#.
 qed.
 

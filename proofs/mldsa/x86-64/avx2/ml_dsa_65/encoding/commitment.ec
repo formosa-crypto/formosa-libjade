@@ -83,8 +83,8 @@ require import WArray1024 WArray128.
 (* (VPMADDUBSW after truncateu4) which handles the full [0..15] range, so the      *)
 (* looser pre still suffices; this matches polynomial__use_hints's tight output    *)
 (* bound (4-bit-masked impl, [0..15]).                                             *)
-lemma commitment_encode_polynomial _a :
-   hoare [ M.commitment____encode_polynomial :
+lemma commitment_encode_polynomial_bits4 _a :
+   hoare [ M.commitment____encode_polynomial_bits4 :
        commitment = _a /\ wpoly_urng (b_w1 + 1) _a
      ==>
        to_list res = SimpleBitPack (liftu_wpoly _a) b_w1
@@ -170,12 +170,23 @@ conseq (:  commitment = BSWA_256u32.init (fun i => BS_W32_W4_U.zeroextu32 (BS_W3
 
 qed.
 
-lemma commitment____encode_polynomial_ll : islossless M.commitment____encode_polynomial.
+lemma commitment_encode_polynomial _a :
+   hoare [ M.commitment____encode_polynomial :
+       commitment = _a /\ wpoly_urng (b_w1 + 1) _a
+     ==>
+       to_list res = SimpleBitPack (liftu_wpoly _a) b_w1
+   ].
+proof. by proc; rcondf 1; [auto | call (commitment_encode_polynomial_bits4 _a); auto]. qed.
+
+lemma commitment____encode_polynomial_ll_bits4 : islossless M.commitment____encode_polynomial_bits4.
 proof.
 proc; wp.
 while (true) ((4 * 256) %/ 8 - output_offset); last by auto => /#.
 by move => *; auto => /#.
 qed.
+
+lemma commitment____encode_polynomial_ll : islossless M.commitment____encode_polynomial.
+proof. by proc; rcondf 1; [auto | call commitment____encode_polynomial_ll_bits4]. qed.
 
 import VecMat PolyKVec.
 

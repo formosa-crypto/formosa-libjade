@@ -9,6 +9,29 @@ namespace sample {
 
         // The L + K error polynomials are sampled four at a time, with the
         // lanes past the last one discarded
+        if (COLUMNS_IN_MATRIX_A == 4) {
+            // ML-DSA-44: 4 + 4 polynomials in two calls
+            s1[COEFFICIENTS_IN_POLYNOMIAL * 0 : COEFFICIENTS_IN_POLYNOMIAL],
+            s1[COEFFICIENTS_IN_POLYNOMIAL * 1 : COEFFICIENTS_IN_POLYNOMIAL],
+            s1[COEFFICIENTS_IN_POLYNOMIAL * 2 : COEFFICIENTS_IN_POLYNOMIAL],
+            s1[COEFFICIENTS_IN_POLYNOMIAL * 3 : COEFFICIENTS_IN_POLYNOMIAL] =
+                error_4x::__sample_polynomials
+                (
+                    rho_prime,
+                    0
+                );
+
+            s2[COEFFICIENTS_IN_POLYNOMIAL * 0 : COEFFICIENTS_IN_POLYNOMIAL],
+            s2[COEFFICIENTS_IN_POLYNOMIAL * 1 : COEFFICIENTS_IN_POLYNOMIAL],
+            s2[COEFFICIENTS_IN_POLYNOMIAL * 2 : COEFFICIENTS_IN_POLYNOMIAL],
+            s2[COEFFICIENTS_IN_POLYNOMIAL * 3 : COEFFICIENTS_IN_POLYNOMIAL] =
+                error_4x::__sample_polynomials
+                (
+                    rho_prime,
+                    4
+                );
+        }
+
         if (COLUMNS_IN_MATRIX_A == 5) {
             // ML-DSA-65: 5 + 6 polynomials in three calls
             s1[COEFFICIENTS_IN_POLYNOMIAL * 0 : COEFFICIENTS_IN_POLYNOMIAL],

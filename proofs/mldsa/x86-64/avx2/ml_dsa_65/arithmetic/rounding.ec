@@ -23,7 +23,7 @@ require import CircuitBindings Bindings.
 (*   highs.[i] = HighBits((liftu_wpoly _a).[i])                      *)
 (* ================================================================== *)
 
-lemma polynomial__decompose_ll : islossless M.polynomial__decompose.
+lemma polynomial__decompose_gamma2_32_ll : islossless M.polynomial__decompose_gamma2_32.
 proof.
 proc.
 wp; while (0 <= offset <= (256 * 32) %/ 8 /\ offset %% 32 = 0)
@@ -181,9 +181,9 @@ have -> : (if 2147483648 <= to_uint L then to_uint L - 4294967296 else to_uint L
 by rewrite HLs -Hlb Hcnd.
 qed.
 
-lemma polynomial__decompose_correct
+lemma polynomial__decompose_gamma2_32_correct
       (_low : W32.t Array256.t) (_high : W32.t Array256.t) (_a : W32.t Array256.t) :
-    hoare [ M.polynomial__decompose :
+    hoare [ M.polynomial__decompose_gamma2_32 :
         lows = _low /\ highs = _high /\ polynomial = _a /\
         wpoly_urng q _a  (* input in [0, q-1] *)
         ==>
@@ -235,6 +235,27 @@ hoare split.
 + by rewrite /hi_lane /=; circuit.
 by rewrite /lo_lane /hi_lane /=; circuit.
 qed.
+
+(* Decompose through the gamma2 dispatcher *)
+lemma polynomial__decompose_ll : islossless M.polynomial__decompose.
+proof. by proc; rcondf 1; [auto | call polynomial__decompose_gamma2_32_ll]. qed.
+
+lemma polynomial__decompose_correct
+      (_low : W32.t Array256.t) (_high : W32.t Array256.t) (_a : W32.t Array256.t) :
+    hoare [ M.polynomial__decompose :
+        lows = _low /\ highs = _high /\ polynomial = _a /\
+        wpoly_urng q _a  (* input in [0, q-1] *)
+        ==>
+        (* LowBits: signed, [-gamma2, gamma2] *)
+        (forall i, 0 <= i < 256 =>
+            W32.to_sint res.`1.[i] = LowBits ((liftu_wpoly _a).[i])) /\
+        wpoly_srng gamma2 gamma2 res.`1 /\
+        (* HighBits: unsigned, [0, (q-1)/(2*gamma2)] *)
+        (forall i, 0 <= i < 256 =>
+            W32.to_uint res.`2.[i] = HighBits ((liftu_wpoly _a).[i])) /\
+        wpoly_urng ((q - 1) %/ (2 * gamma2)) res.`2
+    ].
+proof. by proc; rcondf 1; [auto | call (polynomial__decompose_gamma2_32_correct _low _high _a); auto]. qed.
 
 lemma polynomial__decompose_ph
       (_low : W32.t Array256.t) (_high : W32.t Array256.t) (_a : W32.t Array256.t) :
@@ -345,12 +366,12 @@ have Hh0 : to_uint h = 0 by move: (Hn1 Hh1); smt().
 by rewrite Hh0.
 qed.
 
-lemma polynomial__use_hints_ll : islossless M.polynomial__use_hints.
+lemma polynomial__use_hints_gamma2_32_ll : islossless M.polynomial__use_hints_gamma2_32.
 proof.
 proc.
 while (0 <= offset <= (256 * 32) %/ 8 /\ offset %% 32 = 0)
        ((256 * 32) %/ 8 - offset); last first.
-+ wp; call polynomial__decompose_ll.
++ wp; call polynomial__decompose_gamma2_32_ll.
   by auto => /#.
 by move => *; auto => /#.
 qed.
@@ -358,9 +379,9 @@ qed.
 (* Tight output bound: the AVX2 impl ends use_hints with `& 15` (4-bit mask),     *)
 (* so output is always in [0..15] = wpoly_urng ((q-1)/(2*gamma2)) = wpoly_urng 16.*)
 (* See submodules/dilithium/dilithium/ref/rounding.c:91-95 for the reference.     *)
-lemma polynomial__use_hints_correct
+lemma polynomial__use_hints_gamma2_32_correct
       (_commitment : W32.t Array256.t) (_hints : W32.t Array256.t) :
-    hoare [ M.polynomial__use_hints :
+    hoare [ M.polynomial__use_hints_gamma2_32 :
         commitment = _commitment /\ hint_polynomial = _hints /\
         wpoly_urng q _commitment /\   (* standard range [0, q-1] *)
         wpoly_urng 2 _hints           (* hints are 0 or 1 *)
@@ -379,18 +400,18 @@ proc change ^while.9 : { commitment <- if (0 <= offset*8 <= n*32-n) then BSWAS_2
 seq 5 : (commitment = _commitment /\ hint_polynomial = _hints /\
          wpoly_urng q _commitment /\ wpoly_urng 2 _hints /\
          zeros = W256.zero /\
-         mask = Array5.Array5."_.[_]" polynomial__CONSTANTS_TABLE 0 /\
+         mask = Array5.Array5."_.[_]" polynomial__CONSTANTS_TABLE_gamma2_32 0 /\
          (forall i, 0 <= i < 256 =>
             to_sint lows.[i] = LowBits ((liftu_wpoly _commitment).[i])) /\
          (forall i, 0 <= i < 256 =>
             to_uint highs.[i] = HighBits ((liftu_wpoly _commitment).[i])) /\
          wpoly_urng 16 highs);
-  first (call (polynomial__decompose_correct witness witness _commitment);
+  first (call (polynomial__decompose_gamma2_32_correct witness witness _commitment);
          auto => />; have Hm : 8380416 %/ (2 * gamma2) = 16 by smt(param_sets));
   first by rewrite Hm.
 unroll for ^while; wp -1.
 conseq (: hint_polynomial = _hints /\ zeros = W256.zero /\
-          mask = Array5.Array5."_.[_]" polynomial__CONSTANTS_TABLE 0 /\
+          mask = Array5.Array5."_.[_]" polynomial__CONSTANTS_TABLE_gamma2_32 0 /\
           lows = lows /\ highs = highs ==>
           commitment = BSWA_256u32.init
                          (fun (i:int) => uh_lane _hints.[i] lows.[i] highs.[i])).
@@ -440,6 +461,22 @@ conseq (: hint_polynomial = _hints /\ zeros = W256.zero /\
   by rewrite /liftu_wpoly.
 by rewrite /uh_lane /=; circuit.
 qed.
+
+(* UseHint through the gamma2 dispatcher *)
+lemma polynomial__use_hints_ll : islossless M.polynomial__use_hints.
+proof. by proc; rcondf 1; [auto | call polynomial__use_hints_gamma2_32_ll]. qed.
+
+lemma polynomial__use_hints_correct
+      (_commitment : W32.t Array256.t) (_hints : W32.t Array256.t) :
+    hoare [ M.polynomial__use_hints :
+        commitment = _commitment /\ hint_polynomial = _hints /\
+        wpoly_urng q _commitment /\   (* standard range [0, q-1] *)
+        wpoly_urng 2 _hints           (* hints are 0 or 1 *)
+        ==>
+        liftu_wpoly res = poly_UseHint (liftu_wpoly _hints) (liftu_wpoly _commitment) /\
+        wpoly_urng ((q - 1) %/ (2 * gamma2)) res
+    ].
+proof. by proc; rcondf 1; [auto | call (polynomial__use_hints_gamma2_32_correct _commitment _hints); auto]. qed.
 
 lemma polynomial__use_hints_ph
       (_commitment : W32.t Array256.t) (_hints : W32.t Array256.t) :

@@ -91,8 +91,8 @@ qed.
 
 require import WArray640 WArray1024.
 
-lemma gamma1_encode_polynomial _a :
-   hoare [ M.gamma1____encode_polynomial :
+lemma gamma1_encode_polynomial_bits20 _a :
+   hoare [ M.gamma1____encode_polynomial_bits20 :
        polynomial = _a /\ wpoly_srng 524287 524288 _a
      ==>
        to_list res = BitPack (lifts_wpoly _a) (gamma1-1) gamma1
@@ -153,6 +153,14 @@ conseq (:  _ ==>
 + by move => &hr [<- Hrng] ? /= => ->;rewrite BitPack_liftE //= /#.
 
 qed.
+
+lemma gamma1_encode_polynomial _a :
+   hoare [ M.gamma1____encode_polynomial :
+       polynomial = _a /\ wpoly_srng 524287 524288 _a
+     ==>
+       to_list res = BitPack (lifts_wpoly _a) (gamma1-1) gamma1
+   ].
+proof. by proc; rcondf 1; [auto | call (gamma1_encode_polynomial_bits20 _a); auto]. qed.
 
 
 op gamma1_decode_to_polynomial_lane(c : W20.t) : W32.t =
@@ -224,8 +232,8 @@ by rewrite initiE 1:/# /=.
 qed.
 
 
-lemma gamma1_decode_to_polynomial _a :
-   hoare [ M.gamma1____decode_to_polynomial :
+lemma gamma1_decode_to_polynomial_bits20 _a :
+   hoare [ M.gamma1____decode_to_polynomial_bits20 :
        bytes = _a
      ==>
        lifts_wpoly res = BitUnpack (to_list _a) (gamma1-1) gamma1 /\
@@ -286,6 +294,15 @@ rewrite mldsa65_gamma1 /=.
 have /= /#:= W20.to_uint_cmp.
 qed.
 
+lemma gamma1_decode_to_polynomial _a :
+   hoare [ M.gamma1____decode_to_polynomial :
+       bytes = _a
+     ==>
+       lifts_wpoly res = BitUnpack (to_list _a) (gamma1-1) gamma1 /\
+       wpoly_srng (gamma1-1) gamma1 res
+   ].
+proof. by proc; rcondf 1; [auto | call (gamma1_decode_to_polynomial_bits20 _a); auto]. qed.
+
 import VecMat PolyLVec.
 
 require import Array1280 Array3200.
@@ -339,12 +356,15 @@ rewrite initiE 1:/# /= tP => ii iib.
 rewrite  initiE 1:/# /= nth_sub 1:/# initiE 1:/# /= /#.
 qed.
 
-lemma gamma2_encode_polynomial_ll : islossless M.gamma1____encode_polynomial.
+lemma gamma2_encode_polynomial_ll_bits20 : islossless M.gamma1____encode_polynomial_bits20.
 proc.
 while (0 <= i <= 10) (10 - i); 1: by auto => /> /#.
 inline 9; wp;conseq (: _ ==> true); 1: by smt().
 by while (0 <= input_offset <= 992 /\ input_offset %% 32 = 0) (992 - input_offset); move => *; inline *; auto => /> /#.
 qed.
+
+lemma gamma2_encode_polynomial_ll : islossless M.gamma1____encode_polynomial.
+proof. by proc; rcondf 1; [auto | call gamma2_encode_polynomial_ll_bits20]. qed.
 
 lemma gamma1_encode_ll : islossless  M.gamma1____encode.
 proc;unroll for ^while.
@@ -421,11 +441,14 @@ have -> : (lvec_unflatten256
 exact Hrr2.
 qed.
 
-lemma gamma2_decode_to_polynomial_ll : islossless M.gamma1____decode_to_polynomial.
+lemma gamma2_decode_to_polynomial_ll_bits20 : islossless M.gamma1____decode_to_polynomial_bits20.
 proc.
 while (0 <= output_offset <= 1024 /\ output_offset %% 32 = 0) (1024 - output_offset); 1: by auto => /> /#.
 by auto => /> /#.
 qed.
+
+lemma gamma2_decode_to_polynomial_ll : islossless M.gamma1____decode_to_polynomial.
+proof. by proc; rcondf 1; [auto | call gamma2_decode_to_polynomial_ll_bits20]. qed.
 
 lemma gamma1_decode_ll : islossless  M.gamma1____decode.
 proc;unroll for ^while.

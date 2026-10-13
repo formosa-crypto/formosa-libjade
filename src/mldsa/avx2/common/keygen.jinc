@@ -42,6 +42,31 @@ inline fn __compute_t0_t1(
     return t1, t0;
 }
 
+// The encodings of s1 and s2 written into the signing key. Each slice
+// assignment sits in its own function, so the extracted __keygen_internal
+// declares the same temporaries whether or not s1 and s2 have the same size.
+inline
+fn __encode_s1_into_signing_key(
+    reg ptr u8[SIGNING_KEY_SIZE] signing_key,
+    reg ptr u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] s1
+) -> reg ptr u8[SIGNING_KEY_SIZE]
+{
+    signing_key[START_OF_S1_IN_ENCODED_SIGNING_KEY : S1_ENCODED_SIZE] =
+        s1::__encode(signing_key[START_OF_S1_IN_ENCODED_SIGNING_KEY : S1_ENCODED_SIZE], s1);
+    return signing_key;
+}
+
+inline
+fn __encode_s2_into_signing_key(
+    reg ptr u8[SIGNING_KEY_SIZE] signing_key,
+    reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] s2
+) -> reg ptr u8[SIGNING_KEY_SIZE]
+{
+    signing_key[START_OF_S2_IN_ENCODED_SIGNING_KEY : S2_ENCODED_SIZE] =
+        s2::__encode(signing_key[START_OF_S2_IN_ENCODED_SIGNING_KEY : S2_ENCODED_SIZE], s2);
+    return signing_key;
+}
+
 #[sct="{ptr: public, val: transient} *
        {ptr: public, val: secret} *
        {ptr: public, val: secret} ->
@@ -104,11 +129,8 @@ fn __keygen_internal(
     copied_32_bytes = seed_for_signing.[:u256 0];
     signing_key.[:u256 32] = copied_32_bytes;
 
-    signing_key[START_OF_S1_IN_ENCODED_SIGNING_KEY : S1_ENCODED_SIZE] =
-        s1::__encode(signing_key[START_OF_S1_IN_ENCODED_SIGNING_KEY: S1_ENCODED_SIZE], s1);
-
-    signing_key[START_OF_S2_IN_ENCODED_SIGNING_KEY : S2_ENCODED_SIZE] =
-        s2::__encode(signing_key[START_OF_S2_IN_ENCODED_SIGNING_KEY : S2_ENCODED_SIZE], s2);
+    signing_key = __encode_s1_into_signing_key(signing_key, s1);
+    signing_key = __encode_s2_into_signing_key(signing_key, s2);
 
     () = #spill(signing_key);
 

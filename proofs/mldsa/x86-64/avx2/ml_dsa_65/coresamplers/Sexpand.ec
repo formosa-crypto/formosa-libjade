@@ -1559,6 +1559,7 @@ proof.
 move=> hok; proc.
 sp.
 (* the ML-DSA-65 layout: L = 5 *)
+rcondf 1; 1: by auto.
 rcondt 1; 1: by auto.
 rcondf ^if; 1: by conseq (: true ==> true).
 seq 5 : (rho_prime = rho_
@@ -1592,7 +1593,8 @@ lemma sample____error_vectors_ll :
   islossless M.sample____error_vectors.
 proof.
 move=> hok; have hll := error_4x____sample_polynomials_ll hok.
-proc; rcondt ^if; 1: by auto.
+proc; rcondf ^if; 1: by auto.
+rcondt ^if; 1: by auto.
 rcondf ^if; 1: by conseq (: true ==> true).
 by wp; do 3! (call hll; wp); auto.
 qed.

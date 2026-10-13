@@ -192,7 +192,7 @@ have Eta_val := mldsa65_Eta.
 have Hlvec := mldsa65_lvec.
 have Hkvec := mldsa65_kvec.
 proc => /=.
-inline {2} M.__keygen_internal.
+inline {2} M.__keygen_internal M.__encode_s1_into_signing_key M.__encode_s2_into_signing_key.
 wp;sp 0 4.
 seq 0 11 : #pre; 1: by auto.
 
@@ -240,12 +240,12 @@ seq 1 1 : (#pre
   ecall{2} (error_vectors_correct seed_for_error_vectors{2}).
   by auto => />  ?? rr -> ?->?; split;congr;congr;rewrite Bytes64.tP => k kb;rewrite Bytes64.get_of_list 1:/# get_to_list get_of_list /#.
 
-proc change {2} [13..14] : [s1p : W32.t Array1280.t] {
+proc change {2} [19..20] : [s1p : W32.t Array1280.t] {
    s1p <@ M.row_vector__ntt(s1);
    (t1, t0) <@ M.__compute_t0_t1(matrix_A, s1p, s2);
 }; 1:  by sim.
 
-swap {2} [13..14] -12.
+swap {2} [19..20] -18.
 
 seq 2 2 : (#pre
       /\ lifts_wpolykvec (kvec_unflatten256 t0{2}) = t0{1}
