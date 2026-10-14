@@ -61,13 +61,31 @@ clone Warraypack.WArrayPack as WP848 with
       op size <- 848,
   theory A    <- Array848,
   theory WA   <- WArray848
-  rename "get" as "WArray848_get".
+  rename "get" as "WArray848_get"
+  proof *.
+realize A.WArray848_get_out by exact Array848.get_out.
+realize WA.WArray848_get_out by exact WArray848.get_out.
+realize WA.WArray848_get16E by exact WArray848.get16E.
+realize WA.WArray848_get32E by exact WArray848.get32E.
+realize WA.WArray848_get64E by exact WArray848.get64E.
+realize WA.WArray848_get128E by exact WArray848.get128E.
+realize WA.WArray848_get256E by exact WArray848.get256E.
+realize WA.ArrayW8.WArray848_get_out by exact WArray848.ArrayW8.get_out.
 
 clone Warraypack.WArrayPack as WP256 with
       op size <- 256,
   theory A    <- Array256,
   theory WA   <- WArray256
-  rename "get" as "WArray256_get".
+  rename "get" as "WArray256_get"
+  proof *.
+realize A.WArray256_get_out by exact Array256.get_out.
+realize WA.WArray256_get_out by exact WArray256.get_out.
+realize WA.WArray256_get16E by exact WArray256.get16E.
+realize WA.WArray256_get32E by exact WArray256.get32E.
+realize WA.WArray256_get64E by exact WArray256.get64E.
+realize WA.WArray256_get128E by exact WArray256.get128E.
+realize WA.WArray256_get256E by exact WArray256.get256E.
+realize WA.ArrayW8.WArray256_get_out by exact WArray256.ArrayW8.get_out.
 
 import WP848 WP256.
 

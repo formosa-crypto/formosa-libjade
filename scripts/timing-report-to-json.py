@@ -5,7 +5,7 @@ The report has one node per scenario, each with per-file details:
 
     - name: mldsa
       details:
-      - name: keygen (mldsa/x86-64/avx2/ml_dsa_65/keygen.ec)
+      - name: correctness65 (mldsa/x86-64/avx2/ml_dsa_65/correctness65.ec)
         time: '12.345'
         success: true
         ...

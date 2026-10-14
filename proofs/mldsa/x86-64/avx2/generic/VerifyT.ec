@@ -1,91 +1,59 @@
 require import AllCore List IntDiv RealExp.
-
 from Jasmin require import JModel_x86.
-
-require import Mldsa65.
-from JazzEC require import Mldsa_65_prelude Matrix_A Hashing
-                           Signature Challenge Row_vector Polynomial Commitment T1
-                           Common_ntt Common_modular Common_invert_ntt Rounding.
-
-require import CircuitBindings Bindings XArray48.
-
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
-from Spec require import Spec65.
-import MLDSA65.
+require import Array2 Array32 Array64 Array256.
+require import BitEncoding JWordList.
+require BaseT PreludeT PolynomialT CommonNttT CommonModularT CommonInvertNttT RoundingT.
+require RowVectorT MatrixAT SamplersT SignatureT CommitmentT T1T HashingT.
+
+abstract theory VerifyT.
+
+clone import BaseT.BaseT as B.
+import S R MLDSAParams.
+clone import PreludeT.PreludeT as PR with theory B <= B.
+clone import PolynomialT.PolynomialT as PL with theory B <= B.
+clone import CommonNttT.CommonNttT as CN with theory B <= B.
+clone import CommonModularT.CommonModularT as CM with theory B <= B.
+clone import CommonInvertNttT.CommonInvertNttT as CI with theory B <= B.
+clone import RoundingT.RoundingT as RD with theory B <= B.
+clone import RowVectorT.RowVectorT as RV with
+  theory B <= B, theory PR <= PR, theory PL <= PL, theory CN <= CN, theory CM <= CM.
+clone import MatrixAT.MatrixAT as MA with theory B <= B, theory PR <= PR.
+clone import SamplersT.SamplersT as SM with theory B <= B, theory PR <= PR.
+clone import SignatureT.SignatureT as SG with theory B <= B, theory PR <= PR.
+clone import CommitmentT.CommitmentT as CMT with theory B <= B, theory PR <= PR.
+clone import T1T.T1T as T1 with theory B <= B, theory PR <= PR.
+clone import HashingT.HashingT as HS with theory B <= B.
+import CR.
 
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq.
-
-require import Array2 Array32 Array48 Array64 Array256 Array768 Array1280 Array1536
-               Array1920 Array1952 Array3309 Array7680.
-               require import WArray48.
-
-require import BitEncoding.
-require import JWordList.
+import Array_ctilde Array_pk_enc Array_sig_enc Array_t1_enc Array_w1vec_enc Array_kpolys.
 import BitChunking.
 
 lemma compare_commitment_hashes_ll : islossless M.__compare_commitment_hashes.
 proof.
+have hct : 16 <= ctilde /\ ctilde %% 16 = 0 by rewrite /ctilde; smt(param_sets).
 proc.
-wp;while (0 <=  offset <= 48 /\ offset %% 16 = 0) (48 -  offset); last by auto => />; smt().
-auto => /> ; smt().
+wp; while (0 <= offset <= ctilde /\ offset %% 16 = 0) (ctilde - offset).
++ by move=> z; auto => /> /#.
+by auto => /> /#.
 qed.
 
-lemma compare_commitment_hashes_correct (_lhs _rhs : W8.t Array48.t) :
-    phoare [ M.__compare_commitment_hashes :
-        arg.`1 = _lhs /\ arg.`2 = _rhs
-        ==>
-        res = (if _lhs = _rhs then W64.of_int 0 else -W64.one)
-    ] = 1%r.
-proof.
-have hh : hoare [ M.__compare_commitment_hashes :
-    arg.`1 = _lhs /\ arg.`2 = _rhs
-    ==>
-    res = (if _lhs = _rhs then W64.of_int 0 else -W64.one) ].
-+ proc => /=.
-  proc change 2 : { lhs_bytes <- if (0 <=  offset * 8 <= 48*8-128)
-                                  then BSWAS_48u8_128.sliceget lhs (offset * 8)
-                                  else get128_direct (WArray48.init8 (fun i => lhs.[i])) (offset); }.
-  + auto => /> &2.
-    case (0 <= offset{2} * 8 <= 256); last  by auto.
-    by move => ?; rewrite -BSWAS_48u8_128_slicegetE /#.
-  proc change 3 : { rhs_bytes <- if (0 <=  offset * 8 <= 48*8-128)
-                                  then BSWAS_48u8_128.sliceget rhs ( offset * 8)
-                                  else get128_direct (WArray48.init8 (fun i => rhs.[i])) (offset); }.
-  + auto => /> &2.
-    case (0 <= offset{2} * 8 <= 256); last by auto.
-    by move => ?; rewrite -BSWAS_48u8_128_slicegetE /#.
-  proc change ^while.1 : { lhs_bytes <- if (0 <= offset * 8 <= 48*8-128)
-                                         then BSWAS_48u8_128.sliceget lhs (offset * 8)
-                                         else get128_direct (WArray48.init8 (fun i => lhs.[i])) (offset); }.
-  + auto => /> &2.
-    case (0 <= offset{2} * 8 <= 256); last by auto.
-    by move => ?; rewrite -BSWAS_48u8_128_slicegetE /#.
-  proc change ^while.2 : { rhs_bytes <- if (0 <= offset * 8 <= 48*8-128)
-                                         then BSWAS_48u8_128.sliceget rhs (offset * 8)
-                                         else get128_direct (WArray48.init8 (fun i => rhs.[i])) (offset); }.
-  + auto => /> &2.
-    case (0 <= offset{2} * 8 <= 256); last by auto.
-    by move => ?; rewrite -BSWAS_48u8_128_slicegetE /#.
-  cfold 1;unroll for ^while.
-  cfold 12.
-  wp 12.
-  conseq (: _ ==> _lhs = _rhs <=> result = W64.of_int 65535).
-  + move => &hr [<- <-] rr [Hl Hr].
-    case (rr <> W64.of_int 65535); last first.
-    + move => HH; rewrite Hr //=.
-      move => ?; rewrite ifF 1:/# /=.
-      case (lhs{hr} = rhs{hr}) => ?; 1: by
-       rewrite to_uint_eq /=; smt(W64.to_uint_cmp pow2_64).
-      by rewrite to_uint_eq /= to_uintN /=. 
-  by circuit.
-conseq compare_commitment_hashes_ll hh;smt().
-qed.
+(* The comparison of the two commitment hashes is unrolled on the size of
+   the hash, which depends on the set: its correctness is a hypothesis of
+   this theory, proved for each set. *)
+axiom compare_commitment_hashes_correct (_lhs _rhs : W8.t Array_ctilde.t) :
+  phoare [ M.__compare_commitment_hashes :
+      arg.`1 = _lhs /\ arg.`2 = _rhs
+      ==>
+      res = (if _lhs = _rhs then W64.of_int 0 else -W64.one)
+  ] = 1%r.
 
 
 (* ================================================================== *)
 (* reconstruct_signer_commitment                                       *)
-(* Reconstructs w1' = UseHint(h, A*z - c*t1*2^d) for each of 6 rows. *)
+(* Reconstructs w1' = UseHint(h, A*z - c*t1*2^d) for each of the kvec rows. *)
 (* Per-component loop body:                                            *)
 (*   t1_decode → shift_left → NTT → pmmar(c,t1) →                    *)
 (*   subtract(az, ct1) → reduce32 → invNTT → cond_add_mod →          *)
@@ -99,7 +67,7 @@ lemma reconstruct_signer_commitment_ll :
 proof.
 proc.
 wp; call commitment____encode_ll.
-while (0 <= i <= 6) (6 - i); last by auto => /#.
+while (0 <= i <= kvec) (kvec - i); last by auto => />; smt(gt0_k).
 move => *; wp.
 call polynomial__use_hints_ll; wp.
 call polynomial__conditionally_add_modulus_ll.
@@ -113,9 +81,9 @@ call t1__decode_polynomial_ll.
 by auto => /#.
 qed.
 
-(* Spec-level t1 polykvec obtained from the t1_encoded bytes (6 chunks of 320 bytes, *)
+(* Spec-level t1 polykvec obtained from the t1_encoded bytes (kvec chunks of 320 bytes, *)
 (* each decoded via SimpleBitUnpack with range 2^(q_bits-d)-1 = 1023 = b_t1).        *)
-op t1_from_t1enc (_t1enc : W8.t Array1920.t) : polykvec =
+op t1_from_t1enc (_t1enc : W8.t Array_t1_enc.t) : polykvec =
    KArray.init (fun i =>
       SimpleBitUnpack
         (take ((n * (q_bits - d)) %/ 8)
@@ -127,15 +95,15 @@ op t1_from_t1enc (_t1enc : W8.t Array1920.t) : polykvec =
 (* _az is row_vector____multiply_with_matrix_A's output, a sum of Montgomery         *)
 (* products: it is read in Montgomery form (liftm), as invert_ntt consumes it.       *)
 op signer_commitment_spec
-     (_t1enc : W8.t Array1920.t) (_ch : W32.t Array256.t) (_az : W32.t Array1536.t)
+     (_t1enc : W8.t Array_t1_enc.t) (_ch : W32.t Array256.t) (_az : W32.t Array_kpolys.t)
    : polykvec =
    invnttv (liftm_wpolykvec (kvec_unflatten256 _az)
              - ntt_smul (lifts_wpoly _ch)
                         (nttv (smul (t1_from_t1enc _t1enc) (incoeff (2^d))))).
 
 lemma reconstruct_signer_commitment_correct
-      (_t1enc : W8.t Array1920.t) (_ch : W32.t Array256.t)
-      (_az : W32.t Array1536.t) (_hints : W32.t Array1536.t) :
+      (_t1enc : W8.t Array_t1_enc.t) (_ch : W32.t Array256.t)
+      (_az : W32.t Array_kpolys.t) (_hints : W32.t Array_kpolys.t) :
     hoare [ M.reconstruct_signer_commitment :
         t1_encoded = _t1enc /\ challenge_as_ntt = _ch /\
         a_times_signer_response = _az /\ hints = _hints /\
@@ -150,16 +118,14 @@ lemma reconstruct_signer_commitment_correct
                             (signer_commitment_spec _t1enc _ch _az))
     ].
 proof.
-have kvec_val := mldsa65_kvec.
-have gamma2_val := mldsa65_gamma2.
 proc => /=.
 (* Post-loop: commitment____encode produces res from commitment.                       *)
 (* commitment_encode's pre requires wpolykvec_urng _ b_w1 (values in [0..b_w1-1]).     *)
 wp; ecall (commitment_encode commitment).
-(* Outer 6-iteration loop. Invariant tracks, for each processed component k < i:       *)
+(* Outer kvec-iteration loop. Invariant tracks, for each processed component k < i:       *)
 (*  (a) liftu (commitment.[k]) = poly_UseHint (liftu (_hints.[k])) (spec_commit.[k]);  *)
 (*  (b) wpoly_urng ((q-1)/(2*gamma2)) commitment.[k]  (tight use_hints post = [0..15]) *)
-while (0 <= i <= 6 /\ t1_encoded = _t1enc /\ challenge_as_ntt = _ch /\
+while (0 <= i <= kvec /\ t1_encoded = _t1enc /\ challenge_as_ntt = _ch /\
        a_times_signer_response = _az /\ hints = _hints /\
        wpoly_ntt_orng _ch /\
        wpolykvec_urng (kvec_unflatten256 _hints) 2 /\
@@ -172,9 +138,8 @@ while (0 <= i <= 6 /\ t1_encoded = _t1enc /\ challenge_as_ntt = _ch /\
           wpoly_urng ((q - 1) %/ (2 * gamma2)) (kvec_unflatten256 commitment).[k])
       ); last first.
 + (* Exit: aggregate per-component invariant to kvec level and bridge to w1Encode.    *)
-  auto => |> Hch_rng Hhints_rng Haz_rng; split; 1: smt().
+  auto => |> Hch_rng Hhints_rng Haz_rng; split; 1: smt(gt0_k).
   move => cm_exit i_exit Hng Hi1 Hi2 Hdone.
-  (* Step 1: establish kvec-level equality for liftu cm_exit = UseHint _ spec.         *)
   have Hlifts_cm :
       liftu_wpolykvec (kvec_unflatten256 cm_exit) =
       UseHint (liftu_wpolykvec (kvec_unflatten256 _hints))
@@ -182,30 +147,26 @@ while (0 <= i <= 6 /\ t1_encoded = _t1enc /\ challenge_as_ntt = _ch /\
   + rewrite /UseHint; apply KArray.tP => k kb.
     rewrite KArray.map2iE 1:/# /= /liftu_wpolykvec KArray.mapiE 1:/# /=.
     rewrite KArray.mapiE 1:/# /=.
-    by have /= [-> _] := Hdone k _; smt(mldsa65_kvec).
-  (* Step 2: derive wpolykvec_urng (b_w1+1) bound needed by commitment_encode's pre.    *)
-  (* The invariant gives wpoly_urng ((q-1)/(2*gamma2)) = wpoly_urng 16 = wpoly_urng     *)
-  (* (b_w1+1) per component (tight; the 4-bit-masked impl always stays in [0..15]).    *)
-  have Hurng_b_w1 : wpolykvec_urng (kvec_unflatten256 cm_exit) (b_w1 + 1).
+    by have /= [-> _] := Hdone k _; smt(gt0_k).
+  (* commitment_encode's pre: the invariant bounds each component by hb_range *)
+  split.
   + rewrite /wpolykvec_urng KArray.allP => k kbl.
-    have /= [_ Hrng] := Hdone k _; 1: smt(mldsa65_kvec).
-    by move: Hrng; rewrite /b_w1 /=; smt(mldsa65_gamma2).
-  split; first exact Hurng_b_w1.
-  (* Step 3: relate commitment_encode post (kvec_unflatten128 res = map SimpleBitPack)  *)
-  (* to w1Encode definition (BytesW1.of_list (flatten (map SimpleBitPack (mkseq ...)))).*)
+    by have /= [_ Hrng] := Hdone k _; 1: smt(gt0_k).
+  (* commitment_encode's post, polynomial by polynomial, against w1Encode *)
   move => _ encres Hunflat.
   rewrite Hlifts_cm in Hunflat.
-  rewrite /w1Encode.
-  have Hb_w1 : (q - 1) %/ (2 * gamma2) - 1 = b_w1
-    by rewrite /b_w1 /=; smt(mldsa65_gamma2).
-  rewrite Hb_w1; apply BytesW1.tP => k kb.
-  rewrite !BytesW1.get_of_list 1,2:/# get_to_list (kvec_unflatten128iE encres k) 1:/# Hunflat.
-  rewrite KArray.mapiE; 1: smt(mldsa65_kvec).
-  rewrite /= Array128.Array128.get_of_list 1:/# (BitChunking.nth_flatten witness 128).
-  + rewrite allP => s /mapP [wi [_ ->]] /=.
-    by rewrite size_SimpleBitPack /b_w1 /= /#.
-  rewrite (nth_map witness); 1: by rewrite size_mkseq; smt(mldsa65_kvec).
-  by rewrite nth_mkseq; 1: smt(mldsa65_kvec).
+  rewrite /w1Encode; apply BytesW1.tP => k kb.
+  rewrite !BytesW1.get_of_list 1,2:/# get_to_list (w1_unflatteniE encres k) 1:/# Hunflat.
+  have Hk : 0 <= k < kvec * w1_enc by move: kb; rewrite -w1vec_encE /w1vec_enc.
+  have [Hq Hr] := blk_idx kvec w1_enc k gt0_w1_enc Hk.
+  have Hhb : 1 <= hb_range - 1 by rewrite /hb_range; smt(gamma2_cases).
+  have Hsz : forall p, size (SimpleBitPack p (hb_range - 1)) = w1_enc.
+  + by move=> p; rewrite size_SimpleBitPack // ilog_w1 w1_encE.
+  rewrite KArray.mapiE // /= Array_w1_enc.get_of_list ?Hsz //.
+  rewrite (BitChunking.nth_flatten witness w1_enc).
+  + by rewrite allP => s /mapP [wi [_ ->]] /=; rewrite Hsz.
+  rewrite (nth_map witness); 1: by rewrite size_mkseq; smt(gt0_k).
+  by rewrite nth_mkseq.
 (* Loop body: 9-call chain (t1_decode → shift → ntt → pmmar → subtract → reduce32 →    *)
 (*   invert_ntt → caddq → use_hints) + writeback. The ecall chain is structurally      *)
 (* threaded below.                              *)
@@ -232,13 +193,14 @@ move => result Hliftu_t1 Hurng_t1 Hurng_t1_1024 result0 Hto_sint_shift Hsrng_shi
 move => _ result1 Hlifts_ntt Horng_ntt _ _ result2 Hlifts_pmmar Hsrng_pmmar.
 (* subtract's pre: wpoly_srng on az slice + arithmetic bound *)
 split.
-+ have /= Hslice := kvec_slice_eq _az (i{hr} * n) _ _; 1,2: smt().
++ split; 2: smt(param_sets).
+  have /= Hslice := kvec_slice_eq _az (i{hr} * n) _ _; 1,2: smt().
   have Hdiv : i{hr} * n %/ n = i{hr} by smt().
   move: Hslice; rewrite Hdiv => Hslice.
   rewrite -Hslice.
-  by move: Haz_rng; rewrite /wpolykvec_srng KArray.allP => H; apply H; smt(mldsa65_kvec).
+  by move: Haz_rng; rewrite /wpolykvec_srng KArray.allP => H; apply H; smt(gt0_k).
 move => _ _ result3 Hlifts_sub Hsrng_sub.
-split; first by apply (wpoly_srng_widen result3 (lvec * 8380416 + 8380416) (lvec * 8380416 + 8380416) 2143289343 2143289343); [ smt(mldsa65_lvec) | smt(mldsa65_lvec) | exact Hsrng_sub ].
+split; first by apply (wpoly_srng_widen result3 (lvec * 8380416 + 8380416) (lvec * 8380416 + 8380416) 2143289343 2143289343); [ smt(param_sets) | smt(param_sets) | exact Hsrng_sub ].
 move => _ result4 Hlifts_red Hsrng_red.
 (* invert_ntt's pre: wpoly_intt_irng via widening + bridge *)
 split; first by apply wpoly_bmul_orng_intt_irng;
@@ -246,7 +208,7 @@ split; first by apply wpoly_bmul_orng_intt_irng;
 move => _ result5 Hlifts_invntt Hsrng_invntt.
 (* caddq's pre: wpoly_srng (q-1) (q-1) via widening *)
 split; first by apply (wpoly_srng_widen _ invntt_obound invntt_obound (q-1) (q-1));
-  first 2 smt(invntt_obound_fits_for_caddq mldsa65_Eta);
+  first 2 smt(invntt_obound_fits_for_caddq param_sets);
   exact Hsrng_invntt.
 move => _ result6 Hlifts_caddq Hurng_caddq.
 (* use_hints' pre: wpoly_urng 2 hints slice *)
@@ -255,14 +217,14 @@ split.
   have Hdiv_h : i{hr} * n %/ n = i{hr} by smt().
   move: Hslice_h; rewrite Hdiv_h => Hslice_h.
   rewrite -Hslice_h.
-  by move: Hhints_rng; rewrite /wpolykvec_urng KArray.allP => H; apply H; smt(mldsa65_kvec).
+  by move: Hhints_rng; rewrite /wpolykvec_urng KArray.allP => H; apply H; smt(gt0_k).
 move => _ result7 Hliftu_useh Hurng_useh.
 (* Final goal: invariant at i+1 *)
 split; 1: smt().
 move => k Hk_lo Hk_hi.
 have /= Hwb :=
   kvec_unflatten256_writeback_iE commitment{hr} result7 (i{hr} * n) k _ _;
-  1,2: smt(mldsa65_kvec).
+  1,2: smt(gt0_k).
 rewrite Hwb.
 case (k = i{hr}) => Hki.
 + (* New component k = i *)
@@ -286,19 +248,19 @@ case (k = i{hr}) => Hki.
   + by rewrite -Hlifts_pmmar /liftm_wpoly Hlifts_red Hlifts_sub scaleD scaleN.
   rewrite Hliftu_eq Hlifts_caddq Hlifts_invntt Hm Hlifts_ntt.
   (* Unfold signer_commitment_spec + decompose the kvec ops *)
-  rewrite /signer_commitment_spec /invnttv KArray.mapiE; 1: smt(mldsa65_kvec).
-  rewrite polykvec_sub_iE; 1: smt(mldsa65_kvec).
+  rewrite /signer_commitment_spec /invnttv KArray.mapiE; 1: smt(gt0_k).
+  rewrite polykvec_sub_iE; 1: smt(gt0_k).
   congr; congr.
   + (* liftm_wpoly az_slice = (liftm_wpolykvec ...).[i] *)
-    rewrite /liftm_wpolykvec mapiE; 1: smt(mldsa65_kvec).
+    rewrite /liftm_wpolykvec mapiE; 1: smt(gt0_k).
     congr; by rewrite -kvec_slice_eq; smt().
   (* Remaining: basemul _ch (ntt (lifts result0))
        = (&-) ((ntt_smul _ch (nttv (smul t1_spec (incoeff 2^d)))).[i])  *)
   (* Wait — need to match against the FULL (&-) term *)
   congr.
-  rewrite /ntt_smul KArray.mapiE; 1: smt(mldsa65_kvec).
-  rewrite /= /nttv KArray.mapiE; 1: smt(mldsa65_kvec).
-  rewrite /smul KArray.mapiE; 1: smt(mldsa65_kvec).
+  rewrite /ntt_smul KArray.mapiE; 1: smt(gt0_k).
+  rewrite /= /nttv KArray.mapiE; 1: smt(gt0_k).
+  rewrite /smul KArray.mapiE; 1: smt(gt0_k).
   rewrite /=.
   (* Bridge: lifts_wpoly (shift result) = smul t1_spec (incoeff 2^d) at index i.      *)
   (* Per-coeff: Hto_sint_shift gives to_sint = to_uint * 2^d. After incoeffM and      *)
@@ -312,7 +274,7 @@ case (k = i{hr}) => Hki.
   + apply Array256.tP => j jb.
     rewrite /lifts_wpoly mapiE 1:/# /= (Hto_sint_shift j jb).
     rewrite mapiE 1:/# /=.
-    rewrite /t1_from_t1enc KArray.initiE; 1: smt(mldsa65_kvec).
+    rewrite /t1_from_t1enc KArray.initiE; 1: smt(gt0_k).
     rewrite /=.
     rewrite incoeffM Zq.ComRing.mulrC; congr.
     have <- : liftu_wpoly result = SimpleBitUnpack
@@ -333,7 +295,7 @@ case (k = i{hr}) => Hki.
   apply Array256.tP => j jb.
   have W13_eq : XWord13.W13.modulus = 8192 by smt(XWord13.W13.ge2_modulus).
   rewrite W13_eq.
-  rewrite /basemul !initiE 1,2:/# /=; first smt(mldsa65_kvec).
+  rewrite /basemul !initiE 1,2:/# /=; first smt(gt0_k).
   by rewrite Zq.ComRing.mulrC.
 + (* Old component k < i: via Hdone *)
   have -> : (k = i{hr} * n %/ n) = false by smt().
@@ -342,8 +304,8 @@ case (k = i{hr}) => Hki.
 qed.
 
 lemma reconstruct_signer_commitment_ph
-      (_t1enc : W8.t Array1920.t) (_ch : W32.t Array256.t)
-      (_az : W32.t Array1536.t) (_hints : W32.t Array1536.t) :
+      (_t1enc : W8.t Array_t1_enc.t) (_ch : W32.t Array256.t)
+      (_az : W32.t Array_kpolys.t) (_hints : W32.t Array_kpolys.t) :
     phoare [ M.reconstruct_signer_commitment :
         t1_encoded = _t1enc /\ challenge_as_ntt = _ch /\
         a_times_signer_response = _az /\ hints = _hints /\
@@ -357,6 +319,14 @@ lemma reconstruct_signer_commitment_ph
     ] = 1%r
   by conseq reconstruct_signer_commitment_ll
             (reconstruct_signer_commitment_correct _t1enc _ch _az _hints).
+
+(* the threshold of the norm check of the signer response *)
+lemma thr_gamma1E : (1 `<<` gamma1m1_bits) - tau * Eta = gamma1 - Beta.
+proof. by rewrite /(`<<`) /gamma1m1_bits /gamma1 /Beta ifT; [smt(param_sets) | done]. qed.
+
+lemma gamma1_q2 : gamma1 <= q %/ 2 by smt(gamma1_cases).
+
+lemma gamma1_beta_bnd : 0 < gamma1 - Beta <= q %/ 2 by smt(gamma1_q2 beta_gamma1_lt gt0_beta).
 
 lemma verify_internal_correct _m :
     equiv [ MLDSA(MLDSA_XOFA, MLDSA_XOFS, MLDSA_XOF_SIB, SIB_RO).verify ~ M.__verify_internal :
@@ -375,12 +345,6 @@ lemma verify_internal_correct _m :
        res{1} = (res{2} = W64.of_int 0)
    ].
 proof.
-have Hlvec := mldsa65_lvec.
-have Hkvec := mldsa65_kvec.
-have HLambda := mldsa65_lambda.
-have HEta := mldsa65_Eta.
-have Htau := mldsa65_tau.
-have Hgamma1 := mldsa65_gamma1.
 
 proc => /=; conseq |>.
 
@@ -410,13 +374,10 @@ seq 1 1 : (#pre /\
 seq 0 1 : (#pre /\
     (!wpolylvec_infnorm_lt (gamma1 - Beta) (lvec_unflatten256 signer_response{2}) => result2{2} <> W64.of_int 0) /\
     (wpolylvec_infnorm_lt (gamma1 - Beta) (lvec_unflatten256 signer_response{2})  => result2{2} = W64.zero)).
-+ ecall {2} (row_vector____check_infinity_norm_correct signer_response{2} ((1 `<<` gamma1m1_bits) - 49 * w1_bits)).
++ ecall {2} (row_vector____check_infinity_norm_correct signer_response{2}
+    ((1 `<<` gamma1m1_bits) - tau * Eta)).
   auto => /> &1 &2 6? rr0.
-  have -> : (1 `<<` gamma1m1_bits) - 49 * w1_bits = gamma1 - Beta
-    by rewrite /(`<<`) /= /Beta /=; smt(mldsa65_gamma1 mldsa65_tau mldsa65_Eta).
-  have Hbnd : 0 < gamma1 - Beta <= q %/ 2
-    by rewrite /Beta /=; smt(mldsa65_gamma1 mldsa65_tau mldsa65_Eta). 
-  by smt(). 
+  by rewrite thr_gamma1E; smt(gamma1_beta_bnd).
   
 if {1}; last first.
 + sp 0 2; rcondf {2} 1.
@@ -433,9 +394,9 @@ sp;if {2}; last first.
   auto => /> &1 &2 12? rr0 rr1.
   have ? : (!wpolylvec_infnorm_lt (gamma1 - Beta) (lvec_unflatten256 signer_response{2})) by smt(or64_ne0).
   have Hrng : wpolylvec_srng (lvec_unflatten256 signer_response{2}) (gamma1-1) gamma1 by smt().
-  have Hb : 0 < gamma1 - Beta <= q %/ 2 by rewrite /Beta /=; smt(mldsa65_gamma1 mldsa65_tau mldsa65_Eta).
-  have Hq1 : (gamma1-1) + 1 <= q %/ 2 by smt(mldsa65_gamma1).
-  have Hq2 : gamma1 <= q %/ 2 by smt(mldsa65_gamma1).
+  have Hb := gamma1_beta_bnd.
+  have Hq1 : (gamma1-1) + 1 <= q %/ 2 by smt(gamma1_q2).
+  have Hq2 := gamma1_q2.
   have ? := wpolylvec_infnorm_unliftE (gamma1-Beta) (gamma1-1) gamma1
               (lvec_unflatten256 signer_response{2}) Hb Hq1 Hq2 Hrng.
   by smt().
@@ -451,7 +412,7 @@ seq 1 1 : (#pre /\
     do 2!(rewrite Bytes32.get_of_list //).
     rewrite get_to_list initiE 1:/# /=.
     rewrite nth_take 1,2:/# BytesPK.get_to_list /=.
-    by rewrite BytesPK.get_of_list 1:/# get_to_list.
+    by rewrite BytesPK.get_of_list ?size_to_list -?pk_encE; smt(ge0_t1_enc).
 
 (* anticipate hashing *)
 swap {2} [8..11] -7.
@@ -514,14 +475,14 @@ seq 2 6 :
 sp 1 0.
 seq 0 1 : (#pre /\
       expected_commitment_hash{2} =
-        Array48.of_list witness (BytesCT.to_list (H_ct mu{1} (w1Encode w1{1})))).
+        Array_ctilde.of_list witness (BytesCT.to_list (H_ct mu{1} (w1Encode w1{1})))).
   + ecall{2} (derive_commitment_hash_ph message_representative{2}
                  reconstructed_signer_commitment{2}).
     wp; skip => /> &1 &2 *; do congr.
     rewrite Bytes64.tP => k kb.
     + by rewrite Bytes64.get_of_list // get_to_list get_of_list //.
 
- wp; ecall{2} (compare_commitment_hashes_correct expected_commitment_hash{2} (Array48.init (fun (i : int) => signature_encoded{2}.[0 + i]))).
+ wp; ecall{2} (compare_commitment_hashes_correct expected_commitment_hash{2} (Array_ctilde.init (fun (i : int) => signature_encoded{2}.[0 + i]))).
  
  wp;skip => /> &1 &2 *.
  pose xx := H_ct
@@ -530,12 +491,11 @@ seq 0 1 : (#pre /\
    w1Encode w1{1}).
 have ? : wpolylvec_infnorm_lt (gamma1 - Beta) (lvec_unflatten256 _sr_pre) by smt(or64_ne0).
 have -> /=: infnorm_lt (lifts_wpolylvec (lvec_unflatten256 _sr_pre)) (gamma1 - Beta).
-+ have /# := wpolylvec_infnorm_liftE (gamma1-Beta)
-              (lvec_unflatten256 _sr_pre) _ _; by smt().
-suff: ((BytesCT.init ("_.[_]" signature_encoded{2}) = xx) <=>  (Array48.of_list witness (BytesCT.to_list xx) = Array48.init ("_.[_]" signature_encoded{2}))); last first.
++ by apply (wpolylvec_infnorm_liftE _ _ gamma1_beta_bnd).
+suff: ((BytesCT.init ("_.[_]" signature_encoded{2}) = xx) <=>  (Array_ctilde.of_list witness (BytesCT.to_list xx) = Array_ctilde.init ("_.[_]" signature_encoded{2}))); last first.
 + by rewrite tP BytesCT.tP /=;split => H i ib; have := H i _;[ by smt() | rewrite get_of_list 1:/# BytesCT.get_to_list BytesCT.initiE 1:/# /= initiE /#  | by smt() | rewrite get_of_list 1:/# BytesCT.get_to_list BytesCT.initiE 1:/# /= initiE /# ].
 
-move => -> ; pose bb := Array48.of_list witness (BytesCT.to_list xx) = Array48.init ("_.[_]" signature_encoded{2}).
+move => -> ; pose bb := Array_ctilde.of_list witness (BytesCT.to_list xx) = Array_ctilde.init ("_.[_]" signature_encoded{2}).
 by case (bb) => //=; rewrite to_uint_eq to_uintN /=.
 
 (* algebra: the forward head of `seq 2 4` — chain the four Jasmin ecalls        *)
@@ -545,7 +505,7 @@ by case (bb) => //=; rewrite to_uint_eq to_uintN /=.
 (* matrix multiply) and the pkDecode ↔ t1_from_t1enc slice identity.             *)
 sp 2 0.
 wp; ecall{2} (reconstruct_signer_commitment_ph
-                (Array1920.init (fun i => verification_key{2}.[32 + i]))
+                (Array_t1_enc.init (fun i => verification_key{2}.[32 + i]))
                 challenge{2} a_times_signer_response{2} hints{2}).
 wp; ecall{2} (row_vector____multiply_with_matrix_A_ph matrix_A{2} signer_response{2}).
 wp; ecall{2} (row_vector__ntt_ph signer_response{2}).
@@ -555,7 +515,7 @@ move => &1 &2 ? Hctx Hmsg ? Hov1 Hov2 Hz_srng Hh_none Hh_some_case Hr2_nz Hr2_z 
 split; first by apply wpoly_srng_ntt_irng; apply (wpoly_srng_widen _ 1 1 (q-1) (q-1)); smt().
 move => _ result0 Hlift_chal Horng_chal.
 split; first by apply wpolylvec_srng_ntt_irng;
-  apply (wpolylvec_srng_widen _ (gamma1-1) gamma1 (q-1) (q-1)); smt(mldsa65_gamma1).
+  apply (wpolylvec_srng_widen _ (gamma1-1) gamma1 (q-1) (q-1)); smt(gamma1_q2).
 move => _ result3 Hlift_s_ntt Horng_s.
 move => _ result4 Hlift_amulz Hsrng_amulz.
 have [Hr1z [Hh_lift Hh_urng]] := Hh_some_case Hh_some.
@@ -568,14 +528,14 @@ congr; congr; congr; congr; congr.
 + (* t1_from_t1enc (init (fun i => verification_key0.[32+i])) = pkDecode t1 form *)
   rewrite /t1_from_t1enc.
   apply KArray.tP => k kb.
-  rewrite !KArray.initiE; 1,2: smt(mldsa65_kvec).
+  rewrite !KArray.initiE; 1,2: smt(gt0_k).
   rewrite /= BytesPK.of_listK; 1: by rewrite size_to_list /#.
   congr; congr.
-  have -> : to_list (Array1920.init (fun i => verification_key{2}.[32 + i])) =
+  have -> : to_list (Array_t1_enc.init (fun i => verification_key{2}.[32 + i])) =
             drop 32 (to_list verification_key{2}).
   + apply (eq_from_nth witness); 1: by rewrite size_to_list size_drop 1:/# size_to_list /#.
     move => i Hi.
-    rewrite get_to_list Array1920.initiE /=;
+    rewrite get_to_list Array_t1_enc.initiE /=;
       1: by move: Hi; rewrite size_to_list.
     by rewrite nth_drop 1:/# 1:/# get_to_list /#.
   by rewrite drop_drop 1,2:/#.
@@ -583,3 +543,5 @@ congr; congr; congr; congr; congr.
   have W13_eq : XWord13.W13.modulus = 8192 by smt(XWord13.W13.ge2_modulus).
   by rewrite W13_eq.
 qed.
+
+end VerifyT.

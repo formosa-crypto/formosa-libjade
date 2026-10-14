@@ -180,17 +180,6 @@ rewrite srejectE /scands /nibbles /= flatten_cons flatten_nil cats0 /=.
 by case: (saccept (b `&` W8.of_int 15)); case: (saccept (b `>>>` 4)).
 qed.
 
-lemma sreject_cons (b : W8.t) (bs : W8.t list) :
-  sreject (b :: bs) = sreject [b] ++ sreject bs.
-proof. by rewrite -cat1s sreject_cat 1:dvd1z. qed.
-
-lemma size_sreject_le (bs : W8.t list) :
-  size (sreject bs) <= 2 * size bs.
-proof.
-rewrite srejectE size_map size_filter -size_scands.
-by apply/count_size.
-qed.
-
 (* -------------------------------------------------------------------- *)
 (* splitting the accepted stream at a byte offset of the buffer         *)
 lemma sreject_block (a : W8.t Array272.t) (n m : int) :

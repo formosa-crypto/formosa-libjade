@@ -97,17 +97,6 @@ op mcoeff (bs : W8.t list) (i : int) : W32.t =
 op mdecode (bs : W8.t list) : wpoly =
   Array256.init (mcoeff bs).
 
-lemma mbits_ge0 (bs : W8.t list) (i : int) : 0 <= mbits bs i.
-proof. by rewrite /mbits bs2int_ge0. qed.
-
-lemma mbits_lt (bs : W8.t list) (i : int) : mbits bs i < 2 ^ 20.
-proof.
-rewrite /mbits.
-have := bs2int_le2Xs (take 20 (drop (20 * i) (flatten (map W8.w2bits bs)))).
-move=> h; apply (IntOrder.ltr_le_trans _ _ _ h).
-by apply IntOrder.ler_weexpn2l => //; smt(size_take_le size_ge0).
-qed.
-
 (* -------------------------------------------------------------------- *)
 (* dropping n bytes drops 8n bits                                       *)
 lemma drop_bits8 (bs : W8.t list) (n : int) : 0 <= n =>
@@ -154,44 +143,7 @@ lemma to_uint_pack4 (b0 b1 b2 b3 : W8.t) :
   = bs2int (W8.w2bits b0 ++ W8.w2bits b1 ++ W8.w2bits b2 ++ W8.w2bits b3).
 proof. by rewrite W32.to_uintE w2bits_pack4. qed.
 
-lemma pack4_window (bs : W8.t list) (c : int) :
-  0 <= c => c + 4 <= size bs =>
-  to_uint (W4u8.pack4 [nth witness bs c; nth witness bs (c + 1);
-                       nth witness bs (c + 2); nth witness bs (c + 3)])
-  = bs2int (take 32 (drop (8 * c) (flatten (map W8.w2bits bs)))).
-proof.
-move=> hc hsz.
-rewrite to_uint_pack4 drop_bits8 // (_ : 32 = 8 * 4) 1:// take_bits8 //.
-have -> : take 4 (drop c bs)
-        = [nth witness bs c; nth witness bs (c + 1);
-           nth witness bs (c + 2); nth witness bs (c + 3)].
-- have hsz4 : size (take 4 (drop c bs)) = 4
-    by smt(size_take size_drop size_ge0).
-  apply (eq_from_nth witness); 1: by rewrite hsz4.
-  rewrite hsz4 => j rgj.
-  rewrite nth_take ~-1:/# nth_drop ~-1:/#.
-  by have [->|[->|[->|->]]] /= : j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt().
-by rewrite /= !flatten_cons flatten_nil cats0 !catA.
-qed.
-
 (* -------------------------------------------------------------------- *)
-(* the j-th 20-bit field, read from the 4-byte window at byte offset c  *)
-(* with an in-window bit shift s (s = 0 for even j, 4 for odd j)        *)
-lemma mbits_at (bs : W8.t list) (j c s : int) :
-  0 <= c => c + 4 <= size bs => 20 * j = 8 * c + s => 0 <= s <= 12 =>
-  mbits bs j
-  = to_uint (W4u8.pack4 [nth witness bs c; nth witness bs (c + 1);
-                         nth witness bs (c + 2); nth witness bs (c + 3)])
-    %/ 2 ^ s %% 2 ^ 20.
-proof.
-move=> hc hsz hjs hs.
-rewrite pack4_window // /mbits hjs.
-rewrite bs2int_div 1:/# bs2int_mod //.
-congr.
-rewrite drop_take ~-1:/# take_take ifT 1:/#.
-by rewrite drop_drop ~-1:/# (_ : 8 * c + s = s + 8 * c) 1:#ring.
-qed.
-
 (* ==================================================================== *)
 (* The mask polynomial: the decoding of the first 640 bytes of the      *)
 (* lane's SHAKE256 stream (no rejection)                                *)

@@ -1,21 +1,27 @@
 require import AllCore List IntDiv RealExp.
-
 from Jasmin require import JModel_x86.
 require import CircuitBindings Bindings JWordExtra.
-
-require import Mldsa65.
-from JazzEC require import Mldsa_65_prelude.
-from JazzEC require import Array256 Array128.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
-from Spec require import Spec65.
-import MLDSA65.
-import BitEncoding BitChunking.
+require import Array256 Array128 WArray128.
+require import XArray256 XArray128 XWord4.
+require import ArrayExtra JWord_extra EclibExtra JWordList.
+require import WArray1024 WArray128.
+require BaseT ErrorPolynomialT.
 
+(* The encoding of a polynomial with coefficients in [-Eta, Eta], for the
+   sets where Eta = 4 (ML-DSA-65): 4 bits per coefficient, 128 bytes per
+   polynomial. *)
+abstract theory Eta4T.
+
+clone import BaseT.BaseT as B with
+  op S.Eta = 4,
+  theory R.Array_eta_enc <= Array128,
+  theory R.WArray_eta_enc <= WArray128.
+import S R.
+import BitEncoding BitChunking.
 import Round ZModQ Zq.
 
-require import JWord_extra EclibExtra JWordList.
-
-require import XArray256 XArray128 XWord4 ArrayExtra.
+lemma Eta_val : Eta = 4 by done.
 
 lemma truncateu_32_4E (w : W32.t) : BS_W32_W4_U.truncateu4 w = W4.bits2w (take 4 (W32.w2bits w)).
 proof.
@@ -24,21 +30,9 @@ have {1}-> : 4 = size (take 4 (w2bits w)) by rewrite size_take //.
 by rewrite BS2Int.bs2intK.
 qed.
 
-lemma to_sint_uint_rng_pos_4(xx : W4.t) :
-    0 <= to_sint xx  <=> 0 <= to_uint xx < 8.
- have /= Hxx := W4.to_uint_cmp xx.
- rewrite /to_sint /smod /= /#.
-qed.
-
-lemma to_sint_uint_rng_neg_4(xx : W4.t) :
-    to_sint xx < 0  <=> 8 <= to_uint xx < 16.
- have /= Hxx := W4.to_uint_cmp xx.
- rewrite /to_sint /smod /= /#.
-qed.
-
 (* Circuit spec *)
 
-lemma ilog_Eta : ilog 2 (Eta + Eta) = 3 by rewrite mldsa65_Eta /=.
+lemma ilog_Eta : ilog 2 (Eta + Eta) = 3 by rewrite Eta_val /=.
 
 op error_polynomial_encode_lane(c : W32.t) : W4.t =
     BS_W32_W4_U.truncateu4 ((W32.of_int 4) + (-c)).
@@ -53,7 +47,7 @@ lemma BitPack_liftE (p : wpoly) :
   = to_list (let mapped = BSWA_256u4.init (fun i => error_polynomial_encode_lane p.[i]) in
              BSWA_128u8.init (fun i => W8.init (fun j => mapped.[(i*8+j) %/ 4].[(i*8+j) %% 4]))).
 proof.
-have Eta_val := mldsa65_Eta.
+have HEta := Eta_val.
 move=> h @/BitPack; (pose l := ilog 2 _) => /=.
 have Hlog := ilog_Eta.
 have ? : size
@@ -95,7 +89,6 @@ move : h; rewrite /to_sint /smod ifT //= => ?.
 congr;rewrite to_uint_eq /= of_uintK /=;smt(W32.to_uint_cmp pow2_32).
 qed.
 
-require import WArray1024 WArray128.
 
 lemma error_polynomial_encode_eta4 _a :
    hoare [ M.error_polynomial__encode_eta4 :
@@ -104,7 +97,7 @@ lemma error_polynomial_encode_eta4 _a :
        to_list res = BitPack (lifts_wpoly _a) Eta Eta
        /\ valid_eta_bytes res
    ].
-have Eta_val := mldsa65_Eta.
+have HEta := Eta_val.
 proc;inline * => /=.
 proc change 1 : { temp <- W64.of_int 4097;}; 1: by auto.
 proc change 2 : { shift <- zeroextu256 temp; }.
@@ -199,7 +192,7 @@ conseq (:
   split; 1: by rewrite H2 BitPack_liftE /#.
   rewrite /valid_eta_bytes => k kb.
   have := H1 k _; 1: by smt(mem_iota).
-  by rewrite /(\ule) /= mldsa65_Eta /=.
+  by rewrite /(\ule) /= Eta_val /=.
 qed.
 
 lemma error_polynomial_encode _a :
@@ -223,7 +216,7 @@ lemma BitUnack_liftE (bytes : W8.t Array128.t) :
            error_polynomial_decode_lane
              (W4.init (fun (j : int) => bytes.[(4 * i + j) %/ 8].[(4 * i + j) %% 8]))))).
 proof.
-have Eta_val := mldsa65_Eta.
+have HEta := Eta_val.
 move=>  @/BitUnpack /=; rewrite tP => i ib.
 rewrite initiE 1:// mapiE //= initiE 1:/# /=.
 pose l1 := List.map _ _.
@@ -327,7 +320,7 @@ conseq (_: encoded = _a /\
     decoded = BSWA_256u32.init (fun i => error_polynomial_decode_lane (W4.init (fun j =>
                _a.[(4*i+j) %/ 8].[(4*i+j) %% 8])))); last by simplify;circuit.
 
-+ move => &hr; rewrite iotaredE /valid_eta_bytes mldsa65_Eta /= => [#-> H] /=.
++ move => &hr; rewrite iotaredE /valid_eta_bytes Eta_val /= => [#-> H] /=.
   by rewrite allP => k; rewrite mem_iota /= /(\ule) /=  => ?; rewrite H /#. 
                
 move=> &hr [# <- Hvalid decoded [H Hdecoded]]; split.
@@ -336,7 +329,7 @@ move=> &hr [# <- Hvalid decoded [H Hdecoded]]; split.
   rewrite /lifts_wpoly /=; apply (inj_eq Array256.to_list Array256.to_list_inj).
   by rewrite Hdecoded BitUnack_liftE ~-1:// !array256_mapE; do 2!congr => //.
 - (* Part 2: wpoly_srng Eta Eta res *)
-  rewrite /wpoly_srng allP mldsa65_Eta => w Hw /=.
+  rewrite /wpoly_srng allP Eta_val => w Hw /=.
   have := H; rewrite iotaredE allP => HH; have /= := HH w _; 1: by smt(mem_iota).
   by rewrite /(\sle) /= !of_sintK /smod /= /#.
 qed.
@@ -364,3 +357,37 @@ inline *; wp.
 while (0 <= input_offset <= 128 /\ input_offset %% 16 = 0) (128 - input_offset); 2: by auto => /> /#.
 by move => *; unroll for ^while; auto => /> /#.
 qed.
+
+(* -------------------------------------------------------------------- *)
+(* The hypotheses of ErrorPolynomialT, for these sets                   *)
+(* -------------------------------------------------------------------- *)
+
+(* the generic validity of an encoding, on 4 bits per coefficient *)
+lemma valid_eta4E (a : W8.t Array128.t) :
+  (forall i, 0 <= i < 256 =>
+     BS2Int.bs2int (mkseq (fun j => a.[(4 * i + j) %/ 8].[(4 * i + j) %% 8]) 4) <= 2 * 4)
+  <=> valid_eta_bytes a.
+proof.
+rewrite /valid_eta_bytes /=.
+have E : forall (f : int -> bool), to_uint (W4.init f) = BS2Int.bs2int (mkseq f 4).
++ move=> f; rewrite W4.to_uintE; congr.
+  apply (eq_from_nth false); rewrite W4.size_w2bits.
+  + by rewrite size_mkseq.
+  by move=> j hj; rewrite W4.get_w2bits W4.initiE // nth_mkseq.
+by split => H i hi; [rewrite E | rewrite -E]; apply H.
+qed.
+
+clone ErrorPolynomialT.ErrorPolynomialT as EP with theory B <= B
+proof *.
+realize error_polynomial_encode.
+move=> _a; conseq (error_polynomial_encode _a) => //.
+by move=> &hr _ r [-> /valid_eta4E H].
+qed.
+realize error_polynomial_decode.
+move=> _a; conseq (error_polynomial_decode _a) => //.
+by move=> &hr [-> H]; rewrite -valid_eta4E.
+qed.
+realize error_polynomial_encode_ll by exact error_polynomial_encode_ll.
+realize error_polynomial_decode_ll by exact error_polynomial_decode_ll.
+
+end Eta4T.

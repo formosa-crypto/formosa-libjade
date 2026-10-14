@@ -1,22 +1,28 @@
 require import AllCore List IntDiv RealExp.
-
 from Jasmin require import JModel_x86.
 require import CircuitBindings Bindings JWordExtra.
-
-require import Mldsa65.
-from JazzEC require import Mldsa_65_prelude.
-from JazzEC require import Array256 Array128.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
-from Spec require import Spec65.
-import MLDSA65.
-import BitEncoding BitChunking.
+require import Array256 Array128 WArray128.
+require import XArray256 XArray128 XWord4.
+require import ArrayExtra JWord_extra EclibExtra JWordList.
+require import WArray1024 WArray128.
+require BaseT PreludeT CommitmentT.
 
+(* The encoding of a polynomial of w1, for the sets where gamma2 =
+   (q - 1) / 32 (ML-DSA-65, ML-DSA-87): 4 bits per coefficient, 128 bytes
+   per polynomial. *)
+abstract theory W1Bits4T.
+
+clone import BaseT.BaseT as B with
+  op S.gamma2_div = 32,
+  theory R.Array_w1_enc <= Array128,
+  theory R.WArray_w1_enc <= WArray128.
+import S R.
+clone PreludeT.PreludeT as PR with theory B <= B.
+import BitEncoding BitChunking.
 import Round ZModQ Zq.
 
-require import ArrayExtra.
-require import JWord_extra EclibExtra JWordList.
 
-require import XArray256 XArray128 XWord4.
 
 lemma truncateu_32_4E (w : W32.t) : BS_W32_W4_U.truncateu4 w = W4.bits2w (take 4 (W32.w2bits w)).
 proof.
@@ -79,7 +85,6 @@ rewrite /IntegerToBits w2bits_int2bsE /l ilog_b_w1 /= (modz_small _ q) 1:/# /BS2
 by rewrite !nth_mkseq 1,2:/# /= /#.
 qed.
 
-require import WArray1024 WArray128.
 
 (* Pre relaxed from `wpoly_urng b_w1 _a` (values < 15) to                          *)
 (* `wpoly_urng (b_w1+1) _a` (values < 16). The encoding uses 4-bit truncation      *)
@@ -191,76 +196,12 @@ qed.
 lemma commitment____encode_polynomial_ll : islossless M.commitment____encode_polynomial.
 proof. by proc; rcondf 1; [auto | call commitment____encode_polynomial_ll_bits4]. qed.
 
-import VecMat PolyKVec.
+(* -------------------------------------------------------------------- *)
+(* The hypotheses of CommitmentT, for these sets                        *)
+(* -------------------------------------------------------------------- *)
+clone CommitmentT.CommitmentT as CMT with theory B <= B, theory PR <= PR
+proof *.
+realize commitment_encode_polynomial by exact commitment_encode_polynomial.
+realize commitment____encode_polynomial_ll by exact commitment____encode_polynomial_ll.
 
-require import Array768 Array1536.
-
-(* Pre relaxed from `wpolykvec_urng _ b_w1` (< 15) to `_ (b_w1+1)` (< 16) to match  *)
-(* the tight output bound of polynomial__use_hints (4-bit-masked impl, [0..15]).   *)
-lemma commitment_encode _a :
-    hoare [ M.commitment____encode :
-       commitment = _a /\ wpolykvec_urng (kvec_unflatten256 _a) (b_w1 + 1)
-     ==>
-       kvec_unflatten128 res =
-           KArray.map (fun (p : poly) => Array128.of_list witness (SimpleBitPack  p b_w1)) (liftu_wpolykvec (kvec_unflatten256 _a))
-   ].
-have Hkvec := mldsa65_kvec.
-proc => /=.
-while (0 <= i <= 6 /\ commitment = _a /\ wpolykvec_urng (kvec_unflatten256 _a) (b_w1 + 1)  /\
-       forall k, 0 <= k < i =>
-       (kvec_unflatten128 encoded_commitment).[k] =
-       (map (fun (p : poly) => Array128.of_list witness (SimpleBitPack  p b_w1)) (liftu_wpolykvec (kvec_unflatten256 _a))).[k]);
-       last first.
-       + auto => /> &hr *;do split;1: smt().
-         move => r0 j0 *;rewrite tP => k kb; smt().
-wp; ecall (commitment_encode_polynomial (Array256.init (fun (i_0 : int) => _a.[i * 256 + i_0]))).
-auto => /> &hr ?? Hrng H ?;do split.
-+ move : Hrng; rewrite /wpolykvec_urng /wpoly_urng !allP /=  => Hrng ii iib.
-  have := Hrng i{hr} _; 1:smt().
-  rewrite allP /= initiE 1:/# /= => Hrngj.
-  have := Hrngj ii _; 1:smt().
-  rewrite initiE 1:/# /= initiE 1:/# /= nth_sub 1:/# /#.
-move => ? rr Hrr; do split;1,2: smt().
-move => k kbl kbh.
-case(0<=k<i{hr}) => *.
-+
-   have -> : (kvec_unflatten128
-   (Array768.init
-      (fun (ii : int) => if i{hr} * 128 <= ii < i{hr} * 128 + 128 then rr.[ii - i{hr} * 128] else encoded_commitment{hr}.[ii]))).[k] =
-    ((kvec_unflatten128 encoded_commitment{hr})).[k]; last by smt().
-  rewrite !initiE 1..2:/# /= /of_list /= tP => kk kkb.
-  rewrite !initiE 1,2:/# !nth_sub 1,2:/# initiE 1:/# /= /#.
-have -> : k = i{hr} by smt().
-+ have -> :
-   (kvec_unflatten128
-   (Array768.init
-      (fun (ii : int) => if i{hr} * 128 <= ii < i{hr} * 128 + 128 then rr.[ii - i{hr} * 128] else encoded_commitment{hr}.[ii]))).[i{hr}]  =
-    (rr); last first.
-  + have <- := Array128.to_listK witness rr;rewrite Hrr mapiE 1:/# /=;congr;congr.
-    rewrite /liftu_wpolykvec mapiE 1:/#;congr;rewrite initiE 1:/# /=.
-    rewrite tP => kk kkb; rewrite !initiE 1,2:/# /= nth_sub /#.
-
-rewrite initiE 1:/# /= tP => ii iib.
-rewrite  initiE 1:/# /= nth_sub 1:/# initiE 1:/# /= /#.
-qed.
-
-lemma commitment____encode_ll : islossless M.commitment____encode.
-proof.
-proc.
-while (0 <= i <= 6) (6 - i); last by auto => /#.
-move => *; wp; call commitment____encode_polynomial_ll; auto => /#.
-qed.
-
-(* Phoare variant of commitment_encode, composing the hoare post with
-   losslessness. Used via ecall{2} in the seq 3 3 bridge of
-   ml_dsa_65_sign_correct (sign.ec). *)
-phoare commitment_encode_ph _a :
- [ M.commitment____encode :
-    commitment = _a /\ wpolykvec_urng (kvec_unflatten256 _a) (b_w1 + 1)
-  ==>
-    kvec_unflatten128 res =
-      KArray.map
-        (fun (p : poly) => Array128.of_list witness (SimpleBitPack p b_w1))
-        (liftu_wpolykvec (kvec_unflatten256 _a))
- ] = 1%r.
-proof. by conseq commitment____encode_ll (commitment_encode _a). qed.
+end W1Bits4T.

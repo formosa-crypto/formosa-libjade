@@ -1,22 +1,27 @@
 require import AllCore List IntDiv RealExp.
-
 from Jasmin require import JModel_x86.
 require import CircuitBindings Bindings JWordExtra.
-
-require import Mldsa65.
-from JazzEC require import Mldsa_65_prelude.
-from JazzEC require import Array256 Array640.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
-from Spec require import Spec65.
-import MLDSA65.
-import BitEncoding BitChunking.
+require import Array256 Array640 WArray640.
+require import ArrayExtra JWord_extra EclibExtra JWordList.
+require import XArray256 XArray640 XArray16 XWord20.
+require BaseT PreludeT Gamma1T.
 
+(* The encoding of a polynomial with coefficients in (-gamma1, gamma1], for
+   the sets where gamma1 = 2^19 (ML-DSA-65, ML-DSA-87): 20 bits per
+   coefficient, 640 bytes per polynomial. *)
+abstract theory Gamma1Bits20T.
+
+clone import BaseT.BaseT as B with
+  op S.gamma1_log = 19,
+  theory R.Array_gamma1_enc <= Array640,
+  theory R.WArray_gamma1_enc <= WArray640.
+import S R.
+clone PreludeT.PreludeT as PR with theory B <= B.
+import BitEncoding BitChunking.
 import Round ZModQ Zq.
 
-require import ArrayExtra.
-require import JWord_extra EclibExtra JWordList.
-
-require import XArray256 XArray640 XArray16 XWord20.
+lemma gamma1_val : gamma1 = 524288 by rewrite /gamma1.
 
 lemma truncateu_32_20E (w : W32.t) : BS_W32_W20_U.truncateu20 w = W20.bits2w (take 20 (W32.w2bits w)).
 proof.
@@ -26,18 +31,6 @@ by rewrite BS2Int.bs2intK.
 qed.
 
 import W20.
-lemma to_sint_uint_rng_pos_20(xx : W20.t) :
-    0 <= to_sint xx  <=> 0 <= to_uint xx < 524288.
- have /= Hxx := W20.to_uint_cmp xx.
- rewrite /to_sint /smod /= /#.
-qed.
-
-lemma to_sint_uint_rng_neg_20(xx : W20.t) :
-    to_sint xx < 0  <=> 524288 <= to_uint xx <1048576.
- have /= Hxx := W20.to_uint_cmp xx.
- rewrite /to_sint /smod /= /#.
-qed.
-
 (* Circuit spec *)
 
 op gamma1_encode_polynomial_lane(c : W32.t) : W20.t =
@@ -50,7 +43,7 @@ lemma BitPack_liftE (p : wpoly) :
   = to_list (let mapped = BSWA_256u20.init (fun i => gamma1_encode_polynomial_lane p.[i]) in
              BSWA_640u8.init (fun i => W8.init (fun j => mapped.[(i*8+j) %/ 20].[(i*8+j) %% 20]))).
 proof.
-have gamma1_val := mldsa65_gamma1.
+have Hgamma1 := gamma1_val.
 move=> h @/BitPack; (pose l := ilog 2 _) => /=.
 have Hlog := ilog_gamma1.
 have ? : size
@@ -100,7 +93,7 @@ lemma gamma1_encode_polynomial_bits20 _a :
      ==>
        to_list res = BitPack (lifts_wpoly _a) (gamma1-1) gamma1
    ].
-have gamma1_val := mldsa65_gamma1.
+have Hgamma1 := gamma1_val.
 proc;inline * => /=.
 proc change 2 : { temp <- W64.of_int 524288;}; 1: by  auto; rewrite /(`<<`) /= /#.
 proc change 3 : { gamma1 <- zeroextu256 temp; }.
@@ -171,7 +164,7 @@ op gamma1_decode_to_polynomial_lane(c : W20.t) : W32.t =
 
 lemma gamma1_decode_lane_sint (c : W20.t) :
     W32.to_sint (gamma1_decode_to_polynomial_lane c) = gamma1 - W20.to_uint c.
-have gamma1_val := mldsa65_gamma1.
+have Hgamma1 := gamma1_val.
 have Hc := W20.to_uint_cmp c.
 rewrite /gamma1_decode_to_polynomial_lane /zeroextu32.
 have := W32.to_sintK_small (gamma1 - W20.to_uint c).
@@ -187,7 +180,7 @@ lemma BitUnack_liftE (bytes : W8.t Array640.t) :
            gamma1_decode_to_polynomial_lane
              (W20.init (fun (j : int) => bytes.[(gamma1_bits * i + j) %/ 8].[(gamma1_bits * i + j) %% 8]))))).
 proof.
-have gamma1_val := mldsa65_gamma1.
+have Hgamma1 := gamma1_val.
 move=>  @/BitUnpack /=; rewrite tP => i ib.
 rewrite initiE 1:// mapiE //= initiE 1:/# /=.
 pose l1 := List.map _ _.
@@ -293,7 +286,7 @@ rewrite /wpoly_srng array256_allP /= => w.
 rewrite /to_list mkseqP => He;elim He => k [Hk ->] /=.
 rewrite initiE 1:/# /=.
 rewrite gamma1_decode_lane_sint.
-rewrite mldsa65_gamma1 /=.
+rewrite gamma1_val /=.
 have /= /#:= W20.to_uint_cmp.
 qed.
 
@@ -306,166 +299,33 @@ lemma gamma1_decode_to_polynomial _a :
    ].
 proof. by proc; rcondf 1; [auto | call (gamma1_decode_to_polynomial_bits20 _a); auto]. qed.
 
-import VecMat PolyLVec.
-
-require import Array1280 Array3200.
-
-lemma gamma1_encode _a :
-    hoare [ M.gamma1____encode :
-       decoded = _a /\ wpolylvec_srng (lvec_unflatten256 _a) (gamma1-1) gamma1
-     ==>
-       lvec_unflatten640 res =
-           LArray.map (fun (p : poly) => Array640.of_list witness (BitPack p (gamma1-1) gamma1)) (lifts_wpolylvec (lvec_unflatten256 _a))
-   ].
-have Hlvec := mldsa65_lvec.
-have Hgamma1 := mldsa65_gamma1.
-proc => /=.
-while (0 <= i <= 5 /\ decoded = _a /\
-       wpolylvec_srng (lvec_unflatten256 _a) (gamma1-1) gamma1  /\
-       forall k, 0 <= k < i =>
-       (lvec_unflatten640 encoded).[k] =
-       (map (fun (p : poly) => Array640.of_list witness (BitPack p (gamma1-1) gamma1)) (lifts_wpolylvec (lvec_unflatten256 _a))).[k]);
-       last first.
-       + auto => /> &hr *;do split;1: smt().
-         by move => r0 j0 *;rewrite tP => k kb; smt().
-wp; ecall (gamma1_encode_polynomial (Array256.init (fun (i_0 : int) => _a.[i * 256 + i_0]))).
-auto => /> &hr ?? Hrng H ?;do split.
-+ move : Hrng; rewrite /wpolylvec_srng /wpoly_srng !allP /=  => Hrng ii iib.
-  have := Hrng i{hr} _; 1:smt().
-  rewrite allP /= initiE 1:/# /= => Hrngj.
-  have := Hrngj ii _; 1:smt().
-  rewrite initiE 1:/# /= initiE 1:/# /= nth_sub 1:/# /#.
-move => ? rr Hrr; do split;1,2: smt().
-move => k kbl kbh.
-case(0<=k<i{hr}) => *.
-+
-   have -> : (lvec_unflatten640
-   (Array3200.init
-      (fun (i_0 : int) => if i{hr} * 640 <= i_0 < i{hr} * 640 + 640 then rr.[i_0 - i{hr} * 640] else encoded{hr}.[i_0]))).[k] =
-    ((lvec_unflatten640 encoded{hr})).[k]; last by smt().
-  rewrite !initiE 1..2:/# /= /of_list /= tP => kk kkb.
-  rewrite !initiE 1,2:/# !nth_sub 1,2:/# initiE 1:/# /= /#.
-have -> : k = i{hr} by smt().
-+ have -> :
-   (lvec_unflatten640
-   (Array3200.init
-      (fun (i_0 : int) => if i{hr} * 640 <= i_0 < i{hr} * 640 + 640 then rr.[i_0 - i{hr} * 640] else encoded{hr}.[i_0]))).[i{hr}]  =
-    (rr); last first.
-  + have <- := Array640.to_listK witness rr;rewrite Hrr mapiE 1:/# /=;congr;congr.
-    rewrite /lifts_wpolylvec mapiE 1:/#;congr;rewrite initiE 1:/# /=.
-    rewrite tP => kk kkb; rewrite !initiE 1,2:/# /= nth_sub /#.
-
-rewrite initiE 1:/# /= tP => ii iib.
-rewrite  initiE 1:/# /= nth_sub 1:/# initiE 1:/# /= /#.
-qed.
-
-lemma gamma2_encode_polynomial_ll_bits20 : islossless M.gamma1____encode_polynomial_bits20.
+lemma gamma1_encode_polynomial_ll_bits20 : islossless M.gamma1____encode_polynomial_bits20.
 proc.
 while (0 <= i <= 10) (10 - i); 1: by auto => /> /#.
 inline 9; wp;conseq (: _ ==> true); 1: by smt().
 by while (0 <= input_offset <= 992 /\ input_offset %% 32 = 0) (992 - input_offset); move => *; inline *; auto => /> /#.
 qed.
 
-lemma gamma2_encode_polynomial_ll : islossless M.gamma1____encode_polynomial.
-proof. by proc; rcondf 1; [auto | call gamma2_encode_polynomial_ll_bits20]. qed.
+lemma gamma1_encode_polynomial_ll : islossless M.gamma1____encode_polynomial.
+proof. by proc; rcondf 1; [auto | call gamma1_encode_polynomial_ll_bits20]. qed.
 
-lemma gamma1_encode_ll : islossless  M.gamma1____encode.
-proc;unroll for ^while.
-by do 5!(wp;call gamma2_encode_polynomial_ll).
-qed.
-
-lemma gamma1_encode_ph _a :
-    phoare [ M.gamma1____encode :
-       decoded = _a /\ wpolylvec_srng (lvec_unflatten256 _a) (gamma1-1) gamma1
-     ==>
-       lvec_unflatten640 res =
-           LArray.map (fun (p : poly) => Array640.of_list witness (BitPack p (gamma1-1) gamma1)) (lifts_wpolylvec (lvec_unflatten256 _a))
-   ] = 1%r by conseq gamma1_encode_ll (gamma1_encode _a).
-
-
-lemma gamma1_decode _a :
-    hoare [ M.gamma1____decode :
-       encoded = _a
-     ==>
-       lifts_wpolylvec (lvec_unflatten256 res) =
-           LArray.map (fun p => BitUnpack (to_list p) (gamma1-1) gamma1) (lvec_unflatten640 _a) /\
-       wpolylvec_srng (lvec_unflatten256 res) (gamma1-1) gamma1
-   ].
-have Hlvec := mldsa65_lvec.
-have Hgamma1 := mldsa65_gamma1.
-proc => /=.
-while (0 <= i <= 5 /\ encoded = _a /\
-       (forall k, 0 <= k < i =>
-           (lifts_wpolylvec (lvec_unflatten256 decoded)).[k] =
-           (map (fun (p : W8.t Array640.t) => BitUnpack (to_list p) (gamma1 - 1) gamma1) (lvec_unflatten640 _a)).[k]) /\
-       (forall k, 0 <= k < i =>
-           wpoly_srng (gamma1-1) gamma1 (lvec_unflatten256 decoded).[k]));
-       last first.
-       + auto => /> &hr *;do split;1,2: smt().
-         move => r0 k ? r1 i0 Heq Hrng; split; 1: by rewrite tP => /#. 
-         rewrite /wpolylvec_srng allP => i ib.
-         by apply Hrng; smt(mldsa65_lvec).
-wp; ecall (gamma1_decode_to_polynomial (Array640.init (fun (i_0 : int) => _a.[i * (gamma1_bits * n %/ 8) + i_0]))).
-auto => /> &hr ?? Heq Hrng  ? rr Hrr1 Hrr2;do split;1,2:smt().
-+ move => k kbl kbh.
-  case(0<=k<i{hr}) => *.
-  + have -> : (lifts_wpolylvec
-     (lvec_unflatten256
-        (Array1280.init
-           (fun (i_0 : int) => if i{hr} * n <= i_0 < i{hr} * n + n then rr.[i_0 - i{hr} * n] else decoded{hr}.[i_0])))).[k] =
-      (lifts_wpolylvec (lvec_unflatten256 decoded{hr})).[k]; last by smt().
-    rewrite !mapiE 1..2:/# initiE 1:/# /= initiE 1:/# /= tP =>  ii iib.
-    rewrite mapiE 1:/# /= initiE 1:/# /= mapiE 1:/# /= initiE 1:/# /= !nth_sub 1,2:/# initiE 1:/# /= /#.
-  have -> : k = i{hr} by smt().
-  + have -> : (lifts_wpolylvec
-     (lvec_unflatten256
-        (Array1280.init
-           (fun (i_0 : int) => if i{hr} * n <= i_0 < i{hr} * n + n then rr.[i_0 - i{hr} * n] else decoded{hr}.[i_0])))).[i{hr}]  =
-      (lifts_wpoly rr); last first.
-    + rewrite Hrr1 mapiE 1:/# /=;congr;congr;rewrite  initiE 1:/# /= tP => ii iib.
-      by rewrite initiE 1:/# get_of_list 1:/# /= nth_sub /#.
-  rewrite mapiE 1:/# /= initiE 1:/# /= tP => ii iib.
-  rewrite !mapiE 1,2:/# /= initiE 1:/# /= nth_sub 1:/# initiE 1:/# /= /#.
-move => k kbl kbh.
-case(0<=k<i{hr}) => *.
-+ have -> : (lvec_unflatten256
-     (Array1280.init
-        (fun (i_0 : int) => if i{hr} * n <= i_0 < i{hr} * n + n then rr.[i_0 - i{hr} * n] else decoded{hr}.[i_0]))).[k] =
-    (lvec_unflatten256 decoded{hr}).[k]; last by (apply Hrng; smt()).
-  rewrite initiE 1:/# /= tP => ii iib.
-  rewrite initiE 1:/# /= nth_sub 1:/# initiE 1:/# /=.
-  by rewrite /lvec_unflatten256 LArray.initiE 1:/# /= Array256.get_of_list 1:/# nth_sub /#.
-have -> : k = i{hr} by smt().
-have -> : (lvec_unflatten256
-     (Array1280.init
-        (fun (i_0 : int) => if i{hr} * n <= i_0 < i{hr} * n + n then rr.[i_0 - i{hr} * n] else decoded{hr}.[i_0]))).[i{hr}] =
-    rr.
-+ rewrite initiE 1:/# /= tP => ii iib.
-  rewrite initiE 1:/# /= nth_sub 1:/# initiE 1:/# /= /#.
-exact Hrr2.
-qed.
-
-lemma gamma2_decode_to_polynomial_ll_bits20 : islossless M.gamma1____decode_to_polynomial_bits20.
+lemma gamma1_decode_to_polynomial_ll_bits20 : islossless M.gamma1____decode_to_polynomial_bits20.
 proc.
 while (0 <= output_offset <= 1024 /\ output_offset %% 32 = 0) (1024 - output_offset); 1: by auto => /> /#.
 by auto => /> /#.
 qed.
 
-lemma gamma2_decode_to_polynomial_ll : islossless M.gamma1____decode_to_polynomial.
-proof. by proc; rcondf 1; [auto | call gamma2_decode_to_polynomial_ll_bits20]. qed.
+lemma gamma1_decode_to_polynomial_ll : islossless M.gamma1____decode_to_polynomial.
+proof. by proc; rcondf 1; [auto | call gamma1_decode_to_polynomial_ll_bits20]. qed.
 
-lemma gamma1_decode_ll : islossless  M.gamma1____decode.
-proc;unroll for ^while.
-by do 5!(wp;call gamma2_decode_to_polynomial_ll).
-qed.
+(* -------------------------------------------------------------------- *)
+(* The hypotheses of Gamma1T, for these sets                            *)
+(* -------------------------------------------------------------------- *)
+clone Gamma1T.Gamma1T as G1 with theory B <= B, theory PR <= PR
+proof *.
+realize gamma1_encode_polynomial by exact gamma1_encode_polynomial.
+realize gamma1_decode_to_polynomial by exact gamma1_decode_to_polynomial.
+realize gamma1_encode_polynomial_ll by exact gamma1_encode_polynomial_ll.
+realize gamma1_decode_to_polynomial_ll by exact gamma1_decode_to_polynomial_ll.
 
-
-lemma gamma1_decode_ph _a :
-    phoare [ M.gamma1____decode :
-       encoded = _a
-     ==>
-       lifts_wpolylvec (lvec_unflatten256 res) =
-           LArray.map (fun p => BitUnpack (to_list p) (gamma1-1) gamma1) (lvec_unflatten640 _a) /\
-       wpolylvec_srng (lvec_unflatten256 res) (gamma1-1) gamma1
-   ] = 1%r
- by conseq gamma1_decode_ll (gamma1_decode _a).
+end Gamma1Bits20T.
