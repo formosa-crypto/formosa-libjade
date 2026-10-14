@@ -15,9 +15,9 @@ abstract theory CommonModularT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import Avx2red.Avx2redT as AR with theory P <= S, theory R <= R.
-clone import Pwmulcorrect.PwmulcorrectT as PC with theory P <= S, theory R <= R.
-clone import CommonReduceT.CommonReduceT as CR with theory B <= B.
+clone import Avx2red.Avx2redT as AR with theory P <- S, theory R <- R.
+clone import Pwmulcorrect.PwmulcorrectT as PC with theory P <- S, theory R <- R.
+clone import CommonReduceT.CommonReduceT as CR with theory B <- B.
 
 import Round ZModQ Zq.
 

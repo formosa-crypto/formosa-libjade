@@ -15,8 +15,8 @@ abstract theory Eta4T.
 
 clone import BaseT.BaseT as B with
   op S.Eta = 4,
-  theory R.Array_eta_enc <= Array128,
-  theory R.WArray_eta_enc <= WArray128.
+  theory R.Array_eta_enc <- Array128,
+  theory R.WArray_eta_enc <- WArray128.
 import S R.
 import BitEncoding BitChunking.
 import Round ZModQ Zq.
@@ -377,7 +377,7 @@ have E : forall (f : int -> bool), to_uint (W4.init f) = BS2Int.bs2int (mkseq f 
 by split => H i hi; [rewrite E | rewrite -E]; apply H.
 qed.
 
-clone ErrorPolynomialT.ErrorPolynomialT as EP with theory B <= B
+clone ErrorPolynomialT.ErrorPolynomialT as EP with theory B <- B
 proof *.
 realize error_polynomial_encode.
 move=> _a; conseq (error_polynomial_encode _a) => //.

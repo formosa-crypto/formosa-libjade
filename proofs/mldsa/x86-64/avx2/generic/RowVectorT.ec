@@ -11,10 +11,10 @@ abstract theory RowVectorT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import PreludeT.PreludeT as PR with theory B <= B.
-clone import PolynomialT.PolynomialT as PL with theory B <= B.
-clone import CommonNttT.CommonNttT as CN with theory B <= B.
-clone import CommonModularT.CommonModularT as CM with theory B <= B.
+clone import PreludeT.PreludeT as PR with theory B <- B.
+clone import PolynomialT.PolynomialT as PL with theory B <- B.
+clone import CommonNttT.CommonNttT as CN with theory B <- B.
+clone import CommonModularT.CommonModularT as CM with theory B <- B.
 import CR.
 
 

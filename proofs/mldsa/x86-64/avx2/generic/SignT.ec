@@ -11,31 +11,31 @@ abstract theory SignT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import PreludeT.PreludeT as PR with theory B <= B.
-clone import PolynomialT.PolynomialT as PL with theory B <= B.
-clone import CommonNttT.CommonNttT as CN with theory B <= B.
-clone import CommonModularT.CommonModularT as CM with theory B <= B.
-clone import CommonInvertNttT.CommonInvertNttT as CI with theory B <= B.
-clone import CommonRoundingT.CommonRoundingT as CRD with theory B <= B.
-clone import RoundingT.RoundingT as RD with theory B <= B.
-clone import ErrorPolynomialT.ErrorPolynomialT as EP with theory B <= B.
+clone import PreludeT.PreludeT as PR with theory B <- B.
+clone import PolynomialT.PolynomialT as PL with theory B <- B.
+clone import CommonNttT.CommonNttT as CN with theory B <- B.
+clone import CommonModularT.CommonModularT as CM with theory B <- B.
+clone import CommonInvertNttT.CommonInvertNttT as CI with theory B <- B.
+clone import CommonRoundingT.CommonRoundingT as CRD with theory B <- B.
+clone import RoundingT.RoundingT as RD with theory B <- B.
+clone import ErrorPolynomialT.ErrorPolynomialT as EP with theory B <- B.
 clone import RowVectorT.RowVectorT as RV with
-  theory B <= B, theory PR <= PR, theory PL <= PL, theory CN <= CN, theory CM <= CM.
+  theory B <- B, theory PR <- PR, theory PL <- PL, theory CN <- CN, theory CM <- CM.
 clone import ColumnVectorT.ColumnVectorT as CV with
-  theory B <= B, theory PR <= PR, theory PL <= PL, theory CN <= CN, theory CI <= CI,
-  theory CM <= CM, theory CRD <= CRD, theory RD <= RD.
-clone import SignatureT.SignatureT as SG with theory B <= B, theory PR <= PR.
+  theory B <- B, theory PR <- PR, theory PL <- PL, theory CN <- CN, theory CI <- CI,
+  theory CM <- CM, theory CRD <- CRD, theory RD <- RD.
+clone import SignatureT.SignatureT as SG with theory B <- B, theory PR <- PR.
 clone import SignNormChecksT.SignNormChecksT as SNC with
-  theory B <= B, theory PR <= PR, theory PL <= PL, theory CM <= CM, theory CI <= CI,
-  theory CRD <= CRD, theory RV <= RV, theory SG <= SG.
-clone import MatrixAT.MatrixAT as MA with theory B <= B, theory PR <= PR.
-clone import MaskT.MaskT as MK with theory B <= B, theory PR <= PR, theory G1 <= SG.G1.
-clone import ChallengeT.ChallengeT as CH with theory B <= B.
-clone import CommitmentT.CommitmentT as CMT with theory B <= B, theory PR <= PR.
-clone import S1T.S1T as S1E with theory B <= B, theory PR <= PR, theory EP <= EP.
-clone import S2T.S2T as S2E with theory B <= B, theory PR <= PR, theory EP <= EP.
-clone import T0T.T0T as T0 with theory B <= B, theory PR <= PR.
-clone import HashingT.HashingT as HS with theory B <= B.
+  theory B <- B, theory PR <- PR, theory PL <- PL, theory CN <- CN, theory CM <- CM,
+  theory CI <- CI, theory CRD <- CRD, theory RV <- RV, theory SG <- SG.
+clone import MatrixAT.MatrixAT as MA with theory B <- B, theory PR <- PR.
+clone import MaskT.MaskT as MK with theory B <- B, theory PR <- PR, theory G1 <- SG.G1.
+clone import ChallengeT.ChallengeT as CH with theory B <- B.
+clone import CommitmentT.CommitmentT as CMT with theory B <- B, theory PR <- PR.
+clone import S1T.S1T as S1E with theory B <- B, theory PR <- PR, theory EP <- EP.
+clone import S2T.S2T as S2E with theory B <- B, theory PR <- PR, theory EP <- EP.
+clone import T0T.T0T as T0 with theory B <- B, theory PR <- PR.
+clone import HashingT.HashingT as HS with theory B <- B.
 import CR.
 
 import PolyLVec PolyKVec PolyMat.

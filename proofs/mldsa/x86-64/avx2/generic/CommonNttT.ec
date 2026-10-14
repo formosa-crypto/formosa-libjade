@@ -9,7 +9,7 @@ abstract theory CommonNttT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import Fnttcorrect.FnttcorrectT as FC with theory P <= S, theory R <= R.
+clone import Fnttcorrect.FnttcorrectT as FC with theory P <- S, theory R <- R.
 
 import Round ZModQ Zq.
 

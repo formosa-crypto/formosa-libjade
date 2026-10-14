@@ -39,7 +39,7 @@ abstract theory Sha3x4T.
 
 clone import Parameters.ParamsT as P.
 clone import MldsaT.MldsaT as R with theory P <- P.
-clone import Avx2red.Avx2redT as AR with theory P <= P, theory R <= R.
+clone import Avx2red.Avx2redT as AR with theory P <- P, theory R <- R.
 import Array_ctilde WArray_ctilde.
 
 

@@ -21,7 +21,7 @@ abstract theory PwmulcorrectT.
 
 clone import Parameters.ParamsT as P.
 clone import MldsaT.MldsaT as R with theory P <- P.
-clone import Avx2red.Avx2redT as AR with theory P <= P, theory R <= R.
+clone import Avx2red.Avx2redT as AR with theory P <- P, theory R <- R.
 
 (* -------------------------------------------------------------------- *)
 type wpoly = W32.t Array256.t.

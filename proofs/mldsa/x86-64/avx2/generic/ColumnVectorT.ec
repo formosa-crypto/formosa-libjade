@@ -8,13 +8,13 @@ abstract theory ColumnVectorT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import PreludeT.PreludeT as PR with theory B <= B.
-clone import PolynomialT.PolynomialT as PL with theory B <= B.
-clone import CommonNttT.CommonNttT as CN with theory B <= B.
-clone import CommonInvertNttT.CommonInvertNttT as CI with theory B <= B.
-clone import CommonModularT.CommonModularT as CM with theory B <= B.
-clone import CommonRoundingT.CommonRoundingT as CRD with theory B <= B.
-clone import RoundingT.RoundingT as RD with theory B <= B.
+clone import PreludeT.PreludeT as PR with theory B <- B.
+clone import PolynomialT.PolynomialT as PL with theory B <- B.
+clone import CommonNttT.CommonNttT as CN with theory B <- B.
+clone import CommonInvertNttT.CommonInvertNttT as CI with theory B <- B.
+clone import CommonModularT.CommonModularT as CM with theory B <- B.
+clone import CommonRoundingT.CommonRoundingT as CRD with theory B <- B.
+clone import RoundingT.RoundingT as RD with theory B <- B.
 
 import Round ZModQ Zq PolyKVec.
 import Array_kpolys CR.

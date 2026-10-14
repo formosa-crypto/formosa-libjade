@@ -14,7 +14,7 @@ abstract theory Gamma1T.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import PreludeT.PreludeT as PR with theory B <= B.
+clone import PreludeT.PreludeT as PR with theory B <- B.
 
 import BitEncoding BitChunking.
 import Round ZModQ Zq.

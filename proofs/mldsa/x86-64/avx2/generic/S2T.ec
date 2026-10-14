@@ -11,8 +11,8 @@ abstract theory S2T.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import PreludeT.PreludeT as PR with theory B <= B.
-clone import ErrorPolynomialT.ErrorPolynomialT as EP with theory B <= B.
+clone import PreludeT.PreludeT as PR with theory B <- B.
+clone import ErrorPolynomialT.ErrorPolynomialT as EP with theory B <- B.
 
 import BitEncoding BitChunking.
 

@@ -30,7 +30,7 @@ abstract theory InttcorrectT.
 
 clone import Parameters.ParamsT as P.
 clone import MldsaT.MldsaT as R with theory P <- P.
-clone import Avx2red.Avx2redT as AR with theory P <= P, theory R <= R.
+clone import Avx2red.Avx2redT as AR with theory P <- P, theory R <- R.
 
 (* ==================================================================== *)
 (* Generic strided round (layers 3..7): one GS butterfly of length      *)

@@ -2,20 +2,22 @@ require import AllCore List IntDiv RealExp.
 from Jasmin require import JModel_x86.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 require import Array256.
-require BaseT PreludeT PolynomialT CommonModularT CommonInvertNttT CommonRoundingT
+require BaseT PreludeT PolynomialT CommonNttT CommonModularT CommonInvertNttT CommonRoundingT
         RowVectorT SignatureT.
 
 abstract theory SignNormChecksT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import PreludeT.PreludeT as PR with theory B <= B.
-clone import PolynomialT.PolynomialT as PL with theory B <= B.
-clone import CommonModularT.CommonModularT as CM with theory B <= B.
-clone import CommonInvertNttT.CommonInvertNttT as CI with theory B <= B.
-clone import CommonRoundingT.CommonRoundingT as CRD with theory B <= B.
-clone import RowVectorT.RowVectorT as RV with theory B <= B, theory PR <= PR.
-clone import SignatureT.SignatureT as SG with theory B <= B, theory PR <= PR.
+clone import PreludeT.PreludeT as PR with theory B <- B.
+clone import PolynomialT.PolynomialT as PL with theory B <- B.
+clone CommonNttT.CommonNttT as CN with theory B <- B.
+clone import CommonModularT.CommonModularT as CM with theory B <- B.
+clone import CommonInvertNttT.CommonInvertNttT as CI with theory B <- B.
+clone import CommonRoundingT.CommonRoundingT as CRD with theory B <- B.
+clone import RowVectorT.RowVectorT as RV with
+  theory B <- B, theory PR <- PR, theory PL <- PL, theory CN <- CN, theory CM <- CM.
+clone import SignatureT.SignatureT as SG with theory B <- B, theory PR <- PR.
 import CR.
 
 (* the bound on Eta the norm checks use *)

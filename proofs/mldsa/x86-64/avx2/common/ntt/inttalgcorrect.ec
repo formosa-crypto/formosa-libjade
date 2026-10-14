@@ -22,7 +22,7 @@ abstract theory InttalgcorrectT.
 
 clone import Parameters.ParamsT as P.
 clone import MldsaT.MldsaT as R with theory P <- P.
-clone import Inttcorrect.InttcorrectT as IC with theory P <= P, theory R <= R.
+clone import Inttcorrect.InttcorrectT as IC with theory P <- P, theory R <- R.
 
 (* ==================================================================== *)
 (*---*) import Bigint BIA.

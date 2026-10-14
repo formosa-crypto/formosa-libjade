@@ -9,8 +9,8 @@ abstract theory CommonInvertNttT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import Inttcorrect.InttcorrectT as IC with theory P <= S, theory R <= R.
-clone import CommonReduceT.CommonReduceT as CR with theory B <= B.
+clone import Inttcorrect.InttcorrectT as IC with theory P <- S, theory R <- R.
+clone import CommonReduceT.CommonReduceT as CR with theory B <- B.
 
 import Round ZModQ Zq.
 

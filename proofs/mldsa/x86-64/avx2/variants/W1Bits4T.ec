@@ -15,10 +15,10 @@ abstract theory W1Bits4T.
 
 clone import BaseT.BaseT as B with
   op S.gamma2_div = 32,
-  theory R.Array_w1_enc <= Array128,
-  theory R.WArray_w1_enc <= WArray128.
+  theory R.Array_w1_enc <- Array128,
+  theory R.WArray_w1_enc <- WArray128.
 import S R.
-clone PreludeT.PreludeT as PR with theory B <= B.
+clone PreludeT.PreludeT as PR with theory B <- B.
 import BitEncoding BitChunking.
 import Round ZModQ Zq.
 
@@ -199,7 +199,7 @@ proof. by proc; rcondf 1; [auto | call commitment____encode_polynomial_ll_bits4]
 (* -------------------------------------------------------------------- *)
 (* The hypotheses of CommitmentT, for these sets                        *)
 (* -------------------------------------------------------------------- *)
-clone CommitmentT.CommitmentT as CMT with theory B <= B, theory PR <= PR
+clone CommitmentT.CommitmentT as CMT with theory B <- B, theory PR <- PR
 proof *.
 realize commitment_encode_polynomial by exact commitment_encode_polynomial.
 realize commitment____encode_polynomial_ll by exact commitment____encode_polynomial_ll.

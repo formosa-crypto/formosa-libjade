@@ -19,9 +19,9 @@ abstract theory MaskT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import PreludeT.PreludeT as PR with theory B <= B.
-clone import Gamma1T.Gamma1T as G1 with theory B <= B, theory PR <= PR.
-clone import Sha3x4.Sha3x4T as SX with theory P <= S, theory R <= R.
+clone import PreludeT.PreludeT as PR with theory B <- B.
+clone import Gamma1T.Gamma1T as G1 with theory B <- B, theory PR <- PR.
+clone import Sha3x4.Sha3x4T as SX with theory P <- S, theory R <- R.
 import Shake256x4.
 
 import PolyLVec PolyKVec PolyMat.

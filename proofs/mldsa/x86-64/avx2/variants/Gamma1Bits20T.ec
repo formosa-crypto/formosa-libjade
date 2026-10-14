@@ -14,10 +14,10 @@ abstract theory Gamma1Bits20T.
 
 clone import BaseT.BaseT as B with
   op S.gamma1_log = 19,
-  theory R.Array_gamma1_enc <= Array640,
-  theory R.WArray_gamma1_enc <= WArray640.
+  theory R.Array_gamma1_enc <- Array640,
+  theory R.WArray_gamma1_enc <- WArray640.
 import S R.
-clone PreludeT.PreludeT as PR with theory B <= B.
+clone PreludeT.PreludeT as PR with theory B <- B.
 import BitEncoding BitChunking.
 import Round ZModQ Zq.
 
@@ -321,7 +321,7 @@ proof. by proc; rcondf 1; [auto | call gamma1_decode_to_polynomial_ll_bits20]. q
 (* -------------------------------------------------------------------- *)
 (* The hypotheses of Gamma1T, for these sets                            *)
 (* -------------------------------------------------------------------- *)
-clone Gamma1T.Gamma1T as G1 with theory B <= B, theory PR <= PR
+clone Gamma1T.Gamma1T as G1 with theory B <- B, theory PR <- PR
 proof *.
 realize gamma1_encode_polynomial by exact gamma1_encode_polynomial.
 realize gamma1_decode_to_polynomial by exact gamma1_decode_to_polynomial.

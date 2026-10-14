@@ -21,7 +21,7 @@ abstract theory FnttalgcorrectT.
 
 clone import Parameters.ParamsT as P.
 clone import MldsaT.MldsaT as R with theory P <- P.
-clone import Fnttcorrect.FnttcorrectT as FC with theory P <= P, theory R <= R.
+clone import Fnttcorrect.FnttcorrectT as FC with theory P <- P, theory R <- R.
 
 (* ==================================================================== *)
 (*---*) import Bigint BIA.

@@ -18,8 +18,8 @@ abstract theory ErrorSamplerEta4T.
 
 clone import BaseT.BaseT as B with op S.Eta = 4.
 import S R MLDSAParams.
-clone PreludeT.PreludeT as PR with theory B <= B.
-clone import Sha3x4.Sha3x4T as SX with theory P <= S, theory R <= R.
+clone PreludeT.PreludeT as PR with theory B <- B.
+clone import Sha3x4.Sha3x4T as SX with theory P <- S, theory R <- R.
 import Shake256x4.
 
 lemma Eta_val : Eta = 4 by done.
@@ -1650,7 +1650,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-clone ErrorVectorsT.ErrorVectorsT as EV with theory B <= B, theory PR <= PR
+clone ErrorVectorsT.ErrorVectorsT as EV with theory B <- B, theory PR <- PR
 proof *.
 realize sample_polynomials_4x.
 move=> rho_ ds0.

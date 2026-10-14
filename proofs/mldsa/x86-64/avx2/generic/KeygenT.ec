@@ -11,22 +11,22 @@ abstract theory KeygenT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import PreludeT.PreludeT as PR with theory B <= B.
-clone import PolynomialT.PolynomialT as PL with theory B <= B.
-clone import CommonNttT.CommonNttT as CN with theory B <= B.
-clone import CommonModularT.CommonModularT as CM with theory B <= B.
-clone import ErrorPolynomialT.ErrorPolynomialT as EP with theory B <= B.
+clone import PreludeT.PreludeT as PR with theory B <- B.
+clone import PolynomialT.PolynomialT as PL with theory B <- B.
+clone import CommonNttT.CommonNttT as CN with theory B <- B.
+clone import CommonModularT.CommonModularT as CM with theory B <- B.
+clone import ErrorPolynomialT.ErrorPolynomialT as EP with theory B <- B.
 clone import RowVectorT.RowVectorT as RV with
-  theory B <= B, theory PR <= PR, theory PL <= PL, theory CN <= CN, theory CM <= CM.
+  theory B <- B, theory PR <- PR, theory PL <- PL, theory CN <- CN, theory CM <- CM.
 clone import ColumnVectorT.ColumnVectorT as CV with
-  theory B <= B, theory PR <= PR, theory PL <= PL, theory CN <= CN, theory CM <= CM.
-clone import MatrixAT.MatrixAT as MA with theory B <= B, theory PR <= PR.
-clone import ErrorVectorsT.ErrorVectorsT as EV with theory B <= B, theory PR <= PR.
-clone import T0T.T0T as T0 with theory B <= B, theory PR <= PR.
-clone import T1T.T1T as T1 with theory B <= B, theory PR <= PR.
-clone import S1T.S1T as S1E with theory B <= B, theory PR <= PR, theory EP <= EP.
-clone import S2T.S2T as S2E with theory B <= B, theory PR <= PR, theory EP <= EP.
-clone import HashingT.HashingT as HS with theory B <= B.
+  theory B <- B, theory PR <- PR, theory PL <- PL, theory CN <- CN, theory CM <- CM.
+clone import MatrixAT.MatrixAT as MA with theory B <- B, theory PR <- PR.
+clone import ErrorVectorsT.ErrorVectorsT as EV with theory B <- B, theory PR <- PR.
+clone import T0T.T0T as T0 with theory B <- B, theory PR <- PR.
+clone import T1T.T1T as T1 with theory B <- B, theory PR <- PR.
+clone import S1T.S1T as S1E with theory B <- B, theory PR <- PR, theory EP <- EP.
+clone import S2T.S2T as S2E with theory B <- B, theory PR <- PR, theory EP <- EP.
+clone import HashingT.HashingT as HS with theory B <- B.
 
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq.

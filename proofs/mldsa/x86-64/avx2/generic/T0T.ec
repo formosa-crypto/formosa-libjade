@@ -13,7 +13,7 @@ abstract theory T0T.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import PreludeT.PreludeT as PR with theory B <= B.
+clone import PreludeT.PreludeT as PR with theory B <- B.
 import Array_kpolys Array_t0_enc.
 
 import BitEncoding BitChunking.

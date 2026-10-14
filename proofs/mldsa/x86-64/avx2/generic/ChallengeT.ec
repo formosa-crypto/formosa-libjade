@@ -10,7 +10,7 @@ abstract theory ChallengeT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import Sha3x4.Sha3x4T as SX with theory P <= S, theory R <= R.
+clone import Sha3x4.Sha3x4T as SX with theory P <- S, theory R <- R.
 import Shake256x4.
 import Array_ctilde.
 

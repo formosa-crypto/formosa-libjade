@@ -10,8 +10,8 @@ abstract theory SignatureT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import PreludeT.PreludeT as PR with theory B <= B.
-clone import Gamma1T.Gamma1T as G1 with theory B <= B, theory PR <= PR.
+clone import PreludeT.PreludeT as PR with theory B <- B.
+clone import Gamma1T.Gamma1T as G1 with theory B <- B, theory PR <- PR.
 
 import BitEncoding BitChunking.
 

@@ -10,20 +10,20 @@ abstract theory VerifyT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
-clone import PreludeT.PreludeT as PR with theory B <= B.
-clone import PolynomialT.PolynomialT as PL with theory B <= B.
-clone import CommonNttT.CommonNttT as CN with theory B <= B.
-clone import CommonModularT.CommonModularT as CM with theory B <= B.
-clone import CommonInvertNttT.CommonInvertNttT as CI with theory B <= B.
-clone import RoundingT.RoundingT as RD with theory B <= B.
+clone import PreludeT.PreludeT as PR with theory B <- B.
+clone import PolynomialT.PolynomialT as PL with theory B <- B.
+clone import CommonNttT.CommonNttT as CN with theory B <- B.
+clone import CommonModularT.CommonModularT as CM with theory B <- B.
+clone import CommonInvertNttT.CommonInvertNttT as CI with theory B <- B.
+clone import RoundingT.RoundingT as RD with theory B <- B.
 clone import RowVectorT.RowVectorT as RV with
-  theory B <= B, theory PR <= PR, theory PL <= PL, theory CN <= CN, theory CM <= CM.
-clone import MatrixAT.MatrixAT as MA with theory B <= B, theory PR <= PR.
-clone import ChallengeT.ChallengeT as CH with theory B <= B.
-clone import SignatureT.SignatureT as SG with theory B <= B, theory PR <= PR.
-clone import CommitmentT.CommitmentT as CMT with theory B <= B, theory PR <= PR.
-clone import T1T.T1T as T1 with theory B <= B, theory PR <= PR.
-clone import HashingT.HashingT as HS with theory B <= B.
+  theory B <- B, theory PR <- PR, theory PL <- PL, theory CN <- CN, theory CM <- CM.
+clone import MatrixAT.MatrixAT as MA with theory B <- B, theory PR <- PR.
+clone import ChallengeT.ChallengeT as CH with theory B <- B.
+clone import SignatureT.SignatureT as SG with theory B <- B, theory PR <- PR.
+clone import CommitmentT.CommitmentT as CMT with theory B <- B, theory PR <- PR.
+clone import T1T.T1T as T1 with theory B <- B, theory PR <- PR.
+clone import HashingT.HashingT as HS with theory B <- B.
 import CR.
 
 import PolyLVec PolyKVec PolyMat.
