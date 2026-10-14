@@ -3,8 +3,8 @@
 (* a byte stream decodes to candidates, accepted candidates map to      *)
 (* coefficients; plus the XOF-slice and staged four-lane layers.        *)
 (*                                                                      *)
-(* Instances: Aexpand (3-byte candidates, align 3, coeff = idfun) and   *)
-(* Sexpand (nibbles, align 1, coeff = 4 - z).                           *)
+(* Instances: AexpandT (3-byte candidates, align 3, coeff = idfun) and  *)
+(* ErrorSamplerEta4T (nibbles, align 1, coeff = 4 - z).                 *)
 (* -------------------------------------------------------------------- *)
 require import AllCore List IntDiv IntMin BitEncoding.
 import BitChunking.

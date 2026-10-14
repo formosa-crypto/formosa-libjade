@@ -4,7 +4,7 @@ from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 require import Array2 Array32 Array64 Array256.
 require import BitEncoding JWordList.
 require BaseT PreludeT PolynomialT CommonNttT CommonModularT CommonInvertNttT RoundingT.
-require RowVectorT MatrixAT SamplersT SignatureT CommitmentT T1T HashingT.
+require RowVectorT MatrixAT ChallengeT SignatureT CommitmentT T1T HashingT.
 
 abstract theory VerifyT.
 
@@ -19,7 +19,7 @@ clone import RoundingT.RoundingT as RD with theory B <= B.
 clone import RowVectorT.RowVectorT as RV with
   theory B <= B, theory PR <= PR, theory PL <= PL, theory CN <= CN, theory CM <= CM.
 clone import MatrixAT.MatrixAT as MA with theory B <= B, theory PR <= PR.
-clone import SamplersT.SamplersT as SM with theory B <= B, theory PR <= PR.
+clone import ChallengeT.ChallengeT as CH with theory B <= B.
 clone import SignatureT.SignatureT as SG with theory B <= B, theory PR <= PR.
 clone import CommitmentT.CommitmentT as CMT with theory B <= B, theory PR <= PR.
 clone import T1T.T1T as T1 with theory B <= B, theory PR <= PR.

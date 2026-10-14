@@ -1,20 +1,29 @@
-(* -------------------------------------------------------------------- *)
 require import AllCore CoreUtils List List_extra IntDiv IntMin BitEncoding.
 import BS2Int.
+from Jasmin require import JWord JModel_x86.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from CryptoSpecs require import Keccak1600_Spec.
+require import MldsaConstants Agree Avx2red Errshuffle Prefixarray Rejstream Warraypack.
+require import Array4 Array25 Array64 Array136 Array256 Array272 Array2048.
+require import WArray272 WArray1024 WArray2048.
+require BaseT PreludeT ErrorVectorsT Sha3x4.
 
 (* -------------------------------------------------------------------- *)
-from Jasmin require import JWord JModel_x86.
-require import Mldsa65.
+(* The four-lane core of the sampler of s1 and s2, for the sets where   *)
+(* Eta = 4 (ML-DSA-65): each lane is the RejBoundedPoly of its SHAKE256 *)
+(* stream, the nibbles below 9 accepted as 4 - z. It realizes the       *)
+(* hypothesis of ErrorVectorsT.                                         *)
+(* -------------------------------------------------------------------- *)
+abstract theory ErrorSamplerEta4T.
 
-require import Agree.
-require import Avx2red.
-require import Errshuffle.
-require import Prefixarray.
-require import Rejstream.
-require import Warraypack.
-require import Sha3x4 Shared65. import Sha3x4_65 Shake256x4.
-require import Array4 Array25 Array64 Array136 Array256 Array272 Array1280 Array1536 Array2048.
-require import WArray272 WArray1024 WArray2048.
+clone import BaseT.BaseT as B with op S.Eta = 4.
+import S R MLDSAParams.
+clone PreludeT.PreludeT as PR with theory B <= B.
+clone import Sha3x4.Sha3x4T as SX with theory P <= S, theory R <= R.
+import Shake256x4.
+
+lemma Eta_val : Eta = 4 by done.
+hint simplify Eta_val.
 
 (* -------------------------------------------------------------------- *)
 clone import Prefixarray.PrefixArray as PA_272_136 with
@@ -26,20 +35,39 @@ clone import Prefixarray.PrefixArray as PA_272_136 with
   rename "'S" as "_272"
          "'B" as "_136"
 
-  proof le_size by done.
+  proof *.
+realize le_size by done.
 
 (* -------------------------------------------------------------------- *)
 clone Warraypack.WArrayPack as WP272 with
       op size <- 272,
   theory A    <- Array272,
   theory WA   <- WArray272
-  rename "get" as "WArray272_get".
+  rename "get" as "WArray272_get"
+  proof *.
+realize A.WArray272_get_out by exact Array272.get_out.
+realize WA.WArray272_get_out by exact WArray272.get_out.
+realize WA.WArray272_get16E by exact WArray272.get16E.
+realize WA.WArray272_get32E by exact WArray272.get32E.
+realize WA.WArray272_get64E by exact WArray272.get64E.
+realize WA.WArray272_get128E by exact WArray272.get128E.
+realize WA.WArray272_get256E by exact WArray272.get256E.
+realize WA.ArrayW8.WArray272_get_out by exact WArray272.ArrayW8.get_out.
 
 clone Warraypack.WArrayPack as WP2048 with
       op size <- 2048,
   theory A    <- Array2048,
   theory WA   <- WArray2048
-  rename "get" as "WArray2048_get".
+  rename "get" as "WArray2048_get"
+  proof *.
+realize A.WArray2048_get_out by exact Array2048.get_out.
+realize WA.WArray2048_get_out by exact WArray2048.get_out.
+realize WA.WArray2048_get16E by exact WArray2048.get16E.
+realize WA.WArray2048_get32E by exact WArray2048.get32E.
+realize WA.WArray2048_get64E by exact WArray2048.get64E.
+realize WA.WArray2048_get128E by exact WArray2048.get128E.
+realize WA.WArray2048_get256E by exact WArray2048.get256E.
+realize WA.ArrayW8.WArray2048_get_out by exact WArray2048.ArrayW8.get_out.
 
 import WP272 WP2048.
 
@@ -147,11 +175,12 @@ clone Rejstream.RejStream as SRS with
          "lanes_ok"  as "slanes_ok"
          "blocks_ok" as "sblocks_ok"
 
-  proof gt0_align  by done,
-        ge0_rate   by done,
-        align_rate by apply dvd1z,
-        size_slice by exact size_shake256_slice,
-        slice_cat  by exact shake256_slice_cat.
+  proof *.
+realize gt0_align  by done.
+realize ge0_rate   by done.
+realize align_rate by apply dvd1z.
+realize size_slice by exact size_shake256_slice.
+realize slice_cat  by exact shake256_slice_cat.
 
 import SRS.
 
@@ -1510,80 +1539,125 @@ call (error_4x____sample_polynomialsP rho_ ds0 (hok rho_)).
 by auto.
 qed.
 
+
 (* ==================================================================== *)
-(* The error-vector assembly: three staged batches fill s1 and s2       *)
+(* The link with the specification                                      *)
 (* ==================================================================== *)
 
 (* -------------------------------------------------------------------- *)
-clone Prefixarray.PrefixArray as PW_1280_256 with
-      op sizeB <- 256,
-      op sizeS <- 1280,
-  theory AB    <- Array256,
-  theory AS    <- Array1280
-  proof le_size by done.
-
-clone Prefixarray.PrefixArray as PW_1536_256 with
-      op sizeB <- 256,
-      op sizeS <- 1536,
-  theory AB    <- Array256,
-  theory AS    <- Array1536
-  proof le_size by done.
-
-abbrev poly_of_s1 (s : W32.t Array1280.t) (r : int) : wpoly =
-  PW_1280_256.winof s r.
-abbrev poly_of_s2 (s : W32.t Array1536.t) (r : int) : wpoly =
-  PW_1536_256.winof s r.
-
-(* -------------------------------------------------------------------- *)
-lemma sample____error_vectorsP (rho_ : W8.t Array64.t) :
-  (forall ds, stream_ok (to_list rho_ ++ W2u8.to_list ds)) =>
-hoare[ M.sample____error_vectors :
-    rho_prime = rho_
-  ==>
-     (forall r, 0 <= r < 5 =>
-        poly_of_s1 res.`1 r = Spoly rho_ (W16.of_int r))
-  /\ (forall r, 0 <= r < 6 =>
-        poly_of_s2 res.`2 r = Spoly rho_ (W16.of_int (5 + r))) ].
+(* a code candidate is the spec's CoeffFromHalfByte (eta = 4)           *)
+lemma halfstep_specE (c : W8.t) :
+  to_uint c < 16 =>
+  map W32.to_sint (halfstep c) = pmap idfun [CoeffFromHalfByte (to_uint c)].
 proof.
-move=> hok; proc.
-sp.
-(* the ML-DSA-65 layout: L = 5 *)
-rcondf 1; 1: by auto.
-rcondt 1; 1: by auto.
-rcondf ^if; 1: by conseq (: true ==> true).
-seq 5 : (rho_prime = rho_
-  /\ forall r, 0 <= r < 4 => poly_of_s1 s1 r = Spoly rho_ (W16.of_int r)).
-- wp; ecall (error_4x____sample_polynomialsH rho_ (W16.of_int 0) hok).
-  auto=> &hr |> result hres r rgr rgr2.
-  do 4! (rewrite PW_1280_256.winof_write ~-1:/#).
-  by move: (hres 0 _) (hres 1 _) (hres 2 _) (hres 3 _) => //#.
-seq 5 : (rho_prime = rho_
-  /\ (forall r, 0 <= r < 5 => poly_of_s1 s1 r = Spoly rho_ (W16.of_int r))
-  /\ (forall r, 0 <= r < 3 => poly_of_s2 s2 r = Spoly rho_ (W16.of_int (5 + r)))).
-- wp; ecall (error_4x____sample_polynomialsH rho_ (W16.of_int 4) hok).
-  auto=> &hr |> h1s result hres.
-  split.
-  - move=> r rgr rgr2.
-    rewrite PW_1280_256.winof_write ~-1:/#.
-    by move: (hres 0 _) => //; smt().
-  move=> r rgr rgr2.
-  do 3! (rewrite PW_1536_256.winof_write ~-1:/#).
-  by move: (hres 1 _) (hres 2 _) (hres 3 _) => //#.
-wp; ecall (error_4x____sample_polynomialsH rho_ (W16.of_int 8) hok).
-auto=> &hr |> h1s h2s result hres.
-move=> r rgr rgr2.
-do 3! (rewrite PW_1536_256.winof_write ~-1:/#).
-by move: (hres 0 _) (hres 1 _) (hres 2 _) => //#.
+move=> hc; rewrite /CoeffFromHalfByte Eta_val /saccept /=.
+case: (to_uint c < 9) => h /=; last by [].
+rewrite /scoeff /zeroextu32 (_ : W32.of_int 4 - W32.of_int (to_uint c) = W32.of_int (4 - to_uint c)).
+- by rewrite W32.of_intD W32.of_intN.
+by rewrite W32.to_sintK_small /=; smt(W8.to_uint_cmp).
+qed.
+
+(* one byte, low nibble first, as Alg. 31 reads it                      *)
+lemma sreject1_specE (b : W8.t) :
+  map W32.to_sint (sreject [b])
+  = pmap idfun [CoeffFromHalfByte (to_uint b %% 16); CoeffFromHalfByte (to_uint b %/ 16)].
+proof.
+have hlo : to_uint (b `&` W8.of_int 15) = to_uint b %% 16.
+- by rewrite (W8.to_uint_and_mod 4).
+have hhi : to_uint (b `>>>` 4) = to_uint b %/ 16.
+- by rewrite W8.to_uint_shr.
+have /= hb := W8.to_uint_cmp b.
+rewrite sreject1E map_cat !halfstep_specE ?hlo ?hhi.
+- smt(modz_cmp).
+- smt().
+by rewrite -pmap_cat.
+qed.
+
+(* the code's accepted stream is the spec's accepted list               *)
+lemma sreject_specE (rho : Bytes66.t) (t : int) : 0 <= t =>
+  map W32.to_sint (sreject (shake256_slice (Bytes66.to_list rho) 0 t))
+  = bounded_accepted rho t.
+proof.
+elim: t => [|t ge0t ih].
+- by rewrite /bounded_accepted /shake256_slice /Xof.slice mkseq0 /= iota0.
+rewrite bounded_acceptedS // -ih sreject_slice_block 1,2:// 1:dvd1z map_cat; congr.
+have -> : shake256_slice (Bytes66.to_list rho) t 1
+          = [nth witness (SHAKE256 (Bytes66.to_list rho) (t + 1)) t].
+- by rewrite /shake256_slice /Xof.slice mkseq1 /= /shake256_xof.
+by rewrite sreject1_specE /bounded_cands.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma sample____error_vectors_ll :
-  (forall (rho_ : W8.t Array64.t) ds, stream_ok (to_list rho_ ++ W2u8.to_list ds)) =>
-  islossless M.sample____error_vectors.
+(* termination: the code criterion follows from the spec's              *)
+lemma stream_ok_spec (n : W8.t list) : size n = 66 => stream_ok n.
 proof.
-move=> hok; have hll := error_4x____sample_polynomials_ll hok.
-proc; rcondf ^if; 1: by auto.
-rcondt ^if; 1: by auto.
-rcondf ^if; 1: by conseq (: true ==> true).
-by wp; do 3! (call hll; wp); auto.
+move=> szn; have [t [ge0t hsz]] := rejBounded_terminates (Bytes66.of_list n).
+exists t; split=> //.
+have [l ->] := sreject_slice_prefix n t (136 * t) _; 1: smt().
+move: hsz; rewrite -sreject_specE // Bytes66.of_listK // size_map size_cat.
+smt(size_ge0).
 qed.
+
+lemma stream_ok_all (rho_ : W8.t Array64.t) (ds : W16.t) :
+  stream_ok (to_list rho_ ++ W2u8.to_list ds).
+proof. by apply stream_ok_spec; rewrite size_cat Array64.size_to_list W2u8.size_to_list. qed.
+
+(* -------------------------------------------------------------------- *)
+(* the stream polynomial is the spec's RejBoundedPoly                   *)
+lemma Spoly_specE (rho_ : W8.t Array64.t) (sep : W16.t) :
+  lifts_wpoly (Spoly rho_ sep)
+  = rejBoundedPoly (Bytes66.of_list (to_list rho_ ++ W2u8.to_list sep)).
+proof.
+pose nc := to_list rho_ ++ W2u8.to_list sep.
+pose s := Bytes66.of_list nc.
+have szn : size nc = 66 by rewrite /nc size_cat Array64.size_to_list W2u8.size_to_list.
+have hn : Bytes66.to_list s = nc by rewrite /s Bytes66.of_listK.
+pose p := fun t => 256 <= size (bounded_accepted s t).
+have [t0 [ge0t0 ht0]] := rejBounded_terminates s.
+have hf : p (rejBounded_fuel s) by apply (argminP idfun p t0).
+have ge0f : 0 <= rejBounded_fuel s by rewrite /rejBounded_fuel ge0_argmin.
+have hsz : 256 <= size (sreject (shake256_slice nc 0 (rejBounded_fuel s))).
+- by move: hf; rewrite /p -sreject_specE // hn size_map.
+apply Array256.ext_eq => j rgj.
+rewrite /lifts_wpoly Array256.mapiE // (SpolyP rho_ sep (rejBounded_fuel s) j) //.
+rewrite /rejBoundedPoly Array256.initiE // -sreject_specE // hn.
+by rewrite /= (nth_map W32.zero) 1:/#.
+qed.
+
+(* its coefficients lie in [-eta, eta]                                  *)
+lemma to_sint_scoeff (c : W8.t) : saccept c => to_sint (scoeff c) = 4 - to_uint c.
+proof.
+rewrite /saccept => h.
+rewrite /scoeff /zeroextu32 (_ : W32.of_int 4 - W32.of_int (to_uint c) = W32.of_int (4 - to_uint c)).
+- by rewrite W32.of_intD W32.of_intN.
+by rewrite W32.to_sintK_small /=; smt(W8.to_uint_cmp).
+qed.
+
+lemma Spoly_srng (rho_ : W8.t Array64.t) (sep : W16.t) : wpoly_srng Eta Eta (Spoly rho_ sep).
+proof.
+pose nc := to_list rho_ ++ W2u8.to_list sep.
+have szn : size nc = 66 by rewrite /nc size_cat Array64.size_to_list W2u8.size_to_list.
+have [k [ge0k hk]] := stream_ok_spec nc szn.
+rewrite /wpoly_srng Array256.allP Eta_val => i rgi /=.
+rewrite (SpolyP rho_ sep (136 * k) i) 1:/# // -/nc.
+have : nth W32.zero (sreject (shake256_slice nc 0 (136 * k))) i
+       \in sreject (shake256_slice nc 0 (136 * k)) by apply mem_nth => /#.
+move: (nth W32.zero _ i) => w.
+rewrite srejectE => /mapP [c [/mem_filter [hc _] ->]].
+by rewrite to_sint_scoeff //; move: hc; rewrite /saccept; smt(W8.to_uint_cmp).
+qed.
+
+(* -------------------------------------------------------------------- *)
+
+(* -------------------------------------------------------------------- *)
+clone ErrorVectorsT.ErrorVectorsT as EV with theory B <= B, theory PR <= PR
+proof *.
+realize sample_polynomials_4x.
+move=> rho_ ds0.
+conseq (error_4x____sample_polynomials_ll stream_ok_all)
+       (error_4x____sample_polynomialsH rho_ (W16.of_int ds0) (stream_ok_all rho_)).
+move=> &hr _ r; split => [[_ //] | [_ h]]; split => // i rgi.
+by rewrite /EV.Spoly_ok (h i rgi) -W16.of_intD Spoly_specE Spoly_srng.
+qed.
+
+end ErrorSamplerEta4T.

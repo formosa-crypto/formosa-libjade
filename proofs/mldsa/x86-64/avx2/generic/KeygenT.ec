@@ -5,7 +5,7 @@ require import Array2 Array32 Array64 Array128 Array256 Array320 Array416 WArray
 require import Bindings.
 require import BitEncoding.
 require BaseT PreludeT PolynomialT CommonNttT CommonModularT ErrorPolynomialT.
-require RowVectorT ColumnVectorT MatrixAT SamplersT T0T T1T S1T S2T HashingT.
+require RowVectorT ColumnVectorT MatrixAT ErrorVectorsT T0T T1T S1T S2T HashingT.
 
 abstract theory KeygenT.
 
@@ -21,7 +21,7 @@ clone import RowVectorT.RowVectorT as RV with
 clone import ColumnVectorT.ColumnVectorT as CV with
   theory B <= B, theory PR <= PR, theory PL <= PL, theory CN <= CN, theory CM <= CM.
 clone import MatrixAT.MatrixAT as MA with theory B <= B, theory PR <= PR.
-clone import SamplersT.SamplersT as SM with theory B <= B, theory PR <= PR.
+clone import ErrorVectorsT.ErrorVectorsT as EV with theory B <= B, theory PR <= PR.
 clone import T0T.T0T as T0 with theory B <= B, theory PR <= PR.
 clone import T1T.T1T as T1 with theory B <= B, theory PR <= PR.
 clone import S1T.S1T as S1E with theory B <= B, theory PR <= PR, theory EP <= EP.

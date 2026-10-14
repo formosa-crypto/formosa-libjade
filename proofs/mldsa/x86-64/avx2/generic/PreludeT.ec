@@ -1,10 +1,11 @@
-require import AllCore List IntDiv.
+require import AllCore List IntDiv BitEncoding JWordList.
+from Jasmin require import JWord.
 require import Array256 Array320 Array416.
 require BaseT.
 
 (* The views of the implementation's flat arrays as vectors and matrices of
-   polynomials or of polynomial encodings, and their slice and writeback
-   laws. *)
+   polynomials or of polynomial encodings, their slice and writeback laws,
+   and the encoding of the samplers' domain separators. *)
 abstract theory PreludeT.
 
 clone import BaseT.BaseT as B.
@@ -226,6 +227,27 @@ move=> Hr Hk; apply Array256.tP => j jb.
 rewrite /lvec_unflatten256 LArray.initiE 1:/# /= get_of_list 1:/# nth_sub 1:/# /=.
 rewrite Array_lpolys.initiE 1:/lpolys 1:/# /mat_unflatten256 KLMatrix.initiE; 1: smt(gt0_l).
 rewrite /= get_of_list 1:/# nth_sub 1:/# /=; congr; rewrite /lpolys; ring.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* The specification's separator encoding is the little-endian byte     *)
+(* pair of the W16 counter                                              *)
+import BS2Int.
+
+lemma IntegerToBytes2E (k : int) :
+  0 <= k < 65536 => IntegerToBytes k 2 = W2u8.to_list (W16.of_int k).
+proof.
+move=> rgk; rewrite /IntegerToBytes /BitsToBytes /IntegerToBits /=.
+rewrite (int2bs_cat 8 16) // BitChunking.chunk_cat ?size_int2bs //.
+rewrite !chunk_size ?size_int2bs //=.
+split; apply W8.wordP => j rgj.
+- rewrite get_bits2w // W2u8.bits8iE //= of_intwE /int_bit /=.
+  have -> /= : 0 <= j < 16 by smt().
+  by rewrite /int2bs nth_mkseq //= (pmod_small k 65536).
+rewrite get_bits2w // W2u8.bits8iE //= of_intwE /int_bit /=.
+have -> /= : 0 <= 8 + j < 16 by smt().
+rewrite /int2bs nth_mkseq //= (pmod_small k 65536) // -divz_mul //.
+by have -> // : 256 * 2 ^ j = 2 ^ (8 + j) by rewrite exprD_nneg /#.
 qed.
 
 end PreludeT.

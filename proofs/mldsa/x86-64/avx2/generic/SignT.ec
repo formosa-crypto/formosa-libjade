@@ -5,7 +5,7 @@ require import Array2 Array32 Array64 Array128 Array256 Array416 XWord4.
 require import BitEncoding JWordList.
 require BaseT PreludeT PolynomialT CommonNttT CommonModularT CommonInvertNttT.
 require CommonRoundingT RoundingT ErrorPolynomialT RowVectorT ColumnVectorT.
-require SignatureT SignNormChecksT MatrixAT SamplersT CommitmentT S1T S2T T0T HashingT.
+require SignatureT SignNormChecksT MatrixAT MaskT ChallengeT CommitmentT S1T S2T T0T HashingT.
 
 abstract theory SignT.
 
@@ -29,7 +29,8 @@ clone import SignNormChecksT.SignNormChecksT as SNC with
   theory B <= B, theory PR <= PR, theory PL <= PL, theory CM <= CM, theory CI <= CI,
   theory CRD <= CRD, theory RV <= RV, theory SG <= SG.
 clone import MatrixAT.MatrixAT as MA with theory B <= B, theory PR <= PR.
-clone import SamplersT.SamplersT as SM with theory B <= B, theory PR <= PR.
+clone import MaskT.MaskT as MK with theory B <= B, theory PR <= PR, theory G1 <= SG.G1.
+clone import ChallengeT.ChallengeT as CH with theory B <= B.
 clone import CommitmentT.CommitmentT as CMT with theory B <= B, theory PR <= PR.
 clone import S1T.S1T as S1E with theory B <= B, theory PR <= PR, theory EP <= EP.
 clone import S2T.S2T as S2E with theory B <= B, theory PR <= PR, theory EP <= EP.

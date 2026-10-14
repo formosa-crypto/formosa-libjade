@@ -1,3 +1,19 @@
+require import AllCore List IntDiv IntMin BitEncoding.
+from Jasmin require import JModel_x86.
+from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
+from CryptoSpecs require import Keccak1600_Spec.
+require import Array25 Array28 Array136 Array256 WArray136 WArray1024.
+require import Rejstream.
+require BaseT Sha3x4.
+
+abstract theory ChallengeT.
+
+clone import BaseT.BaseT as B.
+import S R MLDSAParams.
+clone import Sha3x4.Sha3x4T as SX with theory P <= S, theory R <= R.
+import Shake256x4.
+import Array_ctilde.
+
 (* -------------------------------------------------------------------- *)
 (* The challenge sampler against the specification's SampleInBall      *)
 (*                                                                      *)
@@ -8,29 +24,14 @@
 (* first acceptable byte, measured from the largest stream position the *)
 (* state is consistent with (the XOF state need not determine it).      *)
 (* -------------------------------------------------------------------- *)
-require import AllCore List IntDiv IntMin BitEncoding.
-
-from Jasmin require import JModel_x86.
-
-require import Mldsa65.
-from JazzEC require import Mldsa_65_prelude.
-
-from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
-from Spec require import Spec65.
-import MLDSA65.
-
-from CryptoSpecs require import Keccak1600_Spec.
 
 import Round ZModQ Zq.
 
-require import Array25 Array28 Array48 Array136 Array256 WArray136 WArray1024.
-require import Rejstream Sha3x4 Shared65. import Sha3x4_65 Shake256x4.
-
 (* -------------------------------------------------------------------- *)
 (* the stream as the code reads it                                      *)
-lemma sib_byteE (s : W8.t Array48.t) (t : int) :
+lemma sib_byteE (s : W8.t Array_ctilde.t) (t : int) :
   sib_byte (BytesCT.of_list (to_list s)) t = to_uint (shake256_xof (to_list s) t).
-proof. by rewrite /sib_byte BytesCT.of_listK // size_to_list mldsa65_lambda. qed.
+proof. by rewrite /sib_byte BytesCT.of_listK // size_to_list . qed.
 
 lemma blk_byteE (n : W8.t list) (blk : W8.t Array136.t) (kb off : int) :
   Array136.to_list blk = shake256_slice n (136 * kb) 136 => 0 <= off < 136 =>
@@ -41,12 +42,12 @@ by rewrite /shake256_slice /Xof.slice nth_mkseq //= -Array136.get_to_list.
 qed.
 
 (* the sign bits are the first 8 bytes of the first block               *)
-lemma sib_signsE (s : W8.t Array48.t) (blk : W8.t Array136.t) (b : int) :
+lemma sib_signsE (s : W8.t Array_ctilde.t) (blk : W8.t Array136.t) (b : int) :
   Array136.to_list blk = shake256_slice (to_list s) 0 136 => 0 <= b < 64 =>
   (sib_signs (BytesCT.of_list (to_list s))).[b] = blk.[b %/ 8].[b %% 8].
 proof.
 move=> hb rgb.
-rewrite /sib_signs /H_sib BytesCT.of_listK; 1: by rewrite size_to_list mldsa65_lambda.
+rewrite /sib_signs /H_sib BytesCT.of_listK; 1: by rewrite size_to_list .
 rewrite Bytes8.of_listK; 1: by rewrite size_SHAKE256.
 rewrite /BytesToBits /"_.[_]" (BitChunking.nth_flatten witness 8).
 - by rewrite allP => l /mapP [w [_ ->]].
@@ -140,7 +141,7 @@ op xof_at (n : W8.t list) (p : int) (st : W64.t Array28.t) (blk : W8.t Array136.
     /\ to_uint off <= 136 /\ p = 136 * kb + to_uint off.
 
 (* reading the buffered byte at a position below the block end           *)
-lemma xof_read (s : W8.t Array48.t) (p : int) st blk (off : W64.t) :
+lemma xof_read (s : W8.t Array_ctilde.t) (p : int) st blk (off : W64.t) :
   xof_at (to_list s) p st blk off => to_uint off < 136 =>
      to_uint (zeroextu64 blk.[to_uint off]) = sib_byte (BytesCT.of_list (to_list s)) p
   /\ xof_at (to_list s) (p + 1) st blk (off + W64.one).
@@ -176,14 +177,14 @@ op ch_frame (ct : BytesCT.t) (i0 : int) (i signs : W64.t) (out : W32.t Array256.
   /\ wpoly_srng 1 1 out.
 
 (* -------------------------------------------------------------------- *)
-lemma sample____challengeP (s : W8.t Array48.t) :
+lemma sample____challengeP (s : W8.t Array_ctilde.t) :
   phoare [ M.sample____challenge : seed = s ==>
      lifts_wpoly res = (sampleInBall (BytesCT.of_list (to_list s))).`1
   /\ wpoly_srng 1 1 res ] = 1%r.
 proof.
 pose n := to_list s; pose ct := BytesCT.of_list n.
 have hok := sib_terminates ct.
-have ht : tau = 49 by exact mldsa65_tau.
+have ht := tau_bound.
 proc.
 (* zeroing, absorb, first block, sign bits *)
 seq 12 : (true) 1%r 1%r 0%r 0%r
@@ -210,7 +211,7 @@ seq 12 : (true) 1%r 1%r 0%r 0%r
   auto=> &hr [-> hz] st hst; split; 1: by rewrite /= -mk_absorbed_read0.
   move=> _ r [hr1 hr2].
   have hit0 : sib_iter ct 0 = (poly_zero, [], 8) by rewrite /sib_iter iota0.
-  rewrite hit0 /=; split; 1: by rewrite ht.
+  rewrite hit0 /=; split; 1: by rewrite pmod_small; smt(tau_bound).
   split; 1: by exists 0 => /=; rewrite hr1 hr2.
   split.
   - move=> b rgb; rewrite /ct /n (sib_signsE s r.`2 b) //.
@@ -450,3 +451,24 @@ seq 12 : (true) 1%r 1%r 0%r 0%r
 - by hoare; conseq (: _ ==> true).
 by [].
 qed.
+
+(* Equiv between the spec SampleInBall (with concrete MLDSA_XOF_SIB) and the
+   Jasmin sample____challenge. The seed is the 48-byte commitment hash.
+
+   Post also includes wpoly_srng 1 1 — sampleInBall emits a polynomial whose
+   coefficients are in {-1, 0, 1} (with exactly tau nonzero entries), so the
+   signed range is tight at [-1, 1]. *)
+lemma sample_challenge_correct :
+    equiv [ SampleInBall(MLDSA_XOF_SIB).sample ~ M.sample____challenge :
+       arg{1} = BytesCT.of_list (to_list arg{2}.`2)
+       ==>
+       lifts_wpoly res{2} = res{1}.`1 /\
+       wpoly_srng 1 1 res{2}
+    ].
+proof.
+proc*; exlim rho{1}, seed{2} => ct s.
+ecall{2} (sample____challengeP s); ecall{1} (SampleInBall_correct ct).
+by auto=> />.
+qed.
+
+end ChallengeT.

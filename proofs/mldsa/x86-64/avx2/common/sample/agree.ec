@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 (* Agreement of a polynomial with a prefix of an accepted-coefficient   *)
-(* stream: the sampler loop invariants of Aexpand and Sexpand.          *)
+(* stream: the sampler loop invariants of AexpandT and the error       *)
+(* samplers (ErrorSamplerEta4T).                                       *)
 (* -------------------------------------------------------------------- *)
 require import AllCore List.
 
