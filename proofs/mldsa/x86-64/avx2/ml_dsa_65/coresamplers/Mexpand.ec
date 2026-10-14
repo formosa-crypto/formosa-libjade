@@ -11,12 +11,12 @@ import BS2Int.
 
 (* -------------------------------------------------------------------- *)
 from Jasmin require import JWord JModel_x86.
-from JazzEC require import Ml_dsa_65_avx2.
+require import Mldsa65.
 
 require import Prefixarray.
 require import Warraypack.
 require import Avx2red.
-require import Sha3x4. import Shake256x4.
+require import Sha3x4 Shared65. import Sha3x4_65 Shake256x4.
 require import Array2 Array4 Array7 Array25 Array64 Array136 Array256 Array640 Array680 Array1280.
 require import WArray640 WArray1024.
 

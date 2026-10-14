@@ -13,6 +13,7 @@ require import Array1 Array2 Array3 Array4 Array5 Array6 Array7 Array8 Array16
  WArray16 WArray32 WArray64 WArray66 WArray128 WArray136 WArray168 WArray200
  WArray224 WArray256 WArray272 WArray320 WArray416 WArray800 WArray848
  WArray1024 WArray2048.
+require import MldsaConstants.
 require LayoutT.
 
 abstract theory MldsaT.
@@ -30,14 +31,14 @@ import Array_klpolys.
 import Array_kpolys.
 import Array_lpolys.
 import WArray_lpolys_bytes.
-import Array_pk_bytes.
-import WArray_pk_bytes.
+import Array_pk_enc.
+import WArray_pk_enc.
 import Array_s1_enc.
 import Array_s2_enc.
-import Array_sig_bytes.
-import WArray_sig_bytes.
-import Array_sk_bytes.
-import WArray_sk_bytes.
+import Array_sig_enc.
+import WArray_sig_enc.
+import Array_sk_enc.
+import WArray_sk_enc.
 import Array_t0_enc.
 import Array_t1_enc.
 import Array_w1_enc.
@@ -45,1056 +46,6 @@ import WArray_w1_enc.
 import Array_w1vec_enc.
 import WArray_w1vec_enc.
 import Array_z_enc.
-
-abbrev commitment__ENCODING_CONSTANTS_TABLE_bits6 =
-((Array4.of_list witness)
-[(W256.of_int
- 28950230901860469398263684891544233923488650320386368227458800854042216054785
- );
-(W256.of_int
-7237005605977205554490161940277891572388892260029238943406101674466895462401);
-(W256.of_int
-188719626688885783777598157725310765228543136941905289465975116136448);
-(W256.of_int
-(-25480207347730548941657020188721492090752456717537638033530380222208))]).
-
-abbrev commitment__ENCODING_SHUFFLES_bits4 =
-(W256.of_int
-6809477063014005108496892811167092228318171255968858956394831878370493989120).
-
-abbrev eRROR_VECTOR_SHUFFLE_TABLE =
-((Array2048.of_list witness)
-[(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 3); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 3); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 4); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 4); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 4); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 4);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 4); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2);
-(W8.of_int 4); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 4); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 4); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 4); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 3); (W8.of_int 4); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2);
-(W8.of_int 3); (W8.of_int 4); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 5); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 5); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 5);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 5); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 3); (W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3);
-(W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 3); (W8.of_int 5); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 3); (W8.of_int 5); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 5);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 5); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 3); (W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 4); (W8.of_int 5); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 4); (W8.of_int 5); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 4); (W8.of_int 5); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2);
-(W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 6);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2);
-(W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 6);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 3); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 3); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 3); (W8.of_int 6);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 3); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 6);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 3); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 4); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 4);
-(W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 4); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 4); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 4); (W8.of_int 6);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 4); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 4); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 4);
-(W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 3); (W8.of_int 4); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 3); (W8.of_int 4); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 6);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 5); (W8.of_int 6);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 5); (W8.of_int 6);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 5); (W8.of_int 6);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 3); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 3);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 3); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2);
-(W8.of_int 3); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 5); (W8.of_int 6);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 0); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 3); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 3);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2);
-(W8.of_int 3); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 4); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 4); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 4);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 4); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2);
-(W8.of_int 4); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 4);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 4); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 4); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 3); (W8.of_int 4); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 3); (W8.of_int 4); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 3); (W8.of_int 4); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 3); (W8.of_int 4); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 5); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 5);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 5); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 5); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 5); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 5); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 5); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 5);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3);
-(W8.of_int 5); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 5);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 3); (W8.of_int 5); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 3); (W8.of_int 5); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 5); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 5); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 5); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 5);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 4); (W8.of_int 5); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 4); (W8.of_int 5); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 4); (W8.of_int 5); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2);
-(W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 6);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 3); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 3); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 3); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 6);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 3); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 4);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 4); (W8.of_int 6);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 4); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 4); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 4); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 4); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 4);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 4); (W8.of_int 6);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 4); (W8.of_int 6);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 3); (W8.of_int 4); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2);
-(W8.of_int 3); (W8.of_int 4); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 6);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 5); (W8.of_int 6);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 3); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 3); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 3); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 3); (W8.of_int 5); (W8.of_int 6);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 3); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 2); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 0); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6);
-(W8.of_int 7); (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3);
-(W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7)]).
-
-abbrev t1__mask =
-(W256.of_int
-27580025446916579586740047030762717305835781530194468456916412547466239).
-
-abbrev t1__DECODING_TABLE =
-((Array2.of_list witness)
-[(W256.of_int
- (-1704488708535735317993730919615273811755981492442837930308886608702668544)
- );
-(W256.of_int
-161759680028012245712471816852122747571536270840244795705654356475904)]).
-
-abbrev t1__SHUFFLE_TO_GROUP = (W128.of_int (-1152053784517354134044416)).
-
-abbrev t1__ENCODING_SHIFTS_TABLE =
-((Array3.of_list witness)
-[(W256.of_int 138096238178506976811873579382829307350851889511329270071318);
-(W256.of_int 8769009825346546976905862850151196547671258038272);
-(W256.of_int 75325220824640169170112861481543258555010121551634147311628)]).
-
-abbrev t0__DECODING_TABLE =
-((Array3.of_list witness)
-[(W256.of_int
- (-1683702690027913741012871262190298745403129414409667671300841849902661376)
- );
-(W256.of_int
-80879840039114529797782631482765660946599467588442375410801744805888);
-(W256.of_int
-220828923202046630884640982628521424684360592877637234731771588637630463)]).
-
-abbrev t0__ENCODING_SHIFTS_TABLE =
-((Array4.of_list witness)
-[(W256.of_int 119264932972346934519345364012443492712099359123420733243411);
-(W256.of_int 475368975159373001864691843072);
-(W256.of_int 37662610412320084585056430740771629277505060775817073655814);
-(W256.of_int 221360928884514619392)]).
-
-abbrev matrix_A__DECODING_TABLE =
-((Array3.of_list witness)
-[(W256.of_int 31385508682779410369523405889615886801803926611390921441280);
-(W256.of_int
-(-432808243909779573675567928807470101786712732301848327860692622735061155584)
-);
-(W256.of_int
-226156397384342666605459106258636701594091082888230722833791023177481060351)]
-).
-
-abbrev matrix_A__SHUFFLE_TABLE =
-((Array256.of_list witness)
-[(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 8); (W8.of_int 9);
-(W8.of_int 10); (W8.of_int 11); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 8); (W8.of_int 9); (W8.of_int 10);
-(W8.of_int 11); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 8); (W8.of_int 9); (W8.of_int 10); (W8.of_int 11);
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 8); (W8.of_int 9);
-(W8.of_int 10); (W8.of_int 11); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 12); (W8.of_int 13);
-(W8.of_int 14); (W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 12); (W8.of_int 13); (W8.of_int 14);
-(W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 12); (W8.of_int 13); (W8.of_int 14); (W8.of_int 15);
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 12); (W8.of_int 13);
-(W8.of_int 14); (W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 8); (W8.of_int 9);
-(W8.of_int 10); (W8.of_int 11); (W8.of_int 12); (W8.of_int 13);
-(W8.of_int 14); (W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 8); (W8.of_int 9); (W8.of_int 10);
-(W8.of_int 11); (W8.of_int 12); (W8.of_int 13); (W8.of_int 14);
-(W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 8); (W8.of_int 9); (W8.of_int 10); (W8.of_int 11); (W8.of_int 12);
-(W8.of_int 13); (W8.of_int 14); (W8.of_int 15); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 8); (W8.of_int 9); (W8.of_int 10);
-(W8.of_int 11); (W8.of_int 12); (W8.of_int 13); (W8.of_int 14);
-(W8.of_int 15)]).
-
-abbrev rOL8 =
-((Array1.of_list witness)
-[(W256.of_int
- 13620818001941277694121380808605999856886653716761013959207994299728839901191
- )]
-).
-
-abbrev rOL56 =
-((Array1.of_list witness)
-[(W256.of_int
- 10910488462195273559651782724632284871561478246514020268633800075540923875841
- )]
-).
-
-abbrev kECCAK_RHOTATES_RIGHT =
-((Array6.of_list witness)
-[(W256.of_int 144373339913893657577751063007562604548177214458152943091773);
-(W256.of_int 232252764209307188274174373867837442080505530800860351692863);
-(W256.of_int 156927543384667019098616994515559168111335794127330162507795);
-(W256.of_int 351517697181654122777866749001917765472957616589092975280182);
-(W256.of_int 276192476357013953622045746931053922384479139705868246843454);
-(W256.of_int 313855086769334038206421612937983674734430261968315659321364)]).
-
-abbrev kECCAK_RHOTATES_LEFT =
-((Array6.of_list witness)
-[(W256.of_int 257361171150853911329517531560668107745210100483895842570243);
-(W256.of_int 169481746855440380633094220700393270212881784141188433969153);
-(W256.of_int 244806967680080549808651600052671544182051520814718623154221);
-(W256.of_int 50216813883093446129401845566312946820429698352955810381834);
-(W256.of_int 125542034707733615285222847637176789908908175236180538818562);
-(W256.of_int 87879424295413530700846981630247037558957052973733126340652)]).
-
-abbrev kECCAK1600_RC =
-((Array24.of_list witness)
-[(W64.of_int 1); (W64.of_int 32898); (W64.of_int (-9223372036854742902));
-(W64.of_int (-9223372034707259392)); (W64.of_int 32907);
-(W64.of_int 2147483649); (W64.of_int (-9223372034707259263));
-(W64.of_int (-9223372036854743031)); (W64.of_int 138); (W64.of_int 136);
-(W64.of_int 2147516425); (W64.of_int 2147483658); (W64.of_int 2147516555);
-(W64.of_int (-9223372036854775669)); (W64.of_int (-9223372036854742903));
-(W64.of_int (-9223372036854743037)); (W64.of_int (-9223372036854743038));
-(W64.of_int (-9223372036854775680)); (W64.of_int 32778);
-(W64.of_int (-9223372034707292150)); (W64.of_int (-9223372034707259263));
-(W64.of_int (-9223372036854742912)); (W64.of_int 2147483649);
-(W64.of_int (-9223372034707259384))]).
-
-abbrev zETAS_TO_INVERT_LAYER_6 =
-((Array2.of_list witness) [(W32.of_int (-518909)); (W32.of_int (-2608894))]).
-
-abbrev zETAS_TO_INVERT_LAYER_5 =
-((Array4.of_list witness)
-[(W32.of_int 466468); (W32.of_int (-876248)); (W32.of_int (-777960));
-(W32.of_int 237124)]).
-
-abbrev zETAS_TO_INVERT_LAYER_4 =
-((Array8.of_list witness)
-[(W32.of_int 2680103); (W32.of_int 3111497); (W32.of_int (-2884855));
-(W32.of_int 3119733); (W32.of_int (-2091905)); (W32.of_int (-359251));
-(W32.of_int 2353451); (W32.of_int 1826347)]).
-
-abbrev zETAS_TO_INVERT_LAYER_3 =
-((Array16.of_list witness)
-[(W32.of_int 280005); (W32.of_int 4010497); (W32.of_int (-19422));
-(W32.of_int 1757237); (W32.of_int (-3277672)); (W32.of_int (-1399561));
-(W32.of_int (-3859737)); (W32.of_int (-2118186)); (W32.of_int (-2108549));
-(W32.of_int 2619752); (W32.of_int (-1119584)); (W32.of_int (-549488));
-(W32.of_int 3585928); (W32.of_int (-1079900)); (W32.of_int 1024112);
-(W32.of_int 2725464)]).
-
-abbrev zETAS_TO_INVERT_LAYER_2 =
-((Array16.of_list witness)
-[(W256.of_int
- 55858097833101550257214085554898365818120118939289856544579935031533063981);
-(W256.of_int
-105163311027759753657778087208235454592057129092071682892877310237938875440);
-(W256.of_int
-25725989914184953801617746899476742653944181040072196426454101837991327827);
-(W256.of_int
-21889966941809614170064575509624246080299888430238795568055695825414134682);
-(W256.of_int
-(-43147210895140552674126020849390261598795394536363723224061988817370319988)
-);
-(W256.of_int
-94555623449686201047046586089202287911895030785269406424979215626557937175);
-(W256.of_int
-94513323293355592920583638744342789667917531388272404646804202659466555225);
-(W256.of_int
-(-45812120743968864641291703575538650621127909064993469193858518144591140138)
-);
-(W256.of_int
-63320826751879736535069744341302438400871249283798704129972914700106057053);
-(W256.of_int
-95437348505640655333834790623064550541058135367234548429171322106916072013);
-(W256.of_int
-96366226508326934740561615237334246202685117296625000557156943582056431169);
-(W256.of_int
-(-104095427540025280815714770235714915413038677656764623303505208897845490052)
-);
-(W256.of_int
-(-68411269083022995552342786355098589395800322542083880897111870443293524305)
-);
-(W256.of_int
-(-44799127707661490680986551545104751950660152152719002346056174221244420052)
-);
-(W256.of_int
-82964517896806024708470005111380135907348798935390409998868367704828796613);
-(W256.of_int
-72954235777068957422335349253495230275540662222309750361511250266905736736)]).
-
-abbrev zETAS_TO_INVERT_LAYER_1 =
-((Array16.of_list witness)
-[(W256.of_int
- (-81394801961692367886430385872069775591899888374899243279001081876171810855)
- );
-(W256.of_int
-34661567679679177301116532790068060848189603243687759106031639884244584450);
-(W256.of_int
-(-64955246559009626209334090610844950686859823444064428462419434932632520814)
-);
-(W256.of_int
-5110203972054881556156591894762920528448975955081272796495122244267393014);
-(W256.of_int
-64416910343834614792393674441495836491133256368070832133925939380646307848);
-(W256.of_int
-(-100408034753660554592467491302376209402241585185804306979514679237786310208)
-);
-(W256.of_int
-1194002118272767818204969697142475014804055004809772772326363503993317210);
-(W256.of_int
-(-90137400428898195608591888407911072567948167381482086222197180771257596536)
-);
-(W256.of_int
-(-10298322189995975550492998599235942704890266878993213373882488288311628702)
-);
-(W256.of_int
-(-18092847172484030768594150646838607120362146941117652454946646810846033417)
-);
-(W256.of_int
-(-80007523985717796585815385341741418921177183815858461275034603165699132407)
-);
-(W256.of_int
-91992999638536873929403675040794761538037322390893756773920815590270398111);
-(W256.of_int
-(-86006085160608795653219616202775328578590887095922183230672569182969532470)
-);
-(W256.of_int
-(-33905098535969462031579012142083424424900777513339595321775290397735469834)
-);
-(W256.of_int
-(-39157974545820129459247333378438079185440363582611062924321782937515733061)
-);
-(W256.of_int
-(-105963212645560354748648894728962413671494752281642171317139502339957090279)
-)]).
-
-abbrev zETAS_TO_INVERT_LAYER_0 =
-((Array16.of_list witness)
-[(W256.of_int
- (-14947025766810884518519340178851830259972079680536628082551345248834016818)
- );
-(W256.of_int
-(-79236226866924585952449654367977996136871924539618190998681853009488910935)
-);
-(W256.of_int
-(-11503350912960617613730640784158756079862038378229427709112689681143332901)
-);
-(W256.of_int
-(-81929013263830893704991921825282108025075782622382010162513630324042812402)
-);
-(W256.of_int
-(-85824995177798504282796294437560123626439291842320922633474527581536220099)
-);
-(W256.of_int
-(-54286764273279474617153417324944689044923369866922433929488586482031684697)
-);
-(W256.of_int
-(-14623371649451712728712467712169116528326753931430007783612848928714236385)
-);
-(W256.of_int
-(-34499592299998942396114060243824569874827496206622141668637037974906472241)
-);
-(W256.of_int
-(-35939172576451990257306214357269889304653686414943338569916213557288891026)
-);
-(W256.of_int
-(-101558550446453650186530786043368056571637735915462539611172798861872728410)
-);
-(W256.of_int
-76629361786750316726400779924715828393657363260547957195302525993867565638);
-(W256.of_int
-9228308866127115427653890041133811097211812064444699926619978848773806372);
-(W256.of_int
-(-17667554029197039999021031754983291937999381450166200406335605094401629758)
-);
-(W256.of_int
-24282877894665662847114239626329772913956173036192043697149135726675756796);
-(W256.of_int
-7198224895570446916806461394142653175548603531300001347978374732042946014);
-(W256.of_int
-56391230786829500805896074122730759173243203946337935118236635448285439010)]).
-
-abbrev lAYER_5_ZETAS =
-((Array4.of_list witness)
-[(W256.of_int
- 6392850394989879782919009689269382774612906998598077359118130409487179332);
-(W256.of_int
-(-20973733154113172374116031522976669396413195272188229214344316118293536488)
-);
-(W256.of_int
-(-23623572392751038233765597253728972386203994192070686609939037874369158872)
-);
-(W256.of_int
-12575952404860491736722831142078028559353475404522730510421197583764889124)]).
-
-abbrev lAYER_4_ZETAS =
-((Array8.of_list witness)
-[(W256.of_int
- 49238217727174735462858186387578100159688428240787953942213019850271088171);
-(W256.of_int
-63448913458525191735085973044570427962987806332373120219353262977758521643);
-(W256.of_int
-(-9685360842428916145196834697753182983500981930324890315881936664396135251));
-(W256.of_int
-(-56397620285930186220742767687038759905129124854486734450534966836456319873)
-);
-(W256.of_int
-84107835315332748371338501606473572188354819374915131634898543954979953269);
-(W256.of_int
-(-77775510000624713868157743535565931642824611623174616916724477422490879223)
-);
-(W256.of_int
-83885793194530397492084942439958067066428266592234113411818227656112962121);
-(W256.of_int
-72255433959293710361838475334592620664244765969128822575549411552005776679)]).
-
-abbrev lAYER_3_ZETAS =
-((Array16.of_list witness)
-[(W256.of_int
- 73478364100347066145449536207869676010979875339599156186179113790095332952);
-(W256.of_int
-27610004907617431235323091930369958891020619642669127546773784053578440816);
-(W256.of_int
-(-29114019452687944652141730252662392625468968366251687480112978488363874908)
-);
-(W256.of_int
-96676427654751394334623229099637232984438995494630684149338570296686720904);
-(W256.of_int
-(-14814140217741789410927691322378018811565773299786869881706381995571438192)
-);
-(W256.of_int
-(-30183897976476251147078379349797082433450187480859935071749606949296084320)
-);
-(W256.of_int
-70628374217605672732670001650962551502832747150821133068371149173069183336);
-(W256.of_int
-(-56846341638362717550793306634037796725107942789763916007716703659955858565)
-);
-(W256.of_int
-(-57106154644454540695932518592234727621174745748323529001381711937296945706)
-);
-(W256.of_int
-(-104058276733509297387884342293575725750886975620944943210190348485148730649)
-);
-(W256.of_int
-(-37732062966262529937847409797042295828500025804886578957538547746756451081)
-);
-(W256.of_int
-(-88365835373040579013342948867416487189184821000834832474730864937308128104)
-);
-(W256.of_int
-47375015812574144245615171089146026461735045189417729391814688206912933941);
-(W256.of_int
-(-523589124344640168283556650424675203124767070476937215935262608098085854));
-(W256.of_int
-108122785253941937128917104982143485304890013997556525086078105349340869121);
-(W256.of_int
-7548919868293134767531912872774892140000535686570969834094701950491968965)]).
-
-abbrev lAYER_2_ZETAS =
-((Array16.of_list witness)
-[(W256.of_int
- 2582115852594215372922399554661124157277897753758022393249206975595104871);
-(W256.of_int
-95180393253896215529297919275801403125147833943906619600164777952522728653);
-(W256.of_int
-(-96844091563113441459207722112818379943157009722955851967939200150180289277)
-);
-(W256.of_int
-105560026643059242874414333339279123590254343489504880656670121511773358036);
-(W256.of_int
-(-82058394089112118315595779323790756700487005185220852200797524175183604347)
-);
-(W256.of_int
-(-77311583238268369291883430017183366157182291952749413423133918758353597802)
-);
-(W256.of_int
-(-8100547337178139787008245328587635352700729757627470271676080386151676928));
-(W256.of_int
-(-14539445321086234152463082975167421569381635625639435689228564068424231268)
-);
-(W256.of_int
-(-44317218660873969801110717389997338879307479034035967944316937582115679683)
-);
-(W256.of_int
-(-103033744840025696354203701758616738032860190620728572595116874234736574946)
-);
-(W256.of_int
-(-57711755926579748053954944473419501097706598159769197715058567402163436481)
-);
-(W256.of_int
-99740910873226578859027498567763075504868159311739122747018415153785312348);
-(W256.of_int
-14325275504712524173736726246318565876195315536473979690242352211913630632);
-(W256.of_int
-104632712317280022276696336606463762131530400452447840796497601825375948662);
-(W256.of_int
-(-68933321490407250339359046639266418582417944507082254287320285389600881356)
-);
-(W256.of_int
-(-75427945684089319846559526199054989292473894219667903397284946799304401580)
-)]).
-
-abbrev lAYER_1_ZETAS =
-((Array16.of_list witness)
-[(W256.of_int
- (-81992045660348812641476123197708666079241631123768297083540656699031157019)
- );
-(W256.of_int
-(-42737446665651130700293348505910636389708383368459145663957684787411823011)
-);
-(W256.of_int
-(-26965365622709106780368661443443548512078695116176182616612116382728007819)
-);
-(W256.of_int
-3421810351684802082964769067296309699936088410999557092647286114297533056);
-(W256.of_int
-73204208402624985713511618444513909716812773993549855077803124974272385266);
-(W256.of_int
-(-66781028067627493451451431699303436410367131290803476159769148694121498717)
-);
-(W256.of_int
-(-35268139519884621783682773031740188428473545878656661145853861037123190142)
-);
-(W256.of_int
-(-38564289560124577164223236705581139589637471190934819397139455616074765347)
-);
-(W256.of_int
-83521699114705755838561325406274439130886830666761290636494297414977256425);
-(W256.of_int
-106724130180471185595712043181305186969900588105579027577994805152403467520);
-(W256.of_int
-(-87612466623198314199249342155859137881401108183911389095677359257120461878)
-);
-(W256.of_int
-(-35502340576636688572867201419187530558567181874942573856296599846840404628)
-);
-(W256.of_int
-(-49913672231130794101676053937559106172010661027002323394503420373148441492)
-);
-(W256.of_int
-36162185271468838823349331853221926688304910074992295741345607920165534867);
-(W256.of_int
-(-38815340583547530020537411524095712066112549812346116746967645504362275291)
-);
-(W256.of_int
-103525143788042270064916081275428900954501718048654818943189921863570681506)]
-).
-
-abbrev lAYER_0_ZETAS =
-((Array16.of_list witness)
-[(W256.of_int
- (-96043758579160644217776514638953766832040475090913850812646157387223274861)
- );
-(W256.of_int
-(-86093273615620618052689901656884593902421885036751304584651663901315558667)
-);
-(W256.of_int
-(-14086545173911089561949528993457026072356098848467443862900796059865465250)
-);
-(W256.of_int
-(-96943573748591673632705333890837508601762989505283144305719118595512467423)
-);
-(W256.of_int
-5474055421981223595793975988818518111412432267915805729515223516017146137);
-(W256.of_int
-43027373937766165928586588799055057712463440178580726831465884900303527653);
-(W256.of_int
-(-28334095136827246491389516096410921694855453151494860059292548015584803560)
-);
-(W256.of_int
-(-52912723625957039508985463083087738847792605820588336715244713961281836866)
-);
-(W256.of_int
-91826414120696613313678319861910223306340101487465572345151919031776475475);
-(W256.of_int
-(-101827529838471838058920640338224688687792744157920897239160857356254332620)
-);
-(W256.of_int
-(-32551035205553071989555012365732791000044387452985845181336240680081471912)
-);
-(W256.of_int
-(-48503801831739795329241971286407911108857526471346587968315404362093466434)
-);
-(W256.of_int
-12727197713517537082815509913119745890371516046578436962151070568165777724);
-(W256.of_int
-(-103361523849251602159785089487568870121220845713788474355019617747115344571)
-);
-(W256.of_int
-(-95591532408285370970768713552277605216736587735721877751913636348105119900)
-);
-(W256.of_int
-53293964247218654718527730774000289571803083760351434456930051142633097808)]).
-
-abbrev tWO_POW_22_VECTOR =
-(W256.of_int
-113078212172144670016600318886917095060348232468446510094543828752187523072).
-
-abbrev iNVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR =
-(W256.of_int
-1583315853253120773718772168429862829322770379248453373268938642773050925057).
-
-abbrev polynomial__CONSTANTS_TABLE_gamma2_88 =
-((Array5.of_list witness)
-[(W256.of_int
- 303973398742897785767833851683137475682598667402680969552035729689816075);
-(W256.of_int
-5134899283207741363058510574454731367486516415803479218160437536110077952);
-(W256.of_int
-3423913227525323174502430081042878883520180111764122672559515536195711);
-(W256.of_int
-3450873174198750916033945278531405488902228774061477969193842430181504);
-(W256.of_int
-1159277706957392885855153492006644031428092478786277755276056441389099)]).
-
-abbrev polynomial__CONSTANTS_TABLE_gamma2_32 =
-((Array5.of_list witness)
-[(W256.of_int
- 404399200101416122972727962327899080730729934460329449514903409786895);
-(W256.of_int
-27633945340263435069803077425739770516599878854789179050185066335437825);
-(W256.of_int
-14120973028821288748410904079750511260587920143459567849941203224302714368);
-(W256.of_int
-3423913227525323174502430081042878883520180111764122672559515536195711);
-(W256.of_int
-13803492696795003664135781114125621955608915096245911876775369720726016)]).
-
-abbrev gamma1__DECODING_SHIFTS_TABLE_bits18 =
-((Array2.of_list witness)
-[(W256.of_int
- (-425713140823427258726567402212007541116928370375317764183762709239880875776)
- );
-(W256.of_int
-161759680028012245712471816852122747571536270840244795705654356475904)]).
-
-abbrev gamma1__ENCODING_SHIFTS_TABLE_bits18 =
-((Array2.of_list witness)
-[(W256.of_int 87879424295413530698465005061800468314178475143573171863566);
-(W256.of_int 175758848590827061387402103849814659651382461279056833806336)]).
-
-abbrev gamma1__DECODING_SHIFTS_TABLE_bits20 =
-((Array2.of_list witness)
-[(W256.of_int
- (-425713140823427258726663558789254841410387362057345797737825556725963292416)
- );
-(W256.of_int
-107839786668602559184514066897402134367680229671084479353429526839296)]).
-
-abbrev gamma1__ENCODING_SHIFTS_TABLE_bits20 =
-((Array2.of_list witness)
-[(W256.of_int 75325220824640169170112861481543258555010121551634147311628);
-(W256.of_int
-(-392023588615790074933092468460461382420127193604147098349862656))]).
-
-abbrev error_polynomial__ETA2_ENCODING_CONSTANTS =
-((Array5.of_list witness)
-[(W256.of_int
- 3620324877504553054442617659003609112555889197831655080748433503200030558209
- );
-(W256.of_int
-6809477063014005108496892811167092228318171255968858956394831878370493989120);
-(W256.of_int
-28950230901860469398263684891544233923488650320386368227458800854042216054785
-);
-(W256.of_int
-7237005605977205554490161940277891572388892260029238943406101674466895462401);
-(W256.of_int
-(-25480207347730548941657020188721492090752456717537638033530380222208))]).
-
-abbrev error_polynomial__SHIFTS =
-(W256.of_int
-107839786668602559184514066897402134367680229671084479353429526839296).
-
-abbrev error_polynomial__DECODING_SHUFFLES =
-(W256.of_int
-(-6793906561703790865943291268746375741561545978554779831640812377080064)).
-
-abbrev error_polynomial__ENCODING_SHUFFLES =
-(W256.of_int
-6809477063014005108496892811167092228318171255968858956394831878370493989120).
-
-abbrev hALF_OF_BITS_IN_T0_VECTOR =
-(W256.of_int
-110427941574360029313086248913004975644871320769967295014202957765808128).
-
-abbrev mODULUS_VECTOR =
-(W256.of_int
-225935595421087293402315996791205668696012104344015382954355885915737415681).
 
 module M = {
   proc error_polynomial__encode_eta4 (encoded:W8.t Array_eta_enc.t,
@@ -1117,7 +68,7 @@ module M = {
     temp <- (W64.of_int ((16 `<<` 8) + 1));
     shift <- (zeroextu256 (VMOV_64 temp));
     shift <- (VPBROADCAST_16u16 (truncateu16 shift));
-    temp <- (W64.of_int eta_max);
+    temp <- (W64.of_int P.Eta);
     eta_0 <- (zeroextu256 (VMOV_64 temp));
     eta_0 <- (VPBROADCAST_8u32 (truncateu32 eta_0));
     encoding_shuffles <- error_polynomial__ENCODING_SHUFFLES;
@@ -1199,7 +150,7 @@ module M = {
     temp <- (W64.of_int ((1 `<<` 4) - 1));
     mask <- (zeroextu256 (VMOV_64 temp));
     mask <- (VPBROADCAST_8u32 (truncateu32 mask));
-    temp <- (W64.of_int eta_max);
+    temp <- (W64.of_int P.Eta);
     eta_0 <- (zeroextu256 (VMOV_64 temp));
     eta_0 <- (VPBROADCAST_8u32 (truncateu32 eta_0));
     decoding_shuffles <- error_polynomial__DECODING_SHUFFLES;
@@ -1249,7 +200,7 @@ module M = {
     var encoding_constants:W256.t;
     var final_encoded_bytes:W8.t Array16.t;
     final_encoded_bytes <- witness;
-    temp <- (W64.of_int eta_max);
+    temp <- (W64.of_int P.Eta);
     eta_0 <- (zeroextu256 (VMOV_64 temp));
     eta_0 <- (VPBROADCAST_8u32 (truncateu32 eta_0));
     input_offset <- (W64.of_int 0);
@@ -1432,54 +383,54 @@ module M = {
       (zeroextu32 encoded.[(W64.to_uint (input_offset + (W64.of_int 2)))]);
       temp <- t0;
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int eta_max);
+      coefficient <- (W32.of_int P.Eta);
       coefficient <- (coefficient - temp);
       polynomial.[(W64.to_uint out_offset)] <- coefficient;
       temp <- t0;
       temp <- (temp `>>` (W8.of_int 3));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int eta_max);
+      coefficient <- (W32.of_int P.Eta);
       coefficient <- (coefficient - temp);
       polynomial.[(W64.to_uint (out_offset + (W64.of_int 1)))] <-
       coefficient;
       temp <- (t0 `>>` (W8.of_int 6));
       temp <- (LEA_32 (((W32.of_int 4) * t1) + temp));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int eta_max);
+      coefficient <- (W32.of_int P.Eta);
       coefficient <- (coefficient - temp);
       polynomial.[(W64.to_uint (out_offset + (W64.of_int 2)))] <-
       coefficient;
       temp <- t1;
       temp <- (temp `>>` (W8.of_int 1));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int eta_max);
+      coefficient <- (W32.of_int P.Eta);
       coefficient <- (coefficient - temp);
       polynomial.[(W64.to_uint (out_offset + (W64.of_int 3)))] <-
       coefficient;
       temp <- t1;
       temp <- (temp `>>` (W8.of_int 4));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int eta_max);
+      coefficient <- (W32.of_int P.Eta);
       coefficient <- (coefficient - temp);
       polynomial.[(W64.to_uint (out_offset + (W64.of_int 4)))] <-
       coefficient;
       temp <- (t1 `>>` (W8.of_int 7));
       temp <- (LEA_32 (((W32.of_int 2) * t2) + temp));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int eta_max);
+      coefficient <- (W32.of_int P.Eta);
       coefficient <- (coefficient - temp);
       polynomial.[(W64.to_uint (out_offset + (W64.of_int 5)))] <-
       coefficient;
       temp <- t2;
       temp <- (temp `>>` (W8.of_int 2));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int eta_max);
+      coefficient <- (W32.of_int P.Eta);
       coefficient <- (coefficient - temp);
       polynomial.[(W64.to_uint (out_offset + (W64.of_int 6)))] <-
       coefficient;
       temp <- (t2 `>>` (W8.of_int 5));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int eta_max);
+      coefficient <- (W32.of_int P.Eta);
       coefficient <- (coefficient - temp);
       polynomial.[(W64.to_uint (out_offset + (W64.of_int 7)))] <-
       coefficient;
@@ -1491,7 +442,7 @@ module M = {
   proc error_polynomial__encode (encoded:W8.t Array_eta_enc.t,
                                  polynomial:W32.t Array256.t) : W8.t Array_eta_enc.t = {
     
-    if ((eta_max = 2)) {
+    if ((P.Eta = 2)) {
       encoded <@ error_polynomial__encode_eta2 (encoded, polynomial);
     } else {
       encoded <@ error_polynomial__encode_eta4 (encoded, polynomial);
@@ -1501,7 +452,7 @@ module M = {
   proc error_polynomial__decode (decoded:W32.t Array256.t,
                                  encoded:W8.t Array_eta_enc.t) : W32.t Array256.t = {
     
-    if ((eta_max = 2)) {
+    if ((P.Eta = 2)) {
       decoded <@ error_polynomial__decode_eta2 (decoded, encoded);
     } else {
       decoded <@ error_polynomial__decode_eta4 (decoded, encoded);
@@ -1538,7 +489,7 @@ module M = {
     var output_offset:int;
     var input_offset:int;
     final_output_block <- witness;
-    temp <- (W64.of_int (1 `<<` gamma1_log));
+    temp <- (W64.of_int (1 `<<` P.gamma1_log));
     gamma1 <- (zeroextu256 (VMOV_64 temp));
     gamma1 <- (VPBROADCAST_8u32 (truncateu32 gamma1));
     output_offset <- 0;
@@ -1599,10 +550,10 @@ module M = {
     var shifts:W256.t;
     var input_offset:int;
     var output_offset:int;
-    temp <- (W64.of_int (1 `<<` gamma1_log));
+    temp <- (W64.of_int (1 `<<` P.gamma1_log));
     temp1 <- (VMOV_64 temp);
     gamma1 <- (VPBROADCAST_8u32 (truncateu32 temp1));
-    temp <- (W64.of_int (((1 `<<` gamma1_log) `<<` 1) - 1));
+    temp <- (W64.of_int (((1 `<<` P.gamma1_log) `<<` 1) - 1));
     temp1 <- (VMOV_64 temp);
     gamma1_times_2_mask <- (VPBROADCAST_8u32 (truncateu32 temp1));
     coefficients <- (set0_256);
@@ -1666,7 +617,7 @@ module M = {
     var final_output_block:W8.t Array16.t;
     var i:int;
     final_output_block <- witness;
-    temp <- (W64.of_int (1 `<<` gamma1_log));
+    temp <- (W64.of_int (1 `<<` P.gamma1_log));
     gamma1 <- (zeroextu256 (VMOV_64 temp));
     gamma1 <- (VPBROADCAST_8u32 (truncateu32 gamma1));
     input_offset <- (W64.of_int 0);
@@ -1728,16 +679,16 @@ module M = {
     var output_offset:W64.t;
     var sixteen_bytes:W128.t;
     var shifts:W256.t;
-    temp <- (W64.of_int (1 `<<` gamma1_log));
+    temp <- (W64.of_int (1 `<<` P.gamma1_log));
     temp1 <- (VMOV_64 temp);
     gamma1 <- (VPBROADCAST_8u32 (truncateu32 temp1));
-    temp <- (W64.of_int (((1 `<<` gamma1_log) `<<` 1) - 1));
+    temp <- (W64.of_int (((1 `<<` P.gamma1_log) `<<` 1) - 1));
     temp1 <- (VMOV_64 temp);
     gamma1_times_2_mask <- (VPBROADCAST_8u32 (truncateu32 temp1));
     coefficients <- (set0_256);
     input_offset <- (W64.of_int 0);
     output_offset <- (W64.of_int 0);
-    while ((input_offset \ult (W64.of_int ((gamma1_bits * 256) %/ 8)))) {
+    while ((input_offset \ult (W64.of_int ((P.gamma1_bits * 256) %/ 8)))) {
       sixteen_bytes <-
       (get128_direct (WArray_gamma1_enc.init8 (fun i => bytes.[i]))
       (W64.to_uint input_offset));
@@ -1766,7 +717,7 @@ module M = {
   proc gamma1____encode_polynomial (output:W8.t Array_gamma1_enc.t,
                                     polynomial:W32.t Array256.t) : W8.t Array_gamma1_enc.t = {
     
-    if ((gamma1_bits = 18)) {
+    if ((P.gamma1_bits = 18)) {
       output <@ gamma1____encode_polynomial_bits18 (output, polynomial);
     } else {
       output <@ gamma1____encode_polynomial_bits20 (output, polynomial);
@@ -1776,7 +727,7 @@ module M = {
   proc gamma1____decode_to_polynomial (polynomial:W32.t Array256.t,
                                        bytes:W8.t Array_gamma1_enc.t) : W32.t Array256.t = {
     
-    if ((gamma1_bits = 18)) {
+    if ((P.gamma1_bits = 18)) {
       polynomial <@ gamma1____decode_to_polynomial_bits18 (polynomial,
       bytes);
     } else {
@@ -1790,22 +741,22 @@ module M = {
     var aux:W8.t Array_gamma1_enc.t;
     var i:int;
     i <- 0;
-    while ((i < lvec)) {
+    while ((i < P.lvec)) {
       aux <@ gamma1____encode_polynomial ((Array_gamma1_enc.init
                                           (fun i_0 => encoded.[((i *
-                                                                ((gamma1_bits * 256) %/
+                                                                ((P.gamma1_bits * 256) %/
                                                                 8)) +
                                                                i_0)])
                                           ),
       (Array256.init (fun i_0 => decoded.[((i * 256) + i_0)])));
       encoded <-
       (Array_z_enc.init
-      (fun i_0 => (if ((i * ((gamma1_bits * 256) %/ 8)) <= i_0 < ((i *
-                                                         ((gamma1_bits * 256) %/ 8)) +
+      (fun i_0 => (if ((i * ((P.gamma1_bits * 256) %/ 8)) <= i_0 < ((i *
+                                                         ((P.gamma1_bits * 256) %/ 8)) +
                                                         gamma1_enc)) then aux.[
                                                                    (i_0 -
                                                                    (i *
-                                                                   ((gamma1_bits *
+                                                                   ((P.gamma1_bits *
                                                                     256) %/
                                                                    8)))] else 
                   encoded.[i_0]))
@@ -1819,12 +770,12 @@ module M = {
     var aux:W32.t Array256.t;
     var i:int;
     i <- 0;
-    while ((i < lvec)) {
+    while ((i < P.lvec)) {
       aux <@ gamma1____decode_to_polynomial ((Array256.init
                                              (fun i_0 => decoded.[((i * 256) +
                                                                   i_0)])
                                              ),
-      (Array_gamma1_enc.init (fun i_0 => encoded.[((i * ((gamma1_bits * 256) %/ 8)) + i_0)])));
+      (Array_gamma1_enc.init (fun i_0 => encoded.[((i * ((P.gamma1_bits * 256) %/ 8)) + i_0)])));
       decoded <-
       (Array_lpolys.init
       (fun i_0 => (if ((i * 256) <= i_0 < ((i * 256) + 256)) then aux.[
@@ -2034,7 +985,7 @@ module M = {
                               polynomial:W32.t Array256.t) : W32.t Array256.t *
                                                              W32.t Array256.t = {
     
-    if ((((8380417 - 1) %/ gamma2_div) = ((8380417 - 1) %/ 88))) {
+    if ((((8380417 - 1) %/ P.gamma2_div) = ((8380417 - 1) %/ 88))) {
       (lows, highs) <@ polynomial__decompose_gamma2_88 (lows, highs,
       polynomial);
     } else {
@@ -2046,7 +997,7 @@ module M = {
   proc polynomial__use_hints (commitment:W32.t Array256.t,
                               hint_polynomial:W32.t Array256.t) : W32.t Array256.t = {
     
-    if ((((8380417 - 1) %/ gamma2_div) = ((8380417 - 1) %/ 88))) {
+    if ((((8380417 - 1) %/ P.gamma2_div) = ((8380417 - 1) %/ 88))) {
       commitment <@ polynomial__use_hints_gamma2_88 (commitment,
       hint_polynomial);
     } else {
@@ -2076,10 +1027,10 @@ module M = {
     var  _2:bool;
     var  _3:bool;
     var  _4:bool;
-    temp <- (W64.of_int ((8380417 - 1) %/ gamma2_div));
+    temp <- (W64.of_int ((8380417 - 1) %/ P.gamma2_div));
     gamma2 <- (zeroextu256 (VMOV_64 temp));
     gamma2 <- (VPBROADCAST_8u32 (truncateu32 gamma2));
-    temp <- (W64.of_int (- ((8380417 - 1) %/ gamma2_div)));
+    temp <- (W64.of_int (- ((8380417 - 1) %/ P.gamma2_div)));
     minus_gamma2 <- (zeroextu256 (VMOV_64 temp));
     minus_gamma2 <- (VPBROADCAST_8u32 (truncateu32 minus_gamma2));
     weight <- 0;
@@ -12550,7 +11501,7 @@ module M = {
     }
     return (st, buf);
   }
-  proc a_VERIFICATION_KEY____a_ilen_read_upto8_at (buf:W8.t Array_pk_bytes.t,
+  proc a_VERIFICATION_KEY____a_ilen_read_upto8_at (buf:W8.t Array_pk_enc.t,
                                                    offset:int, dELTA:int,
                                                    lEN:int, tRAIL:int,
                                                    cUR:int, aT:int) : 
@@ -12564,7 +11515,7 @@ module M = {
     } else {
       if ((8 <= lEN)) {
         w <-
-        (get64_direct (WArray_pk_bytes.init8 (fun i => buf.[i])) (offset + dELTA));
+        (get64_direct (WArray_pk_enc.init8 (fun i => buf.[i])) (offset + dELTA));
         w <@ __SHLQ (w, (aT - cUR));
         dELTA <- (dELTA + ((cUR + 8) - aT));
         lEN <- (lEN - ((cUR + 8) - aT));
@@ -12573,7 +11524,7 @@ module M = {
         if ((4 <= lEN)) {
           w <-
           (zeroextu64
-          (get32_direct (WArray_pk_bytes.init8 (fun i => buf.[i]))
+          (get32_direct (WArray_pk_enc.init8 (fun i => buf.[i]))
           (offset + dELTA)));
           w <@ __SHLQ (w, (aT - cUR));
           dELTA <-
@@ -12586,7 +11537,7 @@ module M = {
         if (((aT < (cUR + 8)) /\ (2 <= lEN))) {
           t16 <-
           (zeroextu64
-          (get16_direct (WArray_pk_bytes.init8 (fun i => buf.[i]))
+          (get16_direct (WArray_pk_enc.init8 (fun i => buf.[i]))
           (offset + dELTA)));
           dELTA <-
           (dELTA + (((cUR + 8) <= (aT + 2)) ? ((cUR + 8) - aT) : 2));
@@ -12600,7 +11551,7 @@ module M = {
         if (((aT < (cUR + 8)) /\ (1 <= lEN))) {
           t8 <-
           (zeroextu64
-          (get8_direct (WArray_pk_bytes.init8 (fun i => buf.[i])) (offset + dELTA)
+          (get8_direct (WArray_pk_enc.init8 (fun i => buf.[i])) (offset + dELTA)
           ));
           dELTA <- (dELTA + 1);
           lEN <- (lEN - 1);
@@ -12623,7 +11574,7 @@ module M = {
     }
     return (dELTA, lEN, tRAIL, aT, w);
   }
-  proc a_VERIFICATION_KEY____a_ilen_read_upto16_at (buf:W8.t Array_pk_bytes.t,
+  proc a_VERIFICATION_KEY____a_ilen_read_upto16_at (buf:W8.t Array_pk_enc.t,
                                                     offset:int, dELTA:int,
                                                     lEN:int, tRAIL:int,
                                                     cUR:int, aT:int) : 
@@ -12637,7 +11588,7 @@ module M = {
     } else {
       if ((16 <= lEN)) {
         w <-
-        (get128_direct (WArray_pk_bytes.init8 (fun i => buf.[i])) (offset + dELTA)
+        (get128_direct (WArray_pk_enc.init8 (fun i => buf.[i])) (offset + dELTA)
         );
         w <@ __SHLDQ (w, (aT - cUR));
         dELTA <- (dELTA + (16 - (aT - cUR)));
@@ -12661,7 +11612,7 @@ module M = {
     }
     return (dELTA, lEN, tRAIL, aT, w);
   }
-  proc a_VERIFICATION_KEY____a_ilen_read_upto32_at (buf:W8.t Array_pk_bytes.t,
+  proc a_VERIFICATION_KEY____a_ilen_read_upto32_at (buf:W8.t Array_pk_enc.t,
                                                     offset:int, dELTA:int,
                                                     lEN:int, tRAIL:int,
                                                     cUR:int, aT:int) : 
@@ -12675,7 +11626,7 @@ module M = {
     } else {
       if (((aT = cUR) /\ (32 <= lEN))) {
         w <-
-        (get256_direct (WArray_pk_bytes.init8 (fun i => buf.[i])) (offset + dELTA)
+        (get256_direct (WArray_pk_enc.init8 (fun i => buf.[i])) (offset + dELTA)
         );
         dELTA <- (dELTA + 32);
         lEN <- (lEN - 32);
@@ -12698,7 +11649,7 @@ module M = {
     }
     return (dELTA, lEN, tRAIL, aT, w);
   }
-  proc a_VERIFICATION_KEY____a_ilen_read_bcast_upto8_at (buf:W8.t Array_pk_bytes.t,
+  proc a_VERIFICATION_KEY____a_ilen_read_bcast_upto8_at (buf:W8.t Array_pk_enc.t,
                                                          offset:int,
                                                          dELTA:int, lEN:int,
                                                          tRAIL:int, cUR:int,
@@ -12717,7 +11668,7 @@ module M = {
       if ((8 <= lEN)) {
         w256 <-
         (VPBROADCAST_4u64
-        (get64_direct (WArray_pk_bytes.init8 (fun i => buf.[i])) (offset + dELTA))
+        (get64_direct (WArray_pk_enc.init8 (fun i => buf.[i])) (offset + dELTA))
         );
         w256 <@ __SHLQ_256 (w256, (aT - cUR));
         dELTA <- (dELTA + ((cUR + 8) - aT));
@@ -12733,7 +11684,7 @@ module M = {
     return (dELTA, lEN, tRAIL, aT, w256);
   }
   proc a_VERIFICATION_KEY____addstate_avx2 (st:W256.t Array7.t, aT:int,
-                                            buf:W8.t Array_pk_bytes.t, offset:int,
+                                            buf:W8.t Array_pk_enc.t, offset:int,
                                             _LEN:int, _TRAILB:int) : 
   W256.t Array7.t * int * int = {
     var dELTA:int;
@@ -12802,7 +11753,7 @@ module M = {
     return (st, aT, offset);
   }
   proc a_VERIFICATION_KEY____absorb_avx2 (st:W256.t Array7.t, aT:int,
-                                          buf:W8.t Array_pk_bytes.t, _TRAILB:int,
+                                          buf:W8.t Array_pk_enc.t, _TRAILB:int,
                                           _RATE8:int) : W256.t Array7.t * int = {
     var _LEN:int;
     var iTERS:int;
@@ -12812,7 +11763,7 @@ module M = {
     var  _1:int;
     var  _2:int;
     offset <- 0;
-    _LEN <- (32 + (kvec * (((23 - 13) * 256) %/ 8)));
+    _LEN <- (32 + (P.kvec * (((23 - 13) * 256) %/ 8)));
     if ((_RATE8 <= (aT + _LEN))) {
       (st,  _0, offset) <@ a_VERIFICATION_KEY____addstate_avx2 (st, aT, 
       buf, offset, (_RATE8 - aT), 0);
@@ -12841,7 +11792,7 @@ module M = {
     return (st, aT);
   }
   proc a_VERIFICATION_KEY____addstate (st:W64.t Array25.t, aT:int,
-                                       buf:W8.t Array_pk_bytes.t, offset:int,
+                                       buf:W8.t Array_pk_enc.t, offset:int,
                                        _LEN:int, _TRAILB:int) : W64.t Array25.t *
                                                                 int * int = {
     var inc:int;
@@ -12873,7 +11824,7 @@ module M = {
       i <- 0;
       while ((i < inc)) {
         t256 <-
-        (get256_direct (WArray_pk_bytes.init8 (fun i_0 => buf.[i_0]))
+        (get256_direct (WArray_pk_enc.init8 (fun i_0 => buf.[i_0]))
         (offset + dELTA));
         dELTA <- (dELTA + 32);
         t256 <-
@@ -12889,7 +11840,7 @@ module M = {
       }
       if ((16 <= (_LEN %% 32))) {
         t128 <-
-        (get128_direct (WArray_pk_bytes.init8 (fun i_0 => buf.[i_0]))
+        (get128_direct (WArray_pk_enc.init8 (fun i_0 => buf.[i_0]))
         (offset + dELTA));
         dELTA <- (dELTA + 16);
         t128 <-
@@ -12906,7 +11857,7 @@ module M = {
       }
       if ((8 <= (_LEN %% 16))) {
         w <-
-        (get64_direct (WArray_pk_bytes.init8 (fun i_0 => buf.[i_0]))
+        (get64_direct (WArray_pk_enc.init8 (fun i_0 => buf.[i_0]))
         (offset + dELTA));
         dELTA <- (dELTA + 8);
         st <-
@@ -12925,7 +11876,7 @@ module M = {
       offset <- (offset + dELTA);
       dELTA <- 0;
       while ((at < ((aT %/ 8) + (_LEN %/ 8)))) {
-        w <- (get64_direct (WArray_pk_bytes.init8 (fun i_0 => buf.[i_0])) offset);
+        w <- (get64_direct (WArray_pk_enc.init8 (fun i_0 => buf.[i_0])) offset);
         offset <- (offset + 8);
         st.[at] <- (st.[at] `^` w);
         at <- (at + 1);
@@ -12950,7 +11901,7 @@ module M = {
     return (st, aT, offset);
   }
   proc a_VERIFICATION_KEY____absorb (st:W64.t Array25.t, aT:int,
-                                     buf:W8.t Array_pk_bytes.t, _TRAILB:int,
+                                     buf:W8.t Array_pk_enc.t, _TRAILB:int,
                                      _RATE8:int) : W64.t Array25.t * int = {
     var _LEN:int;
     var iTERS:int;
@@ -12960,7 +11911,7 @@ module M = {
     var  _1:int;
     var  _2:int;
     offset <- 0;
-    _LEN <- (32 + (kvec * (((23 - 13) * 256) %/ 8)));
+    _LEN <- (32 + (P.kvec * (((23 - 13) * 256) %/ 8)));
     if ((_RATE8 <= (aT + _LEN))) {
       (st,  _0, offset) <@ a_VERIFICATION_KEY____addstate (st, aT, buf,
       offset, (_RATE8 - aT), 0);
@@ -13251,7 +12202,7 @@ module M = {
     var  _1:int;
     var  _2:int;
     offset <- 0;
-    _LEN <- (((w1_bits * 256) %/ 8) * kvec);
+    _LEN <- (((P.w1_bits * 256) %/ 8) * P.kvec);
     if ((_RATE8 <= (aT + _LEN))) {
       (st,  _0, offset) <@ a_ENCODED_COMMITMENT____addstate_avx2 (st, 
       aT, buf, offset, (_RATE8 - aT), 0);
@@ -13399,7 +12350,7 @@ module M = {
     var  _1:int;
     var  _2:int;
     offset <- 0;
-    _LEN <- (((w1_bits * 256) %/ 8) * kvec);
+    _LEN <- (((P.w1_bits * 256) %/ 8) * P.kvec);
     if ((_RATE8 <= (aT + _LEN))) {
       (st,  _0, offset) <@ a_ENCODED_COMMITMENT____addstate (st, aT, 
       buf, offset, (_RATE8 - aT), 0);
@@ -13666,7 +12617,7 @@ module M = {
     return message_representative;
   }
   proc hash_verification_key (verification_key_hash:W8.t Array64.t,
-                              verification_key:W8.t Array_pk_bytes.t) : W8.t Array64.t = {
+                              verification_key:W8.t Array_pk_enc.t) : W8.t Array64.t = {
     var kECCAK_F:int;
     var lanes:W64.t Array25.t;
     var state:W256.t Array7.t;
@@ -14305,7 +13256,7 @@ module M = {
     signs <- (get64_direct (WArray136.init8 (fun i_0 => xof_block.[i_0])) 0);
     xof_offset <- (W64.of_int 8);
     ms <- (init_msf);
-    i <- (W64.of_int (256 - tau));
+    i <- (W64.of_int (256 - P.tau));
     condition_loop <- (i \ult (W64.of_int 256));
     while (condition_loop) {
       ms <- (update_msf condition_loop ms);
@@ -14371,7 +13322,7 @@ module M = {
     state <- witness;
     (* Erased call to spill *)
     state <@ shake256_absorb_66 (state, rho_prime, domain_separator);
-    inc <- (((((gamma1_bits * 256) %/ 8) + 136) - 1) %/ 136);
+    inc <- (((((P.gamma1_bits * 256) %/ 8) + 136) - 1) %/ 136);
     i <- 0;
     while ((i < inc)) {
       (aux, aux_0) <@ shake256_squeezeblock (state,
@@ -14409,7 +13360,7 @@ module M = {
     var aux_3:W8.t Array136.t;
     var inc:int;
     var i:int;
-    inc <- (((((gamma1_bits * 256) %/ 8) + 136) - 1) %/ 136);
+    inc <- (((((P.gamma1_bits * 256) %/ 8) + 136) - 1) %/ 136);
     i <- 0;
     while ((i < inc)) {
       (aux, aux_0, aux_1, aux_2, aux_3) <@ shake256_squeezeblock4x (state,
@@ -14630,7 +13581,7 @@ module M = {
     var aux:W32.t Array256.t;
     var i:int;
     i <- 0;
-    while ((i < lvec)) {
+    while ((i < P.lvec)) {
       aux <@ polynomial__ntt ((Array256.init
                               (fun i_0 => vector.[((i * 256) + i_0)])));
       vector <-
@@ -14653,7 +13604,7 @@ module M = {
     output <@ polynomial____zero (output);
     (* Erased call to spill *)
     i <- 0;
-    while ((i < lvec)) {
+    while ((i < P.lvec)) {
       (* Erased call to unspill *)
       product <@ polynomial__pointwise_montgomery_multiply_and_reduce (
       product, (Array256.init (fun i_0 => lhs.[((256 * i) + i_0)])),
@@ -14673,10 +13624,10 @@ module M = {
     var i:int;
     out <- witness;
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       aux <@ row_vector____dot_product ((Array256.init
                                         (fun i_0 => out.[((256 * i) + i_0)])),
-      (Array_lpolys.init (fun i_0 => matrix_A.[(((lvec * 256) * i) + i_0)])),
+      (Array_lpolys.init (fun i_0 => matrix_A.[(((P.lvec * 256) * i) + i_0)])),
       vector);
       out <-
       (Array_kpolys.init
@@ -14698,7 +13649,7 @@ module M = {
     vector_element <- witness;
     result <- (W64.of_int 0);
     i <- 0;
-    while ((i < lvec)) {
+    while ((i < P.lvec)) {
       vector_element <-
       (Array256.init (fun i_0 => vector.[((i * 256) + i_0)]));
       ret <@ polynomial____check_infinity_norm (vector_element, threshold);
@@ -14711,7 +13662,7 @@ module M = {
     var aux:W32.t Array256.t;
     var i:int;
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       aux <@ polynomial__reduce32 ((Array256.init
                                    (fun i_0 => vector.[((i * 256) + i_0)])));
       vector <-
@@ -14729,7 +13680,7 @@ module M = {
     var aux:W32.t Array256.t;
     var i:int;
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       aux <@ polynomial__ntt ((Array256.init
                               (fun i_0 => vector.[((i * 256) + i_0)])));
       vector <-
@@ -14748,7 +13699,7 @@ module M = {
     var aux:W32.t Array256.t;
     var i:int;
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       aux <@ polynomial__invert_ntt_montgomery ((Array256.init
                                                 (fun i_0 => vector.[(
                                                                     (
@@ -14776,7 +13727,7 @@ module M = {
     t0 <- witness;
     t1 <- witness;
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       (aux, aux_0) <@ polynomial____power2round ((Array256.init
                                                  (fun i_0 => t1.[((i * 256) +
                                                                  i_0)])
@@ -14809,7 +13760,7 @@ module M = {
     sum <- witness;
     (* Erased call to spill *)
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       aux <@ polynomial__add ((Array256.init
                               (fun i_0 => sum.[((256 * i) + i_0)])),
       (Array256.init (fun i_0 => lhs.[((256 * i) + i_0)])),
@@ -14831,7 +13782,7 @@ module M = {
     var aux:W32.t Array256.t;
     var i:int;
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       aux <@ polynomial__conditionally_add_modulus ((Array256.init
                                                     (fun i_0 => vector.[
                                                                 ((i * 256) +
@@ -14858,7 +13809,7 @@ module M = {
     high <- witness;
     low <- witness;
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       (aux, aux_0) <@ polynomial__decompose ((Array256.init
                                              (fun i_0 => low.[((i * 256) +
                                                               i_0)])
@@ -14951,7 +13902,7 @@ module M = {
     var j:int;
     (* Erased call to spill *)
     j <- 0;
-    while ((j < kvec)) {
+    while ((j < P.kvec)) {
       aux <@ t0__encode_polynomial ((Array416.init
                                     (fun i => encoded.[((j *
                                                         ((13 * 256) %/ 8)) +
@@ -15031,7 +13982,7 @@ module M = {
     var aux:W32.t Array256.t;
     var i:int;
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       aux <@ t0____decode_polynomial ((Array256.init
                                       (fun i_0 => t0.[((i * 256) + i_0)])),
       (Array416.init (fun i_0 => encoded.[((((13 * 256) %/ 8) * i) + i_0)])));
@@ -15110,7 +14061,7 @@ module M = {
     var j:int;
     (* Erased call to spill *)
     j <- 0;
-    while ((j < kvec)) {
+    while ((j < P.kvec)) {
       aux <@ t1__encode_polynomial ((Array320.init
                                     (fun i => encoded.[((j *
                                                         (((23 - 13) * 256) %/
@@ -15179,8 +14130,8 @@ module M = {
     output_offset coefficients)));
     return t1;
   }
-  proc signature____encode_hint (signature:W8.t Array_sig_bytes.t,
-                                 hint_0:W32.t Array_kpolys.t) : W8.t Array_sig_bytes.t = {
+  proc signature____encode_hint (signature:W8.t Array_sig_enc.t,
+                                 hint_0:W32.t Array_kpolys.t) : W8.t Array_sig_enc.t = {
     var ms:W64.t;
     var condition1:bool;
     var condition2:bool;
@@ -15191,14 +14142,14 @@ module M = {
     var j:int;
     var hint_offset:int;
     i <- 0;
-    while ((i < (omega + kvec))) {
-      signature.[((ctilde + (lvec * ((gamma1_bits * 256) %/ 8))) + i)] <- (W8.of_int 0);
+    while ((i < (P.w_hint + P.kvec))) {
+      signature.[((ctilde + (P.lvec * ((P.gamma1_bits * 256) %/ 8))) + i)] <- (W8.of_int 0);
       i <- (i + 1);
     }
     ms <- (init_msf);
     hints_written <- 0;
     i <- 0;
-    condition1 <- (i < kvec);
+    condition1 <- (i < P.kvec);
     while (condition1) {
       ms <- (update_msf condition1 ms);
       j <- 0;
@@ -15213,7 +14164,7 @@ module M = {
         condition_hint <- (hint_coefficient <> (W32.of_int 0));
         if (condition_hint) {
           ms <- (update_msf condition_hint ms);
-          signature.[((ctilde + (lvec * ((gamma1_bits * 256) %/ 8))) + hints_written)] <-
+          signature.[((ctilde + (P.lvec * ((P.gamma1_bits * 256) %/ 8))) + hints_written)] <-
           (truncateu8 (W64.of_int j));
           hints_written <- (hints_written + 1);
         } else {
@@ -15223,17 +14174,17 @@ module M = {
         condition2 <- (j < 256);
       }
       ms <- (update_msf (! condition2) ms);
-      signature.[(((ctilde + (lvec * ((gamma1_bits * 256) %/ 8))) + omega) + i)] <-
+      signature.[(((ctilde + (P.lvec * ((P.gamma1_bits * 256) %/ 8))) + P.w_hint) + i)] <-
       (truncateu8 (W64.of_int hints_written));
       i <- (i + 1);
-      condition1 <- (i < kvec);
+      condition1 <- (i < P.kvec);
     }
     return signature;
   }
-  proc signature____encode (signature:W8.t Array_sig_bytes.t,
+  proc signature____encode (signature:W8.t Array_sig_enc.t,
                             commitment_hash:W8.t Array_ctilde.t,
                             signer_response:W32.t Array_lpolys.t,
-                            hint_0:W32.t Array_kpolys.t) : W8.t Array_sig_bytes.t = {
+                            hint_0:W32.t Array_kpolys.t) : W8.t Array_sig_enc.t = {
     var aux:W8.t Array_z_enc.t;
     var bytes:W128.t;
     var i:int;
@@ -15242,17 +14193,17 @@ module M = {
       bytes <-
       (get128_direct (WArray_ctilde.init8 (fun i_0 => commitment_hash.[i_0])) i);
       signature <-
-      (Array_sig_bytes.init
-      (WArray_sig_bytes.get8
-      (WArray_sig_bytes.set128_direct
-      (WArray_sig_bytes.init8 (fun i_0 => signature.[i_0])) i bytes)));
+      (Array_sig_enc.init
+      (WArray_sig_enc.get8
+      (WArray_sig_enc.set128_direct
+      (WArray_sig_enc.init8 (fun i_0 => signature.[i_0])) i bytes)));
       i <- (i + 16);
     }
     aux <@ gamma1____encode ((Array_z_enc.init
                              (fun i_0 => signature.[(ctilde + i_0)])),
     signer_response);
     signature <-
-    (Array_sig_bytes.init
+    (Array_sig_enc.init
     (fun i_0 => (if (ctilde <= i_0 < (ctilde + z_enc)) then aux.[(i_0 - ctilde)] else 
                 signature.[i_0]))
     );
@@ -15292,7 +14243,7 @@ module M = {
     ill_formed_hint <- (W64.of_int 0);
     previous_true_hints_seen <- 0;
     encoded_offset <- 0;
-    within_bounds <- (kvec <= encoded_offset);
+    within_bounds <- (P.kvec <= encoded_offset);
     done1 <- (SETcc within_bounds);
     done1 <- (done1 `|` (truncateu8 ill_formed_hint));
     not_done1 <- (done1 = (W8.of_int 0));
@@ -15311,7 +14262,7 @@ module M = {
         condition_zero <- (j < 256);
       }
       ms <- (update_msf (! condition_zero) ms);
-      true_hints_seen <- (zeroextu64 hint_encoded.[(omega + encoded_offset)]);
+      true_hints_seen <- (zeroextu64 hint_encoded.[(P.w_hint + encoded_offset)]);
       true_hints_seen <- (protect_64 true_hints_seen ms);
       current_true_hints_seen <- (W64.to_uint true_hints_seen);
       condition_decreasing <-
@@ -15321,7 +14272,7 @@ module M = {
         ill_formed_hint <- (W64.of_int 1);
       } else {
         ms <- (update_msf (! condition_decreasing) ms);
-        condition_too_many <- (omega < current_true_hints_seen);
+        condition_too_many <- (P.w_hint < current_true_hints_seen);
         if (condition_too_many) {
           ms <- (update_msf condition_too_many ms);
           ill_formed_hint <- (W64.of_int 1);
@@ -15377,14 +14328,14 @@ module M = {
       } else {
         ms <- (update_msf (! condition_well_formed) ms);
       }
-      within_bounds <- (kvec <= encoded_offset);
+      within_bounds <- (P.kvec <= encoded_offset);
       done1 <- (SETcc within_bounds);
       done1 <- (done1 `|` (truncateu8 ill_formed_hint));
       not_done1 <- (done1 = (W8.of_int 0));
     }
     ms <- (update_msf (! not_done1) ms);
     encoded_offset <- previous_true_hints_seen;
-    within_bounds <- (omega <= encoded_offset);
+    within_bounds <- (P.w_hint <= encoded_offset);
     done3 <- (SETcc within_bounds);
     done3 <- (done3 `|` (truncateu8 ill_formed_hint));
     not_done3 <- (done3 = (W8.of_int 0));
@@ -15406,7 +14357,7 @@ module M = {
       } else {
         ms <- (update_msf (! condition_well_formed) ms);
       }
-      within_bounds <- (omega <= encoded_offset);
+      within_bounds <- (P.w_hint <= encoded_offset);
       done3 <- (SETcc within_bounds);
       done3 <- (done3 `|` (truncateu8 ill_formed_hint));
       not_done3 <- (done3 = (W8.of_int 0));
@@ -15416,7 +14367,7 @@ module M = {
   }
   proc signature____decode (signer_response:W32.t Array_lpolys.t,
                             hints:W32.t Array_kpolys.t,
-                            signature_encoded:W8.t Array_sig_bytes.t) : W32.t Array_lpolys.t *
+                            signature_encoded:W8.t Array_sig_enc.t) : W32.t Array_lpolys.t *
                                                                   W32.t Array_kpolys.t *
                                                                   W64.t = {
     var result:W64.t;
@@ -15424,7 +14375,7 @@ module M = {
     (Array_z_enc.init (fun i => signature_encoded.[(ctilde + i)])));
     (hints, result) <@ signature____decode_hint (hints,
     (Array_hint_enc.init
-    (fun i => signature_encoded.[((ctilde + (lvec * ((gamma1_bits * 256) %/ 8))) + i)])));
+    (fun i => signature_encoded.[((ctilde + (P.lvec * ((P.gamma1_bits * 256) %/ 8))) + i)])));
     return (signer_response, hints, result);
   }
   proc s1____encode (encoded:W8.t Array_s1_enc.t, s1:W32.t Array_lpolys.t) : 
@@ -15433,7 +14384,7 @@ module M = {
     var i:int;
     (* Erased call to spill *)
     i <- 0;
-    while ((i < lvec)) {
+    while ((i < P.lvec)) {
       aux <@ error_polynomial__encode ((Array_eta_enc.init
                                        (fun i_0 => encoded.[((eta_enc * i) + i_0)])
                                        ),
@@ -15456,7 +14407,7 @@ module M = {
     var i:int;
     (* Erased call to spill *)
     i <- 0;
-    while ((i < lvec)) {
+    while ((i < P.lvec)) {
       aux <@ error_polynomial__decode ((Array256.init
                                        (fun i_0 => s1.[((i * 256) + i_0)])),
       (Array_eta_enc.init (fun i_0 => encoded.[((eta_enc * i) + i_0)])));
@@ -15478,7 +14429,7 @@ module M = {
     var i:int;
     (* Erased call to spill *)
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       aux <@ error_polynomial__encode ((Array_eta_enc.init
                                        (fun i_0 => encoded.[((eta_enc * i) + i_0)])
                                        ),
@@ -15501,7 +14452,7 @@ module M = {
     var i:int;
     (* Erased call to spill *)
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       aux <@ error_polynomial__decode ((Array256.init
                                        (fun i_0 => s2.[((i * 256) + i_0)])),
       (Array_eta_enc.init (fun i_0 => encoded.[((eta_enc * i) + i_0)])));
@@ -15585,7 +14536,7 @@ module M = {
     error_coefficients_128 <- (VPSHUFB_128 coefficient_block shuffles);
     error_coefficients <-
     (VPMOVSX_8u8_8u32 (truncateu64 error_coefficients_128));
-    if ((eta_max = 2)) {
+    if ((P.Eta = 2)) {
       error_coefficients <@ error_4x____reduce_coefficients (error_coefficients);
     } else {
       
@@ -15621,7 +14572,7 @@ module M = {
     var coefficient:W32.t;
     var  _0:W64.t;
     ms <- (init_msf);
-    temp <- (W64.of_int eta_max);
+    temp <- (W64.of_int P.Eta);
     eta_0 <- (zeroextu256 (VMOV_64 temp));
     eta_0 <- (VPBROADCAST_32u8 (truncateu8 eta_0));
     temp <- (W64.of_int rej_bound);
@@ -15721,12 +14672,12 @@ module M = {
       condition <- (coefficient \ult (W32.of_int rej_bound));
       if (condition) {
         ms <- (update_msf condition ms);
-        if ((eta_max = 2)) {
+        if ((P.Eta = 2)) {
           coefficient <@ error_4x____reduce_coefficient (coefficient);
         } else {
           
         }
-        coefficient <- (coefficient - (W32.of_int eta_max));
+        coefficient <- (coefficient - (W32.of_int P.Eta));
         coefficient <- (- coefficient);
         error.[(W64.to_uint filled)] <- coefficient;
         filled <- (filled + (W64.of_int 1));
@@ -15743,12 +14694,12 @@ module M = {
         condition <- (coefficient \ult (W32.of_int rej_bound));
         if (condition) {
           ms <- (update_msf condition ms);
-          if ((eta_max = 2)) {
+          if ((P.Eta = 2)) {
             coefficient <@ error_4x____reduce_coefficient (coefficient);
           } else {
             
           }
-          coefficient <- (coefficient - (W32.of_int eta_max));
+          coefficient <- (coefficient - (W32.of_int P.Eta));
           coefficient <- (- coefficient);
           error.[(W64.to_uint filled)] <- coefficient;
           filled <- (filled + (W64.of_int 1));
@@ -15800,12 +14751,12 @@ module M = {
       condition <- (coefficient \ult (W32.of_int rej_bound));
       if (condition) {
         ms <- (update_msf condition ms);
-        if ((eta_max = 2)) {
+        if ((P.Eta = 2)) {
           coefficient <@ error_4x____reduce_coefficient (coefficient);
         } else {
           
         }
-        coefficient <- (coefficient - (W32.of_int eta_max));
+        coefficient <- (coefficient - (W32.of_int P.Eta));
         coefficient <- (- coefficient);
         error.[(W64.to_uint filled)] <- coefficient;
         filled <- (filled + (W64.of_int 1));
@@ -15822,12 +14773,12 @@ module M = {
         condition <- (coefficient \ult (W32.of_int rej_bound));
         if (condition) {
           ms <- (update_msf condition ms);
-          if ((eta_max = 2)) {
+          if ((P.Eta = 2)) {
             coefficient <@ error_4x____reduce_coefficient (coefficient);
           } else {
             
           }
-          coefficient <- (coefficient - (W32.of_int eta_max));
+          coefficient <- (coefficient - (W32.of_int P.Eta));
           coefficient <- (- coefficient);
           error.[(W64.to_uint filled)] <- coefficient;
           filled <- (filled + (W64.of_int 1));
@@ -16069,7 +15020,7 @@ module M = {
      _1 <- witness;
     s1 <- witness;
     s2 <- witness;
-    if ((lvec = 4)) {
+    if ((P.lvec = 4)) {
       (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
       (W16.of_int 0));
       s1 <-
@@ -16125,7 +15076,7 @@ module M = {
     } else {
       
     }
-    if ((lvec = 5)) {
+    if ((P.lvec = 5)) {
       (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
       (W16.of_int 0));
       s1 <-
@@ -16202,7 +15153,7 @@ module M = {
     } else {
       
     }
-    if ((lvec = 7)) {
+    if ((P.lvec = 7)) {
       (aux, aux_0, aux_1, aux_2) <@ error_4x____sample_polynomials (rho_prime,
       (W16.of_int 0));
       s1 <-
@@ -16335,14 +15286,14 @@ module M = {
     (WArray32.get8
     (WArray32.set256_direct (WArray32.init8 (fun i => seed.[i])) 0
     copied_32_bytes)));
-    inc <- ((kvec * lvec) %/ 4);
+    inc <- ((P.kvec * P.lvec) %/ 4);
     chunk <- 0;
     while ((chunk < inc)) {
       index <- (4 * chunk);
       lane <- 0;
       while ((lane < 4)) {
-        row <- ((index + lane) %/ lvec);
-        column <- ((index + lane) %% lvec);
+        row <- ((index + lane) %/ P.lvec);
+        column <- ((index + lane) %% P.lvec);
         domain_separators.[lane] <-
         (truncateu16 ((W256.of_int (row `<<` 8)) `|` (W256.of_int column)));
         lane <- (lane + 1);
@@ -16371,12 +15322,12 @@ module M = {
       );
       chunk <- (chunk + 1);
     }
-    if ((((kvec * lvec) %% 4) = 2)) {
-      index <- ((kvec * lvec) - 2);
+    if ((((P.kvec * P.lvec) %% 4) = 2)) {
+      index <- ((P.kvec * P.lvec) - 2);
       lane <- 0;
       while ((lane < 2)) {
-        row <- ((index + lane) %/ lvec);
-        column <- ((index + lane) %% lvec);
+        row <- ((index + lane) %/ P.lvec);
+        column <- ((index + lane) %% P.lvec);
         domain_separators.[lane] <-
         (truncateu16 ((W256.of_int (row `<<` 8)) `|` (W256.of_int column)));
         lane <- (lane + 1);
@@ -16404,8 +15355,8 @@ module M = {
   W8.t Array128.t = {
     var extra:W8.t Array2.t;
     extra <- witness;
-    extra.[0] <- (W8.of_int kvec);
-    extra.[1] <- (W8.of_int lvec);
+    extra.[0] <- (W8.of_int P.kvec);
+    extra.[1] <- (W8.of_int P.lvec);
     prf_output <@ _shake256_A128__A32_A2 (prf_output, randomness, extra);
     return prf_output;
   }
@@ -16426,46 +15377,46 @@ module M = {
     (t1, t0) <@ column_vector____power2round (t);
     return (t1, t0);
   }
-  proc __encode_s1_into_signing_key (signing_key:W8.t Array_sk_bytes.t,
-                                     s1:W32.t Array_lpolys.t) : W8.t Array_sk_bytes.t = {
+  proc __encode_s1_into_signing_key (signing_key:W8.t Array_sk_enc.t,
+                                     s1:W32.t Array_lpolys.t) : W8.t Array_sk_enc.t = {
     var aux:W8.t Array_s1_enc.t;
     aux <@ s1____encode ((Array_s1_enc.init
                          (fun i => signing_key.[(((32 + 32) + 64) + i)])),
     s1);
     signing_key <-
-    (Array_sk_bytes.init
+    (Array_sk_enc.init
     (fun i => (if (((32 + 32) + 64) <= i < (((32 + 32) + 64) + s1_enc)) then 
               aux.[(i - ((32 + 32) + 64))] else signing_key.[i]))
     );
     return signing_key;
   }
-  proc __encode_s2_into_signing_key (signing_key:W8.t Array_sk_bytes.t,
-                                     s2:W32.t Array_kpolys.t) : W8.t Array_sk_bytes.t = {
+  proc __encode_s2_into_signing_key (signing_key:W8.t Array_sk_enc.t,
+                                     s2:W32.t Array_kpolys.t) : W8.t Array_sk_enc.t = {
     var aux:W8.t Array_s2_enc.t;
     aux <@ s2____encode ((Array_s2_enc.init
                          (fun i => signing_key.[((((32 + 32) + 64) +
-                                                 (lvec * eta_enc)) +
+                                                 (P.lvec * eta_enc)) +
                                                 i)])
                          ),
     s2);
     signing_key <-
-    (Array_sk_bytes.init
-    (fun i => (if ((((32 + 32) + 64) + (lvec * eta_enc)) <= i < ((((32 + 32) + 64) +
-                                                         (lvec * eta_enc)) +
+    (Array_sk_enc.init
+    (fun i => (if ((((32 + 32) + 64) + (P.lvec * eta_enc)) <= i < ((((32 + 32) + 64) +
+                                                         (P.lvec * eta_enc)) +
                                                         s2_enc)) then aux.[
                                                                    (i -
                                                                    ((
                                                                     (32 + 32) +
                                                                     64) +
-                                                                   (lvec * eta_enc)))] else 
+                                                                   (P.lvec * eta_enc)))] else 
               signing_key.[i]))
     );
     return signing_key;
   }
-  proc __keygen_internal (verification_key:W8.t Array_pk_bytes.t,
-                          signing_key:W8.t Array_sk_bytes.t,
-                          randomness:W8.t Array32.t) : W8.t Array_pk_bytes.t *
-                                                       W8.t Array_sk_bytes.t = {
+  proc __keygen_internal (verification_key:W8.t Array_pk_enc.t,
+                          signing_key:W8.t Array_sk_enc.t,
+                          randomness:W8.t Array32.t) : W8.t Array_pk_enc.t *
+                                                       W8.t Array_sk_enc.t = {
     var aux:W8.t Array_t1_enc.t;
     var aux_0:W8.t Array_t0_enc.t;
     var prf_output:W8.t Array128.t;
@@ -16479,7 +15430,7 @@ module M = {
     var copied_32_bytes:W256.t;
     var t1:W32.t Array_kpolys.t;
     var t0:W32.t Array_kpolys.t;
-    var verification_key_pointer_copy:W8.t Array_pk_bytes.t;
+    var verification_key_pointer_copy:W8.t Array_pk_enc.t;
     var verification_key_hash:W8.t Array64.t;
     matrix_A <- witness;
     prf_output <- witness;
@@ -16509,21 +15460,21 @@ module M = {
     copied_32_bytes <-
     (get256_direct (WArray32.init8 (fun i => seed_for_matrix_A.[i])) 0);
     signing_key <-
-    (Array_sk_bytes.init
-    (WArray_sk_bytes.get8
-    (WArray_sk_bytes.set256_direct (WArray_sk_bytes.init8 (fun i => signing_key.[i])) 0
+    (Array_sk_enc.init
+    (WArray_sk_enc.get8
+    (WArray_sk_enc.set256_direct (WArray_sk_enc.init8 (fun i => signing_key.[i])) 0
     copied_32_bytes)));
     verification_key <-
-    (Array_pk_bytes.init
-    (WArray_pk_bytes.get8
-    (WArray_pk_bytes.set256_direct
-    (WArray_pk_bytes.init8 (fun i => verification_key.[i])) 0 copied_32_bytes)));
+    (Array_pk_enc.init
+    (WArray_pk_enc.get8
+    (WArray_pk_enc.set256_direct
+    (WArray_pk_enc.init8 (fun i => verification_key.[i])) 0 copied_32_bytes)));
     copied_32_bytes <-
     (get256_direct (WArray32.init8 (fun i => seed_for_signing.[i])) 0);
     signing_key <-
-    (Array_sk_bytes.init
-    (WArray_sk_bytes.get8
-    (WArray_sk_bytes.set256_direct (WArray_sk_bytes.init8 (fun i => signing_key.[i]))
+    (Array_sk_enc.init
+    (WArray_sk_enc.get8
+    (WArray_sk_enc.set256_direct (WArray_sk_enc.init8 (fun i => signing_key.[i]))
     32 copied_32_bytes)));
     signing_key <@ __encode_s1_into_signing_key (signing_key, s1);
     signing_key <@ __encode_s2_into_signing_key (signing_key, s2);
@@ -16534,7 +15485,7 @@ module M = {
                          (fun i => verification_key.[(32 + i)])),
     t1);
     verification_key <-
-    (Array_pk_bytes.init
+    (Array_pk_enc.init
     (fun i => (if (32 <= i < (32 + t1_enc)) then aux.[(i - 32)] else verification_key.[
                                                                    i]))
     );
@@ -16552,22 +15503,22 @@ module M = {
     verification_key <- (protect_ptr verification_key ms);
     signing_key <- (protect_ptr signing_key ms);
     signing_key <-
-    (Array_sk_bytes.init
+    (Array_sk_enc.init
     (fun i => (if (64 <= i < (64 + 64)) then verification_key_hash.[(i - 64)] else 
               signing_key.[i]))
     );
     aux_0 <@ t0____encode ((Array_t0_enc.init
                            (fun i => signing_key.[(((((32 + 32) + 64) +
-                                                    (lvec * eta_enc)) +
-                                                   (kvec * eta_enc)) +
+                                                    (P.lvec * eta_enc)) +
+                                                   (P.kvec * eta_enc)) +
                                                   i)])
                            ),
     t0);
     signing_key <-
-    (Array_sk_bytes.init
-    (fun i => (if (((((32 + 32) + 64) + (lvec * eta_enc)) + (kvec * eta_enc)) <= i < 
-                  (((((32 + 32) + 64) + (lvec * eta_enc)) + (kvec * eta_enc)) + t0_enc)) then 
-              aux_0.[(i - ((((32 + 32) + 64) + (lvec * eta_enc)) + (kvec * eta_enc)))] else 
+    (Array_sk_enc.init
+    (fun i => (if (((((32 + 32) + 64) + (P.lvec * eta_enc)) + (P.kvec * eta_enc)) <= i < 
+                  (((((32 + 32) + 64) + (P.lvec * eta_enc)) + (P.kvec * eta_enc)) + t0_enc)) then 
+              aux_0.[(i - ((((32 + 32) + 64) + (P.lvec * eta_enc)) + (P.kvec * eta_enc)))] else 
               signing_key.[i]))
     );
     return (verification_key, signing_key);
@@ -16609,7 +15560,7 @@ module M = {
               mask.[i]))
     );
     domain_separator <- (domain_separator + (W16.of_int 4));
-    if (((lvec %% 4) = 1)) {
+    if (((P.lvec %% 4) = 1)) {
       aux <@ __sample_mask_polynomial_1x ((Array256.init
                                           (fun i => mask.[(((256 * 32) %/ 8) +
                                                           i)])
@@ -16624,7 +15575,7 @@ module M = {
     } else {
       
     }
-    if (((lvec %% 4) = 3)) {
+    if (((P.lvec %% 4) = 3)) {
       (aux, aux_0, aux_1, aux_2) <@ __sample_mask_polynomial_4x (rho_prime,
       domain_separator);
       mask <-
@@ -16674,7 +15625,7 @@ module M = {
     encoding_shuffles <- commitment__ENCODING_SHUFFLES_bits4;
     input_offset <- 0;
     output_offset <- 0;
-    while ((output_offset < ((w1_bits * 256) %/ 8))) {
+    while ((output_offset < ((P.w1_bits * 256) %/ 8))) {
       c0 <-
       (get256_direct (WArray1024.init32 (fun i => commitment.[i]))
       input_offset);
@@ -16836,7 +15787,7 @@ module M = {
                                         commitment:W32.t Array256.t) : 
   W8.t Array_w1_enc.t = {
     
-    if ((w1_bits = 6)) {
+    if ((P.w1_bits = 6)) {
       encoded <@ commitment____encode_polynomial_bits6 (encoded, commitment);
     } else {
       encoded <@ commitment____encode_polynomial_bits4 (encoded, commitment);
@@ -16849,22 +15800,22 @@ module M = {
     var i:int;
     encoded_commitment <- witness;
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       aux <@ commitment____encode_polynomial ((Array_w1_enc.init
                                               (fun i_0 => encoded_commitment.[
                                                           ((i *
-                                                           ((w1_bits * 256) %/ 8)) +
+                                                           ((P.w1_bits * 256) %/ 8)) +
                                                           i_0)])
                                               ),
       (Array256.init (fun i_0 => commitment.[((i * 256) + i_0)])));
       encoded_commitment <-
       (Array_w1vec_enc.init
-      (fun i_0 => (if ((i * ((w1_bits * 256) %/ 8)) <= i_0 < ((i *
-                                                        ((w1_bits * 256) %/ 8)) +
+      (fun i_0 => (if ((i * ((P.w1_bits * 256) %/ 8)) <= i_0 < ((i *
+                                                        ((P.w1_bits * 256) %/ 8)) +
                                                        w1_enc)) then aux.[
                                                                   (i_0 -
                                                                   (i *
-                                                                  ((w1_bits * 256) %/
+                                                                  ((P.w1_bits * 256) %/
                                                                   8)))] else 
                   encoded_commitment.[i_0]))
       );
@@ -16936,11 +15887,11 @@ module M = {
     (* Erased call to declassify *)
      _0 <- (init_msf);
     if ((infinity_norm_check_result <> (W64.of_int 0))) {
-      base <- (lvec * 256);
+      base <- (P.lvec * 256);
     } else {
       
     }
-    while ((base < (lvec * 256))) {
+    while ((base < (P.lvec * 256))) {
       aux <@ __compute_signer_response_element ((Array256.init
                                                 (fun i => s1.[(base + i)])),
       verifier_challenge, (Array256.init (fun i => mask.[(base + i)])),
@@ -16952,12 +15903,12 @@ module M = {
       );
       infinity_norm_check_result <@ polynomial____check_infinity_norm (
       (Array256.init (fun i => signer_response.[(base + i)])),
-      ((1 `<<` gamma1_log) - (tau * eta_max)));
+      ((1 `<<` P.gamma1_log) - (P.tau * P.Eta)));
       base <- (base + 256);
       (* Erased call to declassify *)
        _0 <- (init_msf);
       if ((infinity_norm_check_result <> (W64.of_int 0))) {
-        base <- (lvec * 256);
+        base <- (P.lvec * 256);
       } else {
         
       }
@@ -16979,11 +15930,11 @@ module M = {
     (* Erased call to declassify *)
      _0 <- (init_msf);
     if ((infinity_norm_check_result <> (W64.of_int 0))) {
-      base <- (kvec * 256);
+      base <- (P.kvec * 256);
     } else {
       
     }
-    while ((base < (kvec * 256))) {
+    while ((base < (P.kvec * 256))) {
       cs2 <@ polynomial__pointwise_montgomery_multiply_and_reduce (cs2,
       (Array256.init (fun i => s2.[(base + i)])), verifier_challenge);
       cs2 <@ polynomial__invert_ntt_montgomery (cs2);
@@ -17004,12 +15955,12 @@ module M = {
       );
       infinity_norm_check_result <@ polynomial____check_infinity_norm (
       (Array256.init (fun i => w0_minus_cs2.[(base + i)])),
-      (((8380417 - 1) %/ gamma2_div) - (tau * eta_max)));
+      (((8380417 - 1) %/ P.gamma2_div) - (P.tau * P.Eta)));
       base <- (base + 256);
       (* Erased call to declassify *)
        _0 <- (init_msf);
       if ((infinity_norm_check_result <> (W64.of_int 0))) {
-        base <- (kvec * 256);
+        base <- (P.kvec * 256);
       } else {
         
       }
@@ -17032,17 +15983,17 @@ module M = {
     (* Erased call to declassify *)
      _1 <- (init_msf);
     if ((infinity_norm_check_result <> (W64.of_int 0))) {
-      base <- (kvec * 256);
+      base <- (P.kvec * 256);
     } else {
       
     }
-    while ((base < (kvec * 256))) {
+    while ((base < (P.kvec * 256))) {
       ct0 <@ polynomial__pointwise_montgomery_multiply_and_reduce (ct0,
       (Array256.init (fun i => t0.[(base + i)])), verifier_challenge);
       ct0 <@ polynomial__invert_ntt_montgomery (ct0);
       ct0 <@ polynomial__reduce32 (ct0);
       infinity_norm_check_result <@ polynomial____check_infinity_norm (
-      ct0, ((8380417 - 1) %/ gamma2_div));
+      ct0, ((8380417 - 1) %/ P.gamma2_div));
       (* Erased call to declassify *)
        _0 <- (init_msf);
       if ((infinity_norm_check_result = (W64.of_int 0))) {
@@ -17062,7 +16013,7 @@ module M = {
       (* Erased call to declassify *)
        _1 <- (init_msf);
       if ((infinity_norm_check_result <> (W64.of_int 0))) {
-        base <- (kvec * 256);
+        base <- (P.kvec * 256);
       } else {
         
       }
@@ -17087,11 +16038,11 @@ module M = {
     (* Erased call to declassify *)
      _0 <- (init_msf);
     if ((infinity_norm_check_result <> (W64.of_int 0))) {
-      base <- (kvec * 256);
+      base <- (P.kvec * 256);
     } else {
       
     }
-    while ((base < (kvec * 256))) {
+    while ((base < (P.kvec * 256))) {
       hint_element <- (Array256.init (fun i => hint_0.[(base + i)]));
       (hint_element, ones_in_hint) <@ polynomial____make_hint (hint_element,
       (Array256.init (fun i => w0_minus_cs2_plus_ct0.[(base + i)])),
@@ -17103,7 +16054,7 @@ module M = {
       );
       total_ones_in_hint <- (total_ones_in_hint + ones_in_hint);
       base <- (base + 256);
-      hint_count_exceeded <- (omega < total_ones_in_hint);
+      hint_count_exceeded <- (P.w_hint < total_ones_in_hint);
       hint_count_fail <- (SETcc hint_count_exceeded);
       hint_count_fail_64 <- (zeroextu64 hint_count_fail);
       infinity_norm_check_result <-
@@ -17111,18 +16062,18 @@ module M = {
       (* Erased call to declassify *)
        _0 <- (init_msf);
       if ((infinity_norm_check_result <> (W64.of_int 0))) {
-        base <- (kvec * 256);
+        base <- (P.kvec * 256);
       } else {
         
       }
     }
     return (hint_0, infinity_norm_check_result);
   }
-  proc __sign_internal (signature:W8.t Array_sig_bytes.t,
-                        signing_key:W8.t Array_sk_bytes.t, context_pointer:int,
+  proc __sign_internal (signature:W8.t Array_sig_enc.t,
+                        signing_key:W8.t Array_sk_enc.t, context_pointer:int,
                         context_size:int, message_pointer:int,
                         message_size:int, randomness:W8.t Array32.t) : 
-  W8.t Array_sig_bytes.t * W64.t = {
+  W8.t Array_sig_enc.t * W64.t = {
     var result:W64.t;
     var seed_for_matrix_A:W8.t Array32.t;
     var matrix_A:W32.t Array_klpolys.t;
@@ -17207,10 +16158,10 @@ module M = {
     (Array_s1_enc.init (fun i => signing_key.[(((32 + 32) + 64) + i)])));
     s2 <@ s2____decode (s2,
     (Array_s2_enc.init
-    (fun i => signing_key.[((((32 + 32) + 64) + (lvec * eta_enc)) + i)])));
+    (fun i => signing_key.[((((32 + 32) + 64) + (P.lvec * eta_enc)) + i)])));
     t0 <@ t0__decode (t0,
     (Array_t0_enc.init
-    (fun i => signing_key.[(((((32 + 32) + 64) + (lvec * eta_enc)) + (kvec * eta_enc)) + i)])
+    (fun i => signing_key.[(((((32 + 32) + 64) + (P.lvec * eta_enc)) + (P.kvec * eta_enc)) + i)])
     ));
     s1 <@ row_vector__ntt (s1);
     s2 <@ column_vector__ntt (s2);
@@ -17224,7 +16175,7 @@ module M = {
       (mask, domain_separator_for_mask) <@ sample____mask (seed_for_mask,
       domain_separator_for_mask);
       j <- 0;
-      while ((j < (lvec * ((256 * 32) %/ 8)))) {
+      while ((j < (P.lvec * ((256 * 32) %/ 8)))) {
         copied_32_bytes <-
         (get256_direct (WArray_lpolys_bytes.init32 (fun i => mask.[i])) j);
         mask_as_ntt <-
@@ -17268,7 +16219,7 @@ module M = {
       exit_rejection_sampling_loop <-
       (exit_rejection_sampling_loop `^` (W64.of_int 1));
       kappa_diff <- (zeroextu32 domain_separator_for_mask);
-      kappa_diff <- (kappa_diff `^` (W32.of_int (((65535 - lvec) %/ lvec) * lvec)));
+      kappa_diff <- (kappa_diff `^` (W32.of_int (((65535 - P.lvec) %/ P.lvec) * P.lvec)));
       ( _1,  _2,  _3,  _4, kappa_zf) <- (TEST_32 kappa_diff kappa_diff);
       kappa_bit <- (SETcc kappa_zf);
       kappa_bit_64 <- (zeroextu64 kappa_bit);
@@ -17344,7 +16295,7 @@ module M = {
     t1_element <- witness;
     (* Erased call to spill *)
     i <- 0;
-    while ((i < kvec)) {
+    while ((i < P.kvec)) {
       az_element <-
       (Array256.init (fun i_0 => a_times_signer_response.[((i * 256) + i_0)])
       );
@@ -17379,10 +16330,10 @@ module M = {
     commitment_encoded <@ commitment____encode (commitment);
     return commitment_encoded;
   }
-  proc __verify_internal (verification_key:W8.t Array_pk_bytes.t,
+  proc __verify_internal (verification_key:W8.t Array_pk_enc.t,
                           context_pointer:int, context_size:int,
                           message_pointer:int, message_size:int,
-                          signature_encoded:W8.t Array_sig_bytes.t) : W64.t = {
+                          signature_encoded:W8.t Array_sig_enc.t) : W64.t = {
     var result:W64.t;
     var signer_response:W32.t Array_lpolys.t;
     var hints:W32.t Array_kpolys.t;
@@ -17414,7 +16365,7 @@ module M = {
     (signer_response, hints, result1) <@ signature____decode (signer_response,
     hints, signature_encoded);
     result2 <@ row_vector____check_infinity_norm (signer_response,
-    ((1 `<<` gamma1_log) - (tau * eta_max)));
+    ((1 `<<` P.gamma1_log) - (P.tau * P.Eta)));
     result <- (result1 `|` result2);
      _0 <- (init_msf);
     if ((result = (W64.of_int 0))) {

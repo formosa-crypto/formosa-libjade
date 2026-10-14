@@ -53,7 +53,7 @@ continue in a fresh session (e.g. after moving to an x86-64 + AVX2 host).
 cd src && make            # .s for mldsa65, mlkem768/1024
 
 # EasyCrypt extraction
-make -C proofs/mldsa/x86-64/avx2/ml_dsa_65 ec    # -> ml_dsa_65_avx2.ec + arrays/
+make -C proofs/mldsa/extraction                  # -> Mldsa{44,65,87}.ec + arrays/
 make -C proofs/mlkem/extraction                  # -> {768,1024}/Jkem_avx2.ec (no arrays)
 
 # Multi-backend harness (run targets need an x86-64 + AVX2 host)

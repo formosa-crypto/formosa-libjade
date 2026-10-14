@@ -8,24 +8,23 @@
   input coefficients, the procedures compute the (inverse) NTT of the
   input, coefficient-wise modulo q, with an explicit output bound.
 *)
-
-(* ==================================================================== *)
 require import AllCore CoreUtils List Ring IntDiv BitEncoding.
 require import StdRing StdOrder StdBigop.
-(*---*) import Bigint BIA.
-
-(* -------------------------------------------------------------------- *)
 from Jasmin require import JWord JArray JModel_x86.
-
-(* -------------------------------------------------------------------- *)
-from JazzEC require import Ml_dsa_65_avx2.
-
-(* -------------------------------------------------------------------- *)
+require import MldsaConstants.
+require Parameters MldsaT.
 require import Array256.
-
-(* -------------------------------------------------------------------- *)
 require import Nttlogspec Nttspec Nttzetas Nttalg Fnttalg.
 require import Fnttcorrect.
+
+abstract theory FnttalgcorrectT.
+
+clone import Parameters.ParamsT as P.
+clone import MldsaT.MldsaT as R with theory P <- P.
+clone import Fnttcorrect.FnttcorrectT as FC with theory P <= P, theory R <= R.
+
+(* ==================================================================== *)
+(*---*) import Bigint BIA.
 
 (* ==================================================================== *)
 (* Forward NTT: multipoint evaluation at the odd powers of zeta_, in    *)
@@ -44,3 +43,5 @@ move=> ge0B hB hbnd.
 have [hb hs] := ntt_alg p_ B ge0B hB hbnd.
 by conseq (polynomial__nttP p_) => // /> *.
 qed.
+
+end FnttalgcorrectT.

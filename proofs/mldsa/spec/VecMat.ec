@@ -228,7 +228,7 @@ have hl : `|incoeff (LowBits w.[k].[j]) - cs2.[k].[j]| < gamma2.
   by rewrite poly_negE // /poly_LowBits Array256.initiE.
 apply MakeHintImpl_MakeHint_equiv.
 have [#] _ _ hl0 hl1 _ := Decompose_cases w.[k].[j].
-have [hB0 hB1] := Beta_bnd; have hg := gamma2E.
+have [hB0 hB1] := Beta_bnd; have hg := gamma2_bound.
 have hc : `|crepr cs2.[k].[j]| <= Beta by done.
 move: hl; rewrite -(creprK cs2.[k].[j]) -incoeffB abs_incoeff 1:/#.
 by rewrite creprK.

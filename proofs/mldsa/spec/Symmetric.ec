@@ -4,6 +4,14 @@ require import Parameters GFq Rq.
 from CryptoSpecs require import Keccak1600_Spec.
 require Serialization.
 
+(* The states of the XOF streams of SymmetricT: the seed and the current
+   position in the stream. They are top-level, outside the parametric
+   theory, so that the theory has no stateful module and its instances can
+   be passed as theory parameters. *)
+module XOFSIB_state = { var seed : W8.t list var pos : int }.
+module XOFA_state = { var seed : W8.t list var pos : int }.
+module XOFS_state = { var seed : W8.t list var pos : int }.
+
 abstract theory SymmetricT.
 
 clone include Serialization.SerializationT.
@@ -12,9 +20,16 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 
-abbrev gamma1m1_bits = 19.
-lemma gamma1m1_bitlen :  2^(gamma1m1_bits-1) < gamma1-1 (* signed range *) <= 2^(gamma1m1_bits)
-  by  have/= H := param_sets; elim H => /> ??->???? /=.
+abbrev gamma1m1_bits = gamma1_log.
+lemma gamma1m1_bitlen :  2^(gamma1m1_bits-1) < gamma1-1 (* signed range *) <= 2^(gamma1m1_bits).
+proof.
+have hg : 2 <= gamma1_log by smt(param_sets).
+rewrite /gamma1 (_ : 2 ^ gamma1_log = 2 * 2 ^ (gamma1_log - 1)).
++ by rewrite -exprS 1:/#.
+have : 2 <= 2 ^ (gamma1_log - 1).
++ by rewrite -{1}expr1; apply StdOrder.IntOrder.ler_weexpn2l => /#.
+smt().
+qed.
 
 clone import JArray.MonoArray as Bytes66 with op size <= 66, type elem <= W8.t, op dfl <= witness.
 clone import JArray.MonoArray as Bytes34 with op size <= 34, type elem <= W8.t, op dfl <= witness.
@@ -76,58 +91,50 @@ op H_v (seed : Bytes66.t) : BytesV.t =
   BytesV.of_list (SHAKE256 (Bytes66.to_list seed) (n * (gamma1m1_bits + 1) %/ 8)).
 
 (* Concrete XOF modules using the functional Keccak view.
-   Each stores the seed and current stream position so that successive next()
-   calls return consecutive bytes of the SHAKE output. Correctness relies on
+   Each keeps the seed and current stream position, in its state module above,
+   so that successive next() calls return consecutive bytes of the SHAKE output. Correctness relies on
    the prefix property: SHAKE256 m n = take n (SHAKE256 m N) for n <= N
    (SQUEEZE1600_ext). *)
 
 module MLDSA_XOF_SIB : XOF_SIB = {
-  var seed : BytesCT.t
-  var pos  : int
-
   proc init(ct : BytesCT.t) : unit = {
-    seed <- ct;
-    pos  <- 8;  (* bytes 0–7 are consumed by H_sib *)
+    XOFSIB_state.seed <- BytesCT.to_list ct;
+    XOFSIB_state.pos  <- 8;  (* bytes 0–7 are consumed by H_sib *)
   }
 
   proc next() : W8.t = {
     var b : W8.t;
-    b <- nth witness (SHAKE256 (BytesCT.to_list seed) (pos + 1)) pos;
-    pos <- pos + 1;
+    b <- nth witness (SHAKE256 XOFSIB_state.seed (XOFSIB_state.pos + 1)) XOFSIB_state.pos;
+    XOFSIB_state.pos <- XOFSIB_state.pos + 1;
     return b;
   }
 }.
 
 module MLDSA_XOFA : XOF_RejNTTPoly = {
-  var seed : Bytes34.t
-  var pos  : int
-
   proc init(rho : Bytes34.t) : unit = {
-    seed <- rho;
-    pos  <- 0;
+    XOFA_state.seed <- Bytes34.to_list rho;
+    XOFA_state.pos  <- 0;
   }
 
   proc next() : Bytes3.t = {
     var b : Bytes3.t;
-    b <- Bytes3.of_list (take 3 (drop pos (SHAKE128 (Bytes34.to_list seed) (pos + 3))));
-    pos <- pos + 3;
+    b <- Bytes3.of_list (take 3 (drop XOFA_state.pos
+           (SHAKE128 XOFA_state.seed (XOFA_state.pos + 3))));
+    XOFA_state.pos <- XOFA_state.pos + 3;
     return b;
   }
 }.
 
 module MLDSA_XOFS : XOF_RejBPoly = {
-  var seed : Bytes66.t
-  var pos  : int
-
   proc init(rho : Bytes66.t) : unit = {
-    seed <- rho;
-    pos  <- 0;
+    XOFS_state.seed <- Bytes66.to_list rho;
+    XOFS_state.pos  <- 0;
   }
 
   proc next() : W8.t = {
     var b : W8.t;
-    b <- nth witness (SHAKE256 (Bytes66.to_list seed) (pos + 1)) pos;
-    pos <- pos + 1;
+    b <- nth witness (SHAKE256 XOFS_state.seed (XOFS_state.pos + 1)) XOFS_state.pos;
+    XOFS_state.pos <- XOFS_state.pos + 1;
     return b;
   }
 }.

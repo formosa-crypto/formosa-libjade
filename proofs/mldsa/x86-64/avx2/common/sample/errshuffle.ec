@@ -10,7 +10,7 @@ require import AllCore List List_extra IntDiv BitEncoding.
 import BS2Int.
 
 from Jasmin require import JWord JModel_x86.
-from JazzEC require import Ml_dsa_65_avx2.
+require import MldsaConstants.
 
 require import Avx2red.
 require import Array2048 WArray2048.

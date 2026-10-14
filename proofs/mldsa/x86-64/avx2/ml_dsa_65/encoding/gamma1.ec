@@ -3,7 +3,8 @@ require import AllCore List IntDiv RealExp.
 from Jasmin require import JModel_x86.
 require import CircuitBindings Bindings JWordExtra.
 
-from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude.
+require import Mldsa65.
+from JazzEC require import Mldsa_65_prelude.
 from JazzEC require import Array256 Array640.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 from Spec require import Spec65.
@@ -20,7 +21,7 @@ require import XArray256 XArray640 XArray16 XWord20.
 lemma truncateu_32_20E (w : W32.t) : BS_W32_W20_U.truncateu20 w = W20.bits2w (take 20 (W32.w2bits w)).
 proof.
 rewrite /truncateu20 W20.of_intE W32.to_uintE BS2Int.bs2int_mod //;congr.
-have {1}-> : gamma1_bits = size (take gamma1_bits (w2bits w)) by rewrite size_take //.
+have {1}-> : 20 = size (take 20 (w2bits w)) by rewrite size_take //.
 by rewrite BS2Int.bs2intK.
 qed.
 

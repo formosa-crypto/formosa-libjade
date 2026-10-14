@@ -12,7 +12,8 @@ require import AllCore List IntDiv IntMin BitEncoding.
 
 from Jasmin require import JModel_x86.
 
-from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude.
+require import Mldsa65.
+from JazzEC require import Mldsa_65_prelude.
 
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 from Spec require import Spec65.
@@ -23,7 +24,7 @@ from CryptoSpecs require import Keccak1600_Spec.
 import Round ZModQ Zq.
 
 require import Array25 Array28 Array48 Array136 Array256 WArray136 WArray1024.
-require import Rejstream Sha3x4. import Shake256x4.
+require import Rejstream Sha3x4 Shared65. import Sha3x4_65 Shake256x4.
 
 (* -------------------------------------------------------------------- *)
 (* the stream as the code reads it                                      *)

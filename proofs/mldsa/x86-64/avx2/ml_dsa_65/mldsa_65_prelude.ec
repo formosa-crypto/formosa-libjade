@@ -16,6 +16,9 @@ lemma mldsa65_gamma1 : gamma1 = 524288 by done. (* 2**19 *)
 lemma mldsa65_gamma2 : gamma2 = 261888 by done. (* (q-1)/32 *)
 lemma mldsa65_Eta : Eta = 4 by done.
 lemma mldsa65_tau : tau = 49 by done.
+lemma mldsa65_gamma1_log : gamma1_log = 19 by done.
+lemma mldsa65_gamma2_div : gamma2_div = 32 by done.
+hint simplify mldsa65_gamma1_log, mldsa65_gamma2_div.
 
 op  lvec_unflatten640(a : 'a Array3200.t) =
      LArray.init (fun i => Array640.of_list witness (sub a (640*i) 640)).

@@ -9,14 +9,16 @@ Array<N>/WArray<N> theory names. This script
      token counts must agree),
   2. maps every differing leaf to a role: a named quantity whose tuple of
      values over the sets matches the leaf's tuple,
-  3. writes ../generic/LayoutT.ec: the base parameters (abstract operators),
-     the derived sizes (definitions), and one symbolic PolyArray/WArray clone
-     per array role,
-  4. writes ../generic/MldsaT.ec: the module body with the leaves replaced by
-     the role names,
-  5. writes ../generic/Mldsa<set>I.ec: a clone of MldsaT that realizes the
-     base parameters by literals, the array theories by Array<N>/WArray<N>,
-     and the module M by Mldsa<set>.M.
+  3. writes ../generic/LayoutT.ec: over the specification parameters
+     P = Parameters.ParamsT, the derived sizes (definitions), and one
+     symbolic PolyArray/WArray clone per array role; a base role is an
+     expression over P, written into the body as is,
+  4. writes ../generic/MldsaConstants.ec, the constant tables (the same in
+     every model), and ../generic/MldsaT.ec: the module body with the leaves
+     replaced by the role names,
+  5. writes ../generic/Mldsa<set>I.ec: a clone of MldsaT that realizes P
+     by Spec<set>.Params<set>, the array theories by Array<N>/WArray<N>, and
+     the module M by Mldsa<set>.M.
 EasyCrypt accepts `module M <= Mldsa<set>.M` only if the generic body, with
 the parameters of the set substituted, is convertible to the extracted body:
 each instance file compiling is the statement that MldsaT is that model.
@@ -54,55 +56,65 @@ def log2(x):
     return n
 
 # ---------------------------------------------------------------------------
-# the role table: (name, EasyCrypt definition or None for a base parameter,
-#                  Jasmin name(s), value)
+# the role table: (name, EasyCrypt definition, Jasmin name(s), value). A
+# definition that is a name of P (a base role) is written into the body as
+# is; the others are operators of LayoutT.
 # ---------------------------------------------------------------------------
 ROLES = [
- # base parameters: abstract operators, realized by literals per set
- ("kvec",       None, "ROWS_IN_MATRIX_A",                lambda p: p["ROWS_IN_MATRIX_A"]),
- ("lvec",       None, "COLUMNS_IN_MATRIX_A",             lambda p: p["COLUMNS_IN_MATRIX_A"]),
- ("eta_max",    None, "ETA",                             lambda p: p["ETA"]),
- ("tau",        None, "ONES_IN_VERIFIER_CHALLENGE",      lambda p: p["ONES_IN_VERIFIER_CHALLENGE"]),
- ("omega",      None, "MAX_ONES_IN_HINT",                lambda p: p["MAX_ONES_IN_HINT"]),
- ("ctilde",     None, "COMMITMENT_HASH_SIZE",            lambda p: p["COMMITMENT_HASH_SIZE"]),
- ("gamma1_log", None, "GAMMA1 = 1 << gamma1_log",        lambda p: log2(p["GAMMA1"])),
- ("gamma2_div", None, "GAMMA2 = (MODULUS - 1) / gamma2_div",
+ # base roles: the specification parameters, and their bit widths
+ ("kvec",       "P.kvec",        "ROWS_IN_MATRIX_A",                lambda p: p["ROWS_IN_MATRIX_A"]),
+ ("lvec",       "P.lvec",        "COLUMNS_IN_MATRIX_A",             lambda p: p["COLUMNS_IN_MATRIX_A"]),
+ ("eta_max",    "P.Eta",         "ETA",                             lambda p: p["ETA"]),
+ ("tau",        "P.tau",         "ONES_IN_VERIFIER_CHALLENGE",      lambda p: p["ONES_IN_VERIFIER_CHALLENGE"]),
+ ("omega",      "P.w_hint",      "MAX_ONES_IN_HINT",                lambda p: p["MAX_ONES_IN_HINT"]),
+ ("gamma1_log", "P.gamma1_log",  "GAMMA1 = 1 << gamma1_log",        lambda p: log2(p["GAMMA1"])),
+ ("gamma2_div", "P.gamma2_div",  "GAMMA2 = (MODULUS - 1) / gamma2_div",
                                                          lambda p: (p["MODULUS"] - 1) // p["GAMMA2"]),
- ("rej_bound",  None, "ERROR_REJECTION_BOUND",           lambda p: p["ERROR_REJECTION_BOUND"]),
- ("eta_bits",   None, "BITS_PER_ERROR_COEFFICIENT",      lambda p: p["ENCODED_ERROR_POLYNOMIAL_SIZE"] * 8 // 256),
- ("w1_bits",    None, "BITS_PER_COMMITMENT_COEFFICIENT", lambda p: p["BITS_PER_COMMITMENT_COEFFICIENT"]),
- # derived sizes
- ("gamma1_bits", "gamma1_log + 1",      "BITS_TO_ENCODE_GAMMA1_COEFFICIENT",
+ ("eta_bits",   "P.noise_bits",  "BITS_PER_ERROR_COEFFICIENT",      lambda p: p["ENCODED_ERROR_POLYNOMIAL_SIZE"] * 8 // 256),
+ ("w1_bits",    "P.w1_bits",     "BITS_PER_COMMITMENT_COEFFICIENT", lambda p: p["BITS_PER_COMMITMENT_COEFFICIENT"]),
+ ("gamma1_bits", "P.gamma1_bits", "BITS_TO_ENCODE_GAMMA1_COEFFICIENT",
                                          lambda p: p["BITS_TO_ENCODE_GAMMA1_COEFFICIENT"]),
- ("eta_enc",    "32 * eta_bits",        "ENCODED_ERROR_POLYNOMIAL_SIZE",
+ # the operators of LayoutT
+ ("ctilde",     "P.lambda %/ 4", "COMMITMENT_HASH_SIZE",            lambda p: p["COMMITMENT_HASH_SIZE"]),
+ ("rej_bound",  "if P.Eta = 2 then 15 else 9", "ERROR_REJECTION_BOUND",
+                                                         lambda p: p["ERROR_REJECTION_BOUND"]),
+ ("eta_enc",    "32 * P.noise_bits",    "ENCODED_ERROR_POLYNOMIAL_SIZE",
                                          lambda p: p["ENCODED_ERROR_POLYNOMIAL_SIZE"]),
- ("w1_enc",     "32 * w1_bits",         "ENCODED_COMMITMENT_POLYNOMIAL_SIZE",
+ ("w1_enc",     "32 * P.w1_bits",       "ENCODED_COMMITMENT_POLYNOMIAL_SIZE",
                                          lambda p: p["ENCODED_COMMITMENT_POLYNOMIAL_SIZE"]),
- ("gamma1_enc", "32 * gamma1_bits",     "ENCODED_GAMMA1_POLYNOMIAL_SIZE",
+ ("gamma1_enc", "32 * P.gamma1_bits",   "ENCODED_GAMMA1_POLYNOMIAL_SIZE",
                                          lambda p: p["ENCODED_GAMMA1_POLYNOMIAL_SIZE"]),
- ("z_enc",      "lvec * gamma1_enc",    "GAMMA1_ENCODED_SIZE", lambda p: p["GAMMA1_ENCODED_SIZE"]),
- ("s1_enc",     "lvec * eta_enc",       "S1_ENCODED_SIZE",     lambda p: p["S1_ENCODED_SIZE"]),
- ("s2_enc",     "kvec * eta_enc",       "S2_ENCODED_SIZE",     lambda p: p["S2_ENCODED_SIZE"]),
- ("t1_enc",     "kvec * 320",           "T1_ENCODED_SIZE",     lambda p: p["T1_ENCODED_SIZE"]),
- ("t0_enc",     "kvec * 416",           "T0_ENCODED_SIZE",     lambda p: p["T0_ENCODED_SIZE"]),
- ("hint_enc",   "omega + kvec",         "HINT_ENCODED_SIZE",   lambda p: p["HINT_ENCODED_SIZE"]),
- ("w1vec_enc",  "kvec * w1_enc",        "ENCODED_COMMITMENT_SIZE",
+ ("z_enc",      "P.lvec * gamma1_enc",  "GAMMA1_ENCODED_SIZE", lambda p: p["GAMMA1_ENCODED_SIZE"]),
+ ("s1_enc",     "P.lvec * eta_enc",     "S1_ENCODED_SIZE",     lambda p: p["S1_ENCODED_SIZE"]),
+ ("s2_enc",     "P.kvec * eta_enc",     "S2_ENCODED_SIZE",     lambda p: p["S2_ENCODED_SIZE"]),
+ ("t1_enc",     "P.kvec * 320",         "T1_ENCODED_SIZE",     lambda p: p["T1_ENCODED_SIZE"]),
+ ("t0_enc",     "P.kvec * 416",         "T0_ENCODED_SIZE",     lambda p: p["T0_ENCODED_SIZE"]),
+ ("hint_enc",   "P.w_hint + P.kvec",    "HINT_ENCODED_SIZE",   lambda p: p["HINT_ENCODED_SIZE"]),
+ ("w1vec_enc",  "P.kvec * w1_enc",      "ENCODED_COMMITMENT_SIZE",
                                          lambda p: p["ENCODED_COMMITMENT_SIZE"]),
- ("pk_bytes",   "32 + t1_enc",          "VERIFICATION_KEY_SIZE",
+ ("pk_enc",     "32 + t1_enc",          "VERIFICATION_KEY_SIZE",
                                          lambda p: p["VERIFICATION_KEY_SIZE"]),
- ("sk_bytes",   "128 + s1_enc + s2_enc + t0_enc", "SIGNING_KEY_SIZE",
+ ("sk_enc",     "128 + s1_enc + s2_enc + t0_enc", "SIGNING_KEY_SIZE",
                                          lambda p: p["SIGNING_KEY_SIZE"]),
- ("sig_bytes",  "ctilde + z_enc + hint_enc", "SIGNATURE_SIZE", lambda p: p["SIGNATURE_SIZE"]),
- ("lpolys",     "lvec * 256",           "COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL",
+ ("sig_enc",    "ctilde + z_enc + hint_enc", "SIGNATURE_SIZE", lambda p: p["SIGNATURE_SIZE"]),
+ ("lpolys",     "P.lvec * 256",         "COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL",
                                          lambda p: p["COLUMNS_IN_MATRIX_A"] * 256),
- ("kpolys",     "kvec * 256",           "ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL",
+ ("kpolys",     "P.kvec * 256",         "ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL",
                                          lambda p: p["ROWS_IN_MATRIX_A"] * 256),
- ("klpolys",    "kvec * lvec * 256",    "ROWS * COLUMNS * COEFFICIENTS_IN_POLYNOMIAL",
+ ("klpolys",    "P.kvec * P.lvec * 256", "ROWS * COLUMNS * COEFFICIENTS_IN_POLYNOMIAL",
                                          lambda p: p["ROWS_IN_MATRIX_A"] * p["COLUMNS_IN_MATRIX_A"] * 256),
  ("lpolys_bytes", "4 * lpolys",         "bytes of an L-vector of u32 polynomials",
                                          lambda p: 4 * p["COLUMNS_IN_MATRIX_A"] * 256),
 ]
 ROLE = {r[0]: r for r in ROLES}
+
+def is_base(name):
+    """a base role: a parameter of P, or one of its bit widths"""
+    return re.fullmatch(r"P\.\w+", ROLE[name][1]) is not None
+
+def deps(ecdef):
+    """the operators of LayoutT a definition mentions"""
+    return [d for d in re.findall(r"(?<![.\w])[A-Za-z_]\w*", ecdef) if d in ROLE]
 
 def role_tuple(name):
     return tuple(ROLE[name][3](PAR[k]) for k in SETS)
@@ -193,7 +205,7 @@ def main():
             continue
         used.add(role)
         if kind == "int":
-            subst.append((s, e, role))
+            subst.append((s, e, ROLE[role][1] if is_base(role) else role))
         else:
             sym_arr[(kind, role)] = {k: vals[j] for j, k in enumerate(SETS)}
             subst.append((s, e, "%s_%s" % (kind, role)))
@@ -202,14 +214,14 @@ def main():
         sys.exit("%d unexplained leaves" % len(errors))
 
     # every role, closed under the dependencies of the definitions
-    needed = set(used) | {r[0] for r in ROLES if r[1] is None}
+    needed = set(used)
     changed = True
     while changed:
         changed = False
         for name, ecdef, _, _ in ROLES:
-            if name in needed and ecdef:
-                for dep in re.findall(r"[A-Za-z_]\w*", ecdef):
-                    if dep in ROLE and dep not in needed:
+            if name in needed:
+                for dep in deps(ecdef):
+                    if dep not in needed:
                         needed.add(dep); changed = True
 
     out, prev = [], 0
@@ -221,14 +233,15 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     arrays = sorted(sym_arr, key=lambda x: (x[1], x[0]))
     emit_layout(needed, arrays)
-    emit_generic(abbrevs + generic_body, const_arr | const_hdr, arrays)
+    emit_constants(abbrevs, const_hdr)
+    emit_generic(generic_body, const_arr | const_hdr, arrays)
     for k in SETS:
         emit_instance(k, needed, sym_arr, arrays)
 
     print("roles (%d):" % len(needed))
     for name, ecdef, jas, _ in ROLES:
         if name in needed:
-            print("  %-12s = %-32s %s" % (name, ecdef or "(base)", role_tuple(name)))
+            print("  %-12s = %-32s %s" % (name, ecdef, role_tuple(name)))
     print("symbolic array theories (%d)" % len(arrays))
     if ALIASES: print("alias classes:", ALIASES)
 
@@ -243,34 +256,43 @@ def role_comment(needed):
     return "".join(L)
 
 def emit_layout(needed, arrays):
-    L = [GEN, "require import AllCore IntDiv.\n",
-         "from Jasmin require import JArray JWord_array.\n\n",
+    L = [GEN, "require import AllCore IntDiv List.\n",
+         "from Jasmin require import JArray JWord_array.\n",
+         "require Parameters.\n\n",
          role_comment(needed), "\nabstract theory LayoutT.\n\n",
-         "(* the base parameters of the implementation *)\n"]
+         "(* the specification parameters *)\n",
+         "clone import Parameters.ParamsT as P.\n\n",
+         "(* the derived sizes *)\n"]
     for name, ecdef, _, _ in ROLES:
-        if name in needed and ecdef is None:
-            L.append("op %s : int.\n" % name)
-    L.append("\n")
-    for name, ecdef, _, _ in ROLES:
-        if name in needed and ecdef is None:
-            L.append("axiom ge0_%s : 0 <= %s.\n" % (name, name))
-    L.append("\n(* the derived sizes *)\n")
-    for name, ecdef, _, _ in ROLES:
-        if name in needed and ecdef:
+        if name in needed and not is_base(name):
             L.append("op %s : int = %s.\n" % (name, ecdef))
     L.append("\n")
     for name, ecdef, _, _ in ROLES:
-        if name in needed and ecdef:
-            deps = [d for d in re.findall(r"[A-Za-z_]\w*", ecdef) if d in ROLE]
+        if name not in needed: continue
+        if is_base(name):
+            L.append("lemma ge0_%s : 0 <= %s by smt(P.param_sets).\n" % (name, ecdef))
+        else:
             L.append("lemma ge0_%s : 0 <= %s.\nproof. by rewrite /%s; smt(%s). qed.\n"
-                     % (name, name, name, " ".join("ge0_" + d for d in deps)))
+                     % (name, name, name, " ".join(["P.param_sets"] + ["ge0_" + d for d in deps(ecdef)])))
     L.append("\n(* the array theories whose size varies with the parameter set *)\n")
     for kind, role in arrays:
         base = "PolyArray" if kind == "Array" else "WArray"
+        size = ROLE[role][1] if is_base(role) else role
         L.append("clone %s as %s_%s with op size <- %s\n  proof ge0_size by exact ge0_%s.\n"
-                 % (base, kind, role, role, role))
+                 % (base, kind, role, size, role))
     L.append("\nend LayoutT.\n")
     write("LayoutT.ec", "".join(L))
+
+def emit_constants(abbrevs, const_hdr):
+    L = [GEN,
+         "(* The constant tables of the models Mldsa{44,65,87}.ec, the same *)\n",
+         "(* for every parameter set.                                        *)\n",
+         "require import AllCore IntDiv CoreMap List Distr.\n",
+         "from Jasmin require import JModel_x86.\n\n"]
+    if const_hdr:
+        L.append(wrap_require(sorted(const_hdr, key=arrkey)))
+    L.append("\n" + abbrevs)
+    write("MldsaConstants.ec", "".join(L))
 
 def emit_generic(body, const_arr, arrays):
     L = [GEN,
@@ -281,7 +303,8 @@ def emit_generic(body, const_arr, arrays):
          "from Jasmin require import JModel_x86.\n\nimport SLH64.\n\n"]
     if const_arr:
         L.append(wrap_require(sorted(const_arr, key=arrkey)))
-    L.append("require LayoutT.\n\nabstract theory MldsaT.\n\nclone include LayoutT.LayoutT.\n\n")
+    L.append("require import MldsaConstants.\nrequire LayoutT.\n\n"
+             "abstract theory MldsaT.\n\nclone include LayoutT.LayoutT.\n\n")
     for kind, role in arrays:
         L.append("import %s_%s.\n" % (kind, role))
     L.append("\n" + body + "\nend MldsaT.\n")
@@ -296,17 +319,15 @@ def emit_instance(k, needed, sym_arr, arrays):
          "(* extracted body.                                                  *)\n",
          "require import AllCore IntDiv CoreMap List Distr.\n",
          "from Jasmin require import JModel_x86.\n",
-         "require import Mldsa%d.\n" % k, wrap_require(arrs), "require MldsaT.\n\n",
+         "require import Mldsa%d.\n" % k, wrap_require(arrs),
+         "require Spec%d MldsaT.\n\n" % k,
          "clone MldsaT.MldsaT as Mldsa%dI with\n" % k]
-    items = []
-    base = [r for r in ROLES if r[0] in needed and r[1] is None]
-    for name, _, _, fn in base:
-        items.append("  op %s <= %d" % (name, fn(PAR[k])))
+    items = ["  theory P <= Spec%d.Params%d" % (k, k)]
     for kind, role in arrays:
         items.append("  theory %s_%s <= %s" % (kind, role, sym_arr[(kind, role)][k]))
     items.append("  module M <= Mldsa%d.M" % k)
     L.append(",\n".join(items))
-    L.append("\nproof\n%s.\n" % ",\n".join("  ge0_%s by done" % r[0] for r in base))
+    L.append(".\n")
     write("Mldsa%dI.ec" % k, "".join(L))
 
 if __name__ == "__main__":

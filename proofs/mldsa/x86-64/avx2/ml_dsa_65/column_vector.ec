@@ -2,7 +2,8 @@ require import AllCore List IntDiv RealExp.
 
 from Jasmin require import JModel_x86.
 
-from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Common_modular
+require import Mldsa65.
+from JazzEC require import Mldsa_65_prelude Common_modular
                            Common_invert_ntt Common_ntt Common_rounding Rounding.
 
 require import Polynomial.

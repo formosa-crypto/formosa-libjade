@@ -4,7 +4,7 @@ import BS2Int.
 
 (* -------------------------------------------------------------------- *)
 from Jasmin require import JWord JModel_x86.
-from JazzEC require import Ml_dsa_65_avx2.
+require import Mldsa65.
 
 require import Agree.
 require import Avx2red.
@@ -12,7 +12,7 @@ require import Errshuffle.
 require import Prefixarray.
 require import Rejstream.
 require import Warraypack.
-require import Sha3x4. import Shake256x4.
+require import Sha3x4 Shared65. import Sha3x4_65 Shake256x4.
 require import Array4 Array25 Array64 Array136 Array256 Array272 Array1280 Array1536 Array2048.
 require import WArray272 WArray1024 WArray2048.
 

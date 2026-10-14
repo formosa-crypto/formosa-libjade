@@ -4,33 +4,27 @@
   coefficient of the destination, the montgomery-multiplication of
   the matching coefficients of its two operands (`pwmul`).
 *)
-
-(* -------------------------------------------------------------------- *)
 require import AllCore CoreUtils List Ring IntDiv.
 require import StdRing StdOrder.
-
-(* -------------------------------------------------------------------- *)
 from Jasmin require import JWord JArray.
-
 require import JArrayExtra CircuitBindings.
-
-(* -------------------------------------------------------------------- *)
 from Jasmin require import JModel_x86.
-from JazzEC require import Ml_dsa_65_avx2.
-
-(* -------------------------------------------------------------------- *)
+require import MldsaConstants.
+require Parameters MldsaT.
 require import WArray1024.
 require import Array256.
 require import XArray256.
+require import Nttspec.
+require import Avx2red Listred.
+
+abstract theory PwmulcorrectT.
+
+clone import Parameters.ParamsT as P.
+clone import MldsaT.MldsaT as R with theory P <- P.
+clone import Avx2red.Avx2redT as AR with theory P <= P, theory R <= R.
 
 (* -------------------------------------------------------------------- *)
 type wpoly = W32.t Array256.t.
-
-(* -------------------------------------------------------------------- *)
-require import Nttspec.
-
-(* -------------------------------------------------------------------- *)
-require import Avx2red Listred.
 
 (* ==================================================================== *)
 lemma pwmulP (t_ a_ b_ : wpoly) :
@@ -99,3 +93,5 @@ rewrite wpoly_set256_aligned 1:/# /=.
 apply fill_congr => //= i0 rgi.
 by rewrite pack8_bits32E 1:/#; smt().
 qed.
+
+end PwmulcorrectT.

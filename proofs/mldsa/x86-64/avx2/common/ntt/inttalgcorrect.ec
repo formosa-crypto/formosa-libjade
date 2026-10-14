@@ -9,24 +9,23 @@
   (the inverse transform in Montgomery form), with all coefficients
   bounded by q.
 *)
-
-(* ==================================================================== *)
 require import AllCore CoreUtils List Ring IntDiv BitEncoding.
 require import StdRing StdOrder StdBigop.
-(*---*) import Bigint BIA.
-
-(* -------------------------------------------------------------------- *)
 from Jasmin require import JWord JArray JModel_x86.
-
-(* -------------------------------------------------------------------- *)
-from JazzEC require import Ml_dsa_65_avx2.
-
-(* -------------------------------------------------------------------- *)
+require import MldsaConstants.
+require Parameters MldsaT.
 require import Array256.
-
-(* -------------------------------------------------------------------- *)
 require import Nttlogspec Nttspec Nttzetas Nttalg Inttalg.
 require import Inttcorrect.
+
+abstract theory InttalgcorrectT.
+
+clone import Parameters.ParamsT as P.
+clone import MldsaT.MldsaT as R with theory P <- P.
+clone import Inttcorrect.InttcorrectT as IC with theory P <= P, theory R <= R.
+
+(* ==================================================================== *)
+(*---*) import Bigint BIA.
 
 (* ==================================================================== *)
 (* Inverse NTT: on a reduced input congruent to the forward NTT of p,   *)
@@ -49,3 +48,5 @@ split.
 - by apply hb.
 by apply hs.
 qed.
+
+end InttalgcorrectT.

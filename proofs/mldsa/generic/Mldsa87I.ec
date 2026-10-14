@@ -10,20 +10,10 @@ require import Array64 Array83 Array96 Array128 Array640 Array672 Array768
  Array1024 Array1792 Array2048 Array2560 Array2592 Array3328 Array4480
  Array4627 Array4896 Array14336 WArray64 WArray96 WArray128 WArray640
  WArray1024 WArray2592 WArray4627 WArray4896 WArray7168.
-require MldsaT.
+require Spec87 MldsaT.
 
 clone MldsaT.MldsaT as Mldsa87I with
-  op kvec <= 8,
-  op lvec <= 7,
-  op eta_max <= 2,
-  op tau <= 60,
-  op omega <= 75,
-  op ctilde <= 64,
-  op gamma1_log <= 19,
-  op gamma2_div <= 32,
-  op rej_bound <= 15,
-  op eta_bits <= 3,
-  op w1_bits <= 4,
+  theory P <= Spec87.Params87,
   theory Array_ctilde <= Array64,
   theory WArray_ctilde <= WArray64,
   theory Array_eta_enc <= Array96,
@@ -35,14 +25,14 @@ clone MldsaT.MldsaT as Mldsa87I with
   theory Array_kpolys <= Array2048,
   theory Array_lpolys <= Array1792,
   theory WArray_lpolys_bytes <= WArray7168,
-  theory Array_pk_bytes <= Array2592,
-  theory WArray_pk_bytes <= WArray2592,
+  theory Array_pk_enc <= Array2592,
+  theory WArray_pk_enc <= WArray2592,
   theory Array_s1_enc <= Array672,
   theory Array_s2_enc <= Array768,
-  theory Array_sig_bytes <= Array4627,
-  theory WArray_sig_bytes <= WArray4627,
-  theory Array_sk_bytes <= Array4896,
-  theory WArray_sk_bytes <= WArray4896,
+  theory Array_sig_enc <= Array4627,
+  theory WArray_sig_enc <= WArray4627,
+  theory Array_sk_enc <= Array4896,
+  theory WArray_sk_enc <= WArray4896,
   theory Array_t0_enc <= Array3328,
   theory Array_t1_enc <= Array2560,
   theory Array_w1_enc <= Array128,
@@ -50,16 +40,4 @@ clone MldsaT.MldsaT as Mldsa87I with
   theory Array_w1vec_enc <= Array1024,
   theory WArray_w1vec_enc <= WArray1024,
   theory Array_z_enc <= Array4480,
-  module M <= Mldsa87.M
-proof
-  ge0_kvec by done,
-  ge0_lvec by done,
-  ge0_eta_max by done,
-  ge0_tau by done,
-  ge0_omega by done,
-  ge0_ctilde by done,
-  ge0_gamma1_log by done,
-  ge0_gamma2_div by done,
-  ge0_rej_bound by done,
-  ge0_eta_bits by done,
-  ge0_w1_bits by done.
+  module M <= Mldsa87.M.

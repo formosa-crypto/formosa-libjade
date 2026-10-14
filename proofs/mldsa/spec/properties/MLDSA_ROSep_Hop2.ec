@@ -207,8 +207,7 @@ proc; sp 0 1; if{2}.
     rewrite Bytes64.of_listK //=; split; 1: by rewrite /dbytes64 supp_dmap; exists rL.
     move=> _; split => hmu; split => hx.
     + rewrite !get_set_sameE /= Bytes64.of_listK //=.
-      split => [x1 | l hl];
-        [by rewrite get_setE hvu Bytes64.of_listK // -hv | by have := hpad l hl; smt()].
+      by move=> x1; rewrite get_setE hvu Bytes64.of_listK // -hv.
     + smt(domE).
     + by move: hx; rewrite domE hk; move: hmu; rewrite domE;
          case: (DS5.RO4.RO.m{2}.[(RoutedH.tr{2}, drop 64 x{2}.`1)]).
@@ -220,8 +219,7 @@ proc; sp 0 1; if{2}.
                   DS5.RO2.RO.m{2} RO_rest.RO.m{2} RO_pad.RO.m{2} x{2} rL _.
     + by move=> m'; rewrite /view hp h0.
     split => hr; split => hx.
-    + rewrite !get_set_sameE /=; split => [x1 | l hl];
-        [by rewrite get_setE hvu -hv | by have := hpad l hl; smt()].
+    + by rewrite !get_set_sameE /= => x1; rewrite get_setE hvu -hv.
     + by move: hx; rewrite domE hk; move: hr; rewrite domE.
     + by move: hx; rewrite domE hk; move: hr; rewrite domE.
     by rewrite hk.
@@ -305,8 +303,7 @@ if{2}; [if{2}; [inline * | ] | ].
                 DS5.RO2.RO.m{2} RO_rest.RO.m{2} RO_pad.RO.m{2} x{2} rL _.
   + by move=> m'; rewrite /view /= hnp /= hs h0.
   split => hr; split => hx;
-    [ rewrite !get_set_sameE /=; split => [x1 | l hl];
-        [by rewrite get_setE hvu -hv | by have := hpad l hl; smt()]
+    [ by rewrite !get_set_sameE /= => x1; rewrite get_setE hvu -hv
     | by move: hx; rewrite domE hk; move: hr; rewrite domE
     | by move: hx; rewrite domE hk; move: hr; rewrite domE
     | by rewrite hk ].
@@ -316,8 +313,7 @@ if{2}; 1: (inline *; wp; rnd; auto => &1 &2 /> htrs hv hpad hnp hs hl rL hrL).
                 DS5.RO2.RO.m{2} RO_rest.RO.m{2} RO_pad.RO.m{2} x{2} rL _.
   + by move=> m'; rewrite /view /= hnp /= hs hl.
   split => hr; split => hx;
-    [ rewrite !get_set_sameE /=; split => [x1 | l hl'];
-        [by rewrite get_setE hvu -hv | by have := hpad l hl'; smt()]
+    [ by rewrite !get_set_sameE /= => x1; rewrite get_setE hvu -hv
     | by move: hx; rewrite domE hk; move: hr; rewrite domE
     | by move: hx; rewrite domE hk; move: hr; rewrite domE
     | by rewrite hk ].
@@ -335,8 +331,7 @@ if{2}; 1: (rcondf{2} 3;
   + by move=> m'; rewrite /view /= hnp /= hs hl hpk h0.
   rewrite Bytes64.of_listK //=; split; 1: by rewrite /dbytes64 supp_dmap; exists rL.
   move=> _; split => hm; split => hx;
-    [ rewrite !get_set_sameE /= Bytes64.of_listK //=; split => [x1 | l hl'];
-        [by rewrite get_setE hvu Bytes64.of_listK // -hv | by have := hpad l hl'; smt()]
+    [ by rewrite !get_set_sameE /= Bytes64.of_listK //= => x1; rewrite get_setE hvu Bytes64.of_listK // -hv
     | by move: hx; rewrite domE hk; move: hm; rewrite domE;
          case: (DS5.RO3.RO.m{2}.[BytesPK.of_list x{2}.`1])
     | by move: hx; rewrite domE hk; move: hm; rewrite domE;
@@ -348,8 +343,7 @@ have hvu := view_rest true RoutedH.tr{2} DS5.RO3.RO.m{2} DS5.RO4.RO.m{2} DS5.RO5
               DS5.RO2.RO.m{2} RO_rest.RO.m{2} RO_pad.RO.m{2} x{2} rL _.
 + by move=> m'; rewrite /view /= hnp /= hs hl /= hpk.
 split => hr; split => hx;
-  [ rewrite !get_set_sameE /=; split => [x1 | l hl'];
-      [by rewrite get_setE hvu -hv | by have := hpad l hl'; smt()]
+  [ by rewrite !get_set_sameE /= => x1; rewrite get_setE hvu -hv
   | by move: hx; rewrite domE hk; move: hr; rewrite domE
   | by move: hx; rewrite domE hk; move: hr; rewrite domE
   | by rewrite hk ].

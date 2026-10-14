@@ -14,6 +14,10 @@ require import MLDSA_ROSep_Hop4 MLDSA_ROSep_Hop5 MLDSA_ROSep_Hop6.
 require import MLDSA_ExpandS.
 require DMap.
 
+(* the mask encoding widths of ML-DSA-65 as literals *)
+lemma gamma1_log65 : gamma1_log = 19 by done.
+hint simplify gamma1_log65.
+
 (*************** G7: the hidden samplers are replaced by distributions ****************)
 
 (*************** y from fresh blocks ****************)
@@ -290,7 +294,7 @@ proc; if{1}.
   by wp; call freshem_sy; auto.
 rcondf{2} 2; 1: by auto.
 auto => /> &2 _; rewrite /dpolyl; apply dmap_ll; apply dlist_ll; apply dpoly_ll.
-by rewrite gamma1_E.
+smt(gamma1_cases).
 qed.
 
 (* The RO_v key of block j of polynomial r of y: K || rnd || mu || nonce *)

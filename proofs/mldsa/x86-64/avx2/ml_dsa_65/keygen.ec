@@ -2,7 +2,8 @@ require import AllCore List IntDiv  RealExp (* StdBigop *).
 
 from Jasmin require import JModel_x86.
 
-from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Matrix_A Error_vectors T0 T1 S1 S2 Hashing.
+require import Mldsa65.
+from JazzEC require import Mldsa_65_prelude Matrix_A Error_vectors T0 T1 S1 S2 Hashing.
 (* from JazzEC require import Array32. *)
 
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
@@ -180,8 +181,8 @@ lemma __compute_t0_t1_ph_
     ] = 1%r
   by conseq (__compute_t0_t1_ph _mat _s1 _s2 (liftu_wpolymat (mat_unflatten256 _mat))).
 
-lemma ml_dsa_65_keygen_correct :
-    equiv [ MLDSA(MLDSA_XOFA, MLDSA_XOFS, MLDSA_XOF_SIB, SIB_RO).keygen_derand ~ M.ml_dsa_65_keygen :
+lemma keygen_internal_correct :
+    equiv [ MLDSA(MLDSA_XOFA, MLDSA_XOFS, MLDSA_XOF_SIB, SIB_RO).keygen_derand ~ M.__keygen_internal :
        arg{1} = Bytes32.of_list (to_list arg{2}.`3)
      ==>
        res{1}.`2 = BytesPK.of_list (to_list res{2}.`1) /\
@@ -192,8 +193,8 @@ have Eta_val := mldsa65_Eta.
 have Hlvec := mldsa65_lvec.
 have Hkvec := mldsa65_kvec.
 proc => /=.
-inline {2} M.__keygen_internal M.__encode_s1_into_signing_key M.__encode_s2_into_signing_key.
-wp;sp 0 4.
+inline {2} M.__encode_s1_into_signing_key M.__encode_s2_into_signing_key.
+wp.
 seq 0 11 : #pre; 1: by auto.
 
 (* expanding seeds *)

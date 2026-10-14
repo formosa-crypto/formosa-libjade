@@ -3,7 +3,7 @@ from Jasmin require import JByte_array JWord.
 require import Array256.
 
 require import Parameters GFq Rq.
-require import Spec65.
+require import Spec65 Symmetric.
 import MLDSA65.
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
@@ -308,8 +308,8 @@ equiv RejNTTPoly_equiv :
   ={rho} ==> ={res}.
 proof.
 proc.
-while (={j, c} /\ MLDSA_XOFA.seed{1} = XOFA_O.seed{2}
-       /\ MLDSA_XOFA.pos{1} = XOFA_O.pos{2} /\ 0 <= MLDSA_XOFA.pos{1}).
+while (={j, c} /\ XOFA_state.seed{1} = Bytes34.to_list XOFA_O.seed{2}
+       /\ XOFA_state.pos{1} = XOFA_O.pos{2} /\ 0 <= XOFA_state.pos{1}).
 + inline *; auto => /> &2 *.
   by rewrite SHAKE128_3 //= /#.
 by inline *; auto.
@@ -331,8 +331,8 @@ equiv RejBoundedPoly_equiv :
   ={rho} ==> ={res}.
 proof.
 proc.
-while (={j, a} /\ MLDSA_XOFS.seed{1} = XOFS_O.seed{2}
-       /\ MLDSA_XOFS.pos{1} = XOFS_O.pos{2} /\ 0 <= MLDSA_XOFS.pos{1}).
+while (={j, a} /\ XOFS_state.seed{1} = Bytes66.to_list XOFS_O.seed{2}
+       /\ XOFS_state.pos{1} = XOFS_O.pos{2} /\ 0 <= XOFS_state.pos{1}).
 + inline *; auto => /> &2 *.
   by rewrite SHAKE256_byte //= /#.
 by inline *; auto.
@@ -363,10 +363,10 @@ equiv SampleInBall_equiv :
   ={rho} ==> ={res}.
 proof.
 proc.
-while (={i, c, h, leakage, rho} /\ MLDSA_XOF_SIB.seed{1} = rho{2}
-       /\ MLDSA_XOF_SIB.pos{1} = pos{2} /\ 0 <= pos{2}).
-+ wp; while (={i, j, c, h, leakage, rho} /\ MLDSA_XOF_SIB.seed{1} = rho{2}
-             /\ MLDSA_XOF_SIB.pos{1} = pos{2} /\ 0 <= pos{2}).
+while (={i, c, h, leakage, rho} /\ XOFSIB_state.seed{1} = BytesCT.to_list rho{2}
+       /\ XOFSIB_state.pos{1} = pos{2} /\ 0 <= pos{2}).
++ wp; while (={i, j, c, h, leakage, rho} /\ XOFSIB_state.seed{1} = BytesCT.to_list rho{2}
+             /\ XOFSIB_state.pos{1} = pos{2} /\ 0 <= pos{2}).
   + inline *; auto => /> &2 *.
     by rewrite SHAKE256_byte //= /#.
   inline *; auto => /> &2 *.

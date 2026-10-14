@@ -14,23 +14,23 @@
     - final scaling by 41978 (n^-1 in Montgomery form);
     - main theorem for `M.polynomial__invert_ntt_montgomery`.
 *)
-
-(* -------------------------------------------------------------------- *)
 require import AllCore CoreUtils List Ring IntDiv BitEncoding.
 require import StdRing StdOrder.
-
 from Jasmin require import JWord JArray JModel_x86.
 require import JArrayExtra CircuitBindings.
-
-from JazzEC require import Ml_dsa_65_avx2.
-
+require import MldsaConstants.
+require Parameters MldsaT.
 require import WArray1024.
 require import Array2 Array4 Array8 Array16 Array256.
 require import XArray256.
-
 require import Nttzetas Nttspec Nttlogspec.
 require import Avx2red Listred.
 
+abstract theory InttcorrectT.
+
+clone import Parameters.ParamsT as P.
+clone import MldsaT.MldsaT as R with theory P <- P.
+clone import Avx2red.Avx2redT as AR with theory P <= P, theory R <= R.
 
 (* ==================================================================== *)
 (* Generic strided round (layers 3..7): one GS butterfly of length      *)
@@ -372,7 +372,6 @@ rewrite /= /ireduce_coeff_flatten /ireduce_coeff /=.
 by rewrite /uw /vw /=; do! split; ring.
 qed.
 
-
 lemma polynomial__invert_ntt_at_layer_0P (p_ : wpoly) :
   hoare[M.polynomial__invert_ntt_at_layer_0 :
     polynomial = p_ ==> res = ireduce_level p_ 0].
@@ -398,7 +397,6 @@ rewrite (take_nth witness) ?Array16.size_to_list 1://.
 rewrite map_rcons flatten_rcons ireduce_n_cat /=; congr.
 by rewrite size_flatten_bl0 size_take_condle ?Array16.size_to_list //#.
 qed.
-
 
 lemma polynomial__invert_ntt_at_layer_1P (p_ : wpoly) :
   hoare[M.polynomial__invert_ntt_at_layer_1 :
@@ -673,3 +671,5 @@ rewrite (_ : 4 * n_ %/ 4 = n_) 1:/# /replace_.
 apply fill_congr => //= i0 rgi.
 by rewrite pack8_bits32E 1:/#; smt().
 qed.
+
+end InttcorrectT.

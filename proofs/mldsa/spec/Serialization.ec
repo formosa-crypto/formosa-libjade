@@ -15,21 +15,23 @@ import BitChunking Array256.
 abbrev q_bits = 23.
 lemma q_bitlenl : 2^(q_bits-1) < q-1 <= 2^(q_bits) by auto.
 
-abbrev noise_bits = if Eta = 4 then 4 else 3.
-lemma noise_bitlen :  2^(noise_bits-1) < 2*Eta+1 (* signed range + 1 *) <= 2^(noise_bits)
-  by  have/= H := param_sets; elim H => /> ??????-> /=.
+lemma noise_bitlen :  2^(noise_bits-1) < 2*Eta+1 (* signed range + 1 *) <= 2^(noise_bits).
+proof. by have /= := param_sets; case=> [|[|]] [#] h1 h2 h3 h4 h5 h6 h7 h8; rewrite ?h7 /=. qed.
 
 (* noise_bits is the bit width used by BitPack/BitUnpack for eta-bounded coefficients. *)
 lemma noise_bits_eq : noise_bits = ilog 2 (Eta + Eta) + 1.
-proof. by have/= H := param_sets; elim H => /> ??????->. qed.
+proof. by have /= := param_sets; case=> [|[|]] [#] h1 h2 h3 h4 h5 h6 h7 h8; rewrite ?h7 /=. qed.
 
-abbrev gamma1_bits = 20.
-lemma gamma1_bitlen :  2^(gamma1_bits-1) < 2*gamma1 (* signed range *) <= 2^(gamma1_bits)
-  by  have/= H := param_sets; elim H => /> ??->???? /=.
+lemma gamma1_bitlen :  2^(gamma1_bits-1) < 2*gamma1 (* signed range *) <= 2^(gamma1_bits).
+proof.
+rewrite /gamma1 /= exprS 1:#smt:(param_sets) /=.
+smt(StdOrder.IntOrder.expr_gt0).
+qed.
 
-abbrev w1_bits = 4.
-lemma w1_bitlen : 2^(w1_bits-1) < (q-1) %/ (2*gamma2) - 1 <= 2^(w1_bits)
-  by  have/= H := param_sets; elim H => /> ???->???? /=.
+lemma w1_bitlen : 2^(w1_bits-1) < (q-1) %/ (2*gamma2) - 1 <= 2^(w1_bits).
+proof.
+by have /= := param_sets; case=> [|[|]] [#] h1 h2 h3 h4 h5 h6 h7 h8; rewrite /gamma2 ?h4 /=.
+qed.
 
 abbrev s1_bytes = (n * noise_bits * lvec) %/ 8.
 
@@ -49,16 +51,13 @@ abbrev sig_bytes = lambda %/ 4 + z_bytes + hint_bytes.
 
 abbrev w1_bytes = (n * w1_bits * kvec) %/ 8.
 
-(*
-ML-DSA-44 2560 1312 2420
-ML-DSA-65 4032 1952 3309
-ML-DSA-87 4896 2592 4627
-*)
-
-lemma key_sizes : (sk_bytes, pk_bytes, sig_bytes) \in [ (* (2560,1312,2420); *)
-                                                           (4032,1952,3309);
-                                                           (4896,2592,4627)]
-  by  have /= H:= param_sets;elim H =>  [#] ?->??-> ->->-> /=. 
+lemma key_sizes : (sk_bytes, pk_bytes, sig_bytes) \in [ (2560,1312,2420);
+                                                       (4032,1952,3309);
+                                                       (4896,2592,4627)].
+proof.
+by have /= := param_sets; case=> [|[|]] [#] h1 h2 h3 h4 h5 h6 h7 h8;
+   rewrite ?h1 ?h2 ?h3 ?h4 ?h5 ?h6 ?h7 ?h8 /=.
+qed.
 
 clone import JArray.MonoArray as Bytes32 with op size <= 32, type elem <= W8.t, op dfl <= witness.
 clone import JArray.MonoArray as Bytes64 with op size <= 64, type elem <= W8.t, op dfl <= witness.
@@ -441,15 +440,28 @@ op w1Encode(w1 : polykvec) : BytesW1.t =
 (* -------------------------------------------------------------------- *)
 (* parameter facts on the encoding sizes                                *)
 
-lemma ilog_gamma1 : ilog 2 (gamma1 - 1 + gamma1) = 19.
-proof. by rewrite ilog_eq // gamma1_E. qed.
+lemma ilog_gamma1 : ilog 2 (gamma1 - 1 + gamma1) = gamma1_log.
+proof.
+have h0 : 0 <= gamma1_log by smt(param_sets).
+apply ilog_eq => //.
++ smt(gamma1_cases).
+rewrite /gamma1 exprS //; smt(StdOrder.IntOrder.expr_gt0).
+qed.
 
 (* the ExpandMask encoding maps uniform bytes to uniform coefficients in *)
 (* [-gamma1 + 1, gamma1]                                                *)
 lemma dmap_BitUnpack_gamma1 :
-  dmap (dlist W8.dword 640) (fun v => BitUnpack v (gamma1 - 1) gamma1) = dpoly (-gamma1 + 1) gamma1.
+  dmap (dlist W8.dword (32 * gamma1_bits)) (fun v => BitUnpack v (gamma1 - 1) gamma1) =
+  dpoly (-gamma1 + 1) gamma1.
 proof.
-have := dmap_BitUnpack (gamma1 - 1) gamma1 _ _ _ _; rewrite ?ilog_gamma1 ?gamma1_E //=.
+have h0 : 0 <= gamma1_log by smt(param_sets).
+have := dmap_BitUnpack (gamma1 - 1) gamma1 _ _ _ _; rewrite ?ilog_gamma1.
+- smt(gamma1_cases).
+- by rewrite /gamma1 exprS //; ring.
+- smt(gamma1_cases).
+- smt(gamma1_cases).
+rewrite (_ : gamma1_bits * n %/ 8 = 32 * gamma1_bits) 1:/#.
+by rewrite (_ : - (gamma1 - 1) = - gamma1 + 1) 1:#ring.
 qed.
 
 lemma size_bp_eta (p : poly) : size (BitPack p Eta Eta) = n * noise_bits %/ 8.
@@ -540,21 +552,29 @@ qed.
 (* -------------------------------------------------------------------- *)
 (* w1: the HighBits / UseHint range, and a decoder for w1Encode          *)
 
-op w1rng (w1 : polykvec) : bool = forall i j, 0 <= i < kvec => 0 <= j < n => asint w1.[i].[j] <= 15.
+op w1rng (w1 : polykvec) : bool =
+  forall i j, 0 <= i < kvec => 0 <= j < n => asint w1.[i].[j] < hb_range.
 
 lemma hb_rng (w : polykvec) : w1rng (polykvec_HighBits w).
 proof.
-move=> i j hi hj; rewrite /polykvec_HighBits KArray.mapiE // /poly_HighBits Array256.initiE //= incoeffK.
-by have [h _] := Decompose_cases w.[i].[j]; smt().
+move=> i j hi hj; rewrite /polykvec_HighBits KArray.mapiE // /poly_HighBits.
+rewrite Array256.initiE //= incoeffK.
+by have [h _] := Decompose_cases w.[i].[j]; smt(hb_range_cases).
 qed.
 
 lemma uh_rng (h r : polykvec) : w1rng (UseHint h r).
 proof.
 move=> i j hi hj; rewrite /UseHint KArray.map2iE // /poly_UseHint Array256.initiE //= /UseHint /=.
-have hg : (q - 1) %/ (2 * gamma2) = 16 by have /= H := param_sets; smt().
+have hg : (q - 1) %/ (2 * gamma2) = hb_range by done.
 have [hr _] := Decompose_cases r.[i].[j]; move: hr; rewrite /HighBits => hr.
 case: (Decompose r.[i].[j]) hr => r1 r0 /= hr.
-by rewrite hg; smt(incoeffK).
+by rewrite hg; smt(incoeffK hb_range_cases).
+qed.
+
+(* w1_bits is the bit width of a coefficient in [0, hb_range) *)
+lemma ilog_w1 : ilog 2 (hb_range - 1) + 1 = w1_bits.
+proof.
+by have /= := param_sets; case=> [|[|]] [#] h1 h2 h3 h4 h5 h6 h7 h8; rewrite /hb_range /gamma2 h4.
 qed.
 
 op w1Dec (b : BytesW1.t) : polykvec =
@@ -563,15 +583,15 @@ op w1Dec (b : BytesW1.t) : polykvec =
 
 lemma w1DecK (w1 : polykvec) : w1rng w1 => w1Dec (w1Encode w1) = w1.
 proof.
-move=> hw; have hm : (q - 1) %/ (2 * gamma2) - 1 = 15 by have /= H := param_sets; smt().
-have hsz : forall p, size (SimpleBitPack p ((q - 1) %/ (2 * gamma2) - 1)) = n * w1_bits %/ 8
-  by move=> p; rewrite hm size_SimpleBitPack // (RealExp.ilog_eq 2 15 3).
+move=> hw; have hm : (q - 1) %/ (2 * gamma2) - 1 = hb_range - 1 by done.
+have hsz : forall p, size (SimpleBitPack p ((q - 1) %/ (2 * gamma2) - 1)) = n * w1_bits %/ 8.
++ by move=> p; rewrite hm size_SimpleBitPack ?ilog_w1 //; smt(hb_range_cases).
 apply KArray.ext_eq => i hi; rewrite /w1Dec KArray.initiE //= /w1Encode BytesW1.of_listK.
 + rewrite (size_flatten_ctt (n * w1_bits %/ 8)); 1: by move=> x /mapP [p [_ ->]]; rewrite hsz.
-  by rewrite size_map size_mkseq; have /= H := param_sets; smt().
-rewrite take_drop_flatten //; 1: by rewrite size_mkseq; smt(gt0_k).
-rewrite /= nth_mkseq //= (_ : 8380416 %/ (2 * gamma2) - 1 = 15); 1: by have /= H := param_sets; smt().
-by rewrite SimpleBitPackK // => j hj; apply hw.
+  by rewrite size_map size_mkseq; smt(gt0_k).
+rewrite take_drop_flatten //; 1: smt(); 1: by rewrite size_mkseq; smt(gt0_k).
+rewrite /= nth_mkseq //= hm SimpleBitPackK //; 1: smt(hb_range_cases).
+by move=> j hj; have := hw i j hi hj; smt().
 qed.
 
 end SerializationT.

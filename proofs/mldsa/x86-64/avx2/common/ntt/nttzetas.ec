@@ -18,7 +18,7 @@ require import StdRing StdOrder QFABV.
 (*---*) import BitEncoding.BS2Int BitEncoding.BitChunking.
 
 from Jasmin require import JWord JModel_x86.
-from JazzEC require import Ml_dsa_65_avx2.
+require import MldsaConstants.
 
 require import Nttlogspec Nttspec Listred.
 

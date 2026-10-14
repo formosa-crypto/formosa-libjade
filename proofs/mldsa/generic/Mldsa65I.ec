@@ -10,20 +10,10 @@ require import Array48 Array61 Array128 Array640 Array768 Array1280 Array1536
  Array1920 Array1952 Array2496 Array3200 Array3309 Array4032 Array7680
  WArray48 WArray128 WArray640 WArray768 WArray1952 WArray3309 WArray4032
  WArray5120.
-require MldsaT.
+require Spec65 MldsaT.
 
 clone MldsaT.MldsaT as Mldsa65I with
-  op kvec <= 6,
-  op lvec <= 5,
-  op eta_max <= 4,
-  op tau <= 49,
-  op omega <= 55,
-  op ctilde <= 48,
-  op gamma1_log <= 19,
-  op gamma2_div <= 32,
-  op rej_bound <= 9,
-  op eta_bits <= 4,
-  op w1_bits <= 4,
+  theory P <= Spec65.Params65,
   theory Array_ctilde <= Array48,
   theory WArray_ctilde <= WArray48,
   theory Array_eta_enc <= Array128,
@@ -35,14 +25,14 @@ clone MldsaT.MldsaT as Mldsa65I with
   theory Array_kpolys <= Array1536,
   theory Array_lpolys <= Array1280,
   theory WArray_lpolys_bytes <= WArray5120,
-  theory Array_pk_bytes <= Array1952,
-  theory WArray_pk_bytes <= WArray1952,
+  theory Array_pk_enc <= Array1952,
+  theory WArray_pk_enc <= WArray1952,
   theory Array_s1_enc <= Array640,
   theory Array_s2_enc <= Array768,
-  theory Array_sig_bytes <= Array3309,
-  theory WArray_sig_bytes <= WArray3309,
-  theory Array_sk_bytes <= Array4032,
-  theory WArray_sk_bytes <= WArray4032,
+  theory Array_sig_enc <= Array3309,
+  theory WArray_sig_enc <= WArray3309,
+  theory Array_sk_enc <= Array4032,
+  theory WArray_sk_enc <= WArray4032,
   theory Array_t0_enc <= Array2496,
   theory Array_t1_enc <= Array1920,
   theory Array_w1_enc <= Array128,
@@ -50,16 +40,4 @@ clone MldsaT.MldsaT as Mldsa65I with
   theory Array_w1vec_enc <= Array768,
   theory WArray_w1vec_enc <= WArray768,
   theory Array_z_enc <= Array3200,
-  module M <= Mldsa65.M
-proof
-  ge0_kvec by done,
-  ge0_lvec by done,
-  ge0_eta_max by done,
-  ge0_tau by done,
-  ge0_omega by done,
-  ge0_ctilde by done,
-  ge0_gamma1_log by done,
-  ge0_gamma2_div by done,
-  ge0_rej_bound by done,
-  ge0_eta_bits by done,
-  ge0_w1_bits by done.
+  module M <= Mldsa65.M.

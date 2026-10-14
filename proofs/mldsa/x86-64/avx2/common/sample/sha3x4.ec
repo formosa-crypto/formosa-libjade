@@ -20,23 +20,28 @@
 (* (rate 136); below each instance sit the specifications of the        *)
 (* Keccak primitives and the block-squeeze and absorb wrappers built on *)
 (* them.                                                                *)
-
 require import AllCore List IntDiv.
 require Xof.
 from CryptoSpecs require Keccak1600_Spec.
-
 from Jasmin require import JWord JUtils JArray.
-from JazzEC require import Ml_dsa_65_avx2.
-
+require import MldsaConstants.
+require Parameters MldsaT.
 require import Array4 Array7 Array25 Array28 Array32 Array48 Array64 Array136 Array168.
 require import Array2 WArray2 WArray224.
 require import WArray32 WArray48 WArray64 WArray136 WArray168.
 require import Avx2red.
-
 from Keccak require import Keccakf1600 Keccak1600_ref Keccak1600_fixedsizes_ref.
 from Keccak require import Keccakf1600_avx2 Keccak1600_avx2 Keccak1600_fixedsizes_avx2.
 from Keccak require import Keccak1600_fixedsizes_avx2x4.
 require import Keccak1600_statebytes.
+
+abstract theory Sha3x4T.
+
+clone import Parameters.ParamsT as P.
+clone import MldsaT.MldsaT as R with theory P <- P.
+clone import Avx2red.Avx2redT as AR with theory P <= P, theory R <= R.
+import Array_ctilde WArray_ctilde.
+
 
 (* -------------------------------------------------------------------- *)
 (* logical sponge bookkeeping                                           *)
@@ -118,9 +123,10 @@ clone KeccakArrayRef as Ref2
   with op _ASIZE <- 2, theory A <- Array2, theory WA <- WArray2
   proof _ASIZE_ge0 by done proof _ASIZE_u64 by done.
 
-clone KeccakArrayRef as Ref48
-  with op _ASIZE <- 48, theory A <- Array48, theory WA <- WArray48
-  proof _ASIZE_ge0 by done proof _ASIZE_u64 by done.
+clone KeccakArrayRef as RefCt
+  with op _ASIZE <- ctilde, theory A <- Array_ctilde, theory WA <- WArray_ctilde
+  proof _ASIZE_ge0 by exact ge0_ctilde
+  proof _ASIZE_u64 by (rewrite /ctilde; smt(P.param_sets)).
 
 clone KeccakArrayRef as Ref64
   with op _ASIZE <- 64, theory A <- Array64, theory WA <- WArray64
@@ -134,9 +140,10 @@ clone KeccakArrayAvx2 as Avx2_2
   with op _ASIZE <- 2, theory A <- Array2, theory WA <- WArray2
   proof _ASIZE_ge0 by done proof _ASIZE_u64 by done.
 
-clone KeccakArrayAvx2 as Avx2_48
-  with op _ASIZE <- 48, theory A <- Array48, theory WA <- WArray48
-  proof _ASIZE_ge0 by done proof _ASIZE_u64 by done.
+clone KeccakArrayAvx2 as Avx2_Ct
+  with op _ASIZE <- ctilde, theory A <- Array_ctilde, theory WA <- WArray_ctilde
+  proof _ASIZE_ge0 by exact ge0_ctilde
+  proof _ASIZE_u64 by (rewrite /ctilde; smt(P.param_sets)).
 
 clone KeccakArrayAvx2 as Avx2_64
   with op _ASIZE <- 64, theory A <- Array64, theory WA <- WArray64
@@ -194,8 +201,8 @@ equiv a2_absorb_fips202 :
   M.a2____absorb ~ Ref2.MM.__absorb : ={arg} ==> ={res}
 by sim.
 
-equiv a48_absorb_fips202 :
-  M.a_COMMITMENT_HASH____absorb ~ Ref48.MM.__absorb : ={arg} ==> ={res}
+equiv act_absorb_fips202 :
+  M.a_COMMITMENT_HASH____absorb ~ RefCt.MM.__absorb : ={arg} ==> ={res}
 by sim.
 
 equiv a64_absorb_fips202 :
@@ -210,8 +217,8 @@ equiv a2_absorb_avx2_fips202 :
   M.a2____absorb_avx2 ~ Avx2_2.MM.__absorb_avx2 : ={arg} ==> ={res}
 by sim.
 
-equiv a48_absorb_avx2_fips202 :
-  M.a_COMMITMENT_HASH____absorb_avx2 ~ Avx2_48.MM.__absorb_avx2 : ={arg} ==> ={res}
+equiv act_absorb_avx2_fips202 :
+  M.a_COMMITMENT_HASH____absorb_avx2 ~ Avx2_Ct.MM.__absorb_avx2 : ={arg} ==> ={res}
 by sim.
 
 equiv a64_absorb_avx2_fips202 :
@@ -695,13 +702,13 @@ move=> &1 &2 ->; rewrite ifT // => ->.
 by rewrite sha3oneE /sha3_lane /mk_absorbed /= iter0.
 qed.
 
-lemma absorb_commitment_hash_256P (ct_ : W8.t Array48.t) :
+lemma absorb_commitment_hash_256P (ct_ : W8.t Array_ctilde.t) :
   hoare[ M.a_COMMITMENT_HASH____absorb :
        st \sha3one mk_absorbing []
     /\ buf = ct_ /\ aT = 0 /\ _TRAILB = 31 /\ _RATE8 = 136
     ==> res.`1 \sha3one mk_absorbed (to_list ct_) ].
 proof.
-conseq a48_absorb_fips202 (Ref48.absorb_h [] ct_ 31 136).
+conseq act_absorb_fips202 (RefCt.absorb_h [] ct_ 31 136).
 - move=> &1 [+ [hb [ha [ht hr]]]]; rewrite sha3oneE /sha3_lane /mk_absorbing /= => -[_ hst].
   by exists arg{1}; rewrite ha hb ht hr pabsorb_spec_refE hst.
 move=> &1 &2 ->; rewrite ifT // => ->.
@@ -785,7 +792,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 (* the 48-byte absorb of the commitment hash (SampleInBall's seed)       *)
-lemma shake256_absorb_commitment_hashP (ct_ : W8.t Array48.t) :
+lemma shake256_absorb_commitment_hashP (ct_ : W8.t Array_ctilde.t) :
 hoare[ M.shake256_absorb_commitment_hash :
     commitment_hash = ct_ ==> lanes_of res \sha3one mk_absorbed (to_list ct_) ].
 proof.
@@ -864,11 +871,11 @@ proof. by conseq a64_absorb_avx2_fips202 Avx2_64.absorb_avx2_ll => // &1 _; exis
 hint solve 0 lossless : a64____absorb_avx2_ll.
 
 lemma a_COMMITMENT_HASH____absorb_ll : islossless M.a_COMMITMENT_HASH____absorb.
-proof. by conseq a48_absorb_fips202 Ref48.absorb_ll => // &1 _; exists arg{1}. qed.
+proof. by conseq act_absorb_fips202 RefCt.absorb_ll => // &1 _; exists arg{1}. qed.
 hint solve 0 lossless : a_COMMITMENT_HASH____absorb_ll.
 
 lemma a_COMMITMENT_HASH____absorb_avx2_ll : islossless M.a_COMMITMENT_HASH____absorb_avx2.
-proof. by conseq a48_absorb_avx2_fips202 Avx2_48.absorb_avx2_ll => // &1 _; exists arg{1}. qed.
+proof. by conseq act_absorb_avx2_fips202 Avx2_Ct.absorb_avx2_ll => // &1 _; exists arg{1}. qed.
 hint solve 0 lossless : a_COMMITMENT_HASH____absorb_avx2_ll.
 
 lemma a2____absorb_avx2x4_ll : islossless M.a2____absorb_avx2x4.
@@ -898,3 +905,5 @@ hint solve 0 lossless : a136____dumpstate_avx2x4_ll.
 lemma a168____dumpstate_avx2x4_ll : islossless M.a168____dumpstate_avx2x4.
 proof. by conseq a168_dumpstate_avx2x4_fips202 X4_168.dumpstate_avx2x4_ll => // &1 _; exists arg{1}. qed.
 hint solve 0 lossless : a168____dumpstate_avx2x4_ll.
+
+end Sha3x4T.

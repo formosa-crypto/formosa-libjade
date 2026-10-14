@@ -10,7 +10,8 @@ require import AllCore List IntDiv IntMin BitEncoding.
 
 from Jasmin require import JModel_x86.
 
-from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude.
+require import Mldsa65.
+from JazzEC require import Mldsa_65_prelude.
 
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 from Spec require import Spec65.
@@ -22,7 +23,7 @@ import PolyMat.
 import Round ZModQ Zq.
 
 require import Array32 Array256 Array7680.
-require import Rejstream Sha3x4. import Shake128x4.
+require import Rejstream Sha3x4 Shared65. import Sha3x4_65 Shake128x4.
 require import Aexpand. import ARS.
 require Mexpand.
 

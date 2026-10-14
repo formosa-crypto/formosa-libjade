@@ -2,7 +2,8 @@ require import AllCore List IntDiv RealExp.
 
 from Jasmin require import JModel_x86.
 
-from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Matrix_A Hashing
+require import Mldsa65.
+from JazzEC require import Mldsa_65_prelude Matrix_A Hashing
                            Signature Challenge Row_vector Polynomial Commitment T1
                            Common_ntt Common_modular Common_invert_ntt Rounding.
 
@@ -357,18 +358,18 @@ lemma reconstruct_signer_commitment_ph
   by conseq reconstruct_signer_commitment_ll
             (reconstruct_signer_commitment_correct _t1enc _ch _az _hints).
 
-lemma ml_dsa_65_verify_correct _m :
-    equiv [ MLDSA(MLDSA_XOFA, MLDSA_XOFS, MLDSA_XOF_SIB, SIB_RO).verify ~ M.ml_dsa_65_verify :
+lemma verify_internal_correct _m :
+    equiv [ MLDSA(MLDSA_XOFA, MLDSA_XOFS, MLDSA_XOF_SIB, SIB_RO).verify ~ M.__verify_internal :
        Glob.mem{2} = _m /\
-       arg{1}.`1 = BytesPK.of_list (to_list arg{2}.`1)
-    /\ arg{1}.`2 = BytesSig.init (fun i => arg{2}.`5.[i])
-    /\ W64.to_uint arg{2}.`2.[1] <= 255
-    /\ 0 <= arg{2}.`4
-    /\ to_uint context{2}.[0] + to_uint context{2}.[1] < 18446744073709551616
+       arg{1}.`1 = BytesPK.of_list (to_list verification_key{2})
+    /\ arg{1}.`2 = BytesSig.init (fun i => signature_encoded{2}.[i])
+    /\ 0 <= context_size{2} <= 255
+    /\ 0 <= message_size{2}
+    /\ 0 <= context_pointer{2} /\ context_pointer{2} + context_size{2} < 18446744073709551616
     /\ message_pointer{2} + message_size{2} < 18446744073709551616
-    /\ arg{1}.`3 = [W8.zero; truncateu8 arg{2}.`2.[1]]
-                   ++ memread _m (W64.to_uint arg{2}.`2.[0]) (W64.to_uint arg{2}.`2.[1])
-                   ++ memread _m arg{2}.`3 arg{2}.`4
+    /\ arg{1}.`3 = [W8.zero; W8.of_int context_size{2}]
+                   ++ memread _m context_pointer{2} context_size{2}
+                   ++ memread _m message_pointer{2} message_size{2}
        ==>
        Glob.mem{2} = _m /\
        res{1} = (res{2} = W64.of_int 0)
@@ -383,10 +384,6 @@ have Hgamma1 := mldsa65_gamma1.
 
 proc => /=; conseq |>.
 
-sp 0 2.
-rcondt {2} ^if; 1: by auto => /> /#.
-inline {2} M.__verify_internal.
-sp 0 8.
 seq 1 9 : #pre; 1: by auto.
 sp 1 0.
 seq 1 0 : (#pre /\
@@ -400,7 +397,7 @@ seq 1 0 : (#pre /\
   by auto.
 
 seq 1 1 : (#pre /\
-    ct{1} = BytesCT.init (fun i => signature{2}.[i]) /\
+    ct{1} = BytesCT.init (fun i => signature_encoded{2}.[i]) /\
     lifts_wpolylvec (lvec_unflatten256 signer_response{2}) = z{1} /\
     wpolylvec_srng (lvec_unflatten256 signer_response{2}) (gamma1 - 1) gamma1 /\
     (h{1} = None => result1{2} = -W64.one) /\
@@ -408,13 +405,13 @@ seq 1 1 : (#pre /\
         result1{2} = W64.zero /\
         liftu_wpolykvec (kvec_unflatten256 hints{2}) = oget h{1} /\
         wpolykvec_urng (kvec_unflatten256 hints{2}) 2)).
-+ ecall (signature_decode signature{2}).
++ ecall (signature_decode signature_encoded{2}).
   by auto.
 seq 0 1 : (#pre /\
     (!wpolylvec_infnorm_lt (gamma1 - Beta) (lvec_unflatten256 signer_response{2}) => result2{2} <> W64.of_int 0) /\
     (wpolylvec_infnorm_lt (gamma1 - Beta) (lvec_unflatten256 signer_response{2})  => result2{2} = W64.zero)).
 + ecall {2} (row_vector____check_infinity_norm_correct signer_response{2} ((1 `<<` gamma1m1_bits) - 49 * w1_bits)).
-  auto => /> &1 &2 ?????? rr0.
+  auto => /> &1 &2 6? rr0.
   have -> : (1 `<<` gamma1m1_bits) - 49 * w1_bits = gamma1 - Beta
     by rewrite /(`<<`) /= /Beta /=; smt(mldsa65_gamma1 mldsa65_tau mldsa65_Eta).
   have Hbnd : 0 < gamma1 - Beta <= q %/ 2
@@ -423,17 +420,17 @@ seq 0 1 : (#pre /\
   
 if {1}; last first.
 + sp 0 2; rcondf {2} 1.
-  + auto => |> &hr ?????-> ??. 
+  + auto => |> &hr 7? -> ??.
     have ? : (- W64.one <> W64.zero); last by smt(or64_ne0).
     by rewrite to_uint_eq to_uintN  /=.
-  auto => /> &2 ?????  -> ??.
+  auto => /> &2 7? -> ??.
     have ? : (- W64.one <> W64.zero); last by smt(or64_ne0).
     by rewrite to_uint_eq to_uintN  /=.
   
 sp;if {2}; last first.
 + wp; call {1} (: true ==> true); 1: by proc*; exlim  rho => _rho;  call (SampleInBall_correct _rho).
   wp; call {1} (: true ==> true); 1: by proc*; exlim  rho => _rho;  call (ExpandA_correct _rho).
-  auto => /> &1 &2 ?????????? rr0 rr1.
+  auto => /> &1 &2 12? rr0 rr1.
   have ? : (!wpolylvec_infnorm_lt (gamma1 - Beta) (lvec_unflatten256 signer_response{2})) by smt(or64_ne0).
   have Hrng : wpolylvec_srng (lvec_unflatten256 signer_response{2}) (gamma1-1) gamma1 by smt().
   have Hb : 0 < gamma1 - Beta <= q %/ 2 by rewrite /Beta /=; smt(mldsa65_gamma1 mldsa65_tau mldsa65_Eta).
@@ -449,7 +446,7 @@ seq 1 1 : (#pre /\
       wpolymat_urng (mat_unflatten256 matrix_A{2}) q).
   + ecall{1} (ExpandA_correct rho{1}).
     ecall{2} (matrix_A_correct (Array32.init (fun i => verification_key{2}.[i]))).
-    auto => |> &1 &2 ??????????? rr0 -> ?;congr.
+    auto => |> &1 &2 13? rr0 -> ?;congr.
     apply Bytes32.tP => k kb.
     do 2!(rewrite Bytes32.get_of_list //).
     rewrite get_to_list initiE 1:/# /=.
@@ -481,10 +478,10 @@ seq 0 1 : (#pre /\
     + by rewrite !size_memread /=; smt(W64.to_uint_cmp).
     + by rewrite !size_memread /=; smt(W64.to_uint_cmp).
     + by rewrite !size_memread /=;  smt(W64.to_uint_cmp).
-    move => ????;do congr.
+    move => 4?;do congr.
     + rewrite Bytes64.tP => k kb.
       by rewrite Bytes64.get_of_list // get_to_list get_of_list //.
-    + by rewrite size_memread; smt(W64.to_uint_cmp).
+    + by rewrite size_memread 1:/# /truncateu8 W64.of_uintK (pmod_small _ W64.modulus) //; smt().
    
 (* anticipate sib *)
 swap {2} [4..5] -3.
@@ -529,16 +526,16 @@ seq 0 1 : (#pre /\
  wp;skip => /> &1 &2 *.
  pose xx := H_ct
    (H_mu (H_tr (BytesPK.of_list (to_list verification_key{2})))
-      (W8.zero :: truncateu8 context{2}.[1] :: (memread _m (to_uint context{2}.[0]) (to_uint context{2}.[1]) ++  memread _m message_pointer{2} message_size{2}))) (
+      (W8.zero :: W8.of_int context_size{2} :: (memread _m context_pointer{2} context_size{2} ++  memread _m message_pointer{2} message_size{2}))) (
    w1Encode w1{1}).
 have ? : wpolylvec_infnorm_lt (gamma1 - Beta) (lvec_unflatten256 _sr_pre) by smt(or64_ne0).
 have -> /=: infnorm_lt (lifts_wpolylvec (lvec_unflatten256 _sr_pre)) (gamma1 - Beta).
 + have /# := wpolylvec_infnorm_liftE (gamma1-Beta)
               (lvec_unflatten256 _sr_pre) _ _; by smt().
-suff: ((BytesCT.init ("_.[_]" signature{2}) = xx) <=>  (Array48.of_list witness (BytesCT.to_list xx) = Array48.init ("_.[_]" signature{2}))); last first.
+suff: ((BytesCT.init ("_.[_]" signature_encoded{2}) = xx) <=>  (Array48.of_list witness (BytesCT.to_list xx) = Array48.init ("_.[_]" signature_encoded{2}))); last first.
 + by rewrite tP BytesCT.tP /=;split => H i ib; have := H i _;[ by smt() | rewrite get_of_list 1:/# BytesCT.get_to_list BytesCT.initiE 1:/# /= initiE /#  | by smt() | rewrite get_of_list 1:/# BytesCT.get_to_list BytesCT.initiE 1:/# /= initiE /# ].
 
-move => -> ; pose bb := Array48.of_list witness (BytesCT.to_list xx) = Array48.init ("_.[_]" signature{2}).
+move => -> ; pose bb := Array48.of_list witness (BytesCT.to_list xx) = Array48.init ("_.[_]" signature_encoded{2}).
 by case (bb) => //=; rewrite to_uint_eq to_uintN /=.
 
 (* algebra: the forward head of `seq 2 4` — chain the four Jasmin ecalls        *)
@@ -548,13 +545,13 @@ by case (bb) => //=; rewrite to_uint_eq to_uintN /=.
 (* matrix multiply) and the pkDecode ↔ t1_from_t1enc slice identity.             *)
 sp 2 0.
 wp; ecall{2} (reconstruct_signer_commitment_ph
-                (Array1920.init (fun i => verification_key0{2}.[32 + i]))
+                (Array1920.init (fun i => verification_key{2}.[32 + i]))
                 challenge{2} a_times_signer_response{2} hints{2}).
 wp; ecall{2} (row_vector____multiply_with_matrix_A_ph matrix_A{2} signer_response{2}).
 wp; ecall{2} (row_vector__ntt_ph signer_response{2}).
 wp; ecall{2} (polynomial__ntt_ph challenge{2}).
 auto => />.
-move => &1 &2 Hctx Hmsg Hov1 Hov2 Hz_srng Hh_none Hh_some_case Hr2_nz Hr2_z Hh_some Hor HA Hc_srng.
+move => &1 &2 ? Hctx Hmsg ? Hov1 Hov2 Hz_srng Hh_none Hh_some_case Hr2_nz Hr2_z Hh_some Hor HA Hc_srng.
 split; first by apply wpoly_srng_ntt_irng; apply (wpoly_srng_widen _ 1 1 (q-1) (q-1)); smt().
 move => _ result0 Hlift_chal Horng_chal.
 split; first by apply wpolylvec_srng_ntt_irng;

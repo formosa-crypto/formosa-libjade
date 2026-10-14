@@ -4,7 +4,7 @@ require import Array256.
 from CryptoSpecs require import Keccak1600_Spec.
 from CryptoSpecs require import Keccak1600_Orbit.
 require import Parameters GFq Rq.
-require Symmetric.
+require import Symmetric.
 
 abstract theory SamplingT.
 
@@ -109,29 +109,29 @@ lemma SampleInBall_h (_ct : BytesCT.t) :
 proof.
 have [ge1t ltau] := tau_bound.
 proc; inline MLDSA_XOF_SIB.init.
-while (MLDSA_XOF_SIB.seed = _ct /\ h = sib_signs _ct /\ 256 - tau <= i <= 256
-  /\ (c, leakage, MLDSA_XOF_SIB.pos) = sib_iter _ct (i - (256 - tau))).
+while (XOFSIB_state.seed = BytesCT.to_list _ct /\ h = sib_signs _ct /\ 256 - tau <= i <= 256
+  /\ (c, leakage, XOFSIB_state.pos) = sib_iter _ct (i - (256 - tau))).
 - exlim (sib_iter _ct (i - (256 - tau))) => st.
   inline MLDSA_XOF_SIB.next; wp.
-  while (MLDSA_XOF_SIB.seed = _ct /\ h = sib_signs _ct /\ 256 - tau <= i < 256
+  while (XOFSIB_state.seed = BytesCT.to_list _ct /\ h = sib_signs _ct /\ 256 - tau <= i < 256
      /\ st = sib_iter _ct (i - (256 - tau))
-     /\ c = st.`1 /\ 0 <= MLDSA_XOF_SIB.pos - 1 - st.`3
-     /\ leakage = st.`2 ++ nseq (MLDSA_XOF_SIB.pos - 1 - st.`3) true
-     /\ to_uint j = sib_byte _ct (MLDSA_XOF_SIB.pos - 1)
-     /\ forall k, 0 <= k < MLDSA_XOF_SIB.pos - 1 - st.`3 => i < sib_byte _ct (st.`3 + k)).
+     /\ c = st.`1 /\ 0 <= XOFSIB_state.pos - 1 - st.`3
+     /\ leakage = st.`2 ++ nseq (XOFSIB_state.pos - 1 - st.`3) true
+     /\ to_uint j = sib_byte _ct (XOFSIB_state.pos - 1)
+     /\ forall k, 0 <= k < XOFSIB_state.pos - 1 - st.`3 => i < sib_byte _ct (st.`3 + k)).
   + wp; skip => &hr [#] hs hh rgi hst hc ge0 hl hj hmin hlt hg /=.
     do 6! (split; 1: smt()).
     split.
-    * rewrite hj (_ : MLDSA_XOF_SIB.pos{hr} - st.`3 = (MLDSA_XOF_SIB.pos{hr} - 1 - st.`3) + 1) 1:#ring.
+    * rewrite hj (_ : XOFSIB_state.pos{hr} - st.`3 = (XOFSIB_state.pos{hr} - 1 - st.`3) + 1) 1:#ring.
       by rewrite nseqSr // -cats1 catA.
     split; 1: by rewrite /sib_byte hs.
-    move=> k rgk; case: (k = MLDSA_XOF_SIB.pos{hr} - 1 - st.`3) => [->>|ne]; 2: by apply hlt => /#.
-    by rewrite (_ : st.`3 + (MLDSA_XOF_SIB.pos{hr} - 1 - st.`3) = MLDSA_XOF_SIB.pos{hr} - 1) 1:#ring -hmin.
+    move=> k rgk; case: (k = XOFSIB_state.pos{hr} - 1 - st.`3) => [->>|ne]; 2: by apply hlt => /#.
+    by rewrite (_ : st.`3 + (XOFSIB_state.pos{hr} - 1 - st.`3) = XOFSIB_state.pos{hr} - 1) 1:#ring -hmin.
   wp; skip => &hr [hst [[hs [hh [rg hcl]]] hlt]].
   rewrite -hst in hcl.
   have hc : c{hr} = st.`1 by rewrite -hcl.
   have hl : leakage{hr} = st.`2 by rewrite -hcl.
-  have hp : MLDSA_XOF_SIB.pos{hr} = st.`3 by rewrite -hcl.
+  have hp : XOFSIB_state.pos{hr} = st.`3 by rewrite -hcl.
   split.
   - rewrite hp; do 6! (split; 1: smt()).
     split; 1: by rewrite (_ : st.`3 + 1 - 1 - st.`3 = 0) 1:#ring nseq0 cats0.
@@ -163,8 +163,8 @@ lemma SampleInBall_ll (_ct : BytesCT.t) : sib_ok _ct =>
 proof.
 move=> hok; have [ge1t ltau] := tau_bound.
 proc; inline MLDSA_XOF_SIB.init.
-while (MLDSA_XOF_SIB.seed = _ct /\ 256 - tau <= i <= 256
-  /\ MLDSA_XOF_SIB.pos = (sib_iter _ct (i - (256 - tau))).`3) (256 - i).
+while (XOFSIB_state.seed = BytesCT.to_list _ct /\ 256 - tau <= i <= 256
+  /\ XOFSIB_state.pos = (sib_iter _ct (i - (256 - tau))).`3) (256 - i).
 - move=> z; exlim i => i0.
   case @[ambient]: (256 - tau <= i0 < 256) => hi0; last first.
   + by conseq (_ : false ==> _) => // &hr [#] /#.
@@ -173,22 +173,22 @@ while (MLDSA_XOF_SIB.seed = _ct /\ 256 - tau <= i <= 256
     by rewrite (_ : 256 - tau + (i0 - (256 - tau)) = i0) 1:#ring.
   pose p0 := (sib_iter _ct (i0 - (256 - tau))).`3.
   inline MLDSA_XOF_SIB.next; wp.
-  while (MLDSA_XOF_SIB.seed = _ct /\ i = i0 /\ 256 - i = z
-     /\ 0 <= MLDSA_XOF_SIB.pos - 1 - p0
-     /\ to_uint j = sib_byte _ct (MLDSA_XOF_SIB.pos - 1)
-     /\ (forall k, 0 <= k < MLDSA_XOF_SIB.pos - 1 - p0 => i < sib_byte _ct (p0 + k)))
-    (sib_skip _ct i0 p0 - (MLDSA_XOF_SIB.pos - 1 - p0)).
+  while (XOFSIB_state.seed = BytesCT.to_list _ct /\ i = i0 /\ 256 - i = z
+     /\ 0 <= XOFSIB_state.pos - 1 - p0
+     /\ to_uint j = sib_byte _ct (XOFSIB_state.pos - 1)
+     /\ (forall k, 0 <= k < XOFSIB_state.pos - 1 - p0 => i < sib_byte _ct (p0 + k)))
+    (sib_skip _ct i0 p0 - (XOFSIB_state.pos - 1 - p0)).
   + move=> z'; wp; skip => &hr [[[hs [-> [hz [hk [hj hmin]]]]] hg] hz'] /=.
-    have hlt : MLDSA_XOF_SIB.pos{hr} - 1 - p0 < sib_skip _ct i0 p0.
+    have hlt : XOFSIB_state.pos{hr} - 1 - p0 < sib_skip _ct i0 p0.
     * rewrite ltzNge; apply/negP => hle.
-      case: (MLDSA_XOF_SIB.pos{hr} - 1 - p0 = sib_skip _ct i0 p0) => heq.
-      - by move: hb0 hg; rewrite -/p0 -heq hj (_ : p0 + (MLDSA_XOF_SIB.pos{hr} - 1 - p0) = MLDSA_XOF_SIB.pos{hr} - 1) 1:#ring /#.
+      case: (XOFSIB_state.pos{hr} - 1 - p0 = sib_skip _ct i0 p0) => heq.
+      - by move: hb0 hg; rewrite -/p0 -heq hj (_ : p0 + (XOFSIB_state.pos{hr} - 1 - p0) = XOFSIB_state.pos{hr} - 1) 1:#ring /#.
       by have := hmin (sib_skip _ct i0 p0) _; smt().
     split; 2: smt().
     do 3! (split; 1: smt()).
     split; 1: by rewrite /sib_byte hs.
-    move=> k rgk; case: (k = MLDSA_XOF_SIB.pos{hr} - 1 - p0) => [->>|ne]; 2: by apply hmin => /#.
-    by rewrite (_ : p0 + (MLDSA_XOF_SIB.pos{hr} - 1 - p0) = MLDSA_XOF_SIB.pos{hr} - 1) 1:#ring -hj.
+    move=> k rgk; case: (k = XOFSIB_state.pos{hr} - 1 - p0) => [->>|ne]; 2: by apply hmin => /#.
+    by rewrite (_ : p0 + (XOFSIB_state.pos{hr} - 1 - p0) = XOFSIB_state.pos{hr} - 1) 1:#ring -hj.
   wp; skip => &hr [<- [[[hs [rg hp]] hlt] hz]] /=.
   split.
   - rewrite hs hp -/p0 /=; split; 1: smt().
@@ -421,24 +421,24 @@ lemma RejNTTPoly_h (_rho : Bytes34.t) :
   hoare [ RejNTTPoly(MLDSA_XOFA).sample : rho = _rho ==> res = rejNTTPoly _rho ].
 proof.
 proc; inline MLDSA_XOFA.init.
-while (MLDSA_XOFA.seed = _rho /\ 0 <= MLDSA_XOFA.pos /\ MLDSA_XOFA.pos %% 3 = 0
-  /\ j = size (ntt_accepted _rho (MLDSA_XOFA.pos %/ 3)) /\ j <= 256
-  /\ (forall i, 0 <= i < j => c.[i] = incoeff (nth 0 (ntt_accepted _rho (MLDSA_XOFA.pos %/ 3)) i))
-  /\ (forall t, 0 <= t < MLDSA_XOFA.pos %/ 3 => size (ntt_accepted _rho t) < 256)).
-- inline MLDSA_XOFA.next; wp; skip => &hr [#] <<- ge0p hp3 -> hj hc hmin ltj /=.
-  pose t := MLDSA_XOFA.pos{hr} %/ 3.
-  have hpt : MLDSA_XOFA.pos{hr} = 3 * t by smt().
-  have hnt : (MLDSA_XOFA.pos{hr} + 3) %/ 3 = t + 1 by smt().
+while (XOFA_state.seed = Bytes34.to_list _rho /\ 0 <= XOFA_state.pos /\ XOFA_state.pos %% 3 = 0
+  /\ j = size (ntt_accepted _rho (XOFA_state.pos %/ 3)) /\ j <= 256
+  /\ (forall i, 0 <= i < j => c.[i] = incoeff (nth 0 (ntt_accepted _rho (XOFA_state.pos %/ 3)) i))
+  /\ (forall t, 0 <= t < XOFA_state.pos %/ 3 => size (ntt_accepted _rho t) < 256)).
+- inline MLDSA_XOFA.next; wp; skip => &hr [#] -> ge0p hp3 -> hj hc hmin ltj /=.
+  pose t := XOFA_state.pos{hr} %/ 3.
+  have hpt : XOFA_state.pos{hr} = 3 * t by smt().
+  have hnt : (XOFA_state.pos{hr} + 3) %/ 3 = t + 1 by smt().
   rewrite hnt hpt (ntt_cand_next _ t) 1:/# ntt_acceptedS 1:/#.
   move: hj hc hmin ltj; rewrite -/t => hj hc hmin ltj.
-  have hminS : forall t0, 0 <= t0 < t + 1 => size (ntt_accepted MLDSA_XOFA.seed{hr} t0) < 256.
+  have hminS : forall t0, 0 <= t0 < t + 1 => size (ntt_accepted _rho t0) < 256.
   + by move=> t0 rgt0; case: (t0 = t) => [->> //|ne]; apply hmin; smt().
-  case: (ntt_cand MLDSA_XOFA.seed{hr} t) => [|v] /=.
+  case: (ntt_cand _rho t) => [|v] /=.
   + rewrite cats0 /=; do 3! (split; 1: smt()); split; 2: exact hminS.
     by move=> i rgi; rewrite hc.
   rewrite size_cat /=; do 3! (split; 1: smt()); split; 2: exact hminS.
   move=> i rgi; rewrite Array256.get_setE 1:/# nth_cat.
-  case: (i = size (ntt_accepted MLDSA_XOFA.seed{hr} t)) => [->> /=|ne]; 1: done.
+  case: (i = size (ntt_accepted _rho t)) => [->> /=|ne]; 1: done.
   by rewrite ifT 1:/# hc /#.
 auto => />; split; first by rewrite /ntt_accepted iota0 //=; smt().
 move=> pos c0 ge256 ge0p hp3 le256 hc hmin.
@@ -455,15 +455,15 @@ move=> hok; have [t0 [ge0t0 h256]] := hok.
 have hfuel : 256 <= size (ntt_accepted _rho (rejNTT_fuel _rho)).
 - by apply (argminP idfun (fun t => 256 <= size (ntt_accepted _rho t)) t0).
 proc; inline MLDSA_XOFA.init.
-while (MLDSA_XOFA.seed = _rho /\ 0 <= MLDSA_XOFA.pos /\ MLDSA_XOFA.pos %% 3 = 0
-  /\ j = size (ntt_accepted _rho (MLDSA_XOFA.pos %/ 3)))
-  (rejNTT_fuel _rho - MLDSA_XOFA.pos %/ 3).
-- move=> z; inline MLDSA_XOFA.next; wp; skip => &hr [#] <<- ge0p hp3 -> ltj hz /=.
-  pose t := MLDSA_XOFA.pos{hr} %/ 3.
-  have hpt : MLDSA_XOFA.pos{hr} = 3 * t by smt().
-  have hnt : (MLDSA_XOFA.pos{hr} + 3) %/ 3 = t + 1 by smt().
+while (XOFA_state.seed = Bytes34.to_list _rho /\ 0 <= XOFA_state.pos /\ XOFA_state.pos %% 3 = 0
+  /\ j = size (ntt_accepted _rho (XOFA_state.pos %/ 3)))
+  (rejNTT_fuel _rho - XOFA_state.pos %/ 3).
+- move=> z; inline MLDSA_XOFA.next; wp; skip => &hr [#] -> ge0p hp3 -> ltj hz /=.
+  pose t := XOFA_state.pos{hr} %/ 3.
+  have hpt : XOFA_state.pos{hr} = 3 * t by smt().
+  have hnt : (XOFA_state.pos{hr} + 3) %/ 3 = t + 1 by smt().
   rewrite hnt hpt (ntt_cand_next _ t) 1:/# ntt_acceptedS 1:/#.
-  by case: (ntt_cand MLDSA_XOFA.seed{hr} t) => [|v] /=; rewrite ?cats0 ?size_cat /= /#.
+  by case: (ntt_cand _rho t) => [|v] /=; rewrite ?cats0 ?size_cat /= /#.
 auto => />; split; first by rewrite /ntt_accepted iota0.
 move=> pos ge0p hp3 hz; apply/negP => lt256.
 have := ntt_accepted_mono _rho (rejNTT_fuel _rho) (pos %/ 3) _; 2: smt().
@@ -572,21 +572,21 @@ lemma RejBoundedPoly_h (_rho : Bytes66.t) :
   hoare [ RejBoundedPoly(MLDSA_XOFS).sample : rho = _rho ==> res = rejBoundedPoly _rho ].
 proof.
 proc; inline MLDSA_XOFS.init.
-while (MLDSA_XOFS.seed = _rho /\ 0 <= MLDSA_XOFS.pos
-  /\ j = min 256 (size (bounded_accepted _rho MLDSA_XOFS.pos))
-  /\ (forall i, 0 <= i < j => a.[i] = incoeff (nth 0 (bounded_accepted _rho MLDSA_XOFS.pos) i))
-  /\ (forall t, 0 <= t < MLDSA_XOFS.pos => size (bounded_accepted _rho t) < 256)).
-- inline MLDSA_XOFS.next; wp; skip => &hr [#] <<- ge0p -> hc hmin ltj /=.
-  have hlt : size (bounded_accepted MLDSA_XOFS.seed{hr} MLDSA_XOFS.pos{hr}) < 256 by smt().
+while (XOFS_state.seed = Bytes66.to_list _rho /\ 0 <= XOFS_state.pos
+  /\ j = min 256 (size (bounded_accepted _rho XOFS_state.pos))
+  /\ (forall i, 0 <= i < j => a.[i] = incoeff (nth 0 (bounded_accepted _rho XOFS_state.pos) i))
+  /\ (forall t, 0 <= t < XOFS_state.pos => size (bounded_accepted _rho t) < 256)).
+- inline MLDSA_XOFS.next; wp; skip => &hr [#] -> ge0p -> hc hmin ltj /=.
+  have hlt : size (bounded_accepted _rho XOFS_state.pos{hr}) < 256 by smt().
   rewrite bounded_acceptedS //.
-  have hminS : forall t0, 0 <= t0 < MLDSA_XOFS.pos{hr} + 1 =>
-    size (bounded_accepted MLDSA_XOFS.seed{hr} t0) < 256.
-  + by move=> t0 rgt0; case: (t0 = MLDSA_XOFS.pos{hr}) => [->> //|ne]; apply hmin; smt().
+  have hminS : forall t0, 0 <= t0 < XOFS_state.pos{hr} + 1 =>
+    size (bounded_accepted _rho t0) < 256.
+  + by move=> t0 rgt0; case: (t0 = XOFS_state.pos{hr}) => [->> //|ne]; apply hmin; smt().
   rewrite /bounded_cands /=.
-  pose L := bounded_accepted MLDSA_XOFS.seed{hr} MLDSA_XOFS.pos{hr}.
+  pose L := bounded_accepted _rho XOFS_state.pos{hr}.
   have -> : min 256 (size L) = size L by smt().
-  move: (CoeffFromHalfByte (to_uint (nth witness<:W8.t> (SHAKE256 (Bytes66.to_list MLDSA_XOFS.seed{hr}) (MLDSA_XOFS.pos{hr} + 1)) MLDSA_XOFS.pos{hr}) %% 16))
-        (CoeffFromHalfByte (to_uint (nth witness<:W8.t> (SHAKE256 (Bytes66.to_list MLDSA_XOFS.seed{hr}) (MLDSA_XOFS.pos{hr} + 1)) MLDSA_XOFS.pos{hr}) %/ 16)) => o0 o1.
+  move: (CoeffFromHalfByte (to_uint (nth witness<:W8.t> (SHAKE256 (Bytes66.to_list _rho) (XOFS_state.pos{hr} + 1)) XOFS_state.pos{hr}) %% 16))
+        (CoeffFromHalfByte (to_uint (nth witness<:W8.t> (SHAKE256 (Bytes66.to_list _rho) (XOFS_state.pos{hr} + 1)) XOFS_state.pos{hr}) %/ 16)) => o0 o1.
   move: hc; rewrite -/L => hc.
   have hc' : forall i, 0 <= i < size L => a{hr}.[i] = incoeff (nth 0 L i) by move=> i ?; apply hc; smt().
   case: o0 => [|v0] /=.
@@ -624,14 +624,14 @@ move=> hok; have [t0 [ge0t0 h256]] := hok.
 have hfuel : 256 <= size (bounded_accepted _rho (rejBounded_fuel _rho)).
 - by apply (argminP idfun (fun t => 256 <= size (bounded_accepted _rho t)) t0).
 proc; inline MLDSA_XOFS.init.
-while (MLDSA_XOFS.seed = _rho /\ 0 <= MLDSA_XOFS.pos
-  /\ j = min 256 (size (bounded_accepted _rho MLDSA_XOFS.pos)))
-  (rejBounded_fuel _rho - MLDSA_XOFS.pos).
-- move=> z; inline MLDSA_XOFS.next; wp; skip => &hr [#] <<- ge0p -> ltj hz /=.
+while (XOFS_state.seed = Bytes66.to_list _rho /\ 0 <= XOFS_state.pos
+  /\ j = min 256 (size (bounded_accepted _rho XOFS_state.pos)))
+  (rejBounded_fuel _rho - XOFS_state.pos).
+- move=> z; inline MLDSA_XOFS.next; wp; skip => &hr [#] -> ge0p -> ltj hz /=.
   rewrite bounded_acceptedS // /bounded_cands /=.
-  pose L := bounded_accepted MLDSA_XOFS.seed{hr} MLDSA_XOFS.pos{hr}.
-  move: (CoeffFromHalfByte (to_uint (nth witness<:W8.t> (SHAKE256 (Bytes66.to_list MLDSA_XOFS.seed{hr}) (MLDSA_XOFS.pos{hr} + 1)) MLDSA_XOFS.pos{hr}) %% 16))
-        (CoeffFromHalfByte (to_uint (nth witness<:W8.t> (SHAKE256 (Bytes66.to_list MLDSA_XOFS.seed{hr}) (MLDSA_XOFS.pos{hr} + 1)) MLDSA_XOFS.pos{hr}) %/ 16)) => o0 o1.
+  pose L := bounded_accepted _rho XOFS_state.pos{hr}.
+  move: (CoeffFromHalfByte (to_uint (nth witness<:W8.t> (SHAKE256 (Bytes66.to_list _rho) (XOFS_state.pos{hr} + 1)) XOFS_state.pos{hr}) %% 16))
+        (CoeffFromHalfByte (to_uint (nth witness<:W8.t> (SHAKE256 (Bytes66.to_list _rho) (XOFS_state.pos{hr} + 1)) XOFS_state.pos{hr}) %/ 16)) => o0 o1.
   case: o0 => [|v0] /=.
   + by case: o1 => [|v1] /=; rewrite ?cats0 ?size_cat /= /#.
   by case: o1 => [|v1] /=; rewrite ?cats0 ?size_cat /= /#.

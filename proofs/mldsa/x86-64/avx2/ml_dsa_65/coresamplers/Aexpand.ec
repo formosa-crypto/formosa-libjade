@@ -5,14 +5,14 @@ import BitChunking.
 
 (* -------------------------------------------------------------------- *)
 from Jasmin require import JWord JModel_x86.
-from JazzEC require import Ml_dsa_65_avx2.
+require import Mldsa65.
 
 require import Agree.
 require import Avx2red.
 require import Prefixarray.
 require import Rejstream.
 require import Warraypack.
-require import Sha3x4. import Shake128x4.
+require import Sha3x4 Shared65. import Sha3x4_65 Shake128x4.
 require import Array2 Array4 Array25 Array32 Array168 Array256 Array848 Array7680.
 require import WArray2 WArray256 WArray848 WArray1024.
 require import XArray256 XArray7680.

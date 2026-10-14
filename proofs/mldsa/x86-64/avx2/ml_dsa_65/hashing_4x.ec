@@ -2,7 +2,7 @@ require import AllCore IntDiv List.
 
 from Jasmin require import JModel_x86.
 
-from JazzEC require import Ml_dsa_65_avx2.
+require import Mldsa65.
 
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 from Spec require import Spec65.

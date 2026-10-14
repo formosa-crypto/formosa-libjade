@@ -25,7 +25,8 @@ require import CircuitBindings.
 
 (* -------------------------------------------------------------------- *)
 from Jasmin require import JModel_x86.
-from JazzEC require import Ml_dsa_65_avx2.
+require import MldsaConstants.
+require Parameters MldsaT.
 
 (* -------------------------------------------------------------------- *)
 require import WArray1024.
@@ -414,52 +415,6 @@ lemma wpoly_set256_alignedE (s : int) (p : wpoly) (w : W256.t) :
 proof. by move=> ?; have := wpoly_set256_aligned (s %/ 4) p w; smt(). qed.
 
 end section.
-
-(* ==================================================================== *)
-lemma mmrP (u v : W256.t) : hoare[M.montgomery_multiply_and_reduce :
-      arg = (u, v)
-    ==>
-      res = W8u32.pack8_t (W8u32.Pack.map2 mmr (W8u32.unpack32 u) (W8u32.unpack32 v))
-  ].
-proof.
-hint +listred.
-proc.
-auto=> &hr [#] 2!->>.
-pose uw (i : int) := u \bits32 i; pose vw (i : int) := v \bits32 i.
-rewrite -[u]pack8K /= -!/~(uw _) -[v]pack8K /= -!/~(vw _).
-rewrite INVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR_E MODULUS_VECTOR_E.
-rewrite /INVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR /=.
-rewrite /MODULUS_VECTOR //=.
-
-pose qinv := W32.of_int INVERSE_OF_MODULUS_MOD_MONTGOMERY_R.
-pose q    := W32.of_int MODULUS.
-
-pose F    := fun k =>
-    (uw k \sx vw k)
-  - (uw k \sx vw k \bits32 0 \sx qinv \bits32 0 \sx q) \bits32 1.
-
-apply: (pack8_eq F (fun i => mmr (uw i) (vw i))).
-move=> i rgi @/F @/mmr /=; move: (uw i) (vw i) => w1 w2.
-by rewrite -shr_shrw 1:// => {F vw uw}; circuit.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma mmr_ll (u v : W256.t) : phoare[M.montgomery_multiply_and_reduce :
-      arg = (u, v)
-    ==>
-      true
-  ] = 1%r.
-proof. by proc; islossless. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma mmrP_ll (u v : W256.t) : phoare[M.montgomery_multiply_and_reduce :
-      arg = (u, v)
-    ==>
-      res = W8u32.pack8_t (W8u32.Pack.map2 mmr (W8u32.unpack32 u) (W8u32.unpack32 v))
-  ] = 1%r.
-proof. by conseq (mmr_ll u v) (mmrP u v). qed.
-
-(* -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 hint simplify W64.of_uintK.
@@ -1215,3 +1170,58 @@ by rewrite -(W32.to_uintK (truncateu32 w)) W2u32.to_uint_truncateu32.
 qed.
 
 hint simplify truncateu32_VMOV_64.
+
+(* ==================================================================== *)
+(* Montgomery multiplication of 8 lanes, in the model of any set        *)
+(* ==================================================================== *)
+abstract theory Avx2redT.
+
+clone import Parameters.ParamsT as P.
+clone import MldsaT.MldsaT as R with theory P <- P.
+
+lemma mmrP (u v : W256.t) : hoare[M.montgomery_multiply_and_reduce :
+      arg = (u, v)
+    ==>
+      res = W8u32.pack8_t (W8u32.Pack.map2 mmr (W8u32.unpack32 u) (W8u32.unpack32 v))
+  ].
+proof.
+hint +listred.
+proc.
+auto=> &hr [#] 2!->>.
+pose uw (i : int) := u \bits32 i; pose vw (i : int) := v \bits32 i.
+rewrite -[u]pack8K /= -!/~(uw _) -[v]pack8K /= -!/~(vw _).
+rewrite INVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR_E MODULUS_VECTOR_E.
+rewrite /INVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR /=.
+rewrite /MODULUS_VECTOR //=.
+
+pose qinv := W32.of_int INVERSE_OF_MODULUS_MOD_MONTGOMERY_R.
+pose q    := W32.of_int MODULUS.
+
+pose F    := fun k =>
+    (uw k \sx vw k)
+  - (uw k \sx vw k \bits32 0 \sx qinv \bits32 0 \sx q) \bits32 1.
+
+apply: (pack8_eq F (fun i => mmr (uw i) (vw i))).
+move=> i rgi @/F @/mmr /=; move: (uw i) (vw i) => w1 w2.
+by rewrite -shr_shrw 1:// => {F vw uw}; circuit.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mmr_ll (u v : W256.t) : phoare[M.montgomery_multiply_and_reduce :
+      arg = (u, v)
+    ==>
+      true
+  ] = 1%r.
+proof. by proc; islossless. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mmrP_ll (u v : W256.t) : phoare[M.montgomery_multiply_and_reduce :
+      arg = (u, v)
+    ==>
+      res = W8u32.pack8_t (W8u32.Pack.map2 mmr (W8u32.unpack32 u) (W8u32.unpack32 v))
+  ] = 1%r.
+proof. by conseq (mmr_ll u v) (mmrP u v). qed.
+
+(* -------------------------------------------------------------------- *)
+
+end Avx2redT.

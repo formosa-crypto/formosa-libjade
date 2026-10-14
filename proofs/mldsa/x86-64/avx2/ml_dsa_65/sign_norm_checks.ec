@@ -2,7 +2,8 @@ require import AllCore List IntDiv RealExp.
 
 from Jasmin require import JModel_x86.
 
-from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Signature
+require import Mldsa65.
+from JazzEC require import Mldsa_65_prelude Signature
                            Common_modular Common_invert_ntt Common_rounding.
 
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
@@ -355,7 +356,7 @@ ecall (polynomial____check_infinity_norm_correct
         (Array256.init (fun i => w0_minus_cs2.[base + i]))
         (gamma2 - Beta)).
 
-auto => |> &hr ??????? ?H H0 H1 H2 H3 ?? rr Ht Hf.
+auto => |> &hr 8? H H0 H1 H2 H3 3? rr Ht Hf.
 case (rr = W64.zero) => Hrr /=.
 + (* norm passed: rr = zero, new_incr = zero, update invariant *)
   do split; 1..3: smt().
@@ -998,7 +999,7 @@ wp.
 ecall (polynomial____check_infinity_norm_correct
         (Array256.init (fun i => signer_response.[base + i]))
         (gamma1 - Beta)).
-auto => |> &hr 15? rr Hpass Hfail.
+auto => |> &hr 16? rr Hpass Hfail.
 case (rr = W64.zero) => Hrr /=.
 + (* norm passed: rr = zero, update invariant *)
   do split; 1..3: by smt().

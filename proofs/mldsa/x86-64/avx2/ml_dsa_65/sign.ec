@@ -2,14 +2,15 @@ require import AllCore List IntDiv RealExp.
 
 from Jasmin require import JModel_x86.
 
-from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Matrix_A Hashing
+require import Mldsa65.
+from JazzEC require import Mldsa_65_prelude Matrix_A Hashing
                            Signature Challenge Row_vector S1 S2 T0 Mask
                            Sign_norm_checks Common_ntt Commitment Polynomial.
 
 require import Column_vector.
 
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
-from Spec require import Spec65.
+from Spec require import Spec65 Symmetric.
 import MLDSA65.
 
 import PolyLVec PolyKVec PolyMat.
@@ -134,7 +135,8 @@ qed.
 (* Correctness of the AVX2 ML-DSA-65 signing function.
    We prove an equiv between:
      - MLDSA(...).sign_derand(sk, m, coins) on the spec side
-     - M.ml_dsa_65_sign(sig, sk, ctx, msg_ptr, msg_size, randomness) on the Jasmin side
+     - M.__sign_internal(sig, sk, ctx_ptr, ctx_size, msg_ptr, msg_size, randomness)
+       on the Jasmin side
 
    The _m parameter is a snapshot of Glob.mem so that memread expressions are stable.
    The precondition connects:
@@ -144,19 +146,19 @@ qed.
    The postcondition connects the output signatures byte-for-byte and confirms
    the Jasmin result code is 0 (success, kappa not exceeded). *)
 
-lemma ml_dsa_65_sign_correct _m :
+lemma sign_internal_correct _m :
     kappa_max = (65535 - lvec) %/ lvec =>
     equiv [ MLDSA(MLDSA_XOFA, MLDSA_XOFS, MLDSA_XOF_SIB, SIB_RO).sign_derand
-            ~ M.ml_dsa_65_sign :
+            ~ M.__sign_internal :
        Glob.mem{2} = _m
     /\ sk{1} = BytesSK.of_list (to_list signing_key{2})
     /\ rnd_to_list coins{1} = to_list randomness{2}
-    /\ W64.to_uint context{2}.[1] <= 255
+    /\ 0 <= context_size{2} <= 255
     /\ 0 <= message_size{2}
-    /\ to_uint context{2}.[0] + to_uint context{2}.[1] < W64.modulus
+    /\ 0 <= context_pointer{2} /\ context_pointer{2} + context_size{2} < W64.modulus
     /\ message_pointer{2} + message_size{2} < W64.modulus
-    /\ m{1} = [W8.zero; truncateu8 context{2}.[1]]
-              ++ memread _m (W64.to_uint context{2}.[0]) (W64.to_uint context{2}.[1])
+    /\ m{1} = [W8.zero; W8.of_int context_size{2}]
+              ++ memread _m context_pointer{2} context_size{2}
               ++ memread _m message_pointer{2} message_size{2}
     /\ valid_s1_bytes (Array640.init (fun i => signing_key{2}.[128 + i]))
     /\ valid_s2_bytes (Array768.init (fun i => signing_key{2}.[768 + i]))
@@ -181,12 +183,12 @@ transitivity {1} { r <@ MLDSA(MLDSA_XOFA, MLDSA_XOFS, MLDSA_XOF_SIB, SIB_RO).sig
     (   Glob.mem{2} = _m
     /\ sk{1} = BytesSK.of_list (to_list signing_key{2})
     /\ rnd_to_list coins{1} = to_list randomness{2}
-    /\ W64.to_uint context{2}.[1] <= 255
+    /\ 0 <= context_size{2} <= 255
     /\ 0 <= message_size{2}
-    /\ to_uint context{2}.[0] + to_uint context{2}.[1] < W64.modulus
+    /\ 0 <= context_pointer{2} /\ context_pointer{2} + context_size{2} < W64.modulus
     /\ message_pointer{2} + message_size{2} < W64.modulus
-    /\ m{1} = [W8.zero; truncateu8 context{2}.[1]]
-              ++ memread _m (W64.to_uint context{2}.[0]) (W64.to_uint context{2}.[1])
+    /\ m{1} = [W8.zero; W8.of_int context_size{2}]
+              ++ memread _m context_pointer{2} context_size{2}
               ++ memread _m message_pointer{2} message_size{2}
     /\ valid_s1_bytes (Array640.init (fun i => signing_key{2}.[128 + i]))
     /\ valid_s2_bytes (Array768.init (fun i => signing_key{2}.[768 + i]))
@@ -197,10 +199,10 @@ transitivity {1} { r <@ MLDSA(MLDSA_XOFA, MLDSA_XOFS, MLDSA_XOF_SIB, SIB_RO).sig
           BytesSig.to_list (oget r{1}.`1) = to_list r{2}.`1 /\
           r{2}.`2 = W64.zero)
     ).
-+ auto => /> &1 &2 ??????H.
-  exists (MLDSA_XOFA.pos{1}) (MLDSA_XOFA.seed{1}) MLDSA_XOFS.pos{1} MLDSA_XOFS.seed{1}.
-  exists MLDSA_XOF_SIB.pos{1} MLDSA_XOF_SIB.seed{1}. print rnd_to_list.
-  exists coins{1} (zero :: truncateu8 context{2}.[1] :: (memread _m (to_uint context{2}.[0]) (to_uint context{2}.[1]) ++ memread _m message_pointer{2} message_size{2})).
++ auto => /> &1 &2 8? H.
+  exists (XOFA_state.pos{1}) (XOFA_state.seed{1}) XOFSIB_state.pos{1} XOFSIB_state.seed{1}.
+  exists XOFS_state.pos{1} XOFS_state.seed{1}.
+  exists coins{1} (zero :: W8.of_int context_size{2} :: (memread _m context_pointer{2} context_size{2} ++ memread _m message_pointer{2} message_size{2})).
   exists (BytesSK.of_list (to_list signing_key{2})).
   simplify;split; last by smt().
   by apply s2_valid_commutes=> /#.
@@ -210,12 +212,12 @@ transitivity {1} { r <@ MLDSA(MLDSA_XOFA, MLDSA_XOFS, MLDSA_XOF_SIB, SIB_RO).sig
 call(:  Glob.mem{2} = _m
     /\ sk{1} = BytesSK.of_list (to_list signing_key{2})
     /\ rnd_to_list coins{1} = to_list randomness{2}
-    /\ W64.to_uint context{2}.[1] <= 255
+    /\ 0 <= context_size{2} <= 255
     /\ 0 <= message_size{2}
-    /\ to_uint context{2}.[0] + to_uint context{2}.[1] < W64.modulus
+    /\ 0 <= context_pointer{2} /\ context_pointer{2} + context_size{2} < W64.modulus
     /\ message_pointer{2} + message_size{2} < W64.modulus
-    /\ m{1} = [W8.zero; truncateu8 context{2}.[1]]
-              ++ memread _m (W64.to_uint context{2}.[0]) (W64.to_uint context{2}.[1])
+    /\ m{1} = [W8.zero; W8.of_int context_size{2}]
+              ++ memread _m context_pointer{2} context_size{2}
               ++ memread _m message_pointer{2} message_size{2}
     /\ valid_s1_bytes (Array640.init (fun i => signing_key{2}.[128 + i]))
     /\ valid_s2_bytes (Array768.init (fun i => signing_key{2}.[768 + i]))
@@ -232,16 +234,6 @@ conseq (: _ ==>
   (zh{1} <> None =>
    BytesSig.to_list sigma{1} = to_list signature{2} /\ result{2} = zero)); 1: by smt().
    
-(* Jasmin: compute context_pointer and context_size from context array *)
-sp 0 4.
-
-(* Jasmin: the context-size guard must hold (given by precondition) *)
-rcondt {2} ^if; 1: by auto => /> /#.
-
-(* Inline the Jasmin __sign_internal body *)
-inline {2} M.__sign_internal.
-
-sp 0 7.
 seq 4 19 : #pre; 1: by auto.
 
 (* ── Step 1: SkDecode (spec only) ────────────────────────────────────────
@@ -272,7 +264,7 @@ sp;seq 1 1 : (#pre /\
     wpolymat_urng (mat_unflatten256 matrix_A{2}) q).
 + ecall{1} (ExpandA_correct rho{1}).
   ecall{2} (matrix_A_correct seed_for_matrix_A{2}).
-  auto => |> &1 &2 H ??????rr  -> Hr;congr; rewrite Bytes32.tP => k kb.
+  auto => |> &1 &2 H 8? rr -> Hr;congr; rewrite Bytes32.tP => k kb.
   by rewrite !Bytes32.get_of_list // get_to_list initiE 1:/# /= nth_take 1,2:/# /= BytesSK.get_of_list 1:/# get_to_list.
 
 (* ── Step 4: mu = H_mu tr m (spec simple) ───────────────────────────────
@@ -296,10 +288,10 @@ seq 0 1 : (#pre /\
   + rewrite size_memread; smt(W64.to_uint_cmp). 
   + rewrite size_memread; smt(W64.to_uint_cmp). 
   + rewrite size_memread; smt(W64.to_uint_cmp). 
-  move => ????; congr;congr;congr.
+  move => 4?; congr;congr;congr.
   + rewrite Bytes64.tP => k kb.
     by rewrite !Bytes64.get_of_list // get_to_list initiE 1:/# /= nth_take 1,2:/# nth_drop 1,2:/# BytesSK.of_listK ?size_to_list /#.
-  by rewrite size_memread; smt(W64.to_uint_cmp). 
+  by rewrite size_memread 1:/# /truncateu8 W64.of_uintK (pmod_small _ W64.modulus) //; smt().
 
 (* ── Step 6: rhopp = H_rhopp _K coins mu (spec simple) ─────────────────
    Spec: rhopp <- H_rhopp _K coins mu *)
@@ -333,7 +325,7 @@ seq 0 1 : (#pre /\
     lifts_wpolylvec (lvec_unflatten256 s1{2}) = s1{1} /\
     wpolylvec_srng (lvec_unflatten256 s1{2}) Eta Eta).
 + ecall{2} (s1_decode_ph (Array640.init (fun i => signing_key{2}.[128 + i]))).
-  auto => |> &1 &2 8? rr Hfun Hrng.
+  auto => |> &1 &2 10? rr Hfun Hrng.
   + rewrite Hfun tP => k kb.
     rewrite initiE 1:/# /= mapiE 1:/# /=;do congr.
     apply (eq_from_nth witness).
@@ -347,7 +339,7 @@ seq 0 1 : (#pre /\
     lifts_wpolykvec (kvec_unflatten256 s2{2}) = s2{1} /\
     wpolykvec_srng (kvec_unflatten256 s2{2}) Eta Eta).
 + ecall{2} (s2_decode_ph (Array768.init (fun i => signing_key{2}.[768 + i]))).
-  auto => |> &1 &2 10? rr Hfun Hrng.
+  auto => |> &1 &2 12? rr Hfun Hrng.
   + rewrite Hfun tP => k kb.
     rewrite initiE 1:/# /= mapiE 1:/# /=;do congr.
     apply (eq_from_nth witness).
@@ -362,7 +354,7 @@ seq 0 1 : (#pre /\
     lifts_wpolykvec (kvec_unflatten256 t0{2}) = t0{1} /\
     wpolykvec_srng (kvec_unflatten256 t0{2}) (dpow-1) dpow).
 + ecall{2} (t0_decode_ph (Array2496.init (fun i => signing_key{2}.[1536 + i]))).
-  auto => |> &1 &2 12? rr Hfun Hrng.
+  auto => |> &1 &2 14? rr Hfun Hrng.
   + rewrite Hfun tP => k kb.
     rewrite initiE 1:/# /= mapiE 1:/# /=;do congr; last 2 by smt().
     apply (eq_from_nth witness).
@@ -437,8 +429,8 @@ liftu_wpolymat (mat_unflatten256 matrix_A{2}) = _A{1} /\
     by rewrite minus_one /= /(`<<`) /(`|>>`) /= ib /= sarE initiE 1:/# /= nth_one /#.
   (* success: zh <> None, so last_norm_check_result = W64.zero *)
   wp; ecall (signature_encode commitment_hash{2} signer_response{2} hint_0{2}).
-  auto => |> &1 &2 ?????????????; do split; 1..6:smt().
-  + move => ?????? rr1 rr2 ?.
+  auto => |> &1 &2 13?; do split; 1..6:smt().
+  + move => 6? rr1 rr2 ?.
     have -> : last_norm_check_result{2} = W64.zero by smt().
     split; 1: by rewrite wordP /= minus_one /= /(`<<`) /(`|>>`) /= sarE negb_forall; exists 0 => /=.
     rewrite wordP => i ib.
@@ -502,13 +494,13 @@ while (
    + conseq (_: true ==> mask_as_ntt{2} = mask{2}); 1: smt().
      sp 0 1.
      while{2} (0 <= j{2} <= 5120 /\ j{2} %% 32 = 0 /\
-               (forall i, 0 <= i < j{2} %/ w1_bits => mask_as_ntt{2}.[i] = mask{2}.[i]))
+               (forall i, 0 <= i < j{2} %/ 4 => mask_as_ntt{2}.[i] = mask{2}.[i]))
               (5120 - j{2}).
      + move => _ z; auto => |> &hr Hj_lo Hj_hi Hj_mod Hcopied Hguard.
        do split; 1,2,3,5: smt().
        move => i Hi_lo Hi_hi; rewrite Array1280.initiE 1:/# /=.
        rewrite get32_set256_direct_eq 1,2,3,4:/#.
-       case (j{hr} %/ w1_bits <= i < j{hr} %/ w1_bits + 8) => Hi_region.
+       case (j{hr} %/ 4 <= i < j{hr} %/ 4 + 8) => Hi_region.
        + rewrite get256_direct_init32_bits32 1,2,3,4:/# /= /#.
        rewrite get32_init32 1:/# /=; apply Hcopied; smt().
      skip; move => &1 &2 Hj0; split; 1: smt().
@@ -780,7 +772,7 @@ seq 1 0 : #pre; 1: by auto.
                    w0_minus_cs2_plus_ct0{2} w1{2} hint_0{2}
                    infinity_norm_check_result{2}).
    auto => |> &1 &2 *;smt().  
- auto => |> &1 &2 ??????????????????????? Hh0 ??Hz.
+ auto => |> &1 &2 23? Hh0 ??Hz.
  (* Instantiate the kappa-counter machine-arithmetic helper. *)
  have Hkbu :=
    kappa_bit_update kappa{1} kappa_exceeded{2} domain_separator_for_mask{2}

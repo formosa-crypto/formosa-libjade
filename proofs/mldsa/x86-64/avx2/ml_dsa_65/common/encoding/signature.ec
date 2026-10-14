@@ -2,7 +2,8 @@ require import AllCore List IntDiv RealExp StdBigop.
 
 from Jasmin require import JModel_x86.
 
-from JazzEC require import Ml_dsa_65_avx2 Mldsa_65_prelude Gamma1.
+require import Mldsa65.
+from JazzEC require import Mldsa_65_prelude Gamma1.
 from JazzEC require import Array256 Array61 Array1536 Array3309.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 from Spec require import Spec65.

@@ -2,39 +2,32 @@
   This theory connects the extracted implementation code to the
   machine-level specification of the NTT.
 *)
-
-(* -------------------------------------------------------------------- *)
 require import AllCore CoreUtils List Ring IntDiv BitEncoding.
 require import StdRing StdOrder.
+from Jasmin require import JWord JArray.
+require import JArrayExtra.
+require import CircuitBindings.
+from Jasmin require import JModel_x86.
+require import MldsaConstants.
+require Parameters MldsaT.
+require import WArray1024.
+require import Array4 Array8 Array16 Array256.
+require import XArray256.
+require import Nttzetas Nttspec Nttlogspec.
+require import Avx2red Listred.
+
+abstract theory FnttcorrectT.
+
+clone import Parameters.ParamsT as P.
+clone import MldsaT.MldsaT as R with theory P <- P.
+clone import Avx2red.Avx2redT as AR with theory P <= P, theory R <= R.
+
+(* -------------------------------------------------------------------- *)
 
 import BitChunking.
 
 (* -------------------------------------------------------------------- *)
-from Jasmin require import JWord JArray.
-
-require import JArrayExtra.
-require import CircuitBindings.
-
-(* -------------------------------------------------------------------- *)
-from Jasmin require import JModel_x86.
-from JazzEC require import Ml_dsa_65_avx2.
-
-(* -------------------------------------------------------------------- *)
-require import WArray1024.
-require import Array4 Array8 Array16 Array256.
-require import XArray256.
-
-(* -------------------------------------------------------------------- *)
 type wpoly = W32.t Array256.t.
-
-(* -------------------------------------------------------------------- *)
-require import Nttzetas Nttspec Nttlogspec.
-
-(* ==================================================================== *)
-
-(* -------------------------------------------------------------------- *)
-require import Avx2red Listred.
-
 
 (* -------------------------------------------------------------------- *)
 lemma NTT_layer0_bf (p : wpoly) (start : int) (z : W256.t) :
@@ -872,3 +865,5 @@ exlim polynomial => {q} q; seq 1: (polynomial = reduce_tree p_ 0).
 - by call (polynomial__ntt_at_layer_0P q); auto=> &hr |>.
 done.
 qed.
+
+end FnttcorrectT.

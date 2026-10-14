@@ -15,24 +15,27 @@
   statement: the 2^-32 of the pointwise step and the 2^32 of the
   inverse transform cancel exactly.
 *)
-
-(* -------------------------------------------------------------------- *)
 require import AllCore CoreUtils List Ring IntDiv.
 require import StdRing StdOrder.
-
-(* -------------------------------------------------------------------- *)
 from Jasmin require import JWord JArray JModel_x86.
-from JazzEC require import Ml_dsa_65_avx2.
-
-(* -------------------------------------------------------------------- *)
+require import MldsaConstants.
+require Parameters MldsaT.
 require import Array256.
-
-(* -------------------------------------------------------------------- *)
 require import Nttlogspec Nttspec Nttzetas Nttalg Fnttalg Inttalg.
 require import Crspoly.
-(*---*) import Zq ZqP.
 require import Nttpoly.
 require import Fnttcorrect Inttcorrect Pwmulcorrect.
+
+abstract theory PwmultestT.
+
+clone import Parameters.ParamsT as P.
+clone import MldsaT.MldsaT as R with theory P <- P.
+clone import Fnttcorrect.FnttcorrectT as FC with theory P <= P, theory R <= R.
+clone import Inttcorrect.InttcorrectT as IC with theory P <= P, theory R <= R.
+clone import Pwmulcorrect.PwmulcorrectT as PC with theory P <= P, theory R <= R.
+
+(* -------------------------------------------------------------------- *)
+(*---*) import Zq ZqP.
 
 (* ==================================================================== *)
 (* The multiplication pipeline, calling the AVX2 routines               *)
@@ -97,3 +100,5 @@ proof.
 move=> hba hbb.
 by apply (mul_polyP a_ b_ q).
 qed.
+
+end PwmultestT.
