@@ -1,0 +1,266 @@
+require import Real FMap FSet Int Distr Perms List.
+require PROM IterProc StdOrder.
+import StdOrder.IntOrder.
+
+
+clone include PROM.FullRO.
+axiom dout_ll x : is_lossless (dout x).
+
+type s_in_t, s_out_t.
+module type Sampler(R : RO) = {
+  proc sample(x : s_in_t) : s_out_t { R.get }
+}.
+
+module type ROPair = {
+  include RO [init, get]
+  proc sample(x : s_in_t) : unit
+  
+  (* force a sampling to happen eagerly regardless of
+     whether the pair is lazy or eager.
+     This is technically not needed, as the adversary
+     should be able to compute this themself: by calling
+     the sampler S directly with RO.get. This is not
+     allowed in practice because EasyCrypt requires a
+     constraint { -S } on the adversary (which intuitively
+     should always be provable, because S has no global
+     variables). *)
+  proc sample_force(x : s_in_t) : s_out_t
+}.
+
+module ROS(S : Sampler) : ROPair = {
+  include RO [-sample]
+  proc sample(x) = { S(RO).sample(x); }
+  proc sample_force = S(RO).sample
+}. 
+
+module LROS(S : Sampler) : ROPair = {
+  include RO [-sample]
+  proc sample(x : s_in_t) = {}
+  proc sample_force = S(RO).sample
+}.
+
+type input, output.
+
+module type Distinguisher (RO : ROPair) = {
+  proc distinguish(x : input) : output
+}.
+
+module Main (D : Distinguisher, RO : ROPair) = {
+  proc distinguish(x : input) = {
+    var r;
+    RO.init();
+    r <@ D(RO).distinguish(x);
+    return r;
+  }
+}.
+
+module Empty = { }.
+
+section.
+(* [S] is stateless: its globals are included in those of [Empty]. *)
+declare module S <: Sampler {+Empty}.
+declare axiom S_ll : islossless S(RO).sample.
+declare axiom glob_S_tt (s1 s2 : glob S) : s1 = s2. 
+
+local clone include IterProc with
+  type t <- s_in_t.
+
+declare module D <: Distinguisher {-RO, -S}.
+
+local module RRO : ROPair = {
+  include ROS(S) [-init,sample]
+  var l : s_in_t list
+
+  proc init() = {
+    l <- [];
+    RO.m <- empty;
+  }
+
+  proc sample(x) = {
+    l <- x :: l;
+    ROS(S).sample(x);
+  }
+
+  module I = {
+    proc f = ROS(S).sample
+  }
+
+  proc resample() = {
+    Iter(I).iter(l);
+  }
+}.
+
+local module LRRO : ROPair = {
+  include RRO [-sample]
+  proc sample(x) = {
+    RRO.l <- x :: RRO.l;
+  }
+}.
+
+local lemma resample_ll : islossless RRO.resample.
+proof.
+proc. call (iter_ll RRO.I) => //.
+islossless; exact S_ll.
+qed.
+
+(* This module is a proof artifact. It is required because
+   swapping statements may only deal with global variables. *)
+local module M = {
+  var x : in_t
+  var r : out_t
+  var y : s_in_t
+  
+  proc get() = {
+    r <@ RO.get(x);
+  }
+  
+  proc sample() = {
+    ROS(S).sample(y);
+  }
+}.
+
+local lemma eager_get_sample : eager [
+  M.get();, ROS(S).sample ~ ROS(S).sample, M.get(); :
+  ={M.r, M.x, arg, RO.m} ==> ={M.r, RO.m} ].
+proof.
+eager proc.
+eager call (: ={arg, M.x, M.r, RO.m} ==> ={M.x, M.r, RO.m}) => //.
+eager proc (={M.x, M.r, RO.m}); 1,2: smt(glob_S_tt); 1,3,4: by sim.
+eager proc. inline.
+case (M.x{2} = x{2}); first by auto; smt(mem_set). 
+swap{1} 5 -2. swap{2} [4..5] -3.
+by auto => />; smt(set_setE get_set_neqE).
+qed.
+
+local lemma eager_get : eager [
+  RRO.resample();, RRO.get ~ RRO.get, RRO.resample(); :
+  ={arg, RO.m, RRO.l} ==> ={res, RO.m, RRO.l} ]. 
+proof.
+proc*.
+transitivity{1} { M.r <- witness; M.x <- x; RRO.resample(); M.get(); r <- M.r; }
+  (={x, RO.m, RRO.l} ==> ={r, RO.m, RRO.l})
+  (={x, RO.m, RRO.l} ==> ={r, RO.m, RRO.l}); 1,2: smt().
+- inline M.get. sim />. smt(glob_S_tt).
+transitivity{2} { M.r <- witness; M.x <- x; M.get(); RRO.resample(); r <- M.r; }
+  (={x, RO.m, RRO.l} ==> ={r, RO.m, RRO.l})
+  (={x, RO.m, RRO.l} ==> ={r, RO.m, RRO.l}); 1,2: smt(); last first.
+- inline M.get. sim />. smt(glob_S_tt).
+inline resample iter.
+swap{2} ^l<- -1. sp. wp.
+symmetry.
+eager while (={M.x, M.r, RO.m, RRO.l, l}) => //.
+- swap{2} ^l<- 1. wp.
+  conseq />.
+  by eager call eager_get_sample. 
+- move => &2 b.
+  by inline*; auto => />.
+- wp. call (: ={RO.m}); 1: by sim; smt(glob_S_tt).
+  by auto => />.
+- wp. call (: ={RO.m}); 1: by sim; smt(glob_S_tt).
+  by auto => /> &1 &2; apply glob_S_tt.
+sim />. 
+qed.
+
+local lemma eager_sample : eager [
+  RRO.resample();, RRO.sample ~ LRRO.sample, RRO.resample(); :
+  ={arg, RO.m, RRO.l} ==> ={res, RO.m, RRO.l} ]. 
+proof.
+eager proc.
+inline RRO.resample.
+swap{1} ^<- 1. wp.
+transitivity{1} { Iter(RRO.I).iters(RRO.l, [x]); }
+  (={x, RO.m, RRO.l} ==> ={x, RO.m, RRO.l})
+  (={x, RO.m, RRO.l} ==> ={x, RO.m} /\ (x :: RRO.l){1} = RRO.l{2}); 1,2: smt().
+- conseq />. inline iters. swap{2} ^<-{2} 1. sp.
+  seq 1 1: (={RO.m, x}); 1: by sim; smt(glob_S_tt).
+  inline{2} iter. unroll{2} ^while.
+  rcondf{2} ^while.
+  - move => &m; sp. if => //. 
+    wp. by conseq />. 
+  sp. rcondt{2} ^if => //.
+  wp. call(: ={RO.m}); 1: by sim; smt(glob_S_tt).
+  skip; smt(glob_S_tt).
+sp.
+conseq (: ={x, RO.m} /\ (x :: RRO.l){1} = RRO.l{2} ==> ={RO.m}); 1,2: by auto.
+call (iters_perm RRO.I); last first.
+- auto => /> &1 &2.
+  rewrite perm_catCl cat1s.
+  by split; [ exact perm_eq_refl | exact glob_S_tt ].
+proc.
+conseq (: ={RO.m}); 1: smt(glob_S_tt).
+transitivity{1} { M.y <- t1; M.sample(); ROS(S).sample(t2); }
+  (={t1, t2, RO.m} ==> ={RO.m})
+  (={t1, t2, RO.m} ==> ={RO.m}); 1,2: smt().
+- inline M.sample. sim. smt(glob_S_tt).
+transitivity{2} { M.y <- t1; ROS(S).sample(t2); M.sample(); }
+  (={t1, t2, RO.m} ==> ={RO.m})
+  (={t1, t2, RO.m} ==> ={RO.m}); 1,2: smt(); last first.
+- inline M.sample. sim />. smt(glob_S_tt).
+sp. eager call (: ={arg, M.y,RO.m} ==> ={RO.m}) => //.
+eager proc.
+eager call (: ={arg, M.y, RO.m} ==> ={RO.m}) => //.
+eager proc (={M.y, RO.m}); 1,2: smt(glob_S_tt); 3,4: by sim.
+- sim. smt(glob_S_tt). 
+proc*. conseq />.
+transitivity{1} { M.r <- witness; M.x <- x; ROS(S).sample(M.y); M.get(); r <- M.r; }
+  (={x, M.y, RO.m} ==> ={r, RO.m})
+  (={x, M.y, RO.m} ==> ={r, RO.m}); 1,2: smt().
++ inline M. sp. sim. smt(glob_S_tt).
+transitivity{2} { M.r <- witness; M.x <- x; M.get(); ROS(S).sample(M.y); r <- M.r; }
+  (={x, M.y, RO.m} ==> ={r, RO.m})
+  (={x, M.y, RO.m} ==> ={r, RO.m}); 1,2: smt(); last first.
++ inline M. sp. sim. smt(glob_S_tt).
+sp. wp. symmetry. by eager call eager_get_sample. 
+qed.
+
+local lemma eager_sample_force : eager[
+  RRO.resample();, RRO.sample_force ~ LRRO.sample_force, RRO.resample(); :
+  ={arg, RO.m, RRO.l} ==> ={res, RO.m, RRO.l} ].
+proof.
+eager proc (={RO.m, RRO.l}) => />; 4,5: by sim.
+- smt(glob_S_tt).
+- sim; smt(glob_S_tt).
+exact eager_get.
+qed.
+
+local lemma eager_D :
+  eager [ RRO.resample();, D(RRO).distinguish ~
+          D(LRRO).distinguish, RRO.resample(); :
+        ={x, RO.m, RRO.l, glob D} ==> ={res, RO.m, RRO.l, glob D} ].
+proof.
+eager proc (={RO.m, RRO.l}) => //; try by sim.
+- sim. smt(glob_S_tt).
+- eager proc; inline{2} *; rcondf{2} ^while; auto=> />.
+  by call{1} resample_ll.
+- by apply eager_get.
+- by apply eager_sample.
+  sim. smt(glob_S_tt).
+- by apply eager_sample_force. 
+sim. smt(glob_S_tt). 
+qed.
+
+equiv lazy_eager :
+  Main(D, ROS(S)).distinguish ~ Main(D, LROS(S)).distinguish :
+  ={arg, glob D} ==> ={res, glob D}.
+proof.
+proc.
+inline init. sp.
+transitivity{1} { RRO.l <- []; RRO.resample(); r <@ D(RRO).distinguish(x); }
+  (={x, glob D, RO.m} ==> ={r, glob D}) 
+  (={x, glob D, RO.m} ==> ={r, glob D}); 1,2: smt(). 
+- call (: ={RO.m}); last first; 2,3: (by sim); 3: by sim; smt(glob_S_tt).
+  - inline resample iter. rcondf{2} ^while; 1: by auto.
+    by auto. 
+  proc*. inline{2} RRO.sample.
+  call (: ={RO.m}); 1: by sim; smt(glob_S_tt).
+  by auto; smt(glob_S_tt). 
+transitivity{2} { RRO.l <- []; r <@ D(LRRO).distinguish(x); RRO.resample(); }
+  (={x, glob D, RO.m} ==> ={r, glob D}) 
+  (={x, glob D, RO.m} ==> ={r, glob D}); 1,2: smt().
+- sp. by eager call eager_D.
+kill{1} ^ <@{2}; 1: by call resample_ll.
+call (: ={RO.m}); 1,2,3: by sim.
+- sim; smt(glob_S_tt).
+by auto.
+qed.
+end section.

@@ -183,6 +183,30 @@ rewrite -map_comp (_ : map _ cs = cs).
 rewrite /cs BitChunking.chunkK ?BytesToBitsK //; rewrite size_BytesToBits hsz; apply dvdz_mull; apply dvdzz.
 qed.
 
+lemma SimpleBitUnpackK (v : W8.t list) (b : int) :
+  0 < b => 2 ^ (ilog 2 b + 1) = b + 1 => b < q =>
+  8 * size v = n * (ilog 2 b + 1) =>
+  SimpleBitPack (SimpleBitUnpack v b) b = v.
+proof.
+move=> hb hpow hq hsz; rewrite /SimpleBitPack /SimpleBitUnpack /=.
+have hc : 0 < ilog 2 b + 1 by smt(ilog_ge0).
+pose cs := BitChunking.chunk (ilog 2 b + 1) (BytesToBits v).
+have hcs : size cs = n by rewrite /cs BitChunking.size_chunk // size_BytesToBits hsz mulzK 1:/#.
+have -> : Array256.to_list (Array256.init (nth witness (map (fun (co : bool list) => incoeff (BitsToInteger co)) cs))) =
+          map (fun (co : bool list) => incoeff (BitsToInteger co)) cs.
++ apply (eq_from_nth witness); 1: by rewrite Array256.size_to_list size_map hcs.
+  by rewrite Array256.size_to_list => i hi; rewrite Array256.get_to_list Array256.initiE.
+have hmap : forall co, co \in cs => IntegerToBits (asint (incoeff (BitsToInteger co))) (ilog 2 b + 1) = co.
++ move=> co hco; have hs := BitChunking.in_chunk_size _ _ _ hc hco.
+  rewrite /IntegerToBits /BitsToInteger incoeffK modz_small; 1: smt(BS2Int.bs2int_ge0 BS2Int.bs2int_le2Xs).
+  by rewrite -hs BS2Int.bs2intK.
+rewrite -map_comp (_ : map _ cs = cs).
++ apply (eq_from_nth witness); rewrite ?size_map // => i hi.
+  have hi' : 0 <= i < size cs by rewrite /cs BitChunking.size_chunk //; smt(size_iota).
+  by rewrite (nth_map witness) // /(\o) /=; apply hmap; exact mem_nth.
+rewrite /cs BitChunking.chunkK ?BytesToBitsK //; rewrite size_BytesToBits hsz; apply dvdz_mull; apply dvdzz.
+qed.
+
 (* Validity predicate for byte-encoded eta-bounded polynomials at the spec level.
    Each (ilog 2 (2*Eta) + 1)-bit chunk of v represents an integer in [0, 2*Eta],
    matching valid_eta_bytes from the implementation proofs. *)

@@ -37,7 +37,7 @@ axiom param_sets :
        (49,192,19,32,6,5,4,55);
        (60,256,19,32,8,7,2,75) ].
 
-axiom kappa_max_bnd : 0 <= kappa_max /\ kappa_max * lvec <= 65536.
+axiom kappa_max_bnd : 0 < kappa_max /\ kappa_max * lvec <= 65536.
 
 (* bit widths of the encoded coefficients: eta-bounded, gamma1-bounded *)
 (* and the high bits w1                                                 *)
