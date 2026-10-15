@@ -4,7 +4,7 @@
 (* coefficients; plus the XOF-slice and staged four-lane layers.        *)
 (*                                                                      *)
 (* Instances: AexpandT (3-byte candidates, align 3, coeff = idfun) and  *)
-(* ErrorSamplerEta4T (nibbles, align 1, coeff = 4 - z).                 *)
+(* ErrorSamplerT (nibbles, align 1, coeff = Eta - sred z).              *)
 (* -------------------------------------------------------------------- *)
 require import AllCore List IntDiv IntMin BitEncoding.
 import BitChunking.

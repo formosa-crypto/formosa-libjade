@@ -1,6 +1,6 @@
 require import AllCore.
-require Spec65 Mldsa65I BaseT PreludeT KeygenT SignT VerifyT.
-require Eta4T ErrorSamplerEta4T Gamma1Bits20T W1Bits4T.
+require Spec65 Mldsa65I BaseT PreludeT ErrorSamplerT KeygenT SignT VerifyT.
+require Eta4T Gamma1Bits20T W1Bits4T.
 from JazzEC require Commitment_hash.
 
 (* The generic theories of key generation, signing and verification, at
@@ -30,8 +30,8 @@ clone W1Bits4T.W1Bits4T as W1Bits4_65 with
   theory PR <- Prelude65
 proof *.
 
-(* the variant of the error-vector sampler: Eta = 4 *)
-clone ErrorSamplerEta4T.ErrorSamplerEta4T as ErrorSamplerEta4_65 with
+(* the four-lane core of the error-vector sampler *)
+clone ErrorSamplerT.ErrorSamplerT as ErrorSampler65 with
   theory B <- Base65,
   theory PR <- Prelude65
 proof *.
@@ -41,7 +41,7 @@ clone KeygenT.KeygenT as Keygen65 with
   theory B <- Base65,
   theory PR <- Prelude65,
   theory EP <- Eta4_65.EP,
-  theory EV <- ErrorSamplerEta4_65.EV
+  theory EV <- ErrorSampler65.EV
 proof *.
 
 clone SignT.SignT as Sign65 with

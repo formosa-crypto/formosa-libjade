@@ -1,7 +1,7 @@
 (* -------------------------------------------------------------------- *)
 (* Agreement of a polynomial with a prefix of an accepted-coefficient   *)
 (* stream: the sampler loop invariants of AexpandT and the error       *)
-(* samplers (ErrorSamplerEta4T).                                       *)
+(* sampler (ErrorSamplerT).                                            *)
 (* -------------------------------------------------------------------- *)
 require import AllCore List.
 

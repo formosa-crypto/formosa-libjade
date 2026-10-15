@@ -966,15 +966,15 @@ by rewrite W8u8.of_int_bits8_div //= divz1.
 qed.
 
 (* -------------------------------------------------------------------- *)
-(* signed byte-to-dword extension of a 4 - z coefficient byte           *)
-lemma MOVSX_u32s8_subE (z : W8.t) :
-  to_uint z < 128 =>
-  MOVSX_u32s8 (W8.of_int 4 - z) = W32.of_int 4 - zeroextu32 z.
+(* signed byte-to-dword extension of an e - z coefficient byte           *)
+lemma MOVSX_u32s8_subE (e : int) (z : W8.t) :
+  0 <= e < 128 => to_uint z < 128 =>
+  MOVSX_u32s8 (W8.of_int e - z) = W32.of_int e - zeroextu32 z.
 proof.
-move=> hz; rewrite /MOVSX_u32s8.
-have -> : W8.of_int 4 - z = W8.of_int (4 - to_uint z).
+move=> he hz; rewrite /MOVSX_u32s8.
+have -> : W8.of_int e - z = W8.of_int (e - to_uint z).
 - by rewrite -{1}(W8.to_uintK z); ring.
-have -> : to_sint (W8.of_int (4 - to_uint z)) = 4 - to_uint z.
+have -> : to_sint (W8.of_int (e - to_uint z)) = e - to_uint z.
 - rewrite /to_sint /smod W8.of_uintK.
   by smt(W8.to_uint_cmp).
 rewrite /zeroextu32.
@@ -988,13 +988,13 @@ lemma VPMOVSX_8u8_8u32_to_listE (w : W64.t) :
 proof. by rewrite /VPMOVSX_8u8_8u32 /=. qed.
 
 (* -------------------------------------------------------------------- *)
-(* acceptance as the sign of the z - 9 comparison byte                  *)
-lemma msb_sub9E (z : W8.t) :
-  to_uint z < 16 =>
-  W8.msb (z - W8.of_int 9) = (to_uint z < 9).
+(* acceptance as the sign of the z - k comparison byte                  *)
+lemma msb_subE (z : W8.t) (k : int) :
+  to_uint z < 16 => 0 <= k <= 16 =>
+  W8.msb (z - W8.of_int k) = (to_uint z < k).
 proof.
-move=> hz; rewrite /msb.
-have -> : z - W8.of_int 9 = W8.of_int (to_uint z - 9).
+move=> hz hk; rewrite /msb.
+have -> : z - W8.of_int k = W8.of_int (to_uint z - k).
 - by rewrite -{1}(W8.to_uintK z); ring.
 rewrite W8.of_uintK.
 by smt(W8.to_uint_cmp).
@@ -1101,9 +1101,19 @@ rewrite /range -iotaredE /=.
 by rewrite ?W128.get_out //=.
 qed.
 
-lemma VPSUB_bcast4_pack32E (b00 b01 b02 b03 b04 b05 b06 b07 b08 b09 b10 b11 b12 b13 b14 b15 b16 b17 b18 b19 b20 b21 b22 b23 b24 b25 b26 b27 b28 b29 b30 b31 : W8.t) :
-  VPSUB_32u8 (VPBROADCAST_32u8 (W8.of_int 4)) (W32u8.pack32 [b00; b01; b02; b03; b04; b05; b06; b07; b08; b09; b10; b11; b12; b13; b14; b15; b16; b17; b18; b19; b20; b21; b22; b23; b24; b25; b26; b27; b28; b29; b30; b31])
-  = W32u8.pack32 [W8.of_int 4 - b00; W8.of_int 4 - b01; W8.of_int 4 - b02; W8.of_int 4 - b03; W8.of_int 4 - b04; W8.of_int 4 - b05; W8.of_int 4 - b06; W8.of_int 4 - b07; W8.of_int 4 - b08; W8.of_int 4 - b09; W8.of_int 4 - b10; W8.of_int 4 - b11; W8.of_int 4 - b12; W8.of_int 4 - b13; W8.of_int 4 - b14; W8.of_int 4 - b15; W8.of_int 4 - b16; W8.of_int 4 - b17; W8.of_int 4 - b18; W8.of_int 4 - b19; W8.of_int 4 - b20; W8.of_int 4 - b21; W8.of_int 4 - b22; W8.of_int 4 - b23; W8.of_int 4 - b24; W8.of_int 4 - b25; W8.of_int 4 - b26; W8.of_int 4 - b27; W8.of_int 4 - b28; W8.of_int 4 - b29; W8.of_int 4 - b30; W8.of_int 4 - b31].
+lemma VPSUB_bcast_pack32E (c
+    b00 b01 b02 b03 b04 b05 b06 b07 b08 b09 b10 b11 b12 b13 b14 b15
+    b16 b17 b18 b19 b20 b21 b22 b23 b24 b25 b26 b27 b28 b29 b30 b31 : W8.t) :
+  VPSUB_32u8 (VPBROADCAST_32u8 c) (W32u8.pack32 [
+      b00; b01; b02; b03; b04; b05; b06; b07;
+      b08; b09; b10; b11; b12; b13; b14; b15;
+      b16; b17; b18; b19; b20; b21; b22; b23;
+      b24; b25; b26; b27; b28; b29; b30; b31])
+  = W32u8.pack32 [
+      c - b00; c - b01; c - b02; c - b03; c - b04; c - b05; c - b06; c - b07;
+      c - b08; c - b09; c - b10; c - b11; c - b12; c - b13; c - b14; c - b15;
+      c - b16; c - b17; c - b18; c - b19; c - b20; c - b21; c - b22; c - b23;
+      c - b24; c - b25; c - b26; c - b27; c - b28; c - b29; c - b30; c - b31].
 proof. by rewrite VPBROADCAST_32u8_pack32E VPSUB_32u8E /=. qed.
 
 

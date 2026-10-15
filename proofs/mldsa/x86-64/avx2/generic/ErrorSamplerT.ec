@@ -4,26 +4,29 @@ from Jasmin require import JWord JModel_x86.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 from CryptoSpecs require import Keccak1600_Spec.
 require import MldsaConstants Agree Avx2red Errshuffle Prefixarray Rejstream Warraypack.
+require import CircuitBindings Bindings JWordExtra.
 require import Array4 Array25 Array64 Array136 Array256 Array272 Array2048.
 require import WArray272 WArray1024 WArray2048.
 require BaseT PreludeT ErrorVectorsT Sha3x4.
 
 (* -------------------------------------------------------------------- *)
-(* The four-lane core of the sampler of s1 and s2, for the sets where   *)
-(* Eta = 4 (ML-DSA-65): each lane is the RejBoundedPoly of its SHAKE256 *)
-(* stream, the nibbles below 9 accepted as 4 - z. It realizes the       *)
-(* hypothesis of ErrorVectorsT.                                         *)
+(* The four-lane core of the sampler of s1 and s2: each lane is the     *)
+(* RejBoundedPoly of its SHAKE256 stream, the nibbles below rej_bound   *)
+(* accepted. A nibble z gives 4 - z for Eta = 4, and 2 - (z mod 5) for  *)
+(* Eta = 2, where the code reduces modulo 5. It realizes the hypothesis *)
+(* of ErrorVectorsT.                                                    *)
 (* -------------------------------------------------------------------- *)
-abstract theory ErrorSamplerEta4T.
+abstract theory ErrorSamplerT.
 
-clone import BaseT.BaseT as B with op S.Eta = 4.
+clone import BaseT.BaseT as B.
 import S R MLDSAParams.
 clone PreludeT.PreludeT as PR with theory B <- B.
 clone import Sha3x4.Sha3x4T as SX with theory P <- S, theory R <- R.
 import Shake256x4.
 
-lemma Eta_val : Eta = 4 by done.
-hint simplify Eta_val.
+lemma Eta_cases : Eta = 2 \/ Eta = 4 by smt(param_sets).
+
+lemma rej_boundE : rej_bound = if Eta = 2 then 15 else 9 by done.
 
 (* -------------------------------------------------------------------- *)
 clone import Prefixarray.PrefixArray as PA_272_136 with
@@ -123,12 +126,15 @@ qed.
 (* -------------------------------------------------------------------- *)
 (* -------------------------------------------------------------------- *)
 (* the abstract nibble-candidate stream: every byte yields TWO          *)
-(* candidates, low nibble first; a candidate z is accepted when z < 9   *)
-(* and then contributes the signed coefficient 4 - z                    *)
+(* candidates, low nibble first; a candidate z is accepted when it is   *)
+(* below rej_bound and then contributes the signed coefficient          *)
+(* Eta - sred z                                                         *)
 
-op saccept (z : W8.t) : bool = to_uint z < 9.
+op saccept (z : W8.t) : bool = to_uint z < rej_bound.
 
-op scoeff (z : W8.t) : W32.t = W32.of_int 4 - zeroextu32 z.
+op sred (z : W8.t) : W8.t = if Eta = 2 then z \umod W8.of_int 5 else z.
+
+op scoeff (z : W8.t) : W32.t = W32.of_int Eta - zeroextu32 (sred z).
 
 op nibbles (b : W8.t) : W8.t list = [b `&` W8.of_int 15; b `>>>` 4].
 
@@ -256,7 +262,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 (* -------------------------------------------------------------------- *)
 (* the coefficient byte of a candidate, as computed by VPSUB_32u8       *)
-op cbyte (z : W8.t) : W8.t = W8.of_int 4 - z.
+op cbyte (z : W8.t) : W8.t = W8.of_int Eta - z.
 
 (* -------------------------------------------------------------------- *)
 (* writing eight dwords at the end of the agreed prefix extends the     *)
@@ -280,9 +286,52 @@ by have := hag i _ _ => //#.
 qed.
 
 (* -------------------------------------------------------------------- *)
-(* the whole compact-sign-extend-store step for one 8-candidate group   *)
-lemma sagree_store (p : wpoly) (old : W32.t list) (zs : W8.t list)
-                   (x : W128.t) (h : W64.t) :
+(* the shuffle of one 8-candidate group: its accepted coefficient bytes *)
+(* come first                                                           *)
+op shuffled (x : W128.t) (h : W64.t) : W64.t =
+  truncateu64 (VPSHUFB_128 x
+    (VMOV_64 (W8u8.pack8 (Array2048.sub eRROR_VECTOR_SHUFFLE_TABLE
+       (to_uint (h `<<` W8.of_int 3)) 8)))).
+
+lemma shuffledP (zs : W8.t list) (x : W128.t) (h : W64.t) :
+  take 8 (W16u8.to_list x) = map cbyte zs =>
+  size zs = 8 =>
+  to_uint h = bs2int (map saccept zs) =>
+  take (count idfun (map saccept zs)) (W8u8.to_list (shuffled x h))
+  = map cbyte (filter saccept zs).
+proof.
+move=> hx szzs hh.
+have szbits : size (map saccept zs) = 8 by rewrite size_map.
+have hint2bs : int2bs 8 (bs2int (map saccept zs)) = map saccept zs.
+- by have := bs2intK (map saccept zs); rewrite szbits.
+rewrite -{1}hint2bs /shuffled (shuffle_slot8 h (map saccept zs)) //.
+rewrite (shuffle_compact8 x (bs2int (map saccept zs))) //.
+- have := bs2int_le2Xs (map saccept zs); rewrite szbits bs2int_ge0 /= => /#.
+by rewrite hint2bs hx -map_mask filter_mask'.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* the store of one 8-candidate group, whose first dwords are the       *)
+(* coefficients of its accepted candidates                              *)
+lemma sagree_storeW (p : wpoly) (old : W32.t list) (zs : W8.t list) (w : W256.t) :
+  size zs = 8 =>
+  take (count idfun (map saccept zs)) (W8u32.Pack.to_list (W8u32.unpack32 w))
+  = map scoeff (filter saccept zs) =>
+  size old <= 248 =>
+  agree p 0 old =>
+  agree (Array256.fill (fun i => w \bits32 (i - size old)) (size old) 8 p)
+        0 (old ++ map scoeff (filter saccept zs)).
+proof.
+move=> szzs heq szold hag; rewrite -heq.
+have hcle : count idfun (map saccept zs) <= 8.
+- by have := count_size idfun (map saccept zs); rewrite size_map szzs.
+by apply agree_fill8 => //; smt(count_ge0).
+qed.
+
+(* for Eta = 4, the coefficient is the sign extension of its byte       *)
+lemma sagree_store4 (p : wpoly) (old : W32.t list) (zs : W8.t list)
+                    (x : W128.t) (h : W64.t) :
+  Eta = 4 =>
   take 8 (W16u8.to_list x) = map cbyte zs =>
   size zs = 8 =>
   (forall z, z \in zs => to_uint z < 16) =>
@@ -290,39 +339,89 @@ lemma sagree_store (p : wpoly) (old : W32.t list) (zs : W8.t list)
   size old <= 248 =>
   agree p 0 old =>
   agree (Array256.fill
-           (fun i =>
-              VPMOVSX_8u8_8u32 (truncateu64 (VPSHUFB_128 x
-                (VMOV_64 (W8u8.pack8 (Array2048.sub eRROR_VECTOR_SHUFFLE_TABLE
-                   (to_uint (h `<<` W8.of_int 3)) 8)))))
-              \bits32 (i - size old))
+           (fun i => VPMOVSX_8u8_8u32 (shuffled x h) \bits32 (i - size old))
            (size old) 8 p)
         0 (old ++ map scoeff (filter saccept zs)).
 proof.
-move=> hx szzs hnib hh szold hag.
-have szbits : size (map saccept zs) = 8 by rewrite size_map.
-have hm : 0 <= bs2int (map saccept zs) < 256.
-- by rewrite bs2int_ge0 /=; have := bs2int_le2Xs (map saccept zs); rewrite szbits.
-have hint2bs : int2bs 8 (bs2int (map saccept zs)) = map saccept zs.
-- by have := bs2intK (map saccept zs); rewrite szbits.
+move=> heta hx szzs hnib hh szold hag; apply sagree_storeW => //.
+rewrite VPMOVSX_8u8_8u32_to_listE -map_take (shuffledP zs) // -map_comp.
+apply eq_in_map => z /mem_filter [_ hz] @/(\o) @/scoeff @/cbyte @/sred.
+by rewrite heta /= MOVSX_u32s8_subE //; smt(mem_mask).
+qed.
+
+(* for Eta = 2, the code reduces the sign extension modulo 5: a dword   *)
+(* c = 2 - z with z < 15 becomes 2 - (z mod 5)                          *)
+op red5_ok (w r : W256.t) (i : int) =
+  (W32.of_int 2 - (w \bits32 i)) \ult W32.of_int 15 =>
+  r \bits32 i = W32.of_int 2 - ((W32.of_int 2 - (w \bits32 i)) \umod W32.of_int 5).
+
+lemma reduce_coefficientsP (w : W256.t) :
+  hoare[ M.error_4x____reduce_coefficients :
+    coefficients = w
+    ==>
+       red5_ok w res 0 /\ red5_ok w res 1 /\ red5_ok w res 2 /\ red5_ok w res 3
+    /\ red5_ok w res 4 /\ red5_ok w res 5 /\ red5_ok w res 6 /\ red5_ok w res 7 ].
+proof. by proc; circuit. qed.
+
+lemma reduce_coefficientP (c : W32.t) :
+  hoare[ M.error_4x____reduce_coefficient :
+    coefficient = c /\ c \ult W32.of_int 15 ==> res = c \umod W32.of_int 5 ].
+proof. by proc; circuit. qed.
+
+lemma zext_umod5E (z : W8.t) :
+  zeroextu32 z \umod W32.of_int 5 = zeroextu32 (z \umod W8.of_int 5).
+proof.
+apply W32.to_uint_eq.
+by rewrite WE32.to_uintUM !W4u8.to_uint_zeroextu32 WE8.to_uintUM.
+qed.
+
+lemma VPMOVSX_8u8_8u32_bitsE (v : W64.t) (i : int) :
+  0 <= i < 8 => VPMOVSX_8u8_8u32 v \bits32 i = MOVSX_u32s8 (v \bits8 i).
+proof.
+move=> hi; rewrite /VPMOVSX_8u8_8u32 /=.
+have : i \in iota_ 0 8 by rewrite mem_iota /#.
+by rewrite -iotaredE /=; move=> [|[|[|[|[|[|[|]]]]]]] ->.
+qed.
+
+lemma sagree_store2 (p : wpoly) (old : W32.t list) (zs : W8.t list)
+                    (x : W128.t) (h : W64.t) (r : W256.t) :
+  Eta = 2 =>
+  take 8 (W16u8.to_list x) = map cbyte zs =>
+  size zs = 8 =>
+  (forall z, z \in zs => to_uint z < 16) =>
+  to_uint h = bs2int (map saccept zs) =>
+  (forall i, 0 <= i < 8 => red5_ok (VPMOVSX_8u8_8u32 (shuffled x h)) r i) =>
+  size old <= 248 =>
+  agree p 0 old =>
+  agree (Array256.fill (fun i => r \bits32 (i - size old)) (size old) 8 p)
+        0 (old ++ map scoeff (filter saccept zs)).
+proof.
+move=> heta hx szzs hnib hh hr szold hag; apply sagree_storeW => //.
+have hpre := shuffledP zs x h hx szzs hh.
 have hcle : count idfun (map saccept zs) <= 8.
-- by have := count_size idfun (map saccept zs); rewrite szbits.
-have hVto : forall (w : W64.t),
-  W8u32.Pack.to_list (W8u32.unpack32 (VPMOVSX_8u8_8u32 w))
-  = map MOVSX_u32s8 (W8u8.to_list w).
-- by move=> w; rewrite /VPMOVSX_8u8_8u32 /=.
-pose Y := VPSHUFB_128 x
-  (VMOV_64 (W8u8.pack8 (Array2048.sub eRROR_VECTOR_SHUFFLE_TABLE
-     (to_uint (h `<<` W8.of_int 3)) 8))).
-have heq : take (count idfun (map saccept zs))
-             (map MOVSX_u32s8 (W8u8.to_list (truncateu64 Y)))
-           = map scoeff (filter saccept zs).
-- rewrite -map_take -{1}hint2bs /Y (shuffle_slot8 h (map saccept zs)) //.
-  rewrite (shuffle_compact8 x (bs2int (map saccept zs))) //.
-  rewrite hint2bs hx -map_mask filter_mask' -map_comp.
-  apply eq_in_map => z hz /=.
-  by rewrite /(\o) /scoeff /cbyte MOVSX_u32s8_subE 1:#smt:(mem_mask).
-rewrite -heq -hVto.
-by apply agree_fill8 => //; smt(count_ge0).
+- by have := count_size idfun (map saccept zs); rewrite size_map szzs.
+have szk : size (map scoeff (filter saccept zs)) = count idfun (map saccept zs).
+- by rewrite size_map size_filter count_map.
+apply (eq_from_nth W32.zero).
+- by rewrite size_take ?count_ge0 W8u32.Pack.size_to_list szk /#.
+move=> i; rewrite size_take ?count_ge0 W8u32.Pack.size_to_list => hi.
+have hi8 : 0 <= i < 8 by smt().
+have hik : i < count idfun (map saccept zs) by smt().
+rewrite nth_take ?count_ge0 // W8u32.Pack.to_listE nth_mkseq //= W8u32.get_unpack32 //.
+have hb : (shuffled x h) \bits8 i = nth W8.zero (map cbyte (filter saccept zs)) i.
+- by rewrite -hpre nth_take ?count_ge0 // W8u8.nth_to_list.
+rewrite (nth_map W8.zero) in hb; 1: smt(size_map).
+rewrite (nth_map W8.zero); 1: smt(size_map size_filter count_map).
+have /mem_filter [hacc hin] : nth W8.zero (filter saccept zs) i \in filter saccept zs.
+- by apply mem_nth; smt(size_map size_filter count_map).
+move: (nth W8.zero (filter saccept zs) i) hb hacc hin => z hb hacc hin.
+have hz : W32.of_int 2 - (VPMOVSX_8u8_8u32 (shuffled x h) \bits32 i) = zeroextu32 z.
+- rewrite VPMOVSX_8u8_8u32_bitsE // hb /cbyte heta MOVSX_u32s8_subE //; 1: smt().
+  by ring.
+have := hr i hi8; rewrite /red5_ok hz.
+move: hacc; rewrite /saccept rej_boundE heta /= => hacc.
+rewrite ultE /= W4u8.to_uint_zeroextu32 hacc /= => ->.
+by rewrite zext_umod5E /scoeff /sred heta.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -331,30 +430,33 @@ section.
 hint simplify b2i0, b2i1.
 
 (* --- acceptance bit of each nibble comparison byte --- *)
-lemma msb_lo9E (b : W8.t) :
-  W8.msb ((b `&` W8.of_int 15) - W8.of_int 9) = saccept (b `&` W8.of_int 15).
+lemma rej_bound_rng : 0 <= rej_bound <= 16.
+proof. by rewrite rej_boundE; smt(Eta_cases). qed.
+
+lemma msb_loE (b : W8.t) :
+  W8.msb ((b `&` W8.of_int 15) - W8.of_int rej_bound) = saccept (b `&` W8.of_int 15).
 proof.
-by rewrite msb_sub9E 1:to_uint_lonib_lt16 /saccept.
+by rewrite msb_subE 1:to_uint_lonib_lt16 1:rej_bound_rng /saccept.
 qed.
 
-lemma msb_hi9E (b : W8.t) :
-  W8.msb ((b `>>>` 4) - W8.of_int 9) = saccept (b `>>>` 4).
+lemma msb_hiE (b : W8.t) :
+  W8.msb ((b `>>>` 4) - W8.of_int rej_bound) = saccept (b `>>>` 4).
 proof.
-by rewrite msb_sub9E 1:to_uint_hinib_lt16 /saccept.
+by rewrite msb_subE 1:to_uint_hinib_lt16 1:rej_bound_rng /saccept.
 qed.
 
 (* --- the 32-candidate acceptance mask of a 16-byte window --- *)
 lemma movemask_scands16E (b00 b01 b02 b03 b04 b05 b06 b07 b08 b09 b10 b11 b12 b13 b14 b15 : W8.t) :
   to_uint (zeroextu64 (MOVEMASK_32u8 (VPSUB_32u8
     (W32u8.pack32 (scands [b00; b01; b02; b03; b04; b05; b06; b07; b08; b09; b10; b11; b12; b13; b14; b15]))
-    (VPBROADCAST_32u8 (W8.of_int 9)))))
+    (VPBROADCAST_32u8 (W8.of_int rej_bound)))))
   = bs2int (map saccept (scands [b00; b01; b02; b03; b04; b05; b06; b07; b08; b09; b10; b11; b12; b13; b14; b15])).
 proof.
 rewrite scands16E.
 rewrite VPBROADCAST_32u8_pack32E VPSUB_32u8E /=.
 rewrite /MOVEMASK_32u8 /=.
 rewrite ?W32u8.pack32bE // ?W32u8.Pack.get_of_list //=.
-rewrite !msb_lo9E !msb_hi9E.
+rewrite !msb_loE !msb_hiE.
 by rewrite to_uint_zeroextu64 W32.to_uintE bits2wK //=.
 qed.
 
@@ -384,8 +486,50 @@ hoare[ M.error_4x____write_out_8_coefficients :
   /\ to_uint res.`3 = bs2int (map saccept zs') ].
 proof.
 proc.
-(* the reduction modulo 5 is for ETA = 2 *)
-rcondf ^if; 1: by auto.
+have [heta|heta] := Eta_cases.
+(* for Eta = 2, the stored dwords are reduced modulo 5 *)
+- rcondt ^if; 1: by auto.
+  seq 10 : (error = p_ /\ bytes_filled = bf_ /\ good = go_ `&` W64.of_int 255
+    /\ good_overall = go_ `>>` W8.of_int 8
+    /\ error_coefficients = VPMOVSX_8u8_8u32 (shuffled cb_ (go_ `&` W64.of_int 255))
+    /\ take 8 (W16u8.to_list cb_) = map cbyte zs /\ size zs = 8
+    /\ (forall z, z \in zs => to_uint z < 16)
+    /\ to_uint go_ = bs2int (map saccept (zs ++ zs'))
+    /\ size old <= 248 /\ to_uint bf_ = 4 * size old /\ agree p_ 0 old).
+  - auto => &hr [#] 4!-> hcb szzs hnib hgo szold hbf hag /=.
+    have szmap : size (map saccept zs) = 8 by rewrite size_map szzs.
+    have hand : to_uint (go_ `&` W64.of_int 255) = bs2int (map saccept zs).
+    - rewrite (and255_bs2int _ (map saccept (zs ++ zs'))) // map_cat.
+      by rewrite (_ : 8 = size (map saccept zs)) 1:szmap // take_size_cat.
+    have hm : 0 <= bs2int (map saccept zs) < 256.
+    - by rewrite bs2int_ge0 /=; have := bs2int_le2Xs (map saccept zs); rewrite szmap.
+    have hidx : to_uint ((go_ `&` W64.of_int 255) `<<` W8.of_int 3)
+                = 8 * bs2int (map saccept zs).
+    - by apply (shuffle_slot8 _ (map saccept zs)).
+    by rewrite /shuffled /= WArray2048_get64E 1:hidx 1:/#.
+  wp; ecall (reduce_coefficientsP (VPMOVSX_8u8_8u32 (shuffled cb_ (go_ `&` W64.of_int 255)))).
+  skip => &hr [#] 5!-> hcb szzs hnib hgo szold hbf hag r [#] h0 h1 h2 h3 h4 h5 h6 h7 /=.
+  have hr : forall i, 0 <= i < 8 =>
+    red5_ok (VPMOVSX_8u8_8u32 (shuffled cb_ (go_ `&` W64.of_int 255))) r i.
+  - move=> i hi; have : i \in iota_ 0 8 by rewrite mem_iota /#.
+    by rewrite -iotaredE /= => -[|[|[|[|[|[|[|]]]]]]] ->.
+  have szmap : size (map saccept zs) = 8 by rewrite size_map szzs.
+  have hand : to_uint (go_ `&` W64.of_int 255) = bs2int (map saccept zs).
+  - rewrite (and255_bs2int _ (map saccept (zs ++ zs'))) // map_cat.
+    by rewrite (_ : 8 = size (map saccept zs)) 1:szmap // take_size_cat.
+  have hm : 0 <= bs2int (map saccept zs) < 256.
+  - by rewrite bs2int_ge0 /=; have := bs2int_le2Xs (map saccept zs); rewrite szmap.
+  do ! split.
+  - rewrite wpoly_set256_alignedE 1,2:#smt:(size_ge0).
+    rewrite (_ : to_uint bf_ %/ 4 = size old) 1:/#.
+    by apply (sagree_store2 _ _ _ cb_ (go_ `&` W64.of_int 255) r).
+  - rewrite (popcnt_step8 _ _ (map saccept zs)) // 1:/#.
+    rewrite size_cat size_map size_filter.
+    rewrite (count_map saccept idfun) hbf /preim /idfun /=.
+    by ring.
+  rewrite (shr8_bs2int _ (map saccept (zs ++ zs'))) // map_cat.
+  by rewrite (_ : 8 = size (map saccept zs)) 1:szmap // drop_size_cat.
+rcondf ^if; 1: by auto => /#.
 wp; skip => &hr |> hcb szzs hnib hgo szold hbf hag.
 have szmap : size (map saccept zs) = 8 by rewrite size_map szzs.
 have hand : to_uint (good_overall{hr} `&` W64.of_int 255)
@@ -402,7 +546,7 @@ do ! split.
   rewrite wpoly_set256_alignedE 1,2:#smt:(size_ge0).
   rewrite (_ : to_uint bytes_filled{hr} %/ 4 = size old) 1:/#.
   rewrite -truncateu64_128E.
-  by apply sagree_store.
+  by apply sagree_store4.
 - rewrite (popcnt_step8 _ _ (map saccept zs)) // 1:/#.
   rewrite size_cat size_map size_filter.
   rewrite (count_map saccept idfun) hbf /preim /idfun /=.
@@ -533,18 +677,47 @@ qed.
 abbrev halfstep (c : W8.t) : W32.t list =
   if saccept c then [scoeff c] else [].
 
-(* the acceptance test and the coefficient as computed by the code      *)
-lemma saccept_ultE (n : W8.t) :
-  (zeroextu32 n \ult W32.of_int 9) = saccept n.
+(* the scalar reduction of the code, for Eta = 2                        *)
+op sred32 (c : W32.t) : W32.t =
+  if Eta = 2 then c - ((c * W32.of_int 205) `>>` W8.of_int 10) * W32.of_int 5 else c.
+
+lemma red5_scalarE (n : W8.t) : to_uint n < 15 =>
+  zeroextu32 n - ((zeroextu32 n * W32.of_int 205) `>>` W8.of_int 10) * W32.of_int 5
+  = zeroextu32 (n \umod W8.of_int 5).
 proof.
-rewrite ultE of_uintK /= pmod_small.
-- by have /= := W8.to_uint_cmp n; smt().
-by rewrite /saccept.
+move=> hn; have hc := W8.to_uint_cmp n.
+have h1 : to_uint (zeroextu32 n * W32.of_int 205) = to_uint n * 205.
+- by rewrite W32.to_uintM_small W4u8.to_uint_zeroextu32 /=; smt().
+have h2 : to_uint ((zeroextu32 n * W32.of_int 205) `>>` W8.of_int 10)
+          = to_uint n * 205 %/ 1024.
+- by rewrite /(`>>`) /= W32.to_uint_shr //= h1.
+have hq : to_uint n * 205 %/ 1024 <= 2 by smt().
+have h3 : to_uint (((zeroextu32 n * W32.of_int 205) `>>` W8.of_int 10) * W32.of_int 5)
+          = to_uint n * 205 %/ 1024 * 5.
+- by rewrite W32.to_uintM_small h2 /=; smt().
+apply W32.to_uint_eq; rewrite W32.to_uintB.
+- by rewrite uleE h3 W4u8.to_uint_zeroextu32; smt().
+rewrite h3 !W4u8.to_uint_zeroextu32 WE8.to_uintUM /=.
+have : to_uint n \in iota_ 0 15 by rewrite mem_iota /#.
+move: (to_uint n) => c.
+by rewrite -iotaredE /= => -[|[|[|[|[|[|[|[|[|[|[|[|[|[|]]]]]]]]]]]]]] ->.
 qed.
 
-lemma scoeffE (n : W8.t) :
-  - (zeroextu32 n - W32.of_int 4) = scoeff n.
-proof. by rewrite /scoeff; ring. qed.
+(* the acceptance test and the coefficient as computed by the code      *)
+lemma saccept_ultE (n : W8.t) :
+  (zeroextu32 n \ult W32.of_int rej_bound) = saccept n.
+proof.
+rewrite ultE W4u8.to_uint_zeroextu32 of_uintK pmod_small //.
+by have := rej_bound_rng; smt().
+qed.
+
+lemma scoeffE (n : W8.t) : saccept n =>
+  - (sred32 (zeroextu32 n) - W32.of_int Eta) = scoeff n.
+proof.
+move=> hn; rewrite /scoeff /sred32 /sred.
+case: (Eta = 2) => heta /=; last by ring.
+by move: hn; rewrite /saccept rej_boundE heta /= => hn; rewrite red5_scalarE //; ring.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma sreject_step272 (a : W8.t Array272.t) (n : int) : 0 <= n =>
@@ -590,11 +763,14 @@ lemma error_4x__rejection_sample_multiple_blocksP (buf : W8.t Array272.t)
   ].
 proof.
 proc => /=.
-(* the reduction modulo 5, for ETA = 2, is under false conditions *)
-inline M.error_4x____reduce_coefficient.
+(* the reduction modulo 5, for Eta = 2, as one assignment *)
+proc change ^while{2}.^if.^if : { coefficient <- sred32 coefficient; }.
+- by inline *; if{1}; auto => /> &2 h; rewrite /sred32 h.
+proc change ^while{2}.^if{2}.^if.^if : { coefficient <- sred32 coefficient; }.
+- by inline *; if{1}; auto => /> &2 h; rewrite /sred32 h.
 seq 7 : (randombytes = buf
-  /\ eta_0 = VPBROADCAST_32u8 (W8.of_int 4)
-  /\ bound = VPBROADCAST_32u8 (W8.of_int 9)).
+  /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
+  /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)).
 - by auto => &hr |>; rewrite !truncateu8_bcastE.
 sp 4.
 seq 1 : (
@@ -608,8 +784,8 @@ seq 1 : (
 ).
 - while (
        randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int 4)
-    /\ bound = VPBROADCAST_32u8 (W8.of_int 9)
+    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
+    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
     /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
     /\ (to_uint bytes_filled < 992 /\ to_uint xof_offset < 256 =>
           16 %| to_uint xof_offset)
@@ -622,8 +798,8 @@ seq 1 : (
   exlim xof_offset => off0.
   seq 3 : (
        randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int 4)
-    /\ bound = VPBROADCAST_32u8 (W8.of_int 9)
+    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
+    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
     /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
     /\ to_uint bytes_filled < 992
     /\ to_uint off0 < 256
@@ -641,8 +817,8 @@ seq 1 : (
     by rewrite WArray272_get128E 1:#smt:(W64.to_uint_cmp) sub16E_272 /= /#.
   seq 5 : (
        randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int 4)
-    /\ bound = VPBROADCAST_32u8 (W8.of_int 9)
+    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
+    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
     /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
     /\ to_uint bytes_filled < 992
     /\ to_uint off0 < 256
@@ -656,15 +832,15 @@ seq 1 : (
     /\ coefficient_block = VEXTRACTI128 coefficients W8.zero
   ).
   - auto=> &hr |> hsv h992 h256 h16.
-    by rewrite !sub16E_272 movemask_scands16E scands16E VPSUB_bcast4_pack32E /= /cbyte.
+    by rewrite !sub16E_272 movemask_scands16E scands16E VPSUB_bcast_pack32E /= /cbyte.
   exlim error => p0.
   exlim bytes_filled => bf0.
   exlim good_overall => go0.
   exlim coefficient_block => cb0.
   seq 2 : (
        randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int 4)
-    /\ bound = VPBROADCAST_32u8 (W8.of_int 9)
+    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
+    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
     /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
     /\ xof_offset = off0 + W64.of_int 4
     /\ stop_sampling = W64.of_int 0
@@ -699,8 +875,8 @@ seq 1 : (
   exlim coefficient_block => cb1.
   seq 2 : (
        randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int 4)
-    /\ bound = VPBROADCAST_32u8 (W8.of_int 9)
+    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
+    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
     /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
     /\ xof_offset = off0 + W64.of_int 8
     /\ stop_sampling = W64.of_int 0
@@ -739,8 +915,8 @@ seq 1 : (
   exlim coefficient_block => cb2.
   seq 2 : (
        randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int 4)
-    /\ bound = VPBROADCAST_32u8 (W8.of_int 9)
+    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
+    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
     /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
     /\ xof_offset = off0 + W64.of_int 12
     /\ stop_sampling = W64.of_int 0
@@ -780,8 +956,8 @@ seq 1 : (
   exlim coefficient_block => cb3.
   seq 2 : (
        randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int 4)
-    /\ bound = VPBROADCAST_32u8 (W8.of_int 9)
+    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
+    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
     /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
     /\ xof_offset = off0 + W64.of_int 16
     /\ stop_sampling = W64.of_int 0
@@ -841,7 +1017,7 @@ seq 5 : (
   /\ to_uint xof_offset < 272
   /\ stop_sampling = W64.of_int 0
   /\ coefficient = zeroextu32 (randombytes.[to_uint xof_offset] `&` W8.of_int 15)
-  /\ condition = (coefficient \ult W32.of_int 9)
+  /\ condition = (coefficient \ult W32.of_int rej_bound)
 ).
 - auto=> &hr |> hs hne.
   have [hf256 hoff272] : to_uint filled{hr} < 256 /\ to_uint xof_offset{hr} < 272
@@ -860,7 +1036,7 @@ seq > ^if : (
 - if.
   - auto=> &hr |> hs hf256 hoff272.
     have @/ssampled [#] hoffle hfle hok := hs.
-    rewrite saccept_ultE scoeffE => hsacc.
+    rewrite saccept_ultE => hsacc; rewrite (scoeffE _ hsacc).
     rewrite hsacc /= !to_uintD_small ?of_uintK /=; 1: smt().
     split; 1: smt().
     by apply filled_ok_snoc.
@@ -879,7 +1055,7 @@ seq > ^if : (
     sp 4; if.
     - auto=> &hr |> hoff272 hfle hok hfu.
       move: hfu; rewrite ultE of_uintK /= => hf256.
-      rewrite /SLH64.protect_32 zext_shr4E saccept_ultE scoeffE => hsacc.
+      rewrite /SLH64.protect_32 zext_shr4E saccept_ultE => hsacc; rewrite (scoeffE _ hsacc).
       rewrite /ssampled sreject_step272 1:#smt:(W64.to_uint_cmp) hsacc /= catA.
       rewrite !to_uintD_small ?of_uintK /=; 1: smt().
       split*; 1,2: by smt(size_cat size_ge0).
@@ -928,8 +1104,11 @@ lemma error_4x__rejection_sample_one_blockP (S : W8.t list) (blk : W8.t Array136
    /\ to_uint res.`2 = min 256 (size (sreject (S ++ Array136.to_list blk))) ].
 proof.
 proc.
-(* the reduction modulo 5, for ETA = 2, is under false conditions *)
-inline M.error_4x____reduce_coefficient.
+(* the reduction modulo 5, for Eta = 2, as one assignment *)
+proc change ^while.^if.^if : { coefficient <- sred32 coefficient; }.
+- by inline *; if{1}; auto => /> &2 h; rewrite /sred32 h.
+proc change ^while.^if{2}.^if.^if : { coefficient <- sred32 coefficient; }.
+- by inline *; if{1}; auto => /> &2 h; rewrite /sred32 h.
 seq < ^while : (
      randombytes = blk
   /\ to_uint xof_offset <= 136
@@ -970,7 +1149,7 @@ seq 5 : (
   /\ to_uint xof_offset < 136
   /\ stop_sampling = W64.of_int 0
   /\ coefficient = zeroextu32 (randombytes.[to_uint xof_offset] `&` W8.of_int 15)
-  /\ condition = (coefficient \ult W32.of_int 9)
+  /\ condition = (coefficient \ult W32.of_int rej_bound)
 ).
 - auto=> &hr |> hoffle hok hne.
   have [hf256 hoff136] : to_uint filled{hr} < 256 /\ to_uint xof_offset{hr} < 136
@@ -988,7 +1167,7 @@ seq > ^if : (
 ).
 - if.
   - auto=> &hr |> hok hf256 hoff136.
-    rewrite saccept_ultE scoeffE => hsacc.
+    rewrite saccept_ultE => hsacc; rewrite (scoeffE _ hsacc).
     rewrite hsacc /= !to_uintD_small ?of_uintK /=; 1: smt().
     split; 1: smt().
     by apply filled_ok_snoc.
@@ -1009,7 +1188,7 @@ seq > ^if : (
     sp 4; if.
     - auto=> &hr |> hoff136 hle256 hok hfu.
       move: hfu; rewrite ultE of_uintK /= => hf256.
-      rewrite /SLH64.protect_32 zext_shr4E saccept_ultE scoeffE => hsacc.
+      rewrite /SLH64.protect_32 zext_shr4E saccept_ultE => hsacc; rewrite (scoeffE _ hsacc).
       rewrite sreject_stepS136 1:#smt:(W64.to_uint_cmp) hsacc /= catA.
       rewrite !to_uintD_small ?of_uintK /=; 1: smt().
       split; 2: smt().
@@ -1545,16 +1724,33 @@ qed.
 (* ==================================================================== *)
 
 (* -------------------------------------------------------------------- *)
-(* a code candidate is the spec's CoeffFromHalfByte (eta = 4)           *)
+(* the coefficient of an accepted candidate, and its range             *)
+lemma sredE (c : W8.t) :
+  to_uint (sred c) = if Eta = 2 then to_uint c %% 5 else to_uint c.
+proof. by rewrite /sred; case: (Eta = 2) => //= _; rewrite WE8.to_uintUM. qed.
+
+lemma sred_rng (c : W8.t) : saccept c => 0 <= to_uint (sred c) <= 2 * Eta.
+proof.
+rewrite /saccept rej_boundE sredE; have := W8.to_uint_cmp c.
+by have [] -> /= := Eta_cases; smt().
+qed.
+
+lemma to_sint_scoeff (c : W8.t) : saccept c => to_sint (scoeff c) = Eta - to_uint (sred c).
+proof.
+move=> /sred_rng h; rewrite /scoeff /zeroextu32.
+by rewrite -W32.of_intN -W32.of_intD W32.to_sintK_small //; smt(Eta_cases).
+qed.
+
+(* a code candidate is the spec's CoeffFromHalfByte                     *)
 lemma halfstep_specE (c : W8.t) :
   to_uint c < 16 =>
   map W32.to_sint (halfstep c) = pmap idfun [CoeffFromHalfByte (to_uint c)].
 proof.
-move=> hc; rewrite /CoeffFromHalfByte Eta_val /saccept /=.
-case: (to_uint c < 9) => h /=; last by [].
-rewrite /scoeff /zeroextu32 (_ : W32.of_int 4 - W32.of_int (to_uint c) = W32.of_int (4 - to_uint c)).
-- by rewrite W32.of_intD W32.of_intN.
-by rewrite W32.to_sintK_small /=; smt(W8.to_uint_cmp).
+move=> hc; rewrite /CoeffFromHalfByte.
+case: (saccept c) => hacc /=.
+- rewrite to_sint_scoeff // sredE; move: hacc; rewrite /saccept rej_boundE.
+  by have [] -> /= := Eta_cases => -> /=.
+by move: hacc; rewrite /saccept rej_boundE; have [] -> /= := Eta_cases => -> /=.
 qed.
 
 (* one byte, low nibble first, as Alg. 31 reads it                      *)
@@ -1625,26 +1821,18 @@ by rewrite /= (nth_map W32.zero) 1:/#.
 qed.
 
 (* its coefficients lie in [-eta, eta]                                  *)
-lemma to_sint_scoeff (c : W8.t) : saccept c => to_sint (scoeff c) = 4 - to_uint c.
-proof.
-rewrite /saccept => h.
-rewrite /scoeff /zeroextu32 (_ : W32.of_int 4 - W32.of_int (to_uint c) = W32.of_int (4 - to_uint c)).
-- by rewrite W32.of_intD W32.of_intN.
-by rewrite W32.to_sintK_small /=; smt(W8.to_uint_cmp).
-qed.
-
 lemma Spoly_srng (rho_ : W8.t Array64.t) (sep : W16.t) : wpoly_srng Eta Eta (Spoly rho_ sep).
 proof.
 pose nc := to_list rho_ ++ W2u8.to_list sep.
 have szn : size nc = 66 by rewrite /nc size_cat Array64.size_to_list W2u8.size_to_list.
 have [k [ge0k hk]] := stream_ok_spec nc szn.
-rewrite /wpoly_srng Array256.allP Eta_val => i rgi /=.
+rewrite /wpoly_srng Array256.allP => i rgi /=.
 rewrite (SpolyP rho_ sep (136 * k) i) 1:/# // -/nc.
 have : nth W32.zero (sreject (shake256_slice nc 0 (136 * k))) i
        \in sreject (shake256_slice nc 0 (136 * k)) by apply mem_nth => /#.
 move: (nth W32.zero _ i) => w.
 rewrite srejectE => /mapP [c [/mem_filter [hc _] ->]].
-by rewrite to_sint_scoeff //; move: hc; rewrite /saccept; smt(W8.to_uint_cmp).
+by rewrite to_sint_scoeff //; have := sred_rng c hc; smt().
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1660,4 +1848,4 @@ move=> &hr _ r; split => [[_ //] | [_ h]]; split => // i rgi.
 by rewrite /EV.Spoly_ok (h i rgi) -W16.of_intD Spoly_specE Spoly_srng.
 qed.
 
-end ErrorSamplerEta4T.
+end ErrorSamplerT.
