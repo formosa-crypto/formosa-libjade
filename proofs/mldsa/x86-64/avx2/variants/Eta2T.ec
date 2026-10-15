@@ -4,7 +4,7 @@ require import CircuitBindings Bindings Keccak_bindings JWordExtra.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 require import Array16 Array96 Array256 WArray16 WArray96 WArray1024.
 require import XArray16 XArray96 XArray256 XWord3.
-require import ArrayExtra JWord_extra EclibExtra JWordList.
+require import ArrayExtra JWord_extra EclibExtra JWordList Polyslices.
 require BaseT ErrorPolynomialT.
 
 (* the polynomials as 256 lanes of 3 bits *)
@@ -17,13 +17,7 @@ clone BSWA as BSWA_256u3 with
   theory WE    <- WE3,
   theory BSW   <- BSW3.
 
-(* the array accesses of the code, at the offsets where they are slices *)
-lemma get256_polyE (p : W32.t Array256.t) (o : int) :
-  get256_direct (WArray1024.init32 (fun i => p.[i])) o =
-  if 0 <= o * 8 <= 7936 then BSWAS_256u32_256.sliceget p (o * 8)
-  else get256_direct (WArray1024.init32 (fun i => p.[i])) o.
-proof. by case: (0 <= o * 8 <= 7936) => h //; rewrite BSWAS_256u32_256_slicegetE. qed.
-
+(* a 128-bit write into the encoding *)
 op wr128 (t : W8.t Array96.t) (o : int) (s : W128.t) : W8.t Array96.t =
   Array96.init (WArray96.get8 (WArray96.set128_direct (WArray96.init8 (fun i => t.[i])) o s)).
 
@@ -48,6 +42,8 @@ import BitEncoding BitChunking.
 import Round ZModQ Zq.
 
 lemma Eta_val : Eta = 2 by done.
+
+lemma eta_encE : eta_enc = 96 by rewrite /eta_enc.
 
 lemma truncateu_32_3E (w : W32.t) :
   BS_W32_W3_U.truncateu3 w = W3.bits2w (take 3 (W32.w2bits w)).
@@ -141,39 +137,37 @@ proc change 3 : { eta_0 <- zeroextu256 temp; }.
   rewrite initiE 1:/# /= get_of_list 1:/#.
   by have -> /= : (i %% 128 %/ 64) = 1 by smt().
 (* the writes are slices of the encoding *)
-proc change ^while.44 : {
+proc change ^while.^encoded<- : {
   encoded <-
-    if 0 <= to_uint output_offset * 8 <= 640
-    then BSWAS_96u8_128.sliceset encoded (to_uint output_offset * 8) (truncateu128 c0)
-    else wr128 encoded (to_uint output_offset) (truncateu128 c0); }.
-+ auto => /> &2; case (0 <= to_uint output_offset{2} * 8 <= 640) => h; last by auto.
+    if 0 <= output_offset * 8 <= 640
+    then BSWAS_96u8_128.sliceset encoded (output_offset * 8) (truncateu128 c0)
+    else wr128 encoded (output_offset) (truncateu128 c0); }.
++ auto => /> &2; case (0 <= output_offset{2} * 8 <= 640) => h; last by auto.
   by rewrite (BSWAS_96u8_128_slicesetE _ _ _ h).
-proc change ^while.46 : {
+proc change ^while.^encoded<-{2} : {
   encoded <-
-    if 0 <= to_uint output_offset * 8 <= 640
-    then BSWAS_96u8_128.sliceset encoded (to_uint output_offset * 8) (VEXTRACTI128 c0 W8.one)
-    else wr128 encoded (to_uint output_offset) (VEXTRACTI128 c0 W8.one); }.
-+ auto => /> &2; case (0 <= to_uint output_offset{2} * 8 <= 640) => h; last by auto.
+    if 0 <= (output_offset + 12) * 8 <= 640
+    then BSWAS_96u8_128.sliceset encoded ((output_offset + 12) * 8) (VEXTRACTI128 c0 W8.one)
+    else wr128 encoded (output_offset + 12) (VEXTRACTI128 c0 W8.one); }.
++ auto => /> &2; case (0 <= (output_offset{2} + 12) * 8 <= 640) => h; last by auto.
   by rewrite (BSWAS_96u8_128_slicesetE _ _ _ h).
-proc change 50 : {
+proc change ^encoded<- : {
   encoded <-
-    if 0 <= to_uint output_offset * 8 <= 640
-    then BSWAS_96u8_128.sliceset encoded (to_uint output_offset * 8) (truncateu128 c0)
-    else wr128 encoded (to_uint output_offset) (truncateu128 c0); }.
-+ auto => /> &2; case (0 <= to_uint output_offset{2} * 8 <= 640) => h; last by auto.
+    if 0 <= output_offset * 8 <= 640
+    then BSWAS_96u8_128.sliceset encoded (output_offset * 8) (truncateu128 c0)
+    else wr128 encoded (output_offset) (truncateu128 c0); }.
++ auto => /> &2; case (0 <= output_offset{2} * 8 <= 640) => h; last by auto.
   by rewrite (BSWAS_96u8_128_slicesetE _ _ _ h).
-proc change 52 : {
+proc change ^final_encoded_bytes<-{2} : {
   final_encoded_bytes <- BSWAS_16u8_128.sliceset final_encoded_bytes 0 (VEXTRACTI128 c0 W8.one); }.
 + by auto => /> &2; rewrite (BSWAS_16u8_128_slicesetE _ 0).
-proc change 54.1 : {
-  encoded <- encoded.[to_uint output_offset <- final_encoded_bytes.[to_uint input_offset]]; }.
+proc change ^while{2}.1 : {
+  encoded <- encoded.[output_offset <- final_encoded_bytes.[input_offset]]; }.
 + by auto => /> &2; rewrite -set8_96E.
 (* the offsets are constants once the loops are unrolled *)
-do 3!(unroll ^while; rcondt ^if; 1: by auto).
-rcondf ^while; 1: by auto.
-do 12!(unroll ^while; rcondt ^if; 1: by auto).
-rcondf ^while; 1: by auto.
-cfold 5; cfold 5; proc rewrite /=.
+unroll for ^while.
+swap ^while.2 1; unroll for ^while.
+cfold 5; cfold ^output_offset<-; wp -3; proc rewrite /=.
 proc rewrite get256_polyE; proc rewrite /=.
 conseq (: List.all (fun i => W32.of_int (-2) \sle _a.[i] /\ _a.[i] \sle W32.of_int 2)
             (iotared 0 256) /\ _a = polynomial ==> _); last by circuit.
@@ -243,10 +237,9 @@ lemma error_polynomial_decode_eta2_circuit _a :
    ].
 proof.
 proc.
-do 32!(unroll ^while; rcondt ^if; 1: by auto).
-rcondf ^while; 1: by auto.
+proc rewrite eta_encE; swap ^input_offset<- 1; swap ^while.^input_offset<- 1; unroll for ^while.
 proc change 1 : { eTA_BITS_MASK <- 7; }; 1: by auto.
-cfold 1; cfold 1; cfold 1; wp -3; proc rewrite /=; proc rewrite zext8_32E.
+cfold 1; cfold 1; wp -3; proc rewrite /=; proc rewrite zext8_32E.
 conseq (: encoded = _a /\
   List.all (fun i => W3.init (fun j => encoded.[(3 * i + j) %/ 8].[(3 * i + j) %% 8])
                        \ule W3.of_int 4) (iotared 0 256) ==> _); last by circuit.
@@ -291,18 +284,14 @@ lemma error_polynomial_encode_ll : islossless M.error_polynomial__encode.
 proof.
 proc; rcondt 1; 1: by auto.
 inline *; wp.
-do 3!(unroll ^while; rcondt ^if; 1: by auto).
-rcondf ^while; 1: by auto.
-do 12!(unroll ^while; rcondt ^if; 1: by auto).
-by rcondf ^while; auto.
+by unroll for ^while; swap ^while.2 1; unroll for ^while; auto.
 qed.
 
 lemma error_polynomial_decode_ll : islossless M.error_polynomial__decode.
 proof.
 proc; rcondt 1; 1: by auto.
 inline *; wp.
-do 32!(unroll ^while; rcondt ^if; 1: by auto).
-by rcondf ^while; auto.
+by proc rewrite eta_encE; swap ^input_offset<- 1; swap ^while.^input_offset<- 1; unroll for ^while; auto.
 qed.
 
 (* -------------------------------------------------------------------- *)

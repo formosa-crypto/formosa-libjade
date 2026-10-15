@@ -124,11 +124,11 @@ namespace commitment {
 
         stack u8[16] final_encoded_bytes;
 
-        reg u64 input_offset output_offset;
+        reg ui64 input_offset output_offset;
 
         input_offset = 0;
         output_offset = 0;
-        while (input_offset < BYTES_PER_UNCOMPRESSED_POLYNOMIAL - 128) {
+        while (output_offset < (6 * COEFFICIENTS_IN_POLYNOMIAL) / 8 - 24) {
             c0 = raw.[:u256 input_offset];
             input_offset += 32;
             c1 = raw.[:u256 input_offset];
@@ -141,10 +141,8 @@ namespace commitment {
             bytestream_lower, bytestream_upper = coefficients_to_bytestream_bits6(c0, c1, c2, c3);
 
             encoded.[:u128 output_offset] = bytestream_lower;
-            output_offset += 12;
-
-            encoded.[:u128 output_offset] = bytestream_upper;
-            output_offset += 12;
+            encoded.[:u128 output_offset + 12] = bytestream_upper;
+            output_offset += 24;
         }
         c0 = raw.[:u256 input_offset];
         input_offset += 32;

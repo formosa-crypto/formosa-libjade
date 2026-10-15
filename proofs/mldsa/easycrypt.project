@@ -11,6 +11,7 @@ idirs = JazzEC:../arrays
 rdirs = ../arrays
 rdirs = JazzEC:x86-64/avx2/ml_dsa_65
 rdirs = JazzEC:x86-64/avx2/ml_dsa_87
+rdirs = JazzEC:x86-64/avx2/ml_dsa_44
 rdirs = x86-64/avx2/common
 rdirs = x86-64/avx2/generic
 rdirs = x86-64/avx2/variants
@@ -27,6 +28,7 @@ rdirs = extraction
 rdirs = generic
 rdirs = x86-64/avx2/ml_dsa_65
 rdirs = x86-64/avx2/ml_dsa_87
+rdirs = x86-64/avx2/ml_dsa_44
 
 rdirs = CryptoSpecs:../fips202/spec
 

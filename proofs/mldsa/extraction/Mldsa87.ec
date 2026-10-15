@@ -1206,8 +1206,6 @@ module M = {
   W8.t Array96.t = {
     var temp:W64.t;
     var eta_0:W256.t;
-    var input_offset:W64.t;
-    var output_offset:W64.t;
     var c0:W256.t;
     var c1:W256.t;
     var c2:W256.t;
@@ -1218,53 +1216,55 @@ module M = {
     var c7:W256.t;
     var encoding_constants:W256.t;
     var final_encoded_bytes:W8.t Array16.t;
+    var input_offset:int;
+    var output_offset:int;
     final_encoded_bytes <- witness;
     temp <- (W64.of_int 2);
     eta_0 <- (zeroextu256 (VMOV_64 temp));
     eta_0 <- (VPBROADCAST_8u32 (truncateu32 eta_0));
-    input_offset <- (W64.of_int 0);
-    output_offset <- (W64.of_int 0);
-    while ((input_offset \ult (W64.of_int (((256 * 32) %/ 8) - 256)))) {
+    input_offset <- 0;
+    output_offset <- 0;
+    while ((output_offset < (((3 * 256) %/ 8) - 24))) {
       c0 <-
       (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      (W64.to_uint input_offset));
+      input_offset);
       c0 <- (VPSUB_8u32 eta_0 c0);
-      input_offset <- (input_offset + (W64.of_int 32));
+      input_offset <- (input_offset + 32);
       c1 <-
       (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      (W64.to_uint input_offset));
+      input_offset);
       c1 <- (VPSUB_8u32 eta_0 c1);
-      input_offset <- (input_offset + (W64.of_int 32));
+      input_offset <- (input_offset + 32);
       c2 <-
       (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      (W64.to_uint input_offset));
+      input_offset);
       c2 <- (VPSUB_8u32 eta_0 c2);
-      input_offset <- (input_offset + (W64.of_int 32));
+      input_offset <- (input_offset + 32);
       c3 <-
       (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      (W64.to_uint input_offset));
+      input_offset);
       c3 <- (VPSUB_8u32 eta_0 c3);
-      input_offset <- (input_offset + (W64.of_int 32));
+      input_offset <- (input_offset + 32);
       c4 <-
       (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      (W64.to_uint input_offset));
+      input_offset);
       c4 <- (VPSUB_8u32 eta_0 c4);
-      input_offset <- (input_offset + (W64.of_int 32));
+      input_offset <- (input_offset + 32);
       c5 <-
       (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      (W64.to_uint input_offset));
+      input_offset);
       c5 <- (VPSUB_8u32 eta_0 c5);
-      input_offset <- (input_offset + (W64.of_int 32));
+      input_offset <- (input_offset + 32);
       c6 <-
       (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      (W64.to_uint input_offset));
+      input_offset);
       c6 <- (VPSUB_8u32 eta_0 c6);
-      input_offset <- (input_offset + (W64.of_int 32));
+      input_offset <- (input_offset + 32);
       c7 <-
       (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      (W64.to_uint input_offset));
+      input_offset);
       c7 <- (VPSUB_8u32 eta_0 c7);
-      input_offset <- (input_offset + (W64.of_int 32));
+      input_offset <- (input_offset + 32);
       c0 <- (VPACKUS_8u32 c0 c1);
       c1 <- (VPACKUS_8u32 c2 c3);
       c2 <- (VPACKUS_8u32 c4 c5);
@@ -1288,53 +1288,52 @@ module M = {
       (Array96.init
       (WArray96.get8
       (WArray96.set128_direct (WArray96.init8 (fun i => encoded.[i]))
-      (W64.to_uint output_offset) (truncateu128 c0))));
-      output_offset <- (output_offset + (W64.of_int 12));
+      output_offset (truncateu128 c0))));
       encoded <-
       (Array96.init
       (WArray96.get8
       (WArray96.set128_direct (WArray96.init8 (fun i => encoded.[i]))
-      (W64.to_uint output_offset) (VEXTRACTI128 c0 (W8.of_int 1)))));
-      output_offset <- (output_offset + (W64.of_int 12));
+      (output_offset + 12) (VEXTRACTI128 c0 (W8.of_int 1)))));
+      output_offset <- (output_offset + 24);
     }
     c0 <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint input_offset));
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i])) input_offset
+    );
     c0 <- (VPSUB_8u32 eta_0 c0);
-    input_offset <- (input_offset + (W64.of_int 32));
+    input_offset <- (input_offset + 32);
     c1 <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint input_offset));
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i])) input_offset
+    );
     c1 <- (VPSUB_8u32 eta_0 c1);
-    input_offset <- (input_offset + (W64.of_int 32));
+    input_offset <- (input_offset + 32);
     c2 <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint input_offset));
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i])) input_offset
+    );
     c2 <- (VPSUB_8u32 eta_0 c2);
-    input_offset <- (input_offset + (W64.of_int 32));
+    input_offset <- (input_offset + 32);
     c3 <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint input_offset));
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i])) input_offset
+    );
     c3 <- (VPSUB_8u32 eta_0 c3);
-    input_offset <- (input_offset + (W64.of_int 32));
+    input_offset <- (input_offset + 32);
     c4 <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint input_offset));
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i])) input_offset
+    );
     c4 <- (VPSUB_8u32 eta_0 c4);
-    input_offset <- (input_offset + (W64.of_int 32));
+    input_offset <- (input_offset + 32);
     c5 <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint input_offset));
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i])) input_offset
+    );
     c5 <- (VPSUB_8u32 eta_0 c5);
-    input_offset <- (input_offset + (W64.of_int 32));
+    input_offset <- (input_offset + 32);
     c6 <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint input_offset));
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i])) input_offset
+    );
     c6 <- (VPSUB_8u32 eta_0 c6);
-    input_offset <- (input_offset + (W64.of_int 32));
+    input_offset <- (input_offset + 32);
     c7 <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint input_offset));
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i])) input_offset
+    );
     c7 <- (VPSUB_8u32 eta_0 c7);
     c0 <- (VPACKUS_8u32 c0 c1);
     c1 <- (VPACKUS_8u32 c2 c3);
@@ -1359,102 +1358,91 @@ module M = {
     (Array96.init
     (WArray96.get8
     (WArray96.set128_direct (WArray96.init8 (fun i => encoded.[i]))
-    (W64.to_uint output_offset) (truncateu128 c0))));
-    output_offset <- (output_offset + (W64.of_int 12));
+    output_offset (truncateu128 c0))));
+    output_offset <- (output_offset + 12);
     final_encoded_bytes <-
     (Array16.init
     (WArray16.get8
     (WArray16.set128_direct
     (WArray16.init8 (fun i => final_encoded_bytes.[i])) 0
     (VEXTRACTI128 c0 (W8.of_int 1)))));
-    input_offset <- (W64.of_int 0);
-    while ((input_offset \ult (W64.of_int 12))) {
+    input_offset <- 0;
+    while ((input_offset < 12)) {
       encoded <-
       (Array96.init
       (WArray96.get8
       (WArray96.set8_direct (WArray96.init8 (fun i => encoded.[i]))
-      (W64.to_uint output_offset)
-      final_encoded_bytes.[(W64.to_uint input_offset)])));
-      input_offset <- (input_offset + (W64.of_int 1));
-      output_offset <- (output_offset + (W64.of_int 1));
+      output_offset final_encoded_bytes.[input_offset])));
+      input_offset <- (input_offset + 1);
+      output_offset <- (output_offset + 1);
     }
     return encoded;
   }
   proc error_polynomial__decode_eta2 (polynomial:W32.t Array256.t,
                                       encoded:W8.t Array96.t) : W32.t Array256.t = {
     var eTA_BITS_MASK:int;
-    var input_offset:W64.t;
-    var out_offset:W64.t;
     var t0:W32.t;
     var t1:W32.t;
     var t2:W32.t;
     var temp:W32.t;
     var coefficient:W32.t;
+    var input_offset:int;
+    var out_offset:int;
     eTA_BITS_MASK <- ((1 `<<` 3) - 1);
-    input_offset <- (W64.of_int 0);
-    out_offset <- (W64.of_int 0);
-    while ((input_offset \ult (W64.of_int 96))) {
-      t0 <-
-      (zeroextu32 encoded.[(W64.to_uint (input_offset + (W64.of_int 0)))]);
-      t1 <-
-      (zeroextu32 encoded.[(W64.to_uint (input_offset + (W64.of_int 1)))]);
-      t2 <-
-      (zeroextu32 encoded.[(W64.to_uint (input_offset + (W64.of_int 2)))]);
+    input_offset <- 0;
+    out_offset <- 0;
+    while ((input_offset < 96)) {
+      t0 <- (zeroextu32 encoded.[(input_offset + 0)]);
+      t1 <- (zeroextu32 encoded.[(input_offset + 1)]);
+      t2 <- (zeroextu32 encoded.[(input_offset + 2)]);
       temp <- t0;
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
       coefficient <- (W32.of_int 2);
       coefficient <- (coefficient - temp);
-      polynomial.[(W64.to_uint out_offset)] <- coefficient;
+      polynomial.[out_offset] <- coefficient;
       temp <- t0;
       temp <- (temp `>>` (W8.of_int 3));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
       coefficient <- (W32.of_int 2);
       coefficient <- (coefficient - temp);
-      polynomial.[(W64.to_uint (out_offset + (W64.of_int 1)))] <-
-      coefficient;
+      polynomial.[(out_offset + 1)] <- coefficient;
       temp <- (t0 `>>` (W8.of_int 6));
       temp <- (LEA_32 (((W32.of_int 4) * t1) + temp));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
       coefficient <- (W32.of_int 2);
       coefficient <- (coefficient - temp);
-      polynomial.[(W64.to_uint (out_offset + (W64.of_int 2)))] <-
-      coefficient;
+      polynomial.[(out_offset + 2)] <- coefficient;
       temp <- t1;
       temp <- (temp `>>` (W8.of_int 1));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
       coefficient <- (W32.of_int 2);
       coefficient <- (coefficient - temp);
-      polynomial.[(W64.to_uint (out_offset + (W64.of_int 3)))] <-
-      coefficient;
+      polynomial.[(out_offset + 3)] <- coefficient;
       temp <- t1;
       temp <- (temp `>>` (W8.of_int 4));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
       coefficient <- (W32.of_int 2);
       coefficient <- (coefficient - temp);
-      polynomial.[(W64.to_uint (out_offset + (W64.of_int 4)))] <-
-      coefficient;
+      polynomial.[(out_offset + 4)] <- coefficient;
       temp <- (t1 `>>` (W8.of_int 7));
       temp <- (LEA_32 (((W32.of_int 2) * t2) + temp));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
       coefficient <- (W32.of_int 2);
       coefficient <- (coefficient - temp);
-      polynomial.[(W64.to_uint (out_offset + (W64.of_int 5)))] <-
-      coefficient;
+      polynomial.[(out_offset + 5)] <- coefficient;
       temp <- t2;
       temp <- (temp `>>` (W8.of_int 2));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
       coefficient <- (W32.of_int 2);
       coefficient <- (coefficient - temp);
-      polynomial.[(W64.to_uint (out_offset + (W64.of_int 6)))] <-
-      coefficient;
+      polynomial.[(out_offset + 6)] <- coefficient;
       temp <- (t2 `>>` (W8.of_int 5));
       temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
       coefficient <- (W32.of_int 2);
       coefficient <- (coefficient - temp);
-      polynomial.[(W64.to_uint (out_offset + (W64.of_int 7)))] <-
-      coefficient;
-      input_offset <- (input_offset + (W64.of_int 3));
-      out_offset <- (out_offset + (W64.of_int 8));
+      polynomial.[(out_offset + 7)] <- coefficient;
+      input_offset <- (input_offset + 3);
+      out_offset <- (out_offset + 8);
     }
     return polynomial;
   }
@@ -1628,50 +1616,50 @@ module M = {
   W8.t Array640.t = {
     var temp:W64.t;
     var gamma1:W256.t;
-    var input_offset:W64.t;
-    var output_offset:W64.t;
     var coefficients:W256.t;
     var lower:W128.t;
     var upper:W128.t;
     var final_output_block:W8.t Array16.t;
     var i:int;
+    var input_offset:int;
+    var output_offset:int;
     final_output_block <- witness;
     temp <- (W64.of_int (1 `<<` 19));
     gamma1 <- (zeroextu256 (VMOV_64 temp));
     gamma1 <- (VPBROADCAST_8u32 (truncateu32 gamma1));
-    input_offset <- (W64.of_int 0);
-    output_offset <- (W64.of_int 0);
-    while ((input_offset \ult (W64.of_int (((256 * 32) %/ 8) - 32)))) {
+    input_offset <- 0;
+    output_offset <- 0;
+    while ((input_offset < (((256 * 32) %/ 8) - 32))) {
       coefficients <-
       (get256_direct (WArray1024.init32 (fun i_0 => polynomial.[i_0]))
-      (W64.to_uint input_offset));
-      input_offset <- (input_offset + (W64.of_int 32));
+      input_offset);
       (lower, upper) <@ gamma1__coefficients_to_bytestream_bits18 (gamma1,
       coefficients);
       output <-
       (Array640.init
       (WArray640.get8
       (WArray640.set128_direct (WArray640.init8 (fun i_0 => output.[i_0]))
-      (W64.to_uint output_offset) lower)));
-      output_offset <- (output_offset + (W64.of_int 9));
+      output_offset lower)));
+      output_offset <- (output_offset + 9);
       output <-
       (Array640.init
       (WArray640.get8
       (WArray640.set128_direct (WArray640.init8 (fun i_0 => output.[i_0]))
-      (W64.to_uint output_offset) upper)));
-      output_offset <- (output_offset + (W64.of_int 9));
+      output_offset upper)));
+      output_offset <- (output_offset + 9);
+      input_offset <- (input_offset + 32);
     }
     coefficients <-
     (get256_direct (WArray1024.init32 (fun i_0 => polynomial.[i_0]))
-    (W64.to_uint input_offset));
+    input_offset);
     (lower, upper) <@ gamma1__coefficients_to_bytestream_bits18 (gamma1,
     coefficients);
     output <-
     (Array640.init
     (WArray640.get8
     (WArray640.set128_direct (WArray640.init8 (fun i_0 => output.[i_0]))
-    (W64.to_uint output_offset) lower)));
-    output_offset <- (output_offset + (W64.of_int 9));
+    output_offset lower)));
+    output_offset <- (output_offset + 9);
     final_output_block <-
     (Array16.init
     (WArray16.get8
@@ -1680,8 +1668,7 @@ module M = {
     (* Erased call to declassify *)
     i <- 0;
     while ((i < 9)) {
-      output.[(W64.to_uint (output_offset + (W64.of_int i)))] <-
-      final_output_block.[i];
+      output.[(output_offset + i)] <- final_output_block.[i];
       i <- (i + 1);
     }
     return output;
@@ -1694,10 +1681,10 @@ module M = {
     var gamma1:W256.t;
     var gamma1_times_2_mask:W256.t;
     var coefficients:W256.t;
-    var input_offset:W64.t;
-    var output_offset:W64.t;
     var sixteen_bytes:W128.t;
     var shifts:W256.t;
+    var input_offset:int;
+    var output_offset:int;
     temp <- (W64.of_int (1 `<<` 19));
     temp1 <- (VMOV_64 temp);
     gamma1 <- (VPBROADCAST_8u32 (truncateu32 temp1));
@@ -1705,18 +1692,16 @@ module M = {
     temp1 <- (VMOV_64 temp);
     gamma1_times_2_mask <- (VPBROADCAST_8u32 (truncateu32 temp1));
     coefficients <- (set0_256);
-    input_offset <- (W64.of_int 0);
-    output_offset <- (W64.of_int 0);
-    while ((input_offset \ult (W64.of_int ((20 * 256) %/ 8)))) {
+    input_offset <- 0;
+    output_offset <- 0;
+    while ((output_offset < ((256 * 32) %/ 8))) {
       sixteen_bytes <-
-      (get128_direct (WArray640.init8 (fun i => bytes.[i]))
-      (W64.to_uint input_offset));
-      input_offset <- (input_offset + (W64.of_int 2));
+      (get128_direct (WArray640.init8 (fun i => bytes.[i])) input_offset);
+      input_offset <- (input_offset + 2);
       coefficients <- (VINSERTI128 coefficients sixteen_bytes (W8.of_int 0));
       sixteen_bytes <-
-      (get128_direct (WArray640.init8 (fun i => bytes.[i]))
-      (W64.to_uint input_offset));
-      input_offset <- (input_offset + (W64.of_int 16));
+      (get128_direct (WArray640.init8 (fun i => bytes.[i])) input_offset);
+      input_offset <- (input_offset + 16);
       coefficients <- (VINSERTI128 coefficients sixteen_bytes (W8.of_int 1));
       shifts <- gamma1__DECODING_SHIFTS_TABLE_bits18.[0];
       coefficients <- (VPSHUFB_256 coefficients shifts);
@@ -1728,8 +1713,8 @@ module M = {
       (Array256.init
       (WArray1024.get32
       (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      (W64.to_uint output_offset) coefficients)));
-      output_offset <- (output_offset + (W64.of_int 32));
+      output_offset coefficients)));
+      output_offset <- (output_offset + 32);
     }
     return polynomial;
   }
@@ -16724,8 +16709,6 @@ module M = {
   proc commitment____encode_polynomial_bits6 (encoded:W8.t Array128.t,
                                               raw:W32.t Array256.t) : 
   W8.t Array128.t = {
-    var input_offset:W64.t;
-    var output_offset:W64.t;
     var c0:W256.t;
     var c1:W256.t;
     var c2:W256.t;
@@ -16733,75 +16716,67 @@ module M = {
     var bytestream_lower:W128.t;
     var bytestream_upper:W128.t;
     var final_encoded_bytes:W8.t Array16.t;
+    var input_offset:int;
+    var output_offset:int;
     final_encoded_bytes <- witness;
-    input_offset <- (W64.of_int 0);
-    output_offset <- (W64.of_int 0);
-    while ((input_offset \ult (W64.of_int (((256 * 32) %/ 8) - 128)))) {
+    input_offset <- 0;
+    output_offset <- 0;
+    while ((output_offset < (((6 * 256) %/ 8) - 24))) {
       c0 <-
-      (get256_direct (WArray1024.init32 (fun i => raw.[i]))
-      (W64.to_uint input_offset));
-      input_offset <- (input_offset + (W64.of_int 32));
+      (get256_direct (WArray1024.init32 (fun i => raw.[i])) input_offset);
+      input_offset <- (input_offset + 32);
       c1 <-
-      (get256_direct (WArray1024.init32 (fun i => raw.[i]))
-      (W64.to_uint input_offset));
-      input_offset <- (input_offset + (W64.of_int 32));
+      (get256_direct (WArray1024.init32 (fun i => raw.[i])) input_offset);
+      input_offset <- (input_offset + 32);
       c2 <-
-      (get256_direct (WArray1024.init32 (fun i => raw.[i]))
-      (W64.to_uint input_offset));
-      input_offset <- (input_offset + (W64.of_int 32));
+      (get256_direct (WArray1024.init32 (fun i => raw.[i])) input_offset);
+      input_offset <- (input_offset + 32);
       c3 <-
-      (get256_direct (WArray1024.init32 (fun i => raw.[i]))
-      (W64.to_uint input_offset));
-      input_offset <- (input_offset + (W64.of_int 32));
+      (get256_direct (WArray1024.init32 (fun i => raw.[i])) input_offset);
+      input_offset <- (input_offset + 32);
       (bytestream_lower, bytestream_upper) <@ commitment__coefficients_to_bytestream_bits6 (
       c0, c1, c2, c3);
       encoded <-
       (Array128.init
       (WArray128.get8
       (WArray128.set128_direct (WArray128.init8 (fun i => encoded.[i]))
-      (W64.to_uint output_offset) bytestream_lower)));
-      output_offset <- (output_offset + (W64.of_int 12));
+      output_offset bytestream_lower)));
       encoded <-
       (Array128.init
       (WArray128.get8
       (WArray128.set128_direct (WArray128.init8 (fun i => encoded.[i]))
-      (W64.to_uint output_offset) bytestream_upper)));
-      output_offset <- (output_offset + (W64.of_int 12));
+      (output_offset + 12) bytestream_upper)));
+      output_offset <- (output_offset + 24);
     }
     c0 <-
-    (get256_direct (WArray1024.init32 (fun i => raw.[i]))
-    (W64.to_uint input_offset));
-    input_offset <- (input_offset + (W64.of_int 32));
+    (get256_direct (WArray1024.init32 (fun i => raw.[i])) input_offset);
+    input_offset <- (input_offset + 32);
     c1 <-
-    (get256_direct (WArray1024.init32 (fun i => raw.[i]))
-    (W64.to_uint input_offset));
-    input_offset <- (input_offset + (W64.of_int 32));
+    (get256_direct (WArray1024.init32 (fun i => raw.[i])) input_offset);
+    input_offset <- (input_offset + 32);
     c2 <-
-    (get256_direct (WArray1024.init32 (fun i => raw.[i]))
-    (W64.to_uint input_offset));
-    input_offset <- (input_offset + (W64.of_int 32));
+    (get256_direct (WArray1024.init32 (fun i => raw.[i])) input_offset);
+    input_offset <- (input_offset + 32);
     c3 <-
-    (get256_direct (WArray1024.init32 (fun i => raw.[i]))
-    (W64.to_uint input_offset));
+    (get256_direct (WArray1024.init32 (fun i => raw.[i])) input_offset);
     (bytestream_lower, bytestream_upper) <@ commitment__coefficients_to_bytestream_bits6 (
     c0, c1, c2, c3);
     encoded <-
     (Array128.init
     (WArray128.get8
     (WArray128.set128_direct (WArray128.init8 (fun i => encoded.[i]))
-    (W64.to_uint output_offset) bytestream_lower)));
-    output_offset <- (output_offset + (W64.of_int 12));
+    output_offset bytestream_lower)));
+    output_offset <- (output_offset + 12);
     final_encoded_bytes <-
     (Array16.init
     (WArray16.get8
     (WArray16.set128_direct
     (WArray16.init8 (fun i => final_encoded_bytes.[i])) 0 bytestream_upper)));
-    input_offset <- (W64.of_int 0);
-    while ((input_offset \ult (W64.of_int 12))) {
-      encoded.[(W64.to_uint output_offset)] <-
-      final_encoded_bytes.[(W64.to_uint input_offset)];
-      output_offset <- (output_offset + (W64.of_int 1));
-      input_offset <- (input_offset + (W64.of_int 1));
+    input_offset <- 0;
+    while ((input_offset < 12)) {
+      encoded.[output_offset] <- final_encoded_bytes.[input_offset];
+      output_offset <- (output_offset + 1);
+      input_offset <- (input_offset + 1);
     }
     return encoded;
   }
