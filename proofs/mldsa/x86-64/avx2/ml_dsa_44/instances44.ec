@@ -1,13 +1,11 @@
 require import AllCore.
 require Spec44 Mldsa44I BaseT PreludeT ErrorSamplerT KeygenT SignT VerifyT.
 require Eta2T Gamma1Bits18T W1Bits6T.
-from JazzEC require Commitment_hash44.
 
 (* The generic theories of key generation, signing and verification, at
    the ML-DSA-44 parameters and model. Their hypotheses, on the code that
    depends on the set, are discharged by the variants of that code used
-   by ML-DSA-44 and by the ML-DSA-44 proofs of the rest. The theorems are
-   restated in Correctness44. *)
+   by ML-DSA-44. The theorems are restated in Correctness44. *)
 
 clone BaseT.BaseT as Base44 with
   theory S <- Spec44.MLDSA44,
@@ -58,5 +56,3 @@ clone VerifyT.VerifyT as Verify44 with
   theory CMT <- W1Bits6_44.CMT,
   theory SG.G1 <- Gamma1Bits18_44.G1
 proof *.
-realize compare_commitment_hashes_correct
-  by exact Commitment_hash44.compare_commitment_hashes_correct.

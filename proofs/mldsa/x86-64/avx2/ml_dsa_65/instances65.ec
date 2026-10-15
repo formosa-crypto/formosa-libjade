@@ -1,13 +1,11 @@
 require import AllCore.
 require Spec65 Mldsa65I BaseT PreludeT ErrorSamplerT KeygenT SignT VerifyT.
 require Eta4T Gamma1Bits20T W1Bits4T.
-from JazzEC require Commitment_hash.
 
 (* The generic theories of key generation, signing and verification, at
    the ML-DSA-65 parameters and model. Their hypotheses, on the code that
    depends on the set, are discharged by the variants of that code used
-   by ML-DSA-65 and by the ML-DSA-65 proofs of the rest. The theorems are
-   restated in Correctness65. *)
+   by ML-DSA-65. The theorems are restated in Correctness65. *)
 
 clone BaseT.BaseT as Base65 with
   theory S <- Spec65.MLDSA65,
@@ -58,4 +56,3 @@ clone VerifyT.VerifyT as Verify65 with
   theory CMT <- W1Bits4_65.CMT,
   theory SG.G1 <- Gamma1Bits20_65.G1
 proof *.
-realize compare_commitment_hashes_correct by exact Commitment_hash.compare_commitment_hashes_correct.

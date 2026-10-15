@@ -40,15 +40,128 @@ wp; while (0 <= offset <= ctilde /\ offset %% 16 = 0) (ctilde - offset).
 by auto => /> /#.
 qed.
 
-(* The comparison of the two commitment hashes is unrolled on the size of
-   the hash, which depends on the set: its correctness is a hypothesis of
-   this theory, proved for each set. *)
-axiom compare_commitment_hashes_correct (_lhs _rhs : W8.t Array_ctilde.t) :
+(* the bytes 16 k + i of two hashes agree for the first n blocks *)
+op lane_eq (l r : W8.t Array_ctilde.t) (n i : int) =
+  forall k, 0 <= k < n => l.[16 * k + i] = r.[16 * k + i].
+
+lemma get128_ctildeE (a : W8.t Array_ctilde.t) (o i : int) :
+  0 <= o => o + 16 <= ctilde => 0 <= i < 16 =>
+  WArray_ctilde.get128_direct (WArray_ctilde.init8 (fun j => a.[j])) o \bits8 i = a.[o + i].
+proof.
+move=> ho hoc hi; rewrite /WArray_ctilde.get128_direct W16u8.pack16bE // initiE //=.
+by rewrite /WArray_ctilde.init8 WArray_ctilde.initiE 1:/#.
+qed.
+
+lemma VPCMPEQ_16u8_bitsE (x y : W128.t) (i : int) : 0 <= i < 16 =>
+  VPCMPEQ_16u8 x y \bits8 i = if x \bits8 i = y \bits8 i then W8.onew else W8.zero.
+proof.
+move=> hi; rewrite /VPCMPEQ_16u8 W16u8.map2bE // /wcmp /=.
+move: (x \bits8 i) (y \bits8 i) => a b; case: (a = b) => [-> /=|hne].
+- by apply W8.to_uint_eq; rewrite W8.of_uintK W8.to_uint_onew.
+rewrite ifF // /W8.to_sint /W8.smod /=.
+by have := W8.to_uint_eq a b; have := W8.to_uint_cmp a; have := W8.to_uint_cmp b; smt().
+qed.
+
+lemma and128_bitsE (x y : W128.t) (i : int) : 0 <= i < 16 =>
+  (x `&` y) \bits8 i = (x \bits8 i) `&` (y \bits8 i).
+proof.
+move=> hi; apply W8.wordP => j hj.
+by rewrite !bits8iE // W8.andwE W128.andwE !bits8iE.
+qed.
+
+lemma movemask_onesE (v : W128.t) :
+  (forall i, 0 <= i < 16 => v \bits8 i = W8.onew \/ v \bits8 i = W8.zero) =>
+  (zeroextu64 (MOVEMASK_16u8 v) = W64.of_int 65535 <=>
+   forall i, 0 <= i < 16 => v \bits8 i = W8.onew).
+proof.
+move=> hv; rewrite /MOVEMASK_16u8 /=.
+pose l := [msb (v \bits8 0); msb (v \bits8 1); msb (v \bits8 2); msb (v \bits8 3);
+  msb (v \bits8 4); msb (v \bits8 5); msb (v \bits8 6); msb (v \bits8 7); msb (v \bits8 8);
+  msb (v \bits8 9); msb (v \bits8 10); msb (v \bits8 11); msb (v \bits8 12);
+  msb (v \bits8 13); msb (v \bits8 14); msb (v \bits8 15)].
+have hl : forall i, 0 <= i < 16 => nth false l i = msb (v \bits8 i).
+- move=> i hi; have : i \in iota_ 0 16 by rewrite mem_iota /#.
+  by rewrite -iotaredE /= => -[|[|[|[|[|[|[|[|[|[|[|[|[|[|[|]]]]]]]]]]]]]]] ->.
+have hsz : size l = 16 by done.
+have -> : W32.bits2w l = W32.bits2w (l ++ nseq 16 false).
+- apply W32.wordP => j hj; rewrite !W32.get_bits2w // nth_cat hsz.
+  by case: (j < 16) => hj16 //; rewrite nth_nseq_if /= nth_default /#.
+rewrite W64.to_uint_eq to_uint_zeroextu64 W32.to_uintE W32.bits2wK.
+- by rewrite size_cat hsz size_nseq.
+rewrite -bs2int_pad W64.of_uintK /=.
+have hall : BS2Int.bs2int (nseq 16 true) = 65535.
+- by have := BS2Int.bs2int_cat_nseq_true_false 16 16 _ => //=; rewrite nseq0 cats0.
+have -> : BS2Int.bs2int l = 65535 <=> l = nseq 16 true.
+- split => [h|->] //; rewrite -(BS2Int.bs2intK l) hsz h -hall.
+  by have := BS2Int.bs2intK (nseq 16 true); rewrite size_nseq.
+have m1 : W8.msb W8.onew by rewrite /W8.msb W8.to_uint_onew.
+have m0 : !W8.msb W8.zero by rewrite /W8.msb W8.to_uint0.
+split => [h i hi | h].
+- by have := hl i hi; rewrite h nth_nseq //=; case: (hv i hi) => // ->.
+apply (eq_from_nth false); 1: by rewrite size_nseq.
+by move=> i hi; rewrite hl 1:/# h 1:/# nth_nseq 1:/# m1.
+qed.
+
+(* The comparison of the two commitment hashes, 16 bytes at a time: byte
+   i of the accumulated mask is 0xFF when the bytes 16 k + i of the hashes
+   are equal for every block k read so far, and 0x00 otherwise. *)
+lemma compare_commitment_hashes_h (_lhs _rhs : W8.t Array_ctilde.t) :
+  hoare [ M.__compare_commitment_hashes :
+      arg.`1 = _lhs /\ arg.`2 = _rhs
+      ==>
+      res = (if _lhs = _rhs then W64.of_int 0 else -W64.one) ].
+proof.
+have hct : 16 <= ctilde /\ ctilde %% 16 = 0 by rewrite /ctilde; smt(param_sets).
+proc; wp.
+while (lhs = _lhs /\ rhs = _rhs /\ 16 <= offset <= ctilde /\ offset %% 16 = 0 /\
+  forall i, 0 <= i < 16 => result_vec \bits8 i =
+    if lane_eq _lhs _rhs (offset %/ 16) i then W8.onew else W8.zero).
+- auto => &hr |> h16 hle hmod hrv hlt; do 2!(split; 1: smt()).
+  move=> i h0 h1; rewrite VPCMPEQ_16u8_bitsE //.
+  rewrite (get128_ctildeE lhs{hr} offset{hr} i) 1..3:/#.
+  rewrite (get128_ctildeE rhs{hr} offset{hr} i) 1..3:/# hrv 1:/#.
+  have hm : offset{hr} = 16 * (offset{hr} %/ 16) by smt().
+  have -> : (offset{hr} + 16) %/ 16 = offset{hr} %/ 16 + 1 by smt().
+  have -> : lane_eq lhs{hr} rhs{hr} (offset{hr} %/ 16 + 1) i
+            = (lane_eq lhs{hr} rhs{hr} (offset{hr} %/ 16) i
+               /\ lhs{hr}.[offset{hr} + i] = rhs{hr}.[offset{hr} + i]).
+  - rewrite /lane_eq eq_iff; split => [h | [h hl] k hk].
+    + by split => [k hk | ]; [apply h; smt() | rewrite {1 2}hm; apply h; smt()].
+    case: (k < offset{hr} %/ 16) => hk'; 1: by apply h; smt().
+    by rewrite (_ : k = offset{hr} %/ 16) 1:/# -hm.
+  by case: (lane_eq lhs{hr} rhs{hr} (offset{hr} %/ 16) i);
+     case: (lhs{hr}.[offset{hr} + i] = rhs{hr}.[offset{hr} + i]).
+auto => &hr |>; split.
+- split; 1: smt().
+  move=> i h0 h1; rewrite VPCMPEQ_16u8_bitsE 1:/#.
+  rewrite (get128_ctildeE lhs{hr} 0 i) 1..3:/# (get128_ctildeE rhs{hr} 0 i) 1..3:/# /lane_eq /=.
+  have -> // : (forall k, 0 <= k < 1 => lhs{hr}.[16 * k + i] = rhs{hr}.[16 * k + i])
+               = (lhs{hr}.[i] = rhs{hr}.[i]).
+  by rewrite eq_iff; split => [h | h k hk]; [apply (h 0) | rewrite (_ : k = 0) 1:/#].
+move=> off rv hnlt h16 hle hmod hrv.
+have hoff : off = ctilde by smt().
+have hb : forall i, 0 <= i < 16 => rv \bits8 i = W8.onew \/ rv \bits8 i = W8.zero.
+- by move=> i hi; rewrite hrv //; case: (lane_eq lhs{hr} rhs{hr} (off %/ 16) i).
+have heq : (forall i, 0 <= i < 16 => rv \bits8 i = W8.onew) <=> lhs{hr} = rhs{hr}.
+- split => [h | he i hi]; last by rewrite hrv // ifT // /lane_eq he.
+  apply Array_ctilde.tP => j hj.
+  have := h (j %% 16) _; 1: smt().
+  rewrite hrv 1:/#; case: (lane_eq lhs{hr} rhs{hr} (off %/ 16) (j %% 16)) => hl /=.
+  + have := hl (j %/ 16) _; 1: smt().
+    by rewrite (_ : 16 * (j %/ 16) + j %% 16 = j) 1:/#.
+  by rewrite W8.to_uint_eq W8.to_uint0 W8.to_uint_onew.
+rewrite (movemask_onesE rv hb) heq.
+split => [-> // | hne]; rewrite ifF //.
+by apply W64.to_uint_eq; rewrite W64.of_uintK W64.to_uintN W64.to_uint1.
+qed.
+
+lemma compare_commitment_hashes_correct (_lhs _rhs : W8.t Array_ctilde.t) :
   phoare [ M.__compare_commitment_hashes :
       arg.`1 = _lhs /\ arg.`2 = _rhs
       ==>
       res = (if _lhs = _rhs then W64.of_int 0 else -W64.one)
   ] = 1%r.
+proof. by conseq compare_commitment_hashes_ll (compare_commitment_hashes_h _lhs _rhs). qed.
 
 
 (* ================================================================== *)

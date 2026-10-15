@@ -1,13 +1,11 @@
 require import AllCore.
 require Spec87 Mldsa87I BaseT PreludeT ErrorSamplerT KeygenT SignT VerifyT.
 require Eta2T Gamma1Bits20T W1Bits4T.
-from JazzEC require Commitment_hash87.
 
 (* The generic theories of key generation, signing and verification, at
    the ML-DSA-87 parameters and model. Their hypotheses, on the code that
    depends on the set, are discharged by the variants of that code used
-   by ML-DSA-87 and by the ML-DSA-87 proofs of the rest. The theorems are
-   restated in Correctness87. *)
+   by ML-DSA-87. The theorems are restated in Correctness87. *)
 
 clone BaseT.BaseT as Base87 with
   theory S <- Spec87.MLDSA87,
@@ -58,5 +56,3 @@ clone VerifyT.VerifyT as Verify87 with
   theory CMT <- W1Bits4_87.CMT,
   theory SG.G1 <- Gamma1Bits20_87.G1
 proof *.
-realize compare_commitment_hashes_correct
-  by exact Commitment_hash87.compare_commitment_hashes_correct.
