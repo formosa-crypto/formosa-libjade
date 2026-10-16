@@ -325,15 +325,9 @@ call (sampleAT_sem _sd);auto => />.
 qed.
 
 
-op unlift_polyu(a : poly) = Array256.init (fun i => W16.of_int (Zq.asint a.[i])).
-
-lemma unlift_polyuE a:
- unlift_polyu a
- = Array256.map (fun x => W16.of_int (Zq.asint x)) a.
-proof.
-apply Array256.ext_eq => i Hi.
-by rewrite initiE //= mapiE //.
-qed.
+require import EclibExtra JWordList.
+from Keccak require import Keccak1600_avx2x4.
+require import MLKEM_keccak_avx2 Mlkem_filters_bridge MLKEM_sampler_avx2.
 
 lemma unlift_polyu_getm (A: polymat) i j:
  0 <= i < 4 =>
@@ -351,346 +345,6 @@ have ->: (1024 * i + (256 * j + k)) %% 1024 %/ 256 = j by smt().
 have ->: (1024 * i + (256 * j + k)) %% 256 = k by smt().
 done.
 qed.
-
-require import EclibExtra.
-require import JWordList.
-from Keccak require import Keccak1600_avx2x4.
-require import MLKEM_keccak_avx2.
-require import Mlkem_filters_bridge.
-
-lemma take_rejection16_done n buf buf_o bo:
- 0 <= buf_o <= bo <= 504 =>
- 3 %| buf_o =>
- 3 %| bo =>
- size (take n (rejection16 (buf_subl buf buf_o bo))) = n =>
- take n (rejection16 (buf_subl buf buf_o bo))
- = take n (rejection16 (buf_subl buf buf_o 504)).
-proof.
-move=> H H1 H2 /size_takel' [Hsz1].
-rewrite size_map => Hsz2.
-rewrite -(buf_subl_cat _ _ bo 504) 1:/# /rejection16 rejection_cat.
- by rewrite size_buf_subl /#.
-rewrite -map_take eq_sym -map_take; congr.
-by rewrite take_cat' ifT.
-qed.
-
-lemma pack32_sample_load_shuffle:
- pack32 (to_list sample_load_shuffle)
- = get256_direct ((init8 ("_.[_]" sample_load_shuffle)))%WArray32 0.
-proof.
-rewrite get256E; congr.
-apply W32u8.Pack.all_eqP.
-by rewrite of_listK 1:/# /all_eq /= !initiE /#.
-qed.
-
-lemma size_rejection16_le buf bstart bend1 bend2:
- 3 %| bstart =>
- 3 %| bend1 =>
- 3 %| bend2 =>
- 0 <= bstart <= bend1 <= bend2 <= 536 =>
- size (rejection16 (buf_subl buf bstart bend1))
- <= size (rejection16 (buf_subl buf bstart bend2)).
-proof.
-move=> H1 H2 H3 H.
-rewrite /rejection16 !size_map.
-rewrite -(buf_subl_cat _ _ bend1 bend2) 1:/#.
-rewrite bytes2coeffs_cat.
- by rewrite size_buf_subl /#.
-by rewrite filter_cat size_cat; smt(size_ge0).
-qed.
-
-lemma rejection16_cat l1 l2:
- 3 %| size l1 =>
- rejection16 (l1++l2) = rejection16 l1 ++ rejection16 l2.
-proof.
-by move=> H; rewrite /rejection16 rejection_cat 1:// map_cat.
-qed.
-
-hoare gen_matrix_buf_rejection_h _pol _ctr _buf _buf_offset:
- Jkem_avx2.M._gen_matrix_buf_rejection
- : counter = _ctr
-   /\ pol = _pol
-   /\ buf = _buf
-   /\ buf_offset = _buf_offset
-   /\ 0 <= to_uint counter < 256
-   /\ (to_uint buf_offset = 0 \/ to_uint buf_offset = 2*168)
-   ==>
-   let l = take (256-to_uint _ctr) (rejection16 (buf_subl _buf (to_uint _buf_offset) 504))
-   in plist res.`1 (to_uint _ctr + size l)
-      = plist _pol (to_uint _ctr) ++ l
-      /\ to_uint _ctr + size l = min 256 (to_uint res.`2).
-proof.
-proc; simplify.
-while ( buf=_buf /\ 24 %| to_uint buf_offset /\ 3 %| to_uint _buf_offset /\
-        0 <= to_uint _buf_offset <= to_uint buf_offset <= 504 /\
-        0 <= to_uint _ctr < 256 /\
-        to_uint _ctr <= to_uint counter /\
-        auxdata_ok load_shuffle mask bounds ones sst /\
-        (plist pol (min 256 (to_uint counter))
-         = plist _pol (to_uint _ctr)
-           ++ take (256-to_uint _ctr) (rejection16 (buf_subl _buf (to_uint _buf_offset) (to_uint buf_offset)))
-        ) /\
-        (condition_loop <=> to_uint buf_offset <= 504-24)).
- wp.
- seq 2: (#{/~condition_loop}pre /\ to_uint buf_offset <= 504 - 24 /\ (condition_loop <=> to_uint counter < 256)).
- + by auto => /> &m *; rewrite ultE.
- if; last first.
- + auto => /> &m Hdvd1 Hdvd2 Ho1 Ho2 Ho3 Hctr1 Hctr2 Hctr3 H Hcond1 Hcond2; split; first smt().
-   have : size (take (256 - to_uint _ctr) (rejection16 (buf_subl _buf (to_uint _buf_offset) (to_uint buf_offset{m})))) = 256 - to_uint _ctr.
-   * have : size (plist pol{m} (min 256 (to_uint counter{m}))) = 256 by rewrite size_plist; smt().
-     rewrite H size_cat size_plist; smt().
-   rewrite size_takel' => - [] _ Hsz.
-   move: H; rewrite take_rejection16_done 1, 3:/#; first by [].
-   * rewrite size_take; first smt().
-     by rewrite -/(min _ _) lez_minl.
-   exact.
- wp; ecall (buf_rejection_filter24_h pol counter buf buf_offset).
- auto => &m /> Hdvd1 Hdvd2 Ho1 Ho2 Ho3 Hctr1 Hctr2 Hctr3 H Hcond1 Hcond2.
- have Hsz: min 256 (to_uint counter{m}) = to_uint _ctr + min (256-to_uint _ctr) (size (rejection16 (buf_subl buf{m} (to_uint _buf_offset) (to_uint buf_offset{m})))).
-  rewrite -(size_plist pol{m} (min 256 (to_uint counter{m}))) 1:/# H size_cat size_plist 1:/#; congr.
-  by rewrite size_take_min /#.
- move: H; rewrite take_oversize 1:/# lez_minr 1:/# => H; split; first smt(). 
- move=> Hoff Hcounter [p c' ms'] /= /> Hstep.
- rewrite !to_uintD_small 1:/# !of_uintK=> Hc'; split; first smt().
- split.
-  split; first by rewrite !modz_small 1:// /= /#.
-  by move=> *; rewrite !modz_small 1:// /= /#.
- split; first smt(size_ge0). 
- rewrite modz_small; first smt(size_ge0 size_take_min).
- split; last rewrite ultE to_uintD_small /#.
- rewrite Hc'.
- rewrite Hstep H -catA; congr.
- rewrite -(buf_subl_cat _ (to_uint _buf_offset) (to_uint buf_offset{m}) (to_uint buf_offset{m} + 24)) 1:/#.
- rewrite rejection16_cat.
-  by rewrite size_buf_subl /#.
- by rewrite take_catr 1:/#; congr; congr; smt().
-wp.
-while ( buf=_buf /\ 24 %| to_uint saved_buf_offset /\ 3 %| to_uint _buf_offset /\
-        0 <= to_uint _buf_offset <= to_uint saved_buf_offset <= 504 /\
-        0 <= to_uint _ctr <= to_uint counter <= 256 /\
-        auxdata_ok load_shuffle mask bounds ones sst /\
-        plist pol (min 256 (to_uint counter))
-        = plist _pol (to_uint _ctr)
-           ++ rejection16 (buf_subl _buf (to_uint _buf_offset) (to_uint saved_buf_offset)) /\
-        to_uint _ctr + size (rejection16 (buf_subl _buf (to_uint _buf_offset) (to_uint saved_buf_offset))) <= 256 /\
-        (condition_loop <=> to_uint buf_offset <= 504-48) /\
-        (to_uint buf_offset <= 504 - 48 => saved_buf_offset = buf_offset)).
- seq 2: (#{/~condition_loop}pre /\ to_uint buf_offset <= 504 - 48 /\ saved_buf_offset = buf_offset /\ (condition_loop <=> to_uint counter <= 256 - 32)).
- + auto => &m /> *; rewrite ultE /#.
- if; last by auto.
- wp; ecall (buf_rejection_filter48_h pol counter buf buf_offset).
- auto; rewrite /protect_64 => &m />.
- move => Hdvd1 Hdvd2 Ho1 Ho2 Ho3 Hctr1 Hctr2 Hctr3 + Hbo Hctr4 Hbo4.
- have -> : (min 256 (to_uint counter{m})) = to_uint counter{m} by smt().
- move => H.
- split;1:smt().
- move => ? [p c'] /= /> Hstep. 
- rewrite !to_uintD_small 1:/# !of_uintK; split; first smt().
- split;1: by rewrite !modz_small 1:// /= /#.
- pose R:= rejection16 _.
- have ?: 0 <= size R <= 32.
-  rewrite size_map; split; first smt(size_ge0).
-  move=> _; apply (size_rejection_le' 48); 1:done => /=.
-  by rewrite /buf_subl !size_take 1:/# !size_drop /#.
- rewrite !modz_small 1..2:/#.
-  have -> : (min 256 (to_uint counter{m} + size R)) = to_uint counter{m} + size R by smt().
- split; first smt().
- rewrite -andaE; split.
-  rewrite -(buf_subl_cat _ (to_uint _buf_offset) (to_uint buf_offset{m}) (to_uint buf_offset{m} + 48)) 1:/#.
-  rewrite Hstep H -catA; congr.
-  rewrite rejection16_cat 2://.
-  by rewrite size_buf_subl /#.
- move => HH. 
- have : size (plist p (to_uint counter{m} + size R)) <= 256.
-  by rewrite size_plist /#.
- by rewrite HH size_cat size_plist 1:/# ultE to_uintD_small /#.
-auto; rewrite /protect_64 => &m /> Hctr1 Hctr2 Hbo; split.
- split; first smt().
- split; first smt().
- split; first smt().
- split; first smt().
- split; 1:  by rewrite pack32_sample_load_shuffle.
- have -> : (min 256 (to_uint counter{m})) = to_uint counter{m} by smt().
- split; 1: by rewrite buf_subl0 1:/# /rejection16 rejection0 cats0.
- split; last by rewrite ultE /#.
- by rewrite buf_subl0 1:/# /rejection16 rejection0 /#.
-move => buf_o cond ctr pol saved_buf_offset Hcond Hdvd1 Hdvd2 Hbo1 Hbo2 Hbo3 Hctr3 Hctr4 _ H Hsz Hterm; split.
- by rewrite ultE take_oversize /#.
-move=> buf_o2 cond2 ctr2 pol2 HC2 Hdvd3 Hbo4 Hbo5 Hctr5 HH.
-case: (to_uint ctr2 < 256) => /= C1.
- move=> C2; move: HH; have ->: to_uint buf_o2 = 504 by smt().
- rewrite lez_minr 1:/#.
- move => HH; rewrite andbC -andaE; split.
-  rewrite -(size_plist pol2 (to_uint ctr2)) 1:/# HH.
-  by rewrite size_cat size_plist 1:/#.
- by move => E; move: HH; rewrite -E => ->.
-move: HH.
-have E: min 256 (to_uint ctr2) = 256 by smt().
-rewrite !E => HH.
-rewrite andbC -andaE.
-have HHsz: 256 = to_uint counter{m} + min (256 - to_uint counter{m})
-      (size (rejection16 (buf_subl buf{m} (to_uint buf_offset{m}) (to_uint buf_o2)))).
- rewrite -(size_plist pol2 256) 1:/#.
- by rewrite HH size_cat size_plist 1:/# size_take_min /#.
-rewrite size_take_min 1:/#.
-move => _.
-split; first smt(size_rejection16_le).
-move => ->; rewrite HH; congr.
-apply take_rejection16_done; first 3 smt().
-by rewrite size_take_min /#.
-qed.
-
-lemma gen_matrix_buf_rejection_ll:
- islossless Jkem_avx2.M._gen_matrix_buf_rejection.
-proof.
-proc.
-seq 13: (true)=> //.
- wp; while ((condition_loop
-            <=> to_uint buf_offset <= 504-48) /\ (condition_loop => saved_buf_offset = buf_offset))
-           (504 - to_uint buf_offset).
-  move=> z.
-  exlim buf_offset => _buf_offset.
-  seq 2: (#{~condition_loop} pre /\ saved_buf_offset = buf_offset /\ to_uint buf_offset <= 504 - 48) => //.
-  - by auto => &m />.
-  - if; last by auto => &m /> /#.
-    wp; call buf_rejection_filter48_ll; auto => &m /> H _.
-    rewrite ultE to_uintD_small /#.
-  by hoare; auto => />.
- auto => &m />.
- rewrite ultE /#.
- exlim buf_offset => _buf_offset.
- exlim counter => _counter.
-while (condition_loop
-       <=> to_uint buf_offset <= 504-24)
-      (504 - to_uint buf_offset).
- move=> z.
- seq 2: (#{~condition_loop}pre /\ to_uint buf_offset <= 504 - 24) => //.
- - auto.
- - if; last auto => &m /> /#.
-    wp; call buf_rejection_filter24_ll; auto => &m /> H _.
-    rewrite /protect_64 ultE to_uintD_small /#.
- by hoare; auto.
-auto => &m />.
-rewrite ultE /#.
-qed.
-
-phoare gen_matrix_buf_rejection_ph _pol _ctr _buf _buf_offset:
- [ Jkem_avx2.M._gen_matrix_buf_rejection
- : counter = _ctr
-   /\ pol = _pol
-   /\ buf = _buf
-   /\ buf_offset = _buf_offset
-   /\ 0 <= to_uint counter < 256
-   /\ (to_uint buf_offset = 0 \/ to_uint buf_offset = 2*168)
-   ==>
-   let l = take (256-to_uint _ctr) (rejection16 (buf_subl _buf (to_uint _buf_offset) 504))
-   in plist res.`1 (to_uint _ctr + size l)
-      = plist _pol (to_uint _ctr) ++ l
-      /\ to_uint _ctr + size l = min 256 (to_uint res.`2)
- ] = 1%r.
-proof.
-by conseq gen_matrix_buf_rejection_ll (gen_matrix_buf_rejection_h _pol _ctr _buf _buf_offset).
-qed.
-
-abbrev coeff2u16 x = W16.of_int (Zq.asint x).
-abbrev coeffL2u16L = List.map coeff2u16.
-
-equiv fill_poly_eq:
- Jkem_avx2.M.__gen_matrix_fill_polynomial
- ~ ParseFilter.fill_poly
- : buf_subl buf{1} 0 (3*168) = buf{2}
-   /\ sub buf{1} (2*168) 200 = state2bytes st{2}
-   ==>
-   res{1}.`1 = unlift_polyu res{2}.
-proof.
-proc; simplify.
-while ( min 256 (to_uint counter{1})=c{2} /\ 0 <= c{2} <= 256
-      /\ to_uint buf_offset{1} = 2*168
-      /\ state2bytes st{2} = sub buf{1} (2*168) 200
-      /\ plist pol{1} c{2} = coeffL2u16L p{2}
-      ).
- ecall {1} (gen_matrix_buf_rejection_ph pol{1} counter{1} buf{1} buf_offset{1}).
- ecall {1} (shake128_next_state_ph buf{1}).
- sp 0 1.
- elim* => /= st1.
- auto => /> &1 &2 ? ? -> Est1 Hpol _ Hctr1 buf1 Est2; split; 1:smt().
- move => ?? [pol ctr] /=.
- pose bnd := 256 - to_uint counter{1}.
- move: Hpol; rewrite lez_minr 1:/# => Hpol.
- rewrite Hpol buf_sublE 1:// /= => Hpol1 Ectr.
- have : squeezestate_i c256_r8 (bytes2state (sub buf{1} 336 200)) 0 = buf_subl buf1 336 504.
-  rewrite buf_sublE 1:// /=.
-  rewrite /squeezestate_i /st_i /= iter1.
-  rewrite /squeezestate /= /c256_r8.
-  rewrite -Est2 take_mkseq 1:/# /sub /#.
- rewrite buf_sublE 1:// /= -Est1.
- rewrite state2bytesK => ->.
- move: Ectr; rewrite /rejection16 -map_take size_map => Ectr.
- rewrite -Ectr; split.
-  split; first smt(). 
-  split; first smt(size_ge0 size_take).
-  split.
-   rewrite Est2 /st_i iter1; congr; congr.
-   by rewrite -Est1 state2bytesK.
-  move: Hpol1; rewrite /rejection16.
-  rewrite -map_take map_cat => <-. 
-  by rewrite size_map.
- rewrite ultE !of_uintK /=; smt(size_ge0 size_take size_rejection_le).
-wp; ecall {1} (gen_matrix_buf_rejection_ph pol{1} counter{1} buf{1} buf_offset{1}).
-auto => /> &1 &2 Hbuf [p c] /=; rewrite plist0 ultE /=.
-rewrite /rejection16 !size_take // size_map /= map_take => H Ectr.
-split; first smt(W64.to_uint_cmp size_ge0 size_take).
-move => buf ctr p1 p2 st => _?_?.
-have ->: min 256 (to_uint ctr) = 256 by smt().
-move => _ HH.
-have Hsz: size (coeffL2u16L p2) = 256.
- by rewrite -HH size_plist /#.
-apply Array256.to_list_inj.
-move: HH.
-rewrite /Array256.to_list /plist /= => ->.
-rewrite unlift_polyuE map_of_list /=.
-rewrite -(eq_in_mkseq (nth (coeff2u16 witness) (coeffL2u16L p2))).
- by move => i Hi; rewrite get_of_list //.
-by rewrite -Hsz mkseq_nth.
-qed.
-
-lemma pack2_rc (pos: W8.t Array2.t) rc:
-Array2.init
- (WArray2.get8
-  (WArray2.set16_direct
-   (WArray2.init8 (fun i=> pos.[i])) 0 rc))
-=
-Array2.of_list witness [rc \bits8 0; rc \bits8 1].
-proof. by apply Array2.all_eq_eq; rewrite /all_eq /=. qed.
-
-
-op pack4poly ['a] (ps: 'a Array256.t * 'a Array256.t * 'a Array256.t * 'a Array256.t) =
- Array1024.of_list witness (to_list ps.`1 ++ to_list ps.`2 ++ to_list ps.`3 ++ to_list ps.`4).
-
-op buf_ok (buf: W8.t Array536.t) (l: W8.t list, st: state): bool =
- buf_subl buf 0 504 = l /\ sub buf 336 200 = state2bytes st.
-
-abbrev pack4buf (b:W8.t Array2144.t) (b0 b1 b2 b3: W8.t Array536.t) = 
- Array2144.init
-  (fun i => 
-    if 1608 <= i && i < 2144
-    then b3.[i - 1608]
-    else (Array2144.init
-           (fun i0 =>
-             if 1072 <= i0 && i0 < 1608
-             then b2.[i0 - 1072]
-             else (Array2144.init
-                    (fun i1 =>
-                      if 536 <= i1 && i1 < 1072
-                      then b1.[i1 - 536]
-                      else (Array2144.init
-                             (fun i2 =>
-                               if 0 <= i2 && i2 < 536
-                               then b0.[i2]
-                               else b.[i2])).[i1])).[i0])).[i]).
-
-op buf4x_buf (bufx4 : W8.t Array2144.t) (pos : int) : W8.t Array536.t =
- Array536.init (fun i => bufx4.[pos*536+i]).
 
 hoare gen_matrix_get_indexes_h _pos _transpose:
  Jkem_avx2.M.gen_matrix_get_indexes
@@ -719,15 +373,6 @@ phoare gen_matrix_get_indexes_ph _pos _transpose:
  ] = 1%r.
 proof. by conseq gen_matrix_get_indexes_ll (gen_matrix_get_indexes_h _pos _transpose). qed.
 
-lemma sub_buf4x_buf bx4 k a b:
- 0 <= k < 4 =>
- 0 <= a <= a+b <= 536 =>
- sub (buf4x_buf bx4 k) a b = sub bx4 (k*536+a) b.
-proof.
-move => Hk Hab.
-rewrite /buf4x_buf /sub; apply eq_in_mkseq => i Hi /=.
-by rewrite initiE 1:/# /#.
-qed.
 lemma sub_gen_matrix_indexes idxs _pos _t _k (_a:WArray8.t):
  (_pos = 0 \/ _pos = 4 \/ _pos = 8 \/ _pos = 12) =>
  0 <= _k < 4 =>
@@ -749,104 +394,6 @@ move: {Hk} _k; apply /List.allP => /=.
  by rewrite Hpos;case: _t;rewrite ?b2i1 ?b2i0 /pos2ji kvec_val /sub /mkseq -iotaredE //=. 
 qed.
 
-equiv sample_four_polynomials_eq:
- Jkem_avx2.M._gen_matrix_sample_four_polynomials
- ~  ParseFilter.sample3buf_x4'
- : ={rho} /\ to_uint pos_entry{1} = 2*pos{2} /\ to_uint transposed{1} = b2i t{2} /\ (pos{2}=0 \/ pos{2}=4 \/ pos{2}=8 \/ pos{2}=12)
-   ==>
-  res{1}.`1 = pack4poly (unlift_polyu res{2}.`1, unlift_polyu res{2}.`2, unlift_polyu res{2}.`3, unlift_polyu res{2}.`4).
-proof.
-transitivity ParseFilter.sample3buf_x4
- (={rho} /\ to_uint pos_entry{1} = 2*pos{2} /\ to_uint transposed{1} = b2i t{2} /\ (pos{2}=0 \/ pos{2}=4  \/ pos{2}=8 \/ pos{2}=12)
- ==> res{1}.`1 = pack4poly (unlift_polyu res{2}.`1, unlift_polyu res{2}.`2, unlift_polyu res{2}.`3, unlift_polyu res{2}.`4))
- (={arg} ==> ={res}); last first.
-+ by apply sampleX4_sample3buf_4x.
-+ move=> /> &1 &2 -> *.
-  by exists (rho{2},pos{2},t{2}) => /#.
-+ by move => />.
-proc; simplify.
-seq 13 27: ( buf_ok (buf4x_buf buf{1} 0) buf0{2} st0{2}
-          /\ buf_ok (buf4x_buf buf{1} 1) buf1{2} st1{2}
-          /\ buf_ok (buf4x_buf buf{1} 2) buf2{2} st2{2}
-          /\ buf_ok (buf4x_buf buf{1} 3) buf3{2} st3{2} ).
- seq 10 7: ( st4x_match stx4{1} (st0{2},st1{2},st2{2},st3{2})).
-  wp; ecall {1} (shake128x4_absorb_A32_A2_ph rho{1} indexes{1}) => /=.
-  wp; ecall {1} (gen_matrix_get_indexes_ph pos{2} t{2}) => /=.
-  auto => &1 &2 [# -> Epos Ht Hpos]; split; first smt().
-  move=> _ idxs -> st; pose a:= WArray8.init8 _.  
-  rewrite (sub_gen_matrix_indexes _ pos{2} t{2} 0 a _ _) 1..3://.
-  rewrite (sub_gen_matrix_indexes _ pos{2} t{2} 1 a _ _) 1..3://.
-  rewrite (sub_gen_matrix_indexes _ pos{2} t{2} 2 a _ _) 1..3://.
-  rewrite (sub_gen_matrix_indexes _ pos{2} t{2} 3 a _ _) 1..3://.
-  done.
- wp; ecall {1} (shake128x4_squeeze3blocks_ph st0{2} st1{2} st2{2} st3{2}) => /=.
- auto => /> &1 &2 Hmatch [stx4 bufx4] /=.
- rewrite !buf_sublE 1..4:// /=.
- rewrite !sub_buf4x_buf 1..17:// /= => -> -> -> -> -> -> -> ->.
-  rewrite /SQUEEZE1600 /c256_r8 /= /squeezeblocks -iotaredE /flatten /= !cats0 !take_oversize;
-   first 4 by rewrite !size_cat !size_squeezestate_i //.
-  by rewrite /squeezestate_i /st_i (:3=2+1) 1:// !iterS 1..20:// !iter2 1:// !iter1 !iter0 1..12:// !catA /#.
-wp; call fill_poly_eq.
-wp; call fill_poly_eq.
-wp; call fill_poly_eq.
-wp; call fill_poly_eq.
-auto => /> &1 &2 Hst0 Hst1 Hst2 Hst3 _ _.
-move=> [p0 buf0] p0R /= Hp0.
-pose B1:= Array536.init _.
-have ->: B1 = buf4x_buf buf{1} 1.
- apply Array536.ext_eq => i Hi /=.
- by rewrite initiE //= initiE 1:/# initiE 1:/# /= ifF 1:/#.
-split; first done.
-move=> _ _ {B1} [p1 buf1] p1R /= Hp1.
-pose B2:= Array536.init _.
-have ->: B2 = buf4x_buf buf{1} 2.
- apply Array536.ext_eq => i Hi /=.
- rewrite initiE /= 1:/# initiE 1:/# initiE 1:/# /= ifF 1:/#.
- by rewrite /= initiE /#.
-split; first done.
-move=> _ _ {B2} [p2 buf2] p2R /= Hp2.
-pose B3:= Array536.init _.
-have ->: B3 = buf4x_buf buf{1} 3.
- apply Array536.ext_eq => i Hi /=.
- rewrite initiE /= 1:/# initiE 1:/# initiE 1:/# /= ifF 1:/#.
- by rewrite initiE 1:/# /= ifF 1:/# initiE /#.
-split; first done.
-move=> _ _ {B3} [p3 buf3] p3R /= Hp3.
-rewrite /pack4poly /=.
-apply Array1024.ext_eq => i Hi.
-rewrite initiE //= get_of_list //=.
-case: (i < 256) => C0.
- rewrite ifF 1:/# initiE 1:// /=. 
- rewrite ifF 1:/# initiE 1:// /=. 
- rewrite ifF 1:/# initiE 1:// /=.
- rewrite ifT 1:/# Hp0 initiE 1:/# /=.
- rewrite -!catA nth_cat ifT. 
-  by rewrite !size_to_list /#.
- by rewrite get_to_list initiE 1:/#.
-case: (i < 512) => C1.
- rewrite ifF 1:/# initiE 1:// /=. 
- rewrite ifF 1:/# initiE 1:// /=.
- rewrite ifT 1:/# Hp1 initiE 1:/# /=.
- rewrite -!catA nth_cat ifF. 
-  by rewrite !size_to_list /#.
- rewrite nth_cat ifT !size_to_list 1:/#. 
- by rewrite get_to_list initiE 1:/#.
-case: (i < 768) => C2.
- rewrite ifF 1:/# initiE 1:// /=.
- rewrite ifT 1:/# Hp2 initiE 1:/# /=.
- rewrite -!catA nth_cat ifF !size_to_list 1:/#. 
- rewrite nth_cat ifF !size_to_list 1:/#. 
- rewrite nth_cat ifT.
-  by rewrite !size_to_list /#.
- by rewrite get_to_list initiE 1:/#.
-rewrite ifT 1:/# Hp3 initiE 1:/# /=.
-rewrite -!catA nth_cat ifF !size_to_list 1:/#. 
-rewrite nth_cat ifF !size_to_list 1:/#. 
-rewrite nth_cat ifF !size_to_list 1:/#. 
-by rewrite get_to_list initiE 1:/#.
-qed.
-
-
 
 op mat4atPos (m: polymat) pos =
  ( m.[idx_from_pos pos]
@@ -854,29 +401,6 @@ op mat4atPos (m: polymat) pos =
  , m.[idx_from_pos (pos+2)]
  , m.[idx_from_pos (pos+3)]).
 
-lemma sample3buf_4x_ph _rho _pos _t:
- 0 <= _pos <= 4*4 - 4 =>
- phoare [ ParseFilter.sample3buf_x4'
-        :  rho=_rho /\ pos = _pos /\ t = _t
-           ==>
-           res = mat4atPos (if _t then trmx (sampleA _rho) else sampleA _rho) _pos ]
- = 1%r.
-proof.
-move=> Hpos.
-proc; simplify.
-call (sampleFilter_sem _rho (pos2ji (_pos+3) _t).`1 (pos2ji (_pos+3) _t).`2).
-wp; call (sampleFilter_sem _rho (pos2ji (_pos+2) _t).`1 (pos2ji (_pos+2) _t).`2).
-wp; call (sampleFilter_sem _rho (pos2ji (_pos+1) _t).`1 (pos2ji (_pos+1) _t).`2).
-wp; call (sampleFilter_sem _rho (pos2ji _pos _t).`1 (pos2ji _pos _t).`2).
-auto => />.
-rewrite /mat4atPos /pos2ji /=.
-case: _t => _.
-+ do 4! (rewrite trmxE; 1,2: smt(kvec_val)).
-  do 4! (rewrite sampleAE; 1,2: smt(kvec_val)).
-  done.
-do 4! (rewrite sampleAE; 1,2: smt(kvec_val)).
-done.
-qed.
 
 lemma pack4poly_subarray1024 (A: polymat) p:
  0 <= p < 4 =>
@@ -906,6 +430,7 @@ rewrite initiE 1:/# /= /mat4atPos /=.
 by congr; congr; congr; smt(kvec_val).
 qed.
 
+
 lemma sample_four _sd _rc b :
  (_rc = 0 \/ _rc = 4 \/ _rc = 8 \/ _rc = 12) =>
  phoare
@@ -914,14 +439,37 @@ lemma sample_four _sd _rc b :
    res.`1 = subarray1024 (unlift_matrix (if b then trmx (sampleA _sd) else (sampleA _sd))) (_rc %/ 4) ] = 1%r.
 proof.
 move=> Hrc.
-conseq sample_four_polynomials_eq  (sample3buf_4x_ph _sd _rc b _).
-+ move => &1 /> -> ->.
-  exists (rho{1},_rc,b) => /=.
-  by rewrite !of_uintK /#.
-+ move=> /> &1 ->.
-  rewrite -pack4poly_subarray1024 1:/#.
-  by case: Hrc => [ | [ | [] ] ] ->.
-smt().
+pose w := W8u8.pack8 (sub gen_matrix_indexes (2*_rc + 32*b2i b) 8).
+conseq (sample_four_ph _sd (W64.of_int (2*_rc)) (W64.of_int (b2i b)) w _) => //.
+- move=> &hr _ r.
+  (* the index bytes of lane k are the coordinates of entry _rc + k *)
+  have hw : forall k, 0 <= k < 4 =>
+    w \bits8 (2*k) = (pos2ji (_rc+k) b).`1 /\ w \bits8 (2*k+1) = (pos2ji (_rc+k) b).`2.
+  + move=> k rgk.
+    have := sub_gen_matrix_indexes (idx_of w) _rc b k
+              (WArray8.init8 (fun i => (witness<:W8.t Array8.t>).[i])) Hrc rgk _.
+    * done.
+    by rewrite idx_subE.
+  have hM : forall pos, 0 <= pos < 16 =>
+    (if b then trmx (sampleA _sd) else sampleA _sd).[idx_from_pos pos]
+    = parse _sd (pos2ji pos b).`1 (pos2ji pos b).`2.
+  + move=> pos rgp; rewrite /pos2ji /=; case: b => _ /=.
+    * by rewrite trmxE 1,2:#smt:(kvec_val) sampleAE 1,2:#smt:(kvec_val).
+    by rewrite sampleAE 1,2:#smt:(kvec_val).
+  suff -> : subarray1024 (unlift_matrix (if b then trmx (sampleA _sd) else sampleA _sd))
+                         (_rc %/ 4)
+          = pack4poly (lane_poly _sd w 0, lane_poly _sd w 1,
+                       lane_poly _sd w 2, lane_poly _sd w 3) by done.
+  rewrite -(pack4poly_subarray1024 _ (_rc %/ 4)) 1:/# (_ : 4 * (_rc %/ 4) = _rc) 1:/#.
+  rewrite /mat4atPos /=.
+  have [h00 h01] := hw 0 _; 1: done.
+  have [h10 h11] := hw 1 _; 1: done.
+  have [h20 h21] := hw 2 _; 1: done.
+  have [h30 h31] := hw 3 _; 1: done.
+  move: h00 h01 h10 h11 h20 h21 h30 h31 => /= -> -> -> -> -> -> -> ->.
+  by rewrite !hM 1..4:/#.
+conseq (gen_matrix_get_indexes_ph _rc b) => &hr /= ->.
+by rewrite /= !of_uintK; case: Hrc => [|[|[]]] -> /=; case: b.
 qed.
 
 phoare _gen_matrix_avx2_sem _sd b :

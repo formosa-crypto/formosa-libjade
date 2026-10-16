@@ -690,7 +690,7 @@ require import IntMin.
 require import EclibExtra.
 require import JWordList.
 from CryptoSpecs require import Keccak1600_Spec Keccak1600_Orbit.
-require import Rejstream.
+require import Agree Rejstream.
 
 (** parses a byte list into (candidate) coefficients *)
 op bytes2coeffs(bytes : W8.t list) : int list =
@@ -954,260 +954,6 @@ op pos2ji (pos: int) (t: bool): W8.t*W8.t =
  let rc = idx_from_pos pos  in
  if t then (W8.of_int rc.`1, W8.of_int rc.`2) else (W8.of_int rc.`2, W8.of_int rc.`1).
 
-op m4atPos m pos =
- ( m.[idx_from_pos pos]
- , m.[idx_from_pos (pos+1)]
- , m.[idx_from_pos (pos+2)]
- , m.[idx_from_pos (pos+3)]
- ).
-
-module ParseFilter = {
-  proc sample(rho: W8.t Array32.t, j: W8.t, i: W8.t) : poly = {
-    var st, buf;
-    var c, k;
-    var l, p;
-
-    st <- SHAKE128_ABSORB (rejection_seed (rho,(j,i)));
-    p <- [];
-    c <- 0;
-    k <- 0;
-    while (c < 256) {
-      (st, buf) <- SHAKE128_SQUEEZEBLOCK st;
-      l <- take (256-c) (rejection buf);
-      c <- c + size l;
-      p <- p ++ l;
-      k <- k + 1;
-    }
-    return Array256.of_list witness p;
-  }
-  proc fill_poly(buf: W8.t list, st: state): poly = {
-    var p, c, k, l;
-    k <- 3;
-    p <- take 256 (rejection buf);
-    c <- size p;
-    while (c < 256) {
-      (st, buf) <- SHAKE128_SQUEEZEBLOCK st;
-      l <- take (256-c) (rejection buf);
-      c <- c + size l;
-      p <- p ++ l;
-      k <- k + 1;
-    }
-    return Array256.of_list witness p;
-  }
-  proc sample3buf(rho: W8.t Array32.t, ji: W8.t*W8.t) : poly = {
-    var st, buf, tmp;
-    var p';
-
-    st <- SHAKE128_ABSORB (rejection_seed (rho,ji));
-    (st, buf) <- SHAKE128_SQUEEZEBLOCK st;
-    (st, tmp) <- SHAKE128_SQUEEZEBLOCK st;
-    buf <- buf ++ tmp;
-    (st, tmp) <- SHAKE128_SQUEEZEBLOCK st;
-    buf <- buf ++ tmp;
-    p' <@ fill_poly(buf, st);
-    return p';
-  }
-  proc sample3bufX(rho: W8.t Array32.t, ji: W8.t*W8.t) : poly = {
-    var st, buf, tmp;
-    var c, k;
-    var l, p;
-
-    st <- SHAKE128_ABSORB (rejection_seed (rho,ji));
-    p <- [];
-    (st, buf) <- SHAKE128_SQUEEZEBLOCK st;
-    (st, tmp) <- SHAKE128_SQUEEZEBLOCK st;
-    buf <- buf ++ tmp;
-    (st, tmp) <- SHAKE128_SQUEEZEBLOCK st;
-    buf <- buf ++ tmp;
-    p <- take 256 (rejection buf);
-    c <- size p;
-    k <- 3;
-    while (c < 256) {
-      (st, buf) <- SHAKE128_SQUEEZEBLOCK st;
-      l <- take (256-c) (rejection buf);
-      c <- c + size l;
-      p <- p ++ l;
-      k <- k + 1;
-    }
-    return Array256.of_list witness p;
-  }
-  (* 4-way sampling (AVX2) *)
-  proc sample3buf_x4'(rho: W8.t Array32.t, pos: int, t: bool) : poly*poly*poly*poly = {
-    var p0, p1, p2, p3;
-    var i, j;
-    ( j, i ) <- pos2ji pos t;
-    p0 <@ sample(rho, j, i);
-    pos <- pos + 1;
-    ( j, i ) <- pos2ji pos t;
-    p1 <@ sample(rho, j, i);
-    pos <- pos + 1;
-    ( j, i ) <- pos2ji pos t;
-    p2 <@ sample(rho, j, i);
-    pos <- pos + 1;
-    ( j, i ) <- pos2ji pos t;
-    p3 <@ sample(rho, j, i);
-    return (p0, p1, p2, p3);
-  }
-  proc sample3buf_x4(rho: W8.t Array32.t, pos: int, t:bool) : poly*poly*poly*poly = {
-    var st0, st1, st2, st3, buf0, buf1, buf2, buf3, tmp0, tmp1, tmp2, tmp3;
-    var p0, p1, p2, p3;
-
-    st0 <- SHAKE128_ABSORB (rejection_seed (rho, pos2ji pos t));
-    pos <- pos + 1;
-    st1 <- SHAKE128_ABSORB (rejection_seed (rho, pos2ji pos t));
-    pos <- pos + 1;
-    st2 <- SHAKE128_ABSORB (rejection_seed (rho, pos2ji pos t));
-    pos <- pos + 1;
-    st3 <- SHAKE128_ABSORB (rejection_seed (rho, pos2ji pos t));
-
-    (st0, buf0) <- SHAKE128_SQUEEZEBLOCK st0;
-    (st1, buf1) <- SHAKE128_SQUEEZEBLOCK st1;
-    (st2, buf2) <- SHAKE128_SQUEEZEBLOCK st2;
-    (st3, buf3) <- SHAKE128_SQUEEZEBLOCK st3;
-
-    (st0, tmp0) <- SHAKE128_SQUEEZEBLOCK st0;
-    buf0 <- buf0 ++ tmp0;
-    (st1, tmp1) <- SHAKE128_SQUEEZEBLOCK st1;
-    buf1 <- buf1 ++ tmp1;
-    (st2, tmp2) <- SHAKE128_SQUEEZEBLOCK st2;
-    buf2 <- buf2 ++ tmp2;
-    (st3, tmp3) <- SHAKE128_SQUEEZEBLOCK st3;
-    buf3 <- buf3 ++ tmp3;
-
-    (st0, tmp0) <- SHAKE128_SQUEEZEBLOCK st0;
-    buf0 <- buf0 ++ tmp0;
-    (st1, tmp1) <- SHAKE128_SQUEEZEBLOCK st1;
-    buf1 <- buf1 ++ tmp1;
-    (st2, tmp2) <- SHAKE128_SQUEEZEBLOCK st2;
-    buf2 <- buf2 ++ tmp2;
-    (st3, tmp3) <- SHAKE128_SQUEEZEBLOCK st3;
-    buf3 <- buf3 ++ tmp3;
-
-    p0 <@ fill_poly(buf0, st0);
-    p1 <@ fill_poly(buf1, st1);
-    p2 <@ fill_poly(buf2, st2);
-    p3 <@ fill_poly(buf3, st3);
-    return (p0,p1,p2,p3);
-  }
-  proc sample3buf_x4X(rho: W8.t Array32.t, pos: int, t:bool) : poly*poly*poly*poly = {
-    var st0, st1, st2, st3, buf0, buf1, buf2, buf3, tmp;
-    var p0, p1, p2, p3;
-
-    st0 <- SHAKE128_ABSORB (rejection_seed (rho, pos2ji pos t));
-    pos <- pos + 1;
-    st1 <- SHAKE128_ABSORB (rejection_seed (rho, pos2ji pos t));
-    pos <- pos + 1;
-    st2 <- SHAKE128_ABSORB (rejection_seed (rho, pos2ji pos t));
-    pos <- pos + 1;
-    st3 <- SHAKE128_ABSORB (rejection_seed (rho, pos2ji pos t));
-
-    (st0, buf0) <- SHAKE128_SQUEEZEBLOCK st0;
-    (st0, tmp) <- SHAKE128_SQUEEZEBLOCK st0;
-    buf0 <- buf0 ++ tmp;
-    (st0, tmp) <- SHAKE128_SQUEEZEBLOCK st0;
-    buf0 <- buf0 ++ tmp;
-    (st1, buf1) <- SHAKE128_SQUEEZEBLOCK st1;
-    (st1, tmp) <- SHAKE128_SQUEEZEBLOCK st1;
-    buf1 <- buf1 ++ tmp;
-    (st1, tmp) <- SHAKE128_SQUEEZEBLOCK st1;
-    buf1 <- buf1 ++ tmp;
-    (st2, buf2) <- SHAKE128_SQUEEZEBLOCK st2;
-    (st2, tmp) <- SHAKE128_SQUEEZEBLOCK st2;
-    buf2 <- buf2 ++ tmp;
-    (st2, tmp) <- SHAKE128_SQUEEZEBLOCK st2;
-    buf2 <- buf2 ++ tmp;
-    (st3, buf3) <- SHAKE128_SQUEEZEBLOCK st3;
-    (st3, tmp) <- SHAKE128_SQUEEZEBLOCK st3;
-    buf3 <- buf3 ++ tmp;
-    (st3, tmp) <- SHAKE128_SQUEEZEBLOCK st3;
-    buf3 <- buf3 ++ tmp;
-
-    p0 <@ fill_poly(buf0, st0);
-    p1 <@ fill_poly(buf1, st1);
-    p2 <@ fill_poly(buf2, st2);
-    p3 <@ fill_poly(buf3, st3);
-    return (p0,p1,p2,p3);
-  }
-  proc sample3buf_x4XX(rho: W8.t Array32.t, pos: int, t:bool) : poly*poly*poly*poly = {
-    var st0, st1, st2, st3, buf0, buf1, buf2, buf3, tmp;
-    var c;
-    var l, p0, p1, p2, p3;
-
-    p0 <- [];
-    p1 <- [];
-    p2 <- [];
-    p3 <- [];
-
-    st0 <- SHAKE128_ABSORB (rejection_seed (rho, pos2ji pos t));
-    pos <- pos + 1;
-    st1 <- SHAKE128_ABSORB (rejection_seed (rho, pos2ji pos t));
-    pos <- pos + 1;
-    st2 <- SHAKE128_ABSORB (rejection_seed (rho, pos2ji pos t));
-    pos <- pos + 1;
-    st3 <- SHAKE128_ABSORB (rejection_seed (rho, pos2ji pos t));
-
-    (st0, buf0) <- SHAKE128_SQUEEZEBLOCK st0;
-    (st0, tmp) <- SHAKE128_SQUEEZEBLOCK st0;
-    buf0 <- buf0 ++ tmp;
-    (st0, tmp) <- SHAKE128_SQUEEZEBLOCK st0;
-    buf0 <- buf0 ++ tmp;
-    (st1, buf1) <- SHAKE128_SQUEEZEBLOCK st1;
-    (st1, tmp) <- SHAKE128_SQUEEZEBLOCK st1;
-    buf1 <- buf1 ++ tmp;
-    (st1, tmp) <- SHAKE128_SQUEEZEBLOCK st1;
-    buf1 <- buf1 ++ tmp;
-    (st2, buf2) <- SHAKE128_SQUEEZEBLOCK st2;
-    (st2, tmp) <- SHAKE128_SQUEEZEBLOCK st2;
-    buf2 <- buf2 ++ tmp;
-    (st2, tmp) <- SHAKE128_SQUEEZEBLOCK st2;
-    buf2 <- buf2 ++ tmp;
-    (st3, buf3) <- SHAKE128_SQUEEZEBLOCK st3;
-    (st3, tmp) <- SHAKE128_SQUEEZEBLOCK st3;
-    buf3 <- buf3 ++ tmp;
-    (st3, tmp) <- SHAKE128_SQUEEZEBLOCK st3;
-    buf3 <- buf3 ++ tmp;
-
-    p0 <- take 256 (rejection buf0);
-    c <- size p0;
-    while (c < 256) {
-      (st0, buf0) <- SHAKE128_SQUEEZEBLOCK st0;
-      l <- take (256-c) (rejection buf0);
-      c <- c + size l;
-      p0 <- p0 ++ l;
-    }
-
-    p1 <- take 256 (rejection buf1);
-    c <- size p1;
-    while (c < 256) {
-      (st1, buf1) <- SHAKE128_SQUEEZEBLOCK st1;
-      l <- take (256-c) (rejection buf1);
-      c <- c + size l;
-      p1 <- p1 ++ l;
-    }
-
-    p2 <- take 256 (rejection buf2);
-    c <- size p2;
-    while (c < 256) {
-      (st2, buf2) <- SHAKE128_SQUEEZEBLOCK st2;
-      l <- take (256-c) (rejection buf2);
-      c <- c + size l;
-      p2 <- p2 ++ l;
-    }
-
-    p3 <- take 256 (rejection buf3);
-    c <- size p3;
-    while (c < 256) {
-      (st3, buf3) <- SHAKE128_SQUEEZEBLOCK st3;
-      l <- take (256-c) (rejection buf3);
-      c <- c + size l;
-      p3 <- p3 ++ l;
-    }
-    return (Array256.of_list witness p0, Array256.of_list witness p1, Array256.of_list witness p2, Array256.of_list witness p3);
-  }
-}.
-
-
-(** [plist p n] is the list "[p.[0]; ...; p.[n-1]]" (obs: "plist p n = sub p 0 n"!) *)
 op plist ['a] (pol: 'a Array256.t) n = mkseq ("_.[_]" pol) n.
 
 lemma size_plist ['a] (pol : 'a Array256.t) n:
@@ -1231,86 +977,6 @@ move=> H; rewrite /plist /=.
 by rewrite take_mkseq 1:/# //.
 qed.
 
-(** updates a list [l] in [p] (at position [k]) *)
-op pupdl ['a] (p: 'a Array256.t) l k =
- with l="[]" => p
- with l=x::xs => pupdl p.[k<-x] xs (k+1).
-
-lemma pupdl_nil ['a] (p: 'a Array256.t)  k:
- pupdl p [] k = p by done.
-
-lemma pupdl_cons ['a] (p: 'a Array256.t) x xs k:
- pupdl p (x::xs) k = pupdl p.[k<-x] xs (k+1)
-by done.
-
-lemma pupdl_cat ['a] (p: 'a Array256.t) k l1 l2:
- pupdl p (l1++l2) k = pupdl (pupdl p l1 k) l2 (k+size l1).
-proof.
-elim: l1 p k => //= x xs IH p k.
-by rewrite IH addzA.
-qed.
-
-lemma plist_upd_out ['a] (p: 'a Array256.t) (k i:int) x:
- k <= i < 256 =>
- plist p.[i <- x] k = plist p k.
-proof.
-move=> Hk; rewrite /plist.
-apply eq_in_mkseq => j Hj.
-by rewrite get_setE 1:/# ifF 1:/#.
-qed.
-
-lemma plist_pupdl ['a] (p: 'a Array256.t) l k:
- 0 <= k && k + size l <= 256 =>
- plist (pupdl p l k) (k+size l) = plist p k ++ l.
-proof.
-elim: l p k => [|x xs IH] p k /= Hk.
- by rewrite cats0.
-rewrite addzA IH 1:/# plistS 1:/# -cats1 plist_upd_out.
- smt(size_ge0).
-rewrite get_setE /=.
- smt(size_ge0).
-by rewrite -catA /=.
-qed.
-
-lemma size_SHAKE128_SQUEEZEBLOCKS_dvd3 st k:
- 0 <= k =>
- 3 %| size (SHAKE128_SQUEEZEBLOCKS st k).
-proof.
-by move=> Hk; rewrite size_squeezeblocks // /#.
-qed.
-
-lemma take_rejection_done n k (buf: W8.t Array168.t):
- 0 <= k =>
- 3 %| k =>
- size (take n (rejection (take k (to_list buf)))) = n =>
- take n (rejection (take k (to_list buf))) = take n (rejection (to_list buf)).
-proof.
-move=> Hk H3k /size_takel' Hsz.
-rewrite -{2}(cat_take_drop k (to_list buf)) rejection_cat.
- by rewrite size_take 1:/# size_to_list /#.
-by rewrite take_cat' ifT 1:/#.
-qed.
-
-lemma bytes2coefs_3bytes (buf:W8.t Array168.t) k:
- bytes2coeffs [buf.[k]; buf.[k + 1]; buf.[k + 2]]
- = [ to_uint buf.[k] + 256 * (to_uint buf.[k + 1] %% 16)
-   ; to_uint buf.[k + 1] %/ 16 + 16 * to_uint buf.[k + 2] ].
-proof.
-rewrite /bytes2coeffs /bytes_to_bits /flatten /chunk /mkseq size_bytes_to_bits -iotaredE /=.
-split.
- rewrite drop0 cats0 /to_uint.
- rewrite take_cat ifF !size_w2bits //= take_cat.
- by rewrite ifT 1:size_w2bits 1:// bs2int_cat size_w2bits bs2int_take.
-rewrite drop_cat ifF !size_w2bits //= cats0.
-rewrite drop_cat ifT 1:size_w2bits //= /to_uint.
-rewrite take_cat ifF.
- by rewrite size_drop 1:// size_w2bits.
-rewrite bs2int_cat bs2int_drop 1:// size_drop -1:/max //=.
-rewrite bs2int_take 1:// modz_small //.
-split; first by apply bs2int_ge0.
-by move=> _; move: (bs2int_le2Xs (w2bits buf.[k + 2]) ); smt().
-qed.
-
 lemma take_k3 (buf: W8.t Array168.t) k:
  0 <= k && k+3 <= 168 =>
  take (k+3) (to_list buf)
@@ -1325,300 +991,185 @@ rewrite /to_list drop_mkseq 1:/# take_mkseq 1:/#.
 by rewrite /mkseq -iotaredE /(\o) /=.
 qed.
 
-equiv parse_corr _rho _j _i:
- SampleNTT(XOF).sample ~ ParseFilter.sample
- : XOF.state{1}=SHAKE128_ABSORB_34 _rho _j _i 
-   /\ (rho,(j,i)){2}=(_rho,(_j,_i)) 
- ==> ={res}.
+(* -------------------------------------------------------------------- *)
+(* SampleNTT against the stream: a 3-byte group appends its accepted    *)
+(* candidates, a block its group candidates, and the polynomial is the  *)
+(* first 256 accepted coefficients.                                     *)
+lemma bytes2coeffs3E (b0 b1 b2 : W8.t) :
+ bytes2coeffs [b0; b1; b2]
+ = [ to_uint b0 + 256 * (to_uint b1 %% 16); to_uint b1 %/ 16 + 16 * to_uint b2 ].
 proof.
-proc.
-while ( (st,c,p){2}=(XOF.state,j,plist aa j){1}
-        /\ 0 <= j{1} <= 256 ).
- seq 1 1: (#pre /\ to_list b168{1}=buf{2}).
-  inline*; auto => /> *.
-  by rewrite /SHAKE128_SQUEEZE_168 /= of_listK 1:size_squeezestate_i.
- clear _i _j; simplify.
- exists* aa{1}; exists* j{1}; elim* => _j _a; wp.
- while {1} ( 0 <= j{1} <= 256
-           /\ 0 <= k{1} <= 168
-           /\ 3 %| k{1}
-           /\ to_list b168{1}=buf{2}
-           /\ (let l = take (256-_j) (rejection (take k{1} buf{2}))
-               in j{1} = _j + size l /\ aa{1} = pupdl _a l _j)
-           )
-       (168-k{1}).
-  move=> &2 z; auto=> &m />.
-  move=> Hj1 Hj2 Hk1 Hk2 H3k T1 T2.
-  rewrite take_k3 1:/#.
-  rewrite rejection_cat.
-   by rewrite size_take 1:/# size_to_list /#.
-  rewrite take_catX.
-  pose rbufk := rejection (take k{m} (to_list b168{m})).
-  pose N := 256-_j.
-  have E: take N rbufk = rbufk.
-   by rewrite take_oversize //; smt(size_ge0 size_take).
-  move: Hj1 Hj2 T1; rewrite !E => Hj1 Hj2 T1; clear E.
-  pose ldelta := rejection [b168{m}.[k{m}]; b168{m}.[k{m}+1]; b168{m}.[k{m}+2] ].  
-  pose cond1 := (_ + _ < q)%Int.
-  pose cond2 := (_ + _ < q)%Int.
-  pose L':= take (N-size rbufk) ldelta.
-  pose L := pupdl _a rbufk _j.
-  case: cond1 => /= C1.
-   case: cond2 => /= C2.
-    (* cond1 && cond2 *)
-    have E: ldelta = [ incoeff (to_uint b168{m}.[k{m}] + 256 * (to_uint b168{m}.[k{m} + 1] %% 16))
-               ; incoeff (to_uint b168{m}.[k{m} + 1] %/ 16 + 16 * to_uint b168{m}.[k{m} + 2]) ].
-     rewrite /ldelta /rejection bytes2coefs_3bytes /=.
-     by rewrite !ifT //=.
-    split.
-     move=> HH1 (* take_all *).
-     split.
-      split; first smt().
-      split; first smt().
-      split; first smt().
-      split.
-       rewrite size_cat addrA /L' E; congr.
-       by rewrite size_take 1:/# /= ifF /#.
-      rewrite /L' E take_oversize /=.
-       smt(size_ge0).
-      by rewrite pupdl_cat /=.
-     smt().
-    move=> HH1 (* take_one *).
-    split.
-     split; first smt().
-     split; first smt().
-     split; first smt(). 
-     split.
-      rewrite size_cat addrA /L' E; congr.
-      by rewrite size_take 1:/# /= ifT /#.
-     rewrite /L' E (:N-size rbufk=1) /=.
-      smt(size_ge0).
-     by rewrite pupdl_cat.
-    smt().
-   (* cond1 && !cond2 *)
-   have E: ldelta = [ incoeff (to_uint b168{m}.[k{m}] + 256 * (to_uint b168{m}.[k{m} + 1] %% 16)) ].
-    rewrite /ldelta /rejection bytes2coefs_3bytes /=.
-    by rewrite ifT 1:/# ifF /#.
-   split.
-    split; first smt().
-    split; first smt().
-    split; first smt().
-    split.
-     rewrite size_cat addrA /L' E; congr.
-     by rewrite size_take 1:/# /= ifF /#.
-    rewrite /L' E take_oversize.
-     smt(size_ge0).
-    by rewrite pupdl_cat /=.
-   smt().
-  case: cond2 => /= C2.
-   (* !cond1 && cond2 *)
-   have E: ldelta = [ incoeff (to_uint b168{m}.[k{m} + 1] %/ 16 + 16 * to_uint b168{m}.[k{m} + 2])  ].
-    rewrite /ldelta /rejection bytes2coefs_3bytes /=.
-    by rewrite ifF 1:/# ifT /#.
-   split.
-    split; first smt().
-    split; first smt().
-    split; first smt().
-    split.
-     rewrite size_cat addrA /L' E; congr.
-     by rewrite size_take 1:/# /= ifF /#.
-    rewrite /L' E take_oversize.
-     smt(size_ge0).
-    by rewrite pupdl_cat /=.
-   smt().
-  (* !cond1 && !cond2 *)
-  have E: ldelta = [].
-   rewrite /ldelta /rejection bytes2coefs_3bytes /=.
-   by rewrite ifF 1:/# ifF /#.
-  split.
-   split; first smt().
-   split; first smt().
-   split; first by rewrite size_cat; smt(size_ge0).
-   rewrite /L' take_oversize.
-    smt(size_ge0).
-   by rewrite E pupdl_cat /=.
-  smt().
- auto => /> &1 &2 Hj1 Hj2.
- split.
-  by rewrite !take0 !rejection0.
- move => k />; split; first smt().
- rewrite andaE negb_and; move => [T|T] Hn1 Hn2 Hk1 Hk2 H3k.
-  have E: size (take (256-_j) (rejection (take k (to_list b168{1})))) = 256-_j by smt().
-  have E' := take_rejection_done _ _ _ Hk1 H3k E.
-  by rewrite plist_pupdl /#.
- move: Hn1 Hn2; have E: k=168 by smt().
- rewrite (take_oversize _ (to_list b168{1})).
-  by rewrite size_to_list E.
- move=> Hn1 Hn2.
- by rewrite plist_pupdl.
-auto => />; split.
- by rewrite plist0.
-move=> p j Hc1 Hc2 Hj1 Hj2.
-apply Array256.ext_eq => i Hi.
-by rewrite get_of_list 1:// nth_mkseq /#.
+rewrite /bytes2coeffs /bytes_to_bits /flatten /chunk /mkseq size_bytes_to_bits -iotaredE /=.
+split.
+ rewrite drop0 cats0 /to_uint.
+ rewrite take_cat ifF !size_w2bits //= take_cat.
+ by rewrite ifT 1:size_w2bits 1:// bs2int_cat size_w2bits bs2int_take.
+rewrite drop_cat ifF !size_w2bits //= cats0.
+rewrite drop_cat ifT 1:size_w2bits //= /to_uint.
+rewrite take_cat ifF.
+ by rewrite size_drop 1:// size_w2bits.
+rewrite bs2int_cat bs2int_drop 1:// size_drop -1:/max //=.
+rewrite bs2int_take 1:// modz_small //.
+split; first by apply bs2int_ge0.
+by move=> _; move: (bs2int_le2Xs (w2bits b2)); smt().
 qed.
 
-equiv sample_sample3buf:
- ParseFilter.sample ~ ParseFilter.sample3buf
- : (rho,(j,i)){1}=arg{2} ==> ={res}.
+lemma rejection3E (b0 b1 b2 : W8.t) :
+ rejection [b0; b1; b2]
+ = (if to_uint b0 + 256 * (to_uint b1 %% 16) < q
+    then [incoeff (to_uint b0 + 256 * (to_uint b1 %% 16))] else [])
+   ++ (if to_uint b1 %/ 16 + 16 * to_uint b2 < q
+       then [incoeff (to_uint b1 %/ 16 + 16 * to_uint b2)] else []).
+proof. by rewrite /rejection bytes2coeffs3E /=; do 2! case: (_ < q). qed.
+
+lemma rejection_expand_prefix seed nb1 nb2:
+ 0 <= nb1 <= nb2 =>
+ exists l, rejection (expand_seed seed nb2) = rejection (expand_seed seed nb1) ++ l.
 proof.
-proc.
-splitwhile {1} 5: (k < 3).
-inline fill_poly.
-seq 5 11: (={rho, p, k, c} /\ (st,(j,i)){1}=(st0,ji){2} /\ k{2}=3).
- unroll {1} 5; rcondt {1} 5; first by auto.
- unroll {1} 10; rcondt {1} 10.
-  move=> &m; auto => /> &hr.
-  rewrite take_oversize.
-   apply (ler_trans 112); 2:done.
-   apply (size_rejection_le' 168); 1:done.
-   by rewrite size_squeezestate_i.
-  smt(size_rejection_le).
- unroll {1} 15; rcondt {1} 15.
-  move=> &m; auto => /> &hr.
-  rewrite take_oversize.
-   apply (ler_trans 112); 2:done.
-   apply (size_rejection_le' 168); 1:done.
-   by rewrite size_squeezestate_i.
-  smt(size_rejection_le size_take_le_size).
- rcondf {1} 20; first by auto.
- auto => /> &1 &2.
- rewrite !rejection_cat.
-   by rewrite size_cat !size_squeezestate_i.
-  by rewrite size_squeezestate_i //.
- rewrite !take_cat !size_cat ifF; first smt(size_rejection_le).
- rewrite size_take 1:// ifF; first smt(size_rejection_le).
- rewrite size_take 1://; first smt(size_rejection_le).
- rewrite ifF; first smt(size_rejection_le).
- rewrite take_oversize; first smt(size_rejection_le).
- rewrite take_oversize; first smt(size_rejection_le).
- split.
-  by congr; smt(). 
- by rewrite ?size_cat /#.
-wp; while (={c,p,k} /\ st{1}=st0{2}).
- by auto.
-by auto => />.
+move=> [ge0nb1 le12]; have [d [ge0d ->]] : exists d, 0 <= d /\ nb2 = nb1 + d.
+- by exists (nb2 - nb1); smt().
+elim: d ge0d => [|d ge0d [l ih]]; 1: by exists []; rewrite cats0.
+exists (l ++ rejection (squeezestate_i c256_r8 (SHAKE128_ABSORB (rejection_seed seed)) (nb1 + d))).
+rewrite addzA expand_seedS 1:/# rejection_cat 2:ih 2:catA //.
+by rewrite size_expand_seed 1:/# dvdz_mulr.
 qed.
 
-phoare sampleFilter_sem _rho _j _i: 
- [ ParseFilter.sample : rho=_rho /\ i =_i /\ j=_j ==> 
-   res = parse _rho _j _i ] = 1%r.
+lemma lt_needed_blocks seed nb:
+ 0 <= nb =>
+ size (rejection (expand_seed seed nb)) < 256 => nb < needed_blocks seed.
 proof.
-proc; simplify.
-pose _m := (_rho,(_j,_i)).
-pose _st := SHAKE128_ABSORB (rejection_seed _m).
-pose _nb := needed_blocks _m.
-have Hnb := needed_blocksP _m.
-have Hnb_min := needed_blocks_min _m.
-have Hdvd3:= size_SHAKE128_SQUEEZEBLOCKS_dvd3.
-while (p = take 256 (rejection (SHAKE128_SQUEEZEBLOCKS _st k))
-       /\ st = FIPS202_SHA3_Spec.st_i _st k
-       /\ 0 <= k <= _nb/\ 0 <= c <= 256 /\ c = size p )
-      (_nb - k).
- move=> z; auto => /> &m Hk0 Hk1 Hn0 Hn1 Hn2; split.
-  have: size (take 256 (rejection (SHAKE128_SQUEEZEBLOCKS _st k{m}))) < 256 by smt().
-  rewrite size_take_lt => Hp'.
-  rewrite take_oversize 1:/#.
-  split.
-   rewrite squeezeblocksS 1..2:// rejection_cat 1:/# take_cat.
-   by rewrite ifF 1:/#; congr; smt().
-  split.
-   by rewrite /st_i iter1 iterS //.
-  split.
-   split; first smt().
-   have ?: ! enough_blocks _m k{m} by smt().
-   have ?: k{m} < _nb.
-    smt(needed_blocks_min).
-   smt().
-  split.
-   split.
-    smt(size_ge0).
-   smt(size_take_le).
-  by rewrite size_cat /#.
- smt().
-auto => /> *;  split.
- split.
-  rewrite /squeezeblocks iota0 1:// /= flatten_nil.
-  by rewrite /rejection /bytes2coeffs /chunk mkseq0.
- split; first by rewrite /st_i iter0 1:// /#.
- smt(needed_blocks_ge3).
-move=> k; split.
- move=> Hk0 Hn0 H Hk Hk2.
- have E: k = _nb by smt().
- rewrite enough_blocksE in Hnb.
- by move: Hk; rewrite E Hnb /#.
-pose N:= size (take 256 _).
-move=> Hn0 Hk0 Hk1 Hn1 Hn2.
-have : N=256 by smt().
-rewrite -enough_blocksE => HH.
-have E: k = _nb by smt().
-rewrite /parse; congr.
-smt(enough_blocksE).
+move=> ge0nb hlt; rewrite ltzNge; apply/negP => hle.
+have := size_rejection_mono seed (needed_blocks seed) nb _; 1: smt(needed_blocks_ge3).
+by have := needed_blocksP seed; rewrite /enough_blocks /#.
 qed.
 
-hoare sampleFilter_sem_h _rho _j _i: 
- ParseFilter.sample 
- : rho=_rho /\ i =_i /\ j=_j ==>  res = parse _rho _j _i.
-proof. by conseq (sampleFilter_sem _rho _j _i). qed.
+lemma parseE rho j i nb idx:
+ 0 <= nb => 256 <= size (rejection (expand_seed (rho, (j, i)) nb)) =>
+ 0 <= idx < 256 =>
+ (parse rho j i).[idx] = nth witness (rejection (expand_seed (rho, (j, i)) nb)) idx.
+proof.
+move=> ge0nb hsz rgi; have hle := needed_blocks_min (rho, (j, i)) nb ge0nb hsz.
+have [l ->] := rejection_expand_prefix (rho, (j, i)) (needed_blocks (rho, (j, i))) nb _.
+- smt(needed_blocks_ge3).
+have := needed_blocksP (rho, (j, i)); rewrite /enough_blocks => hn.
+rewrite /parse /parse_coeffs Array256.get_of_list 1://.
+by rewrite nth_cat ifT 1:/# nth_take /#.
+qed.
 
+lemma SHAKE128_SQUEEZE_168_st_i st n:
+ 0 <= n =>
+ SHAKE128_SQUEEZE_168 (FIPS202_SHA3_Spec.st_i st n)
+ = (FIPS202_SHA3_Spec.st_i st (n + 1),
+    Array168.of_list W8.zero (squeezestate_i c256_r8 st n)).
+proof.
+move=> ge0n; have e : FIPS202_SHA3_Spec.st_i (FIPS202_SHA3_Spec.st_i st n) 1
+                      = FIPS202_SHA3_Spec.st_i st (n + 1).
+- by rewrite /FIPS202_SHA3_Spec.st_i iter1 iterS.
+by rewrite /SHAKE128_SQUEEZE_168 /= /squeezestate_i /= e.
+qed.
+
+op parse_inv seed (k : int) (st : state) (aa : poly) (j : int) =
+  0 <= k /\ st = FIPS202_SHA3_Spec.st_i (SHAKE128_ABSORB (rejection_seed seed)) k
+  /\ filled_ok aa (rejection (expand_seed seed k)) j.
+
+(* SampleNTT computes parse. The Keccak state does not determine the    *)
+(* block count, so the loop variant is the largest count up to          *)
+(* needed_blocks that the current state is consistent with.            *)
 lemma parse_sem _st _rho _j _i:
- _st = SHAKE128_ABSORB_34 _rho _j _i => 
+ _st = SHAKE128_ABSORB_34 _rho _j _i =>
  phoare [ SampleNTT(XOF).sample
         : XOF.state = _st ==> res = parse _rho _j _i ] = 1%r.
 proof.
-move=> Est.
-conseq (parse_corr _rho _j _i) (sampleFilter_sem _rho _j _i).
- move => &1 /> .
- by exists (_rho,_j,_i); smt().
-smt().
+move=> ->; pose seed := (_rho, (_j, _i)).
+pose K := needed_blocks seed.
+pose st0 := SHAKE128_ABSORB (rejection_seed seed).
+pose R := fun n => rejection (expand_seed seed n).
+pose blk := squeezestate_i c256_r8 st0.
+have ge0K : 0 <= K by smt(needed_blocks_ge3).
+proc; sp.
+while (exists nb, nb <= K /\ parse_inv seed nb XOF.state aa j)
+      (K - argmax idfun (fun nb => nb <= K /\ parse_inv seed nb XOF.state aa j)).
+- move=> z.
+  exlim (argmax idfun (fun nb => nb <= K /\ parse_inv seed nb XOF.state aa j)) => m.
+  conseq (_ : parse_inv seed m XOF.state aa j /\ m < K /\ K - m = z ==> _).
+  + move=> &hr [-> [[[nb [hnb hinv]] hj] hz]].
+    have := argmax_bounded (fun nb => parse_inv seed nb XOF.state{hr} aa{hr} j{hr}) K nb _ hinv.
+    - by case: hinv => /#.
+    move=> /= [rgm [hm _]]; split; 1: exact hm.
+    split; 2: smt().
+    case: hm => [ge0m [_ [_ hjm]]].
+    by have := lt_needed_blocks seed _ ge0m _; smt().
+  (* one 3-byte group *)
+  wp; while (XOF.state = FIPS202_SHA3_Spec.st_i st0 (m + 1) /\ to_list b168 = blk m
+             /\ 0 <= k <= 168 /\ 3 %| k /\ 0 <= m < K /\ K - m = z
+             /\ filled_ok aa (R m ++ rejection (take k (to_list b168))) j)
+            (168 - k).
+  - move=> z0; auto => &hr |> hb ge0k lek dvdk ge0m ltmK hok hj hk.
+    rewrite take_k3 1:/# rejection_cat; 1: by rewrite size_take 1:/# size_to_list /#.
+    rewrite rejection3E catA.
+    pose c1 := to_uint b168{hr}.[k{hr}] + 256 * (to_uint b168{hr}.[k{hr} + 1] %% 16).
+    pose c2 := to_uint b168{hr}.[k{hr} + 1] %/ 16 + 16 * to_uint b168{hr}.[k{hr} + 2].
+    pose cs := R m ++ rejection (take k{hr} (to_list b168{hr})).
+    have h3 : 3 %| (k{hr} + 3) by rewrite dvdzD.
+    have hk3 : k{hr} + 3 <= 168 by move: dvdk => /dvdzP [n hn]; smt().
+    have hok1 : c1 < q =>
+      filled_ok aa{hr}.[j{hr} <- incoeff c1] (cs ++ [incoeff c1]) (j{hr} + 1).
+    - by move=> _; apply filled_ok_snoc.
+    have hok2 : c2 < q =>
+      filled_ok aa{hr}.[j{hr} <- incoeff c2] (cs ++ [incoeff c2]) (j{hr} + 1).
+    - by move=> _; apply filled_ok_snoc.
+    split=> h1; split=> h2 /=; rewrite ?h1 ?h2 /=.
+    - move=> hj1; split; 2: smt(); split; 1: smt(); split; 1: done.
+      have -> : cs ++ [incoeff c1; incoeff c2] = (cs ++ [incoeff c1]) ++ [incoeff c2].
+      - by rewrite /cs -!catA.
+      rewrite (_ : j{hr} + 2 = j{hr} + 1 + 1) 1:/#.
+      by apply filled_ok_snoc => //; apply hok1.
+    - split; 2: smt(); split; 1: smt(); split; 1: done.
+      case: (c2 < q) => h2' /=; last by apply hok1.
+      have -> : cs ++ [incoeff c1; incoeff c2] = (cs ++ [incoeff c1]) ++ [incoeff c2].
+      - by rewrite /cs -!catA.
+      by apply filled_ok_full; [apply hok1 | smt()].
+    - by split; 2: smt(); split; 1: smt(); split; [done | apply hok2].
+    by split; 2: smt(); split; 1: smt(); split; [done | rewrite cats0].
+  (* one block *)
+  inline XOF.next_bytes; auto => &hr |> [ge0m [hst hok]] ltmK.
+  rewrite hst SHAKE128_SQUEEZE_168_st_i //= of_listK; 1: by rewrite size_squeezestate_i.
+  rewrite take0 rejection0 cats0 hok /=; split; 1: smt().
+  move=> aa0 j0 k0; split; 1: smt().
+  move=> hexit _ _ ge0k0 lek0 dvdk0 hok0.
+  move=> hokk.
+  have hR : filled_ok aa0 (R (m + 1)) j0.
+  - rewrite /R expand_seedS // rejection_cat; 1: by rewrite size_expand_seed // dvdz_mulr.
+    case: (k0 = 168) => [->> | ne168].
+    - have e : take 168 (blk m) = blk m by rewrite take_oversize // size_squeezestate_i.
+      by move: hokk; rewrite e => h; exact h.
+    have hj0 : 256 <= j0 by smt().
+    rewrite -(cat_take_drop k0 (squeezestate_i c256_r8 (SHAKE128_ABSORB (rejection_seed seed)) m)).
+    rewrite rejection_cat; 1: by rewrite size_take // size_squeezestate_i /#.
+    by rewrite catA; apply filled_ok_full; [exact hokk | smt()].
+  have hinv : parse_inv seed (m + 1) (FIPS202_SHA3_Spec.st_i st0 (m + 1)) aa0 j0.
+  - by do 2! (split; 1: smt()); exact hR.
+  split; 1: by exists (m + 1); split; [smt() | exact hinv].
+  have := argmax_bounded (fun nb => parse_inv seed nb (FIPS202_SHA3_Spec.st_i st0 (m + 1)) aa0 j0)
+            K (m + 1) _ hinv; 1: smt().
+  by move=> /= /#.
+skip => &hr |> /=; split.
+- exists 0; split; 1: smt().
+  rewrite /parse_inv /FIPS202_SHA3_Spec.st_i iter0 //= expand_seed0 // rejection0.
+  by rewrite /filled_ok.
+move=> st aa0 j0; split.
+- move=> nb hnb hinv hv.
+  have := argmax_bounded (fun nb => parse_inv seed nb st aa0 j0) K nb _ hinv.
+  - by case: hinv => /#.
+  move=> /= [rgm [hm _]].
+  have hK : argmax idfun (fun nb => nb <= K /\ parse_inv seed nb st aa0 j0) = K by smt().
+  move: hm; rewrite hK => -[_ [_ [_ ->]]].
+  by have := needed_blocksP seed; rewrite /enough_blocks /#.
+move=> hj nb hnb [ge0nb [_ [hag hj0]]]; apply Array256.ext_eq => idx rgidx.
+have hsz : 256 <= size (R nb) by smt().
+by rewrite (agree_nth witness _ _ _ hsz hag rgidx) (parseE _ _ _ nb).
 qed.
 
-equiv sampleX4_sample3buf_4x:
- ParseFilter.sample3buf_x4 ~ ParseFilter.sample3buf_x4'
- : ={arg} ==> ={res}.
-proof.
-proc; simplify.
-transitivity {2}
- { p0 <@ ParseFilter.sample3buf(rho, pos2ji pos t);
-   pos <- pos + 1;
-   p1 <@ ParseFilter.sample3buf(rho, pos2ji pos t);
-   pos <- pos + 1;
-   p2 <@ ParseFilter.sample3buf(rho, pos2ji pos t);
-   pos <- pos + 1;
-   p3 <@ ParseFilter.sample3buf(rho, pos2ji pos t);
- }
- ( ={rho, pos, t} ==> ={p0, p1, p2, p3} ) 
- ( ={rho, pos, t} ==> ={p0, p1, p2, p3} ); last first.
-* symmetry. 
-  call sample_sample3buf.
-  wp; call sample_sample3buf.
-  wp; call sample_sample3buf.
-  wp; call sample_sample3buf.
-  by auto => /> /#.
-* by move=> &1 &2 /> /#.
-* by move=> &1 &m &2 /> /#.
-swap {1} 8 -6.
-swap {1} 9 -4.
-swap {1} 10 -2.
-swap {1} [12..13] -9.
-swap {1} [14..15] -6.
-swap {1} [16..17] -3.
-swap {1} [20..21] -15.
-swap {1} [22..23] -10.
-swap {1} [24..25] -5.
-swap {1} 28 -21.
-swap {1} 29 -14.
-swap {1} 30 -7.
-seq 7 1: (#pre /\ ={p0}).
- by inline sample3buf; wp; sim; auto.
-seq 8 2: (#pre /\ ={p1}).
- by inline sample3buf; wp; sim; auto.
-seq 8 2: (#pre /\ ={p2}).
- by inline sample3buf; wp; sim; auto.
-by inline sample3buf; wp; sim; auto.
-qed.
-
-import PolyMat.
 
 module Hmodule = {
     proc sampleA(sd : W8.t Array32.t) : polymat = {
