@@ -167,6 +167,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 clone Rejstream.RejStream as SRS with
   type cand   <- W8.t,
+  type coeff_t <- W32.t,
     op dec1   <- (fun (g : W8.t list) => nibbles (head witness g)),
     op align  <- 1,
     op accept <- saccept,
@@ -1336,7 +1337,7 @@ lemma SpolyP (rho' : W8.t Array64.t) (sep : W16.t) (m j : int) :
   (Spoly rho' sep).[j]
   = nth W32.zero
       (sreject (shake256_slice (to_list rho' ++ W2u8.to_list sep) 0 m)) j.
-proof. by move=> *; rewrite /Spoly (rpolyP _ m). qed.
+proof. by move=> *; rewrite /Spoly (rpolyP W32.zero _ m). qed.
 
 (* -------------------------------------------------------------------- *)
 
@@ -1489,7 +1490,7 @@ seq ^while : (true) 1%r 1%r 0%r 0%r
       apply Array256.ext_eq => j rgj.
       rewrite (SpolyP rho_ (ds0 + W16.of_int i) (136 * k) j) //; 1: smt(); 1: by move: hsz; rewrite hdata.
       rewrite -hdata.
-      by move: hag => @/agree hag; smt().
+      by apply (agree_nth W32.zero _ _ _ hsz hag rgj).
     move=> i rgi.
     have /= := h i rgi.
     rewrite /sreject_ok => -[hag hf].

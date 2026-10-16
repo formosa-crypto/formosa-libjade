@@ -1,10 +1,7 @@
 (* -------------------------------------------------------------------- *)
-(* The rejection-sampling stream algebra shared by the ML-DSA samplers: *)
-(* a byte stream decodes to candidates, accepted candidates map to      *)
+(* The rejection-sampling stream algebra of the samplers: a byte       *)
+(* stream decodes to candidates, accepted candidates map to             *)
 (* coefficients; plus the XOF-slice and staged four-lane layers.        *)
-(*                                                                      *)
-(* Instances: AexpandT (3-byte candidates, align 3, coeff = idfun) and  *)
-(* ErrorSamplerT (nibbles, align 1, coeff = Eta - sred z).              *)
 (* -------------------------------------------------------------------- *)
 require import AllCore List IntDiv IntMin BitEncoding.
 import BitChunking.
@@ -12,7 +9,7 @@ import BitChunking.
 from Jasmin require import JWord JUtils.
 
 require import Agree.
-require import Array4 Array256.
+from JazzEC require import Array4 Array256.
 
 (* -------------------------------------------------------------------- *)
 (* the largest k <= K satisfying p (when some i <= K does)               *)
@@ -38,8 +35,10 @@ op align : int.
 
 axiom gt0_align : 0 < align.
 
+type coeff_t.
+
 op accept : cand -> bool.
-op coeff  : cand -> W32.t.
+op coeff  : cand -> coeff_t.
 
 (* decoding is group-local: the candidate stream of a byte stream      *)
 op decode (bs : W8.t list) : cand list =
@@ -55,7 +54,7 @@ by move=> h; rewrite /decode chunk_cat // map_cat flatten_cat.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op [opaque] reject (bs : W8.t list) : W32.t list =
+op [opaque] reject (bs : W8.t list) : coeff_t list =
   map coeff (filter accept (decode bs)).
 
 lemma rejectE (bs : W8.t list) :
@@ -131,14 +130,14 @@ qed.
 op rfuel (n : W8.t list) : int =
   argmin idfun (fun m => 256 <= size (reject (slice n 0 m))).
 
-op rpoly (n : W8.t list) : W32.t Array256.t =
-  Array256.init (fun j => nth W32.zero (reject (slice n 0 (rfuel n))) j).
+op rpoly (n : W8.t list) : coeff_t Array256.t =
+  Array256.init (fun j => nth witness (reject (slice n 0 (rfuel n))) j).
 
-lemma rpolyP (n : W8.t list) (m j : int) :
+lemma rpolyP (x0 : coeff_t) (n : W8.t list) (m j : int) :
   0 <= m => 256 <= size (reject (slice n 0 m)) => 0 <= j < 256 =>
-  (rpoly n).[j] = nth W32.zero (reject (slice n 0 m)) j.
+  (rpoly n).[j] = nth x0 (reject (slice n 0 m)) j.
 proof.
-move=> hm hsz rgj; rewrite /rpoly Array256.initiE //=.
+move=> hm hsz rgj; rewrite /rpoly Array256.initiE //= (nth_change_dfl witness x0) 1:/#.
 pose p := fun m => 256 <= size (reject (slice n 0 m)).
 have hf : p (argmin idfun p) by apply (argminP idfun p m).
 have hle : argmin idfun p <= m by smt(argmin_min).
@@ -169,12 +168,12 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 (* a sampled polynomial holds the accepted prefix, count capped at 256  *)
-op reject_ok (nonce : W8.t list) (sz : int) (p : W32.t Array256.t) (filled : int) =
+op reject_ok (nonce : W8.t list) (sz : int) (p : coeff_t Array256.t) (filled : int) =
      agree p 0 (reject (slice nonce 0 sz))
   /\ filled = min 256 (size (reject (slice nonce 0 sz))).
 
 (* a finished lane satisfies the invariant at any longer prefix         *)
-lemma reject_ok_full (nonce : W8.t list) (m l : int) (p : W32.t Array256.t) :
+lemma reject_ok_full (nonce : W8.t list) (m l : int) (p : coeff_t Array256.t) :
   0 <= m => 0 <= l => align %| m =>
   reject_ok nonce m p 256 =>
   reject_ok nonce (m + l) p 256.
@@ -188,7 +187,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 (* the four sampling lanes, staged: lanes below j are one block ahead   *)
 op lanes_ok (data : W8.t list Array4.t) (k j : int)
-            (ps : W32.t Array256.t list) (fs : W64.t list) =
+            (ps : coeff_t Array256.t list) (fs : W64.t list) =
   forall i, 0 <= i < 4 =>
     reject_ok data.[i] (rate * (k + b2i (i < j)))
       (nth witness ps i) (to_uint (nth witness fs i)).

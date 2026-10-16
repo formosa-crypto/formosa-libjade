@@ -252,6 +252,7 @@ op cands (bs : W8.t list) : W32.t list =
 
 clone Rejstream.RejStream as ARS with
   type cand   <- W32.t,
+  type coeff_t <- W32.t,
     op dec1   <- (fun (g : W8.t list) => [W4u8.pack4 g `&` mask23]),
     op align  <- 3,
     op accept <- accept,
@@ -376,8 +377,7 @@ rewrite /XArray256.PAE.replace_ Array256.filliE 1:/# szl /=.
 move: rgi rgibase; rewrite size_cat size_take 1:/# szl => rgi rgibase.
 rewrite nth_cat.
 case: (i < size old) => hio; last first.
-- rewrite ifT 1:/# nth_take 1,2:/#.
-  by rewrite (nth_change_dfl witness W32.zero) 1:/#.
+- by rewrite ifT 1:/# nth_take 1,2:/#.
 rewrite ifF 1:/#.
 by have := hag i _ _ => //#.
 qed.
@@ -1066,7 +1066,7 @@ lemma ApolyP (rho : rho) (rc : int * int) (m j : int) :
   (Apoly rho rc).[j]
   = nth W32.zero
       (reject (shake128_slice (to_list rho ++ W2u8.to_list (A_ds rc)) 0 m)) j.
-proof. by move=> *; rewrite /Apoly (rpolyP _ m). qed.
+proof. by move=> *; rewrite /Apoly (rpolyP W32.zero _ m). qed.
 
 (* -------------------------------------------------------------------- *)
 op A_rc_of_index (i : int) =
@@ -1329,7 +1329,7 @@ seq ^while : (true) 1%r 1%r 0%r 0%r
       apply Array256.ext_eq => j rgj.
       rewrite (ApolyP rho_ rc (168 * k) j) //; 1: smt(); 1: by move: hsz; rewrite hdata.
       rewrite -hdata.
-      by move: hag => @/agree hag; smt().
+      by apply (agree_nth W32.zero _ _ _ hsz hag rgj).
     move=> i; with hint +listred (apply: allP_range i => /=).
     do 3? split.
     - have /= := h 0 _; 1: done.
