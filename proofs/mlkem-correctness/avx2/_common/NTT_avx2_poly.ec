@@ -9,6 +9,8 @@ require import NTT_Fq.
 require import NTT_AVX_Fq.
 require import NTT_AVX_j.
 require import AVX2_Ops.
+require import Montgomery16 W16extra.
+require NttKem MLKEM_ntt_levels MLKEM_ntt_avx2 MLKEM_invntt_levels MLKEM_invntt_avx2.
 
 from Spec require import GFq Rq Serialization Correctness.
 import Zq IntOrder BitReverse.
@@ -340,16 +342,69 @@ rewrite !perm_ntt_nttpackE !nttunpackK => <-.
 by rewrite /scale -map_pack nttpackK.
 qed.
 
+(* -------------------------------------------------------------------- *)
+(* The forward NTT, from the level-by-level proof (MLKEM_ntt_avx2)      *)
+lemma poly_ntt_ll : islossless Jkem_avx2.M._poly_ntt.
+proof.
+proc; inline *; wp; while (true) (2 - i); first by move=> z; auto => /> /#.
+by auto => /> /#.
+qed.
+
+(* the code returns the leaves, Barrett-reduced, in nttunpack order *)
+lemma nttresE (r : W16.t Array256.t) :
+  MLKEM_ntt_avx2.nttres r = nttunpack (Array256.map sbred16 (NttKem.reduce_tree r 1)).
+proof.
+rewrite nttunpackE; apply Array256.ext_eq => j rgj.
+rewrite /MLKEM_ntt_avx2.nttres !initiE //= mapiE; first by smt(nttunpack_inbounds).
+congr; congr; move: j rgj; apply/allP_range.
+by rewrite -iotaredE /MLKEM_ntt_avx2.fin /MLKEM_ntt_levels.pos2 /MLKEM_ntt_avx2.sigma.
+qed.
+
+lemma sbred16P (x : W16.t) :
+  incoeff (W16.to_sint (sbred16 x)) = incoeff (W16.to_sint x)
+  /\ 0 <= W16.to_sint (sbred16 x) < 2 * q.
+proof.
+have [h1 h2] := MLKEM_ntt_levels.sbred16P x.
+by split; [apply/eq_incoeff; rewrite /coeffcgr qE | rewrite qE].
+qed.
+
 lemma poly_ntt_avx2_corr _r :
   phoare [Jkem_avx2.M._poly_ntt :
     rp = _r /\ signed_bound_cxq rp 0 256 2 ==>
     ntt (lift_array256 _r) = lift_array256 (nttpack res) /\
     pos_bound256_cxq res 0 256 2] = 1%r.
 proof.
-conseq poly_ntt_avx2_eq (ntt_avx_spec (lift_array256 _r)).
- by move => &1 [-> H] /#.
-move=> &1 &2 [-> H] <-.
-by rewrite lift_nttpack perm_ntt_nttpackE.
+conseq poly_ntt_ll (_ : rp = _r /\ signed_bound_cxq rp 0 256 2 ==>
+  ntt (lift_array256 _r) = lift_array256 (nttpack res) /\ pos_bound256_cxq res 0 256 2) => //.
+conseq (MLKEM_ntt_avx2.poly_ntt_h _r) => //.
+move=> &m [->> hb] r ->; rewrite nttresE nttunpackK.
+have hc : NttKem.cbnd _r (2 * q).
+- by move=> i rgi; have := hb i rgi; rewrite b16E /q /#.
+have hB : 2 * q + 7 * 3329 < 2^15 by rewrite qE.
+have [hcb hl] := NttKem.ntt_link _r (2 * q) _ hB hc; first by rewrite qE.
+split.
+- rewrite -(_ : NttKem.liftw _r = lift_array256 _r) // -hl.
+  apply Array256.ext_eq => i rgi.
+  rewrite /lift_array256 /NttKem.liftw !mapiE //=.
+  by have [-> _] := sbred16P (NttKem.reduce_tree _r 1).[i].
+move=> k rgk; rewrite bpos16E nttunpackE initiE //= mapiE; first smt(nttunpack_inbounds).
+by have [_] := sbred16P (NttKem.reduce_tree _r 1).[nttunpack_idx.[k]].
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* The inverse NTT, from the level-by-level proof (MLKEM_invntt_avx2)   *)
+lemma poly_invntt_ll : islossless Jkem_avx2.M._poly_invntt.
+proof.
+proc; inline *; wp; while (true) (2 - i); first by move=> z; auto => /> /#.
+by wp; while (true) (2 - i); [move=> z; auto => /> /# | auto => /> /#].
+qed.
+
+(* the code reads its input in nttpack order *)
+lemma pkE (r : W16.t Array256.t) : MLKEM_invntt_avx2.pk r = nttpack r.
+proof.
+apply Array256.ext_eq => i rgi; rewrite /MLKEM_invntt_avx2.pk /nttpack !initiE //=.
+congr; move: i rgi; apply/MLKEM_ntt_levels.allP_range.
+by rewrite /MLKEM_invntt_levels.pkidx -iotaredE.
 qed.
 
 lemma poly_invntt_avx2_corr _r :
@@ -358,9 +413,28 @@ lemma poly_invntt_avx2_corr _r :
     mul1x256 (incoeff W16.modulus) (invntt (lift_array256 _r)) = (lift_array256 res) /\
     signed_bound_cxq res 0 256 1] = 1%r.
 proof.
-conseq poly_invntt_avx2_eq (invntt_avx_spec (lift_array256 _r)).
-move => &1 [<- H]. exists (lift_array256 arg{1}) => />. rewrite lift_nttpack perm_ntt_nttpackE //.
-move => &1 &2 [<- H] -> /#.
+conseq poly_invntt_ll (_ : lift_array256 (nttpack rp) = lift_array256 _r /\
+  signed_bound_cxq rp 0 256 4 ==> _) => //.
+exlim rp => r0; conseq (MLKEM_invntt_avx2.poly_invntt_h r0); first smt().
+move=> &m [->> [hl hb]] _ ->.
+(* the expected result, as 16-bit words *)
+pose p := Array256.init (fun i => W16.of_int (asint (invntt (lift_array256 _r)).[i])).
+have hpE : forall i, 0 <= i < 256 =>
+  W16.to_sint p.[i] = asint (invntt (lift_array256 _r)).[i].
+- move=> i rgi; rewrite /p initiE //= W16.to_sintK_small //.
+  by have := rg_asint (invntt (lift_array256 _r)).[i]; rewrite qE /#.
+have hcb : NttKem.cbnd p 3329.
+- by move=> i rgi; rewrite hpE //; have := rg_asint (invntt (lift_array256 _r)).[i]; smt(qE).
+have hlp : NttKem.liftw p = invntt (lift_array256 _r).
+- by apply Array256.ext_eq => i rgi; rewrite NttKem.liftwE // hpE // asintK.
+have hv1 : NttKem.icgr p (MLKEM_invntt_avx2.pk arg{m}) 1.
+- by apply (NttKem.intt_leaves _ _ 3329) => //; rewrite hlp nttK pkE -hl.
+have [hc hbnd] := MLKEM_invntt_avx2.invres_val arg{m} p _ hv1.
+- by move=> i rgi; have := hb i rgi; rewrite b16E qE /#.
+split.
+- apply Array256.ext_eq => i rgi; rewrite -hlp /lift_array256 !mapiE //=.
+  by rewrite -incoeffM; apply/eq_incoeff; rewrite /coeffcgr qE hc.
+by move=> k rgk; rewrite b16E qE; have := hbnd k _ => // /#.
 qed.
 
 (* variant-independent register shuffles (relocated from the per-variant NTT_avx2) *)
