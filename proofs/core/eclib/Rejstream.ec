@@ -25,6 +25,24 @@ by smt(ge0_argmax).
 qed.
 
 (* -------------------------------------------------------------------- *)
+(* a monotone count that gains one in every period of length c grows    *)
+(* without bound                                                         *)
+lemma count_grows (f : int -> int) (c : int) (g : int -> int) :
+  0 <= c =>
+  (forall a b, 0 <= a <= b => f a <= f b) =>
+  (forall N, 0 <= N => c * N <= g N /\ g N + 1 <= c * (N + 1) /\ f (g N) + 1 <= f (g N + 1)) =>
+  0 <= f 0 =>
+  forall N, 0 <= N => N <= f (c * N).
+proof.
+move=> ge0c hmono hg h0; elim => [|N ge0N ih]; 1: done.
+have [h1 [h2 h3]] := hg N ge0N.
+have hcN : 0 <= c * N by apply StdOrder.IntOrder.mulr_ge0.
+have := hmono (c * N) (g N) _; 1: smt().
+have := hmono (g N + 1) (c * (N + 1)) _; 1: smt().
+smt().
+qed.
+
+(* -------------------------------------------------------------------- *)
 abstract theory RejStream.
 
 type cand.

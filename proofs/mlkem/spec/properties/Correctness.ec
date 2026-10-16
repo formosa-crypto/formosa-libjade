@@ -689,7 +689,8 @@ qed.
 require import IntMin.
 require import EclibExtra.
 require import JWordList.
-from CryptoSpecs require import Keccak1600_Spec.
+from CryptoSpecs require import Keccak1600_Spec Keccak1600_Orbit.
+require import Rejstream.
 
 (** parses a byte list into (candidate) coefficients *)
 op bytes2coeffs(bytes : W8.t list) : int list =
@@ -807,12 +808,97 @@ lemma enough_blocksE m nb:
 proof. by rewrite size_takel' /#. qed.
 
 
-(** We axiomatize the fact that rejection sampling
- as specified in Kyber terminates.
- (c.f. https://eprint.iacr.org/2023/708)
-*)
-axiom kyber_terminates (seed: W8.t Array32.t * (W8.t * W8.t)):
+(** Rejection sampling as specified terminates. Keccak-f[1600] is a
+ permutation, so the absorbed state of the 34-byte seed recurs once per
+ period, and with it an aligned zero 3-byte group at offset 36 of the
+ squeezed block, whose two candidates are accepted. *)
+lemma expand_seedS seed nb:
+ 0 <= nb =>
+ expand_seed seed (nb + 1)
+ = expand_seed seed nb
+   ++ squeezestate_i c256_r8 (SHAKE128_ABSORB (rejection_seed seed)) nb.
+proof.
+move=> ge0nb; rewrite /expand_seed /squeezeblocks iotaSr // -cats1.
+by rewrite map_cat flatten_cat /= flatten_cons flatten_nil cats0.
+qed.
+
+lemma SHAKE128_expand_seed seed nb:
+ 0 <= nb =>
+ SHAKE128 (rejection_seed seed) (168 * nb) = expand_seed seed nb.
+proof.
+move=> ge0nb; case: (nb = 0) => [->|ne0nb].
+- by rewrite expand_seed0 // -size_eq0 size_SHAKE128.
+rewrite /SHAKE128 /KECCAK1600 /SQUEEZE1600 /expand_seed /c256_r8 /=.
+rewrite (_ : (168 * nb - 1) %/ 168 + 1 = nb) 1:/# take_oversize //.
+by rewrite size_squeezeblocks /#.
+qed.
+
+lemma rejection_zero3:
+ rejection [W8.zero; W8.zero; W8.zero] = [incoeff 0; incoeff 0].
+proof.
+rewrite /rejection /bytes2coeffs /bytes_to_bits /= byte_to_bits_nil /= /chunk /=.
+have -> : flatten [nseq 8 false; nseq 8 false; nseq 8 false] = nseq 24 false.
+- by rewrite !flatten_cons flatten_nil cats0 !cat_nseq.
+rewrite size_nseq /= (mkseqS _ 1) // mkseq1 /= !drop_nseq //= !take_nseq /=.
+by rewrite !bs2int_nseq_false /= (_ : 0 < q) // /q.
+qed.
+
+lemma size_rejectionS seed nb:
+ 0 <= nb =>
+ size (rejection (expand_seed seed (nb + 1)))
+ = size (rejection (expand_seed seed nb))
+   + size (rejection (squeezestate_i c256_r8 (SHAKE128_ABSORB (rejection_seed seed)) nb)).
+proof.
+move=> ge0nb; rewrite expand_seedS // rejection_cat 2:size_cat //.
+by rewrite size_expand_seed // dvdz_mulr.
+qed.
+
+lemma size_rejection_mono seed nb1 nb2:
+ 0 <= nb1 <= nb2 =>
+ size (rejection (expand_seed seed nb1))
+ <= size (rejection (expand_seed seed nb2)).
+proof.
+move=> [ge0nb1 le12]; have [d [ge0d ->]] : exists d, 0 <= d /\ nb2 = nb1 + d.
+- by exists (nb2 - nb1); smt().
+elim: d ge0d => [|d ge0d ih] //.
+by rewrite addzA size_rejectionS 1:/#; smt(size_ge0).
+qed.
+
+lemma kyber_terminates (seed: W8.t Array32.t * (W8.t * W8.t)):
  exists nblocks, enough_blocks seed nblocks.
+proof.
+pose m := rejection_seed seed.
+pose blk := squeezestate_i c256_r8 (SHAKE128_ABSORB m).
+have szm : size m = 34 by rewrite /m size_cat size_to_list.
+have [L [gt0L hL]] := SHAKE128_zero_run m _; 1: by rewrite szm.
+pose f := fun n => size (rejection (expand_seed seed n)).
+have := count_grows f L (fun N => (N + 1) * L - 1) _ _ _ _ 256 _.
+- smt().
+- by move=> a b rgab; apply size_rejection_mono.
+- move=> N ge0N /=; pose g := (N + 1) * L - 1.
+  have ge0g : 0 <= g by smt().
+  do 2! (split; 1: smt()).
+  rewrite (_ : (N + 1) * L = g + 1) 1:/# /f size_rejectionS // -/m -/(blk g).
+  have szb : size (blk g) = 168 by rewrite size_squeezestate_i.
+  (* the zero group of the recurring block *)
+  have hz : forall j, 0 <= j < 3 => nth witness (blk g) (36 + j) = W8.zero.
+  - move=> j rgj; have := hL (N + 1) (36 + j) (168 * (g + 1)) _ _ _; 1..3: smt().
+    rewrite SHAKE128_expand_seed 1:/# expand_seedS // nth_cat size_expand_seed //.
+    rewrite -/m -/(blk g) -/g ifF 1:/#.
+    by rewrite (_ : g * 168 + (36 + j) - 3 * (56 * g) = 36 + j) 1:#ring.
+  have /= h0 := hz 0 _; 1: done.
+  have /= h1 := hz 1 _; 1: done.
+  have /= h2 := hz 2 _; 1: done.
+  rewrite -(cat_take_drop 36 (blk g)) rejection_cat; 1: by rewrite size_take // szb.
+  rewrite (drop_nth witness 36) 1:/# (drop_nth witness 37) 1:/#.
+  rewrite (drop_nth witness 38) 1:/# h0 h1 h2 /=.
+  rewrite (_ : W8.zero :: W8.zero :: W8.zero :: drop 39 (blk g)
+             = [W8.zero; W8.zero; W8.zero] ++ drop 39 (blk g)) //.
+  by rewrite rejection_cat // rejection_zero3 !size_cat /=; smt(size_ge0).
+- by rewrite /f size_ge0.
+- done.
+by move=> /= h; exists (L * 256); rewrite /enough_blocks; smt().
+qed.
 
 
 

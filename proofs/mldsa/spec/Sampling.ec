@@ -4,6 +4,7 @@ require import Array256.
 from CryptoSpecs require import Keccak1600_Spec.
 from CryptoSpecs require import Keccak1600_Orbit.
 require import Parameters GFq Rq.
+require import Rejstream.
 require import Symmetric.
 
 abstract theory SamplingT.
@@ -218,23 +219,7 @@ qed.
 (* Termination: Keccak-f[1600] is a permutation, so the padded block of *)
 (* a single-block seed recurs in its SHAKE stream once per period of the *)
 (* absorbed state (Keccak1600_Orbit), and its zero bytes are accepted by *)
-(* every sampler.  A count that is monotone and gains one in every       *)
-(* period grows without bound.                                          *)
-lemma count_grows (f : int -> int) (c : int) (g : int -> int) :
-  0 <= c =>
-  (forall a b, 0 <= a <= b => f a <= f b) =>
-  (forall N, 0 <= N => c * N <= g N /\ g N + 1 <= c * (N + 1) /\ f (g N) + 1 <= f (g N + 1)) =>
-  0 <= f 0 =>
-  forall N, 0 <= N => N <= f (c * N).
-proof.
-move=> ge0c hmono hg h0; elim => [|N ge0N ih]; 1: done.
-have [h1 [h2 h3]] := hg N ge0N.
-have hcN : 0 <= c * N by apply StdOrder.IntOrder.mulr_ge0.
-have := hmono (c * N) (g N) _; 1: smt().
-have := hmono (g N + 1) (c * (N + 1)) _; 1: smt().
-smt().
-qed.
-
+(* every sampler; [count_grows] turns this into unbounded growth.       *)
 (* SampleInBall: a zero byte of the stream lies beyond any position, and
    zero is accepted at every index *)
 lemma sib_terminates (ct : BytesCT.t) : sib_ok ct.
