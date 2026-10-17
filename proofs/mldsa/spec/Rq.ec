@@ -3,6 +3,7 @@ require StdOrder.
 require import Array256.
 
 require import GFq Parameters.
+require NttResidue.
 import Round ZModQ Zq .
 
 
@@ -401,56 +402,51 @@ by rewrite scaleE // poly_zeroE // ZModpRing.mul0r.
 qed.
 
 (* -------------------------------------------------------------------- *)
-(* The residue view of the NTT: slot j is the evaluation at             *)
-(* x_j = zroot^(nttexp j), a root of X^256 + 1, which is a ring          *)
-(* morphism on Zq[X]/(X^256 + 1): the convolution theorem               *)
+(* The residue view of the NTT: slot j is the residue modulo            *)
+(* X - x_j, x_j = zroot^(nttexp j), a root of X^256 + 1; the NTT of a   *)
+(* product is the pointwise product (the generic residue theory, at     *)
+(* leaves of size 1)                                                    *)
 (* -------------------------------------------------------------------- *)
-lemma peval_expX (x : coeff) (k : int) : 0 <= k =>
-  peval (PolyComRing.exp X k) x = ZModpRing.exp x k.
+clone NttResidue.NttResidueT as NR with
+  type coeff   <- coeff,
+  theory Coeff <- ZModpRing,
+  op s         <- 0
+  proof rg_s by done.
+
+lemma mulE (a b : poly) : a &* b = NR.negmul a b.
 proof.
-elim: k => [|k ge0k ih]; first by rewrite PolyComRing.expr0 ZModpRing.expr0 pevalC.
-by rewrite PolyComRing.exprS // ZModpRing.exprS // pevalM pevalX ih.
+apply/Array256.ext_eq => k rgk; rewrite /(&*) alg2polyiE // rcoeffM // initiE //=.
+apply eq_big_int => i rgi /=; case: (i <= k) => hik.
+- rewrite (gered_rcoeff _ (n + k - i)) 1:/# ZModpRing.mulr0 ZModpRing.subr0.
+  by rewrite poly2algiE 1:/# poly2algiE 1:/#.
+rewrite (lt0_rcoeff _ (k - i)) 1:/# ZModpRing.mulr0 ZModpRing.sub0r.
+by rewrite poly2algiE 1:/# poly2algiE 1:/#.
 qed.
 
-(* evaluation at a root of X^n + 1 is constant on the classes mod X^n + 1 *)
-lemma peval_eqv (p q : BasePoly.poly) (x : coeff) :
-  ZModpRing.exp x n = - one => eqv p q => peval p x = peval q x.
-proof.
-move=> hx; rewrite /eqv /I PIdeal.mem_idgen1 => -[b hb].
-have : peval (q - p) x = zero.
-- by rewrite hb pevalM pevalD pevalC peval_expX // hx ZModpRing.addNr ZModpRing.mulr0.
-by rewrite pevalB ZModpRing.subr_eq0 => ->.
-qed.
+op xroot (j : int) : coeff = ZModpRing.exp zroot (nttexp j).
 
-lemma pevalX_mul (A B : polyXnD1) (x : coeff) :
-  ZModpRing.exp x n = - one => pevalX (A * B) x = pevalX A x * pevalX B x.
+lemma xrootN (j : int) : ZModpRing.exp (xroot j) 256 = - one.
 proof.
-move=> hx; rewrite /pevalX -pevalM.
-have -> : A * B = pinject (prepr A * prepr B) by rewrite -mulE !reprK.
-by apply/peval_eqv/eqv_repr.
-qed.
-
-lemma nttroot (j : int) : ZModpRing.exp (ZModpRing.exp zroot (nttexp j)) n = - one.
-proof.
-rewrite -ZModpRing.exprM mulzC ZModpRing.exprM zroot256 /nttexp.
+rewrite /xroot -ZModpRing.exprM mulzC ZModpRing.exprM zroot256 /nttexp.
 rewrite ZModpRing.exprS 1:#smt:(br_rg) ZModpRing.exprM ZModpRing.expr2.
 by rewrite ZModpRing.mulrNN ZModpRing.mul1r ZModpRing.expr1z ZModpRing.mulr1.
 qed.
 
-lemma ntt_peval (p : poly) (j : int) : 0 <= j < 256 =>
-  (ntt p).[j] = pevalX (poly2alg p) (ZModpRing.exp zroot (nttexp j)).
+lemma ntt_rntt (p : poly) : ntt p = NR.rntt xroot p.
 proof.
-move=> rgj; rewrite /ntt initiE //= /pevalX.
-rewrite (peval_eqv _ (crepr (poly2alg p))) 1:&(nttroot) 1:&(eqv_reduce).
-rewrite (pevalE_ge _ _ n) 1:&(deg_crepr).
-apply eq_big_int => s rgs /=.
-by rewrite -/("_.[_]" (poly2alg p) s) poly2algiE // ZModpRing.exprM.
+apply/Array256.ext_eq => j rgj; rewrite /ntt /NR.rntt !initiE //= /NR.resid /=.
+by apply eq_big_int => u rgu /=; rewrite /xroot ZModpRing.exprM.
+qed.
+
+lemma basemul_rmul (a b : poly) : basemul a b = NR.rmul xroot a b.
+proof.
+apply/Array256.ext_eq => j rgj.
+by rewrite basemulE // /NR.rmul initiE //= NR.resmul_s0.
 qed.
 
 lemma ntt_mul (a b : poly) : ntt (a &* b) = basemul (ntt a) (ntt b).
 proof.
-apply/Array256.ext_eq => j rgj.
-by rewrite basemulE // !ntt_peval // /(&*) poly2algK pevalX_mul 1:&(nttroot).
+by rewrite mulE basemul_rmul !ntt_rntt NR.rntt_negmul // => j _; apply xrootN.
 qed.
 
 (* the convolution theorem *)

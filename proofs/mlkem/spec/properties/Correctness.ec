@@ -9,6 +9,7 @@ from JazzEC require import Array25 Array256 Array384 Array128 Array168  Array32.
 (*---*) import RField RealOrder IntOrder IntID.
 
 require import MLKEMLib DistrExtra.
+require NttResidue.
 from Spec require import GFq Rq Parameters Symmetric Sampling VecMat  Serialization KPKE MLKEM.
 import Zq MLKEMParams PolyVec PolyMat.
 
@@ -2318,371 +2319,59 @@ rewrite (_: p = ntt (invntt p)); first by rewrite nttK.
 by rewrite -ntt_scale {1}invnttK  nttK.
 qed.
 
-lemma polymulE (pa pb : poly) :
-  pa &* pb =
-  (Array256.init
-    (fun (i : int) =>
-      BigDom.BAdd.bigi
-        predT
-        (fun (k : int) =>
-          pa.[k] * pb.[(i - k) %% 256] *
-          ZqRing.exp (incoeff (-1)) ((i - k) %/ 256))
-        0 256)).
+(* -------------------------------------------------------------------- *)
+(* The residue view of the NTT: block j is the residue modulo           *)
+(* X^2 - zroot^(2 br j + 1), a factor of X^256 + 1; the NTT of a        *)
+(* product is the product of the residues (the generic residue theory,  *)
+(* at leaves of size 2)                                                 *)
+(* -------------------------------------------------------------------- *)
+clone NttResidue.NttResidueT as NR with
+  type coeff   <- coeff,
+  theory Coeff <- ZqRing,
+  op s         <- 1
+  proof rg_s by done.
+
+lemma mulE (a b : poly) : a &* b = NR.negmul a b.
 proof.
-  rewrite /( &* ); apply/Array256.tP => i /mem_range mem_i_range.
-  do 2!(rewrite Array256.initiE /=; [by apply/mem_range|]).
-  rewrite -(ZqRing.addr0 (BigDom.BAdd.big _ _ _)); move: Zq.zero.
-  have: (256 \in range 0 257) by apply/mem_range.
-  have: (0 <= 256) by trivial.
-  move: {1 2 4 7}256; elim => [_ /=|j le0j IHj /mem_range_addr /= mem_j_range] z.
-  + by rewrite iota0 //= range_geq //= BigDom.BAdd.big_nil ZqRing.add0r.
-  rewrite iotaSr // foldr_rcons /= rangeSr // BigDom.BAdd.big_rcons {1}/predT /=.
-  move: mem_j_range; rewrite range_ltn //=; case => [->>//|mem_j_range].
-  rewrite IHj; [by move: mem_j_range; apply/mem_range_incl|].
-  case: (0 <= i - j) => [le0s|/ltrNge lts0].
-  + rewrite divz_small.
-    - rewrite le0s /= ltr_subl_addr; move: mem_i_range; apply/mem_range_gt.
-      by rewrite -ler_subl_addl; move: mem_j_range; apply/mem_range_le.
-    rewrite modz_small.
-    - rewrite le0s /= ltr_subl_addr; move: mem_i_range; apply/mem_range_gt.
-      by rewrite -ler_subl_addl; move: mem_j_range; apply/mem_range_le.
-    by rewrite ZqRing.expr0 ZqRing.mulr1 -!ZqRing.addrA; congr; ring.
-  move: (modzMDl 1 (i - j) 256) => /= <-.
-  move: (divzMDl 1 (i - j) 256) => /=; rewrite (Ring.IntID.addrC 1) -subr_eq => <-.
-  rewrite divz_small.
-  + rewrite -mem_range mem_range_addl mem_range lts0 /=.
-    rewrite ler_subr_addr; move: mem_i_range; apply/mem_range_le.
-    by rewrite addrC subr_le0; move: mem_j_range; apply/mem_range_ge.
-  rewrite modz_small.
-  + rewrite -mem_range mem_range_addl mem_range lts0 /=.
-    rewrite ler_subr_addr; move: mem_i_range; apply/mem_range_le.
-    by rewrite addrC subr_le0; move: mem_j_range; apply/mem_range_ge.
-  rewrite incoeffN /= ZqRing.exprN ZqRing.expr1 ZqRing.invrN1 ZqRing.mulrN ZqRing.mulr1.
-  by rewrite -!ZqRing.addrA; congr; ring.
+apply/Array256.ext_eq => k rgk; rewrite mul_lift polyr2polyP // RqTheory.rcoeffM // initiE //=.
+apply BigDom.BAdd.eq_big_int => i rgi /=; case: (i <= k) => hik.
+- rewrite (RqTheory.gered_rcoeff _ (256 + k - i)) 1:/# ZqRing.mulr0 ZqRing.subr0.
+  by rewrite poly2polyrP 1:/# poly2polyrP 1:/#.
+rewrite (RqTheory.lt0_rcoeff _ (k - i)) 1:/# ZqRing.mulr0 ZqRing.sub0r.
+by rewrite poly2polyrP 1:/# poly2polyrP 1:/#.
 qed.
 
-lemma BigDom_BAdd_big_allpairs_idfun ['a, 'b] (f : 'a -> 'b -> coeff) s t :
-  BigDom.BAdd.big predT idfun (allpairs f s t) =
-  BigDom.BAdd.big predT (fun (x : 'a) => BigDom.BAdd.big predT (fun (y : 'b) => f x y) t) s.
-proof. by rewrite BigDom.BAdd.big_allpairs; apply BigDom.BAdd.eq_big. qed.
+op xroot (j : int) : coeff = ZqRing.exp zroot (2 * br j + 1).
 
-lemma BigDom_BAdd_mulr_big_allpairs ['a] f1 f2 (s1 s2 : 'a list) :
-  BigDom.BAdd.big predT f1 s1 * BigDom.BAdd.big predT f2 s2 =
-  BigDom.BAdd.big predT idfun (allpairs (fun (x1, x2) => f1 x1 * f2 x2) s1 s2).
-proof. by rewrite BigDom.mulr_big BigDom_BAdd_big_allpairs_idfun. qed.
-
-lemma allpairs_map ['a, 'b, 'c] (f : 'a -> 'b -> 'c) s t :
-  allpairs f s t = map (fun (p : 'a * 'b) => f p.`1 p.`2) (allpairs (fun x y => (x, y)) s t).
+lemma xrootN (j : int) : ZqRing.exp (xroot j) 128 = - Zq.one.
 proof.
-  rewrite /allpairs; elim: s => [|hs ts IHs] //=; move: IHs => ->.
-  rewrite map_cat; congr; rewrite -map_comp; apply eq_map => x.
-  by rewrite /(\o).
+have ge0br : 0 <= br j by rewrite /br /bsrev BS2Int.bs2int_ge0.
+rewrite /xroot -ZqRing.exprM mulzC ZqRing.exprM exp_zroot_128 ZqRing.exprS 1:/#.
+by rewrite ZqRing.exprM exp_neg1_2 ZqRing.expr1z ZqRing.mulr1 incoeffN.
 qed.
 
-lemma BigDom_BAdd_big_allpairs_pair ['a, 'b] (f : 'a -> 'b -> coeff) s t :
-  BigDom.BAdd.big predT (fun (x : 'a) => BigDom.BAdd.big predT (fun (y : 'b) => f x y) t) s =
-  BigDom.BAdd.big predT (fun (p : 'a * 'b) => f p.`1 p.`2) (allpairs (fun (x1, x2) => (x1, x2)) s t).
+lemma ntt_rntt (p : poly) : ntt p = NR.rntt xroot p.
 proof.
-  rewrite -BigDom_BAdd_big_allpairs_idfun.
-  rewrite (BigDom.BAdd.eq_big _ predT _ (idfun \o (fun (p : 'a * 'b) => f p.`1 p.`2))) //.
-  by rewrite -BigDom.BAdd.big_mapT -allpairs_map.
+apply/Array256.ext_eq => i rgi; rewrite nttE /NR.rntt !initiE //= /NR.resid /=.
+have [] hi : i %% 2 = 0 \/ i %% 2 = 1 by smt().
+- by rewrite hi /=; apply BigDom.BAdd.eq_big_int => u rgu /=; rewrite mulzC /xroot ZqRing.exprM.
+by rewrite hi /=; apply BigDom.BAdd.eq_big_int => u rgu /=; rewrite mulzC /xroot ZqRing.exprM.
 qed.
 
-lemma BigDom_BAdd_mulr_big_allpairs_pair ['a] f1 f2 (s1 s2 : 'a list) :
-  BigDom.BAdd.big predT f1 s1 * BigDom.BAdd.big predT f2 s2 =
-  BigDom.BAdd.big predT (fun (p : 'a * 'a) => f1 p.`1 * f2 p.`2)
-    (allpairs (fun (x1, x2) => (x1, x2)) s1 s2).
+lemma basemul_rmul (a b : poly) : basemul a b = NR.rmul xroot a b.
 proof.
-  rewrite BigDom_BAdd_mulr_big_allpairs allpairs_map BigDom.BAdd.big_mapT.
-  by apply BigDom.BAdd.eq_big.
-qed.
-
-lemma eq_modz_inj (a b m n : int) :
-  0 < n =>
-  a \in range m (m + n) =>
-  b \in range m (m + n) =>
-  a %% n = b %% n =>
-  a = b.
-proof.
-  move => lt0n mem_a_range mem_b_range eq_mod.
-  rewrite (divz_eq a n) mem_range_addr addrAC mem_range_mulr // in mem_a_range.
-  rewrite (Ring.IntID.addrC _ n) -{3}(Ring.IntID.mul1r n) (Ring.IntID.opprD (1 * n)) in mem_a_range.
-  rewrite -mulNr divzMDl in mem_a_range; [by apply/gtr_eqF|].
-  rewrite (Ring.IntID.opprD (-1)) /= (Ring.IntID.addrC 1) range_ltn in mem_a_range; [by apply/ltzS|].
-  rewrite range_geq //= in mem_a_range.
-  rewrite (divz_eq b n) mem_range_addr addrAC mem_range_mulr // in mem_b_range.
-  rewrite (Ring.IntID.addrC _ n) -{3}(Ring.IntID.mul1r n) (Ring.IntID.opprD (1 * n)) in mem_b_range.
-  rewrite -mulNr divzMDl in mem_b_range; [by apply/gtr_eqF|].
-  rewrite (Ring.IntID.opprD (-1)) /= (Ring.IntID.addrC 1) range_ltn in mem_b_range; [by apply/ltzS|].
-  rewrite range_geq //= in mem_b_range.
-  by rewrite (divz_eq a n) (divz_eq b n); congr; congr; rewrite mem_a_range mem_b_range eq_mod.
-qed.
-
-lemma perm_mul_even :
-  perm_eq
-    (allpairs (fun (x1 x2 : int) => (x1, x2)) (range 0 128) (range 0 256))
-    (map
-      (fun (p : int * int) => ((p.`1 + p.`2 + 1) %% 128, 2 * p.`1 + 1) )
-      (allpairs (fun (x1 x2 : int) => (x1, x2)) (range 0 128) (range 0 128)) ++
-     map
-      (fun (p : int * int) => ((p.`1 + p.`2) %% 128, 2 * p.`1) )
-      (allpairs (fun (x1 x2 : int) => (x1, x2)) (range 0 128) (range 0 128))).
-proof.
-  apply/uniq_perm_eq.
-  + by apply/allpairs_uniq; [apply/range_uniq|apply/range_uniq|].
-  + rewrite cat_uniq; split; [|split].
-    - rewrite map_inj_in_uniq; [|by apply/allpairs_uniq; [apply/range_uniq|apply/range_uniq|]].
-      move => [x1 x2] [y1 y2] /= /allpairsP [[? ?] /=] [mem_x1_range] [mem_x2_range] [<<- <<-].
-      move => /allpairsP [[? ?] /=] [mem_y1_range] [mem_y2_range] [<<- <<-] [eq_1].
-      move => /Ring.IntID.addIr eq_2; move: (mulfI 2 _ x1 y1 _) => //= <<- /= {eq_2}; move: eq_1.
-      rewrite !(Ring.IntID.addrAC _ _ 1); move: (eq_modz_inj (x1 + 1 + x2) (x1 + 1 + y2) (x1 + 1) 128 _ _ _) => //.
-      * by rewrite mem_range_addl /= opprD !addrA addrAC /= addrAC.
-      * by rewrite mem_range_addl /= opprD !addrA addrAC /= addrAC.
-      by move => imp_ hyp_; move: (imp_ hyp_) => {imp_ hyp_} /Ring.IntID.addrI.
-    - apply/hasPn => [] [x1 x2] /mapP [] [y1 y2] /= [] /allpairsP [[? ?] /=] [mem_y1_range] [mem_y2_range] [<<- <<-].
-      move => [->> ->>]; apply/negP => /mapP [] [z1 z2] [] /allpairsP [[? ?] /=] [mem_z1_range] [mem_z2_range] [<<- <<-].
-      apply/negP => -[_]; rewrite !(Ring.IntID.mulrC 2) => eq_; have: ((y1 * 2) %% 2 = (z1 * 2 + 1) %% 2) by rewrite eq_.
-      by rewrite modzMl modzMDl.
-    rewrite map_inj_in_uniq; [|by apply/allpairs_uniq; [apply/range_uniq|apply/range_uniq|]].
-    move => [x1 x2] [y1 y2] /= /allpairsP [[? ?] /=] [mem_x1_range] [mem_x2_range] [<<- <<-].
-    move => /allpairsP [[? ?] /=] [mem_y1_range] [mem_y2_range] [<<- <<-] [eq_1].
-    move => eq_2; move: (mulfI 2 _ x1 y1 _) => //= <<- /= {eq_2}; move: eq_1.
-    move: (eq_modz_inj (x1 + x2) (x1 + y2) x1 128 _ _ _) => //.
-      * by rewrite mem_range_addl /= addrAC.
-      * by rewrite mem_range_addl /= addrAC.
-      by move => imp_ hyp_; move: (imp_ hyp_) => {imp_ hyp_} /Ring.IntID.addrI.
-  move => [x1 x2]; rewrite mem_cat; split.
-  + move => /allpairsP [[? ?] /=] [mem_x1_range] [mem_x2_range] [<<- <<-].
-    move: (mem_range_mod x2 2 _) => //.
-    rewrite range_ltn // range_ltn // range_geq //=; case => eq_mod.
-    - right; apply/mapP => /=; exists (x2 %/ 2, (x1 - x2 %/ 2) %% 128) => //=.
-      split; [|split]; first last.
-      * by rewrite -modzDm modz_mod modzDm addrA addrAC /= modz_small //; apply/mem_range.
-      * by rewrite (Ring.IntID.mulrC 2) {1}(divz_eq x2 2) eq_mod.
-      apply/allpairsP => /=; exists (x2 %/ 2, (x1 - x2 %/ 2) %% 128) => /=.
-      by rewrite range_div_range //= mem_x2_range /=; apply/(mem_range_mod _ 128).
-    left; apply/mapP => /=; exists (x2 %/ 2, (x1 - x2 %/ 2 -1) %% 128) => //=.
-    split; [|split]; first last.
-    - by rewrite addrAC -modzDm modz_mod modzDm addrA addrAC /= addrA addrAC /= modz_small //; apply/mem_range.
-    - by rewrite (Ring.IntID.mulrC 2) {1}(divz_eq x2 2) eq_mod.
-    apply/allpairsP => /=; exists (x2 %/ 2, (x1 - x2 %/ 2 - 1) %% 128) => /=.
-    by rewrite range_div_range //= mem_x2_range /=; apply/(mem_range_mod _ 128).
-  case; move => /mapP [] [y1 y2] [] /allpairsP [[? ?] /=] [mem_y1_range] [mem_y2_range];
-  move => [<<- <<-] [->> ->>]; apply/allpairsP => /=.
-  + exists ((y1 + y2 + 1) %% 128, 2 * y1 + 1) => /=.
-    by rewrite mem_range_addr mem_range_mull //= mem_y1_range /=; apply/(mem_range_mod _ 128).
-  exists ((y1 + y2) %% 128, 2 * y1) => /=.
-  by rewrite mem_range_mull //= mem_y1_range /=; apply/(mem_range_mod _ 128).
-qed.
-
-lemma perm_mul_odd :
-  perm_eq
-    (allpairs (fun (x1 x2 : int) => (x1, x2)) (range 0 128) (range 0 256))
-    (map
-      (fun (p : int * int) => ((p.`1 + p.`2) %% 128, 2 * p.`1) )
-      (allpairs (fun (x1 x2 : int) => (x1, x2)) (range 0 128) (range 0 128)) ++
-     map
-      (fun (p : int * int) => ((p.`1 + p.`2) %% 128, 2 * p.`1 + 1) )
-      (allpairs (fun (x1 x2 : int) => (x1, x2)) (range 0 128) (range 0 128))).
-proof.
-  apply/uniq_perm_eq.
-  + by apply/allpairs_uniq; [apply/range_uniq|apply/range_uniq|].
-  + rewrite cat_uniq; split; [|split].
-    - rewrite map_inj_in_uniq; [|by apply/allpairs_uniq; [apply/range_uniq|apply/range_uniq|]].
-      move => [x1 x2] [y1 y2] /= /allpairsP [[? ?] /=] [mem_x1_range] [mem_x2_range] [<<- <<-].
-      move => /allpairsP [[? ?] /=] [mem_y1_range] [mem_y2_range] [<<- <<-] [eq_1].
-      move => eq_2; move: (mulfI 2 _ x1 y1 _) => //= <<- /= {eq_2}; move: eq_1.
-      move: (eq_modz_inj (x1 + x2) (x1 + y2) x1 128 _ _ _) => //.
-      * by rewrite mem_range_addl /= addrAC.
-      * by rewrite mem_range_addl /= addrAC.
-      by move => imp_ hyp_; move: (imp_ hyp_) => {imp_ hyp_} /Ring.IntID.addrI.
-    - apply/hasPn => [] [x1 x2] /mapP [] [y1 y2] /= [] /allpairsP [[? ?] /=] [mem_y1_range] [mem_y2_range] [<<- <<-].
-      move => [->> ->>]; apply/negP => /mapP [] [z1 z2] [] /allpairsP [[? ?] /=] [mem_z1_range] [mem_z2_range] [<<- <<-].
-      apply/negP => -[_]; rewrite !(Ring.IntID.mulrC 2) => eq_; have: ((y1 * 2 + 1) %% 2 = (z1 * 2) %% 2) by rewrite eq_.
-      by rewrite modzMl modzMDl.
-    rewrite map_inj_in_uniq; [|by apply/allpairs_uniq; [apply/range_uniq|apply/range_uniq|]].
-    move => [x1 x2] [y1 y2] /= /allpairsP [[? ?] /=] [mem_x1_range] [mem_x2_range] [<<- <<-].
-    move => /allpairsP [[? ?] /=] [mem_y1_range] [mem_y2_range] [<<- <<-] [eq_1].
-    move => /Ring.IntID.addIr eq_2; move: (mulfI 2 _ x1 y1 _) => //= <<- /= {eq_2}; move: eq_1.
-    move: (eq_modz_inj (x1 + x2) (x1 + y2) x1 128 _ _ _) => //.
-      * by rewrite mem_range_addl /= addrAC.
-      * by rewrite mem_range_addl /= addrAC.
-      by move => imp_ hyp_; move: (imp_ hyp_) => {imp_ hyp_} /Ring.IntID.addrI.
-  move => [x1 x2]; rewrite mem_cat; split.
-  + move => /allpairsP [[? ?] /=] [mem_x1_range] [mem_x2_range] [<<- <<-].
-    move: (mem_range_mod x2 2 _) => //.
-    rewrite range_ltn // range_ltn // range_geq //=; case => eq_mod; last first.
-    - right; apply/mapP => /=; exists (x2 %/ 2, (x1 - x2 %/ 2) %% 128) => //=.
-      split; [|split]; first last.
-      * by rewrite -modzDm modz_mod modzDm addrA addrAC /= modz_small //; apply/mem_range.
-      * by rewrite (Ring.IntID.mulrC 2) {1}(divz_eq x2 2) eq_mod.
-      apply/allpairsP => /=; exists (x2 %/ 2, (x1 - x2 %/ 2) %% 128) => /=.
-      by rewrite range_div_range //= mem_x2_range /=; apply/(mem_range_mod _ 128).
-    left; apply/mapP => /=; exists (x2 %/ 2, (x1 - x2 %/ 2) %% 128) => //=.
-    split; [|split]; first last.
-    - by rewrite -modzDm modz_mod modzDm addrA addrAC /= modz_small //; apply/mem_range.
-    - by rewrite (Ring.IntID.mulrC 2) {1}(divz_eq x2 2) eq_mod.
-    apply/allpairsP => /=; exists (x2 %/ 2, (x1 - x2 %/ 2) %% 128) => /=.
-    by rewrite range_div_range //= mem_x2_range /=; apply/(mem_range_mod _ 128).
-  case; move => /mapP [] [y1 y2] [] /allpairsP [[? ?] /=] [mem_y1_range] [mem_y2_range];
-  move => [<<- <<-] [->> ->>]; apply/allpairsP => /=.
-  + exists ((y1 + y2) %% 128, 2 * y1) => /=.
-    by rewrite mem_range_mull //= mem_y1_range /=; apply/(mem_range_mod _ 128).
-  exists ((y1 + y2) %% 128, 2 * y1 + 1) => /=.
-  by rewrite mem_range_addr mem_range_mull //= mem_y1_range /=; apply/(mem_range_mod _ 128).
+apply/Array256.ext_eq => i rgi; rewrite /basemul /NR.rmul !initiE //= /cmplx_mul /=.
+have [h0 h1] := NR.resmul_s1
+  (fun t => a.[i %/ 2 * 2 + t]) (fun t => b.[i %/ 2 * 2 + t]) (xroot (i %/ 2)) _ => //.
+have [] hi : i %% 2 = 0 \/ i %% 2 = 1 by smt().
+- by rewrite hi /= h0 /= /xroot (mulzC 2) ZqRing.addrC (ZqRing.mulrC (exp zroot _)).
+by rewrite hi /= h1 /= (mulzC 2).
 qed.
 
 lemma mul_comm_ntt (pa pb : poly):
   ntt (pa &* pb) = basemul (ntt pa) (ntt pb).
 proof.
-  rewrite /ntt polymulE /basemul; apply/Array256.tP => i /mem_range mem_i_range.
-  do 2!(rewrite Array256.initiE /=; [by apply/mem_range|]).
-  rewrite Array256.initiE /=; [by apply/mem_range/mem_range_mull/range_div_range|].
-  rewrite Array256.initiE /=; [by apply/mem_range/mem_range_addr/mem_range_mull/range_div_range|].
-  rewrite Array256.initiE /=; [by apply/mem_range/mem_range_mull/range_div_range|].
-  rewrite Array256.initiE /=; [by apply/mem_range/mem_range_addr/mem_range_mull/range_div_range|].
-  rewrite modzMr /= (Ring.IntID.mulrC 2 (i %/ 2)) modzMDl /= divzMDl //= mulzK //=.
-  rewrite /cmplx_mul /= !BigDom_BAdd_mulr_big_allpairs_pair.
-  move: (mem_range_mod i 2 _) => //.
-  rewrite range_ltn // range_ltn // range_geq //=.
-  case => eq_mod; rewrite eq_mod /=.
-  + pose f j:=
-      (BigDom.BAdd.bigi predT
-        (fun (k : int) =>
-          pa.[k] * pb.[(2 * j - k) %% 256] *
-          ZqRing.exp (incoeff (-1)) ((2 * j - k) %/ 256) *
-          ZqRing.exp zroot ((2 * br (i %/ 2) + 1) * j) )
-        0 256).
-    rewrite (BigDom.BAdd.eq_big_int _ _ _ f); rewrite /f => {f}.
-    - move => j /mem_range mem_j_range /=.
-      rewrite Array256.initiE /=; [by apply/mem_range/mem_range_mull|].
-      by rewrite BigDom.BAdd.mulr_suml; apply BigDom.BAdd.eq_big_int => k /mem_range mem_k_range.
-    rewrite BigDom_BAdd_big_allpairs_pair (BigDom.BAdd.eq_big_perm _ _ _ _ perm_mul_even).
-    rewrite BigDom.BAdd.big_cat; congr.
-    - rewrite BigDom.BAdd.big_mapT BigDom.BAdd.mulr_suml.
-      apply/BigDom.BAdd.eq_big_seq => //= -[x1 x2].
-      move => /allpairsP /= [] [? ?] /= [mem_x1_range] [mem_x2_range] [<<- <<-] /=.
-      rewrite -!ZqRing.mulrA; congr; rewrite !ZqRing.mulrA (ZqRing.mulrC (ZqRing.exp _ _)) -!ZqRing.mulrA.
-      rewrite -!ZqRing.exprD; [by apply/unit_zroot_ring|by apply/unit_zroot_ring|].
-      rewrite mulz_modr //= -modzDm modz_mod modzDm; congr; [congr|].
-      * rewrite !mulrDr addrAC opprD !addrA /= (Ring.IntID.addrAC (2 * _)) /= modz_small //.
-        by rewrite -mem_range mem_range_addr mem_range_mull.
-      rewrite addrA -mulrDr (Ring.IntID.mulrC _ (x1 + x2)) -mulrSl (Ring.IntID.mulrC (x1 + x2 + 1)).
-      rewrite -(mulz_modr 2 (x1 + x2 + 1) 128) // {3}(divz_eq (x1 + x2 + 1) 128).
-      rewrite mulrDr !mulrA mulrAC (Ring.IntID.mulrDl _ _ 128) /= mulrAC /= (Ring.IntID.mulrDl _ 128).
-      rewrite !ZqRing.exprD ?unit_zroot_ring //; congr.
-      rewrite -mulrA ZqRing.exprM exp_zroot_256_ring ZqRing.expr1z ZqRing.mul1r.
-      rewrite ZqRing.exprM exp_zroot_128_ring.
-      rewrite (exp_mod _ _ _ exp_neg1_2) eq_sym (exp_mod _ _ _ exp_neg1_2) eq_sym; congr.
-      move: (mem_range_add2 _ _ _ _ _ _ mem_x1_range mem_x2_range) => /=.
-      move => /(mem_range_addr 1 256 (x1 + x2) 1); rewrite (range_cat 128) //.
-      rewrite mem_cat; case => mem_add_range.
-      * rewrite (modz_small _ 128); [by apply/mem_range; move: mem_add_range; apply/mem_range_incl|].
-        rewrite (divz_small _ 128); [by apply/mem_range; move: mem_add_range; apply/mem_range_incl|].
-        rewrite /= !mulrDr opprD !addrA addrAC /= addrAC (Ring.IntID.addrAC _ _ (- 2 * _)) /=.
-        by rewrite divz_small //=; apply/mem_range; rewrite mem_range_addr mem_range_mull.
-      rewrite -(Ring.IntID.subrK (x1 + x2 + 1) 128) modzDr (divzDr _ 128) ?dvdzz //.
-      rewrite (modz_small _ 128); [by apply/mem_range/mem_range_subr; move: mem_add_range; apply/mem_range_incl|].
-      rewrite (divz_small _ 128); [by apply/mem_range/mem_range_subr; move: mem_add_range; apply/mem_range_incl|].
-      rewrite /= !mulrDr opprD !addrA addrAC /= addrAC (Ring.IntID.addrAC _ _ (- 2 * _)) /=.
-      have ->: -255 = 1 + (-1) * 256 by trivial.
-      by rewrite addrA addrC divzMDl // divz_small //= -mem_range mem_range_addr mem_range_mull.
-    rewrite BigDom.BAdd.big_mapT.
-    apply/BigDom.BAdd.eq_big_seq => //= -[x1 x2].
-    move => /allpairsP /= [] [? ?] /= [mem_x1_range] [mem_x2_range] [<<- <<-] /=.
-    rewrite -!ZqRing.mulrA; congr; rewrite !ZqRing.mulrA (ZqRing.mulrC (ZqRing.exp _ _)) -!ZqRing.mulrA.
-    rewrite -ZqRing.exprD; [by apply/unit_zroot_ring|].
-    rewrite mulz_modr //= -modzDm modz_mod modzDm; congr; [congr|].
-    - rewrite !mulrDr addrAC /= modz_small //.
-      by rewrite -mem_range mem_range_mull.
-    rewrite -mulrDr (Ring.IntID.mulrC _ (x1 + x2)).
-    rewrite (Ring.IntID.mulrC _ 2) -(mulz_modr 2 (x1 + x2) 128) // {3}(divz_eq (x1 + x2) 128).
-    rewrite mulrDr !mulrA mulrAC (Ring.IntID.mulrDl _ _ 128) /= mulrAC /= (Ring.IntID.mulrDl _ 128).
-    rewrite !ZqRing.exprD ?unit_zroot_ring //; congr.
-    rewrite -mulrA ZqRing.exprM exp_zroot_256_ring ZqRing.expr1z ZqRing.mul1r.
-    rewrite ZqRing.exprM exp_zroot_128_ring.
-    rewrite (exp_mod _ _ _ exp_neg1_2) eq_sym (exp_mod _ _ _ exp_neg1_2) eq_sym; congr.
-    move: (mem_range_add2 _ _ _ _ _ _ mem_x1_range mem_x2_range) => /=.
-    rewrite (range_cat 128) //.
-    rewrite mem_cat; case => mem_add_range.
-    - rewrite (modz_small _ 128); [by apply/mem_range; move: mem_add_range; apply/mem_range_incl|].
-      rewrite (divz_small _ 128); [by apply/mem_range; move: mem_add_range; apply/mem_range_incl|].
-      rewrite /= !mulrDr addrAC /=.
-      by rewrite divz_small //=; apply/mem_range; rewrite mem_range_mull.
-    rewrite -(Ring.IntID.subrK (x1 + x2) 128) modzDr (divzDr _ 128) ?dvdzz //.
-    rewrite (modz_small _ 128); [by apply/mem_range/mem_range_subr; move: mem_add_range; apply/mem_range_incl|].
-    rewrite (divz_small _ 128); [by apply/mem_range/mem_range_subr; move: mem_add_range; apply/mem_range_incl|].
-    rewrite /= !mulrDr addrAC /= (Ring.IntID.addrAC _ _ (- 2 * _)) /=.
-    have ->: -256 = (-1) * 256 by trivial.
-    by rewrite addrC divzMDl // divz_small //= -mem_range mem_range_mull.
-  pose f j:=
-    (BigDom.BAdd.bigi predT
-      (fun (k : int) =>
-        pa.[k] * pb.[(2 * j + 1 - k) %% 256] *
-        ZqRing.exp (incoeff (-1)) ((2 * j + 1 - k) %/ 256) *
-        ZqRing.exp zroot ((2 * br (i %/ 2) + 1) * j) )
-      0 256).
-  rewrite (BigDom.BAdd.eq_big_int _ _ _ f); rewrite /f => {f}.
-  + move => j /mem_range mem_j_range /=.
-    rewrite Array256.initiE /=; [by apply/mem_range/mem_range_addr/mem_range_mull|].
-    by rewrite BigDom.BAdd.mulr_suml; apply BigDom.BAdd.eq_big_int => k /mem_range mem_k_range.
-  rewrite BigDom_BAdd_big_allpairs_pair (BigDom.BAdd.eq_big_perm _ _ _ _ perm_mul_odd).
-  rewrite BigDom.BAdd.big_cat; congr.
-  + rewrite BigDom.BAdd.big_mapT.
-    apply/BigDom.BAdd.eq_big_seq => //= -[x1 x2].
-    move => /allpairsP /= [] [? ?] /= [mem_x1_range] [mem_x2_range] [<<- <<-] /=.
-    rewrite -!ZqRing.mulrA; congr; rewrite !ZqRing.mulrA (ZqRing.mulrC (ZqRing.exp _ _)) -!ZqRing.mulrA.
-    rewrite -!ZqRing.exprD; [by apply/unit_zroot_ring|].
-    rewrite -addrA mulz_modr //= -modzDm modz_mod modzDm; congr; [congr|].
-    - rewrite addrA addrAC mulrDr (Ring.IntID.addrAC (2 * _)) /= modz_small //.
-      by rewrite -mem_range mem_range_addr mem_range_mull.
-    rewrite -mulrDr -(mulz_modr 2 (x1 + x2) 128) // {3}(divz_eq (x1 + x2) 128).
-    rewrite mulrDr !mulrA mulrAC (Ring.IntID.mulrDl _ _ 128) /= mulrAC /= (Ring.IntID.mulrDl _ 128).
-    rewrite !ZqRing.exprD ?unit_zroot_ring //; congr.
-    rewrite -mulrA ZqRing.exprM exp_zroot_256_ring ZqRing.expr1z ZqRing.mul1r.
-    rewrite ZqRing.exprM exp_zroot_128_ring.
-    rewrite (exp_mod _ _ _ exp_neg1_2) eq_sym (exp_mod _ _ _ exp_neg1_2) eq_sym; congr.
-    move: (mem_range_add2 _ _ _ _ _ _ mem_x1_range mem_x2_range) => /=.
-    rewrite (range_cat 128) //.
-    rewrite mem_cat; case => mem_add_range.
-    - rewrite (modz_small _ 128); [by apply/mem_range; move: mem_add_range; apply/mem_range_incl|].
-      rewrite (divz_small _ 128); [by apply/mem_range; move: mem_add_range; apply/mem_range_incl|].
-      rewrite /= !mulrDr !addrA addrAC /= (Ring.IntID.addrAC _ _ (- 2 * _)) /=.
-      by rewrite divz_small //=; apply/mem_range; rewrite mem_range_addr mem_range_mull.
-    rewrite -(Ring.IntID.subrK (x1 + x2) 128) modzDr (divzDr _ 128) ?dvdzz //.
-    rewrite (modz_small _ 128); [by apply/mem_range/mem_range_subr; move: mem_add_range; apply/mem_range_incl|].
-    rewrite (divz_small _ 128); [by apply/mem_range/mem_range_subr; move: mem_add_range; apply/mem_range_incl|].
-    rewrite /= !mulrDr !addrA /= addrAC (Ring.IntID.addrAC _ _ (- 2 * _)) /=.
-    have ->: -255 = 1 + (-1) * 256 by trivial.
-    by rewrite addrA addrC divzMDl // divz_small //= -mem_range mem_range_addr mem_range_mull.
-  rewrite BigDom.BAdd.big_mapT.
-  apply/BigDom.BAdd.eq_big_seq => //= -[x1 x2].
-  move => /allpairsP /= [] [? ?] /= [mem_x1_range] [mem_x2_range] [<<- <<-] /=.
-  rewrite -!ZqRing.mulrA; congr; rewrite !ZqRing.mulrA (ZqRing.mulrC (ZqRing.exp _ _)) -!ZqRing.mulrA.
-  rewrite -ZqRing.exprD; [by apply/unit_zroot_ring|].
-  rewrite opprD !addrA addrAC /= mulz_modr //= -modzDm modz_mod modzDm; congr; [congr|].
-  + rewrite !mulrDr addrAC /= modz_small //.
-    by rewrite -mem_range mem_range_mull.
-  rewrite -mulrDr (Ring.IntID.mulrC _ (x1 + x2)).
-  rewrite (Ring.IntID.mulrC _ 2) -(mulz_modr 2 (x1 + x2) 128) // {3}(divz_eq (x1 + x2) 128).
-  rewrite mulrDr !mulrA mulrAC (Ring.IntID.mulrDl _ _ 128) /= mulrAC /= (Ring.IntID.mulrDl _ 128).
-  rewrite !ZqRing.exprD ?unit_zroot_ring //; congr.
-  rewrite -mulrA ZqRing.exprM exp_zroot_256_ring ZqRing.expr1z ZqRing.mul1r.
-  rewrite ZqRing.exprM exp_zroot_128_ring.
-  rewrite (exp_mod _ _ _ exp_neg1_2) eq_sym (exp_mod _ _ _ exp_neg1_2) eq_sym; congr.
-  move: (mem_range_add2 _ _ _ _ _ _ mem_x1_range mem_x2_range) => /=.
-  rewrite (range_cat 128) //.
-  rewrite mem_cat; case => mem_add_range.
-  + rewrite (modz_small _ 128); [by apply/mem_range; move: mem_add_range; apply/mem_range_incl|].
-    rewrite (divz_small _ 128); [by apply/mem_range; move: mem_add_range; apply/mem_range_incl|].
-    rewrite /= !mulrDr addrAC /=.
-    by rewrite divz_small //=; apply/mem_range; rewrite mem_range_mull.
-  rewrite -(Ring.IntID.subrK (x1 + x2) 128) modzDr (divzDr _ 128) ?dvdzz //.
-  rewrite (modz_small _ 128); [by apply/mem_range/mem_range_subr; move: mem_add_range; apply/mem_range_incl|].
-  rewrite (divz_small _ 128); [by apply/mem_range/mem_range_subr; move: mem_add_range; apply/mem_range_incl|].
-  rewrite /= !mulrDr addrAC (Ring.IntID.addrAC _ _ (- 2 * _)) /=.
-  have ->: -256 = (-1) * 256 by trivial.
-  by rewrite addrC divzMDl // divz_small //= -mem_range mem_range_mull.
+by rewrite mulE basemul_rmul !ntt_rntt NR.rntt_negmul // => j _; apply xrootN.
 qed.
 
 lemma add_comm_ntt (pa pb : poly):
