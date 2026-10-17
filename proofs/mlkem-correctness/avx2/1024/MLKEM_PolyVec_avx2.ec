@@ -7,27 +7,27 @@ from JazzEC require import WArray32 WArray256 WArray512 WArray800 WArray1536 WAr
 
 require import AVX2_Ops.
 from JazzEC require import Jkem_avx2.
-require import MLKEM_Poly_avx2.
+require import Instances1024.
 require import AVX2_Ops MLKEMFCLib.
 
 module Mprevec = {
   proc polyvec_add2 (r:W16.t Array1024.t, b:W16.t Array1024.t) : W16.t Array1024.t = {
     var aux: W16.t Array256.t;
     
-    aux <@ MLKEM_Poly_avx2.Mprevec.poly_add2 ((Array256.init (fun i => r.[0 + i])),
+    aux <@ MLKEM_Poly_avx2I.Mprevec.poly_add2 ((Array256.init (fun i => r.[0 + i])),
     (Array256.init (fun i => b.[0 + i])));
     r <- Array1024.init
          (fun i => if 0 <= i < 0 + 256 then aux.[i-0] else r.[i]);
-    aux <@ MLKEM_Poly_avx2.Mprevec.poly_add2 ((Array256.init (fun i => r.[256 + i])),
+    aux <@ MLKEM_Poly_avx2I.Mprevec.poly_add2 ((Array256.init (fun i => r.[256 + i])),
     (Array256.init (fun i => b.[256 + i])));
     r <- Array1024.init
          (fun i => if 256 <= i < 256 + 256 then aux.[i-256] else r.[i]);
-    aux <@ MLKEM_Poly_avx2.Mprevec.poly_add2 ((Array256.init (fun i => r.[(2 * 256) + i])),
+    aux <@ MLKEM_Poly_avx2I.Mprevec.poly_add2 ((Array256.init (fun i => r.[(2 * 256) + i])),
     (Array256.init (fun i => b.[(2 * 256) + i])));
     r <- Array1024.init
          (fun i => if (2 * 256) <= i < (2 * 256) + 256 then aux.[i-(2 * 256)]
          else r.[i]);
-    aux <@ MLKEM_Poly_avx2.Mprevec.poly_add2 ((Array256.init (fun i => r.[(3 * 256) + i])),
+    aux <@ MLKEM_Poly_avx2I.Mprevec.poly_add2 ((Array256.init (fun i => r.[(3 * 256) + i])),
     (Array256.init (fun i => b.[(3 * 256) + i])));
     r <- Array1024.init
          (fun i => if (3 * 256) <= i < (3 * 256) + 256 then aux.[i-(3 * 256)]
@@ -41,17 +41,17 @@ module Mprevec = {
     
     
     
-    aux <@ MLKEM_Poly_avx2.Mprevec.poly_reduce ((Array256.init (fun i => r.[0 + i])));
+    aux <@ MLKEM_Poly_avx2I.Mprevec.poly_reduce ((Array256.init (fun i => r.[0 + i])));
     r <- Array1024.init
          (fun i => if 0 <= i < 0 + 256 then aux.[i-0] else r.[i]);
-    aux <@ MLKEM_Poly_avx2.Mprevec.poly_reduce ((Array256.init (fun i => r.[256 + i])));
+    aux <@ MLKEM_Poly_avx2I.Mprevec.poly_reduce ((Array256.init (fun i => r.[256 + i])));
     r <- Array1024.init
          (fun i => if 256 <= i < 256 + 256 then aux.[i-256] else r.[i]);
-    aux <@ MLKEM_Poly_avx2.Mprevec.poly_reduce ((Array256.init (fun i => r.[(2 * 256) + i])));
+    aux <@ MLKEM_Poly_avx2I.Mprevec.poly_reduce ((Array256.init (fun i => r.[(2 * 256) + i])));
     r <- Array1024.init
          (fun i => if (2 * 256) <= i < (2 * 256) + 256 then aux.[i-(2 * 256)]
          else r.[i]);
-    aux <@ MLKEM_Poly_avx2.Mprevec.poly_reduce ((Array256.init (fun i => r.[(3 * 256) + i])));
+    aux <@ MLKEM_Poly_avx2I.Mprevec.poly_reduce ((Array256.init (fun i => r.[(3 * 256) + i])));
     r <- Array1024.init
          (fun i => if (3 * 256) <= i < (3 * 256) + 256 then aux.[i-(3 * 256)]
          else r.[i]);
@@ -77,20 +77,20 @@ module Mvec = {
   proc polyvec_add2 (r:W16.t Array1024.t, b:W16.t Array1024.t) : W16.t Array1024.t = {
     var aux: W16.t Array256.t;
     
-    aux <@ MLKEM_Poly_avx2.Mvec.poly_add2 ((Array256.init (fun i => r.[0 + i])),
+    aux <@ MLKEM_Poly_avx2I.Mvec.poly_add2 ((Array256.init (fun i => r.[0 + i])),
     (Array256.init (fun i => b.[0 + i])));
     r <- Array1024.init
          (fun i => if 0 <= i < 0 + 256 then aux.[i-0] else r.[i]);
-    aux <@ MLKEM_Poly_avx2.Mvec.poly_add2 ((Array256.init (fun i => r.[256 + i])),
+    aux <@ MLKEM_Poly_avx2I.Mvec.poly_add2 ((Array256.init (fun i => r.[256 + i])),
     (Array256.init (fun i => b.[256 + i])));
     r <- Array1024.init
          (fun i => if 256 <= i < 256 + 256 then aux.[i-256] else r.[i]);
-    aux <@ MLKEM_Poly_avx2.Mvec.poly_add2 ((Array256.init (fun i => r.[(2 * 256) + i])),
+    aux <@ MLKEM_Poly_avx2I.Mvec.poly_add2 ((Array256.init (fun i => r.[(2 * 256) + i])),
     (Array256.init (fun i => b.[(2 * 256) + i])));
     r <- Array1024.init
          (fun i => if (2 * 256) <= i < (2 * 256) + 256 then aux.[i-(2 * 256)]
          else r.[i]);
-    aux <@ MLKEM_Poly_avx2.Mvec.poly_add2 ((Array256.init (fun i => r.[(3 * 256) + i])),
+    aux <@ MLKEM_Poly_avx2I.Mvec.poly_add2 ((Array256.init (fun i => r.[(3 * 256) + i])),
     (Array256.init (fun i => b.[(3 * 256) + i])));
     r <- Array1024.init
          (fun i => if (3 * 256) <= i < (3 * 256) + 256 then aux.[i-(3 * 256)]
@@ -104,17 +104,17 @@ module Mvec = {
     
     
     
-    aux <@ MLKEM_Poly_avx2.Mvec.poly_reduce ((Array256.init (fun i => r.[0 + i])));
+    aux <@ MLKEM_Poly_avx2I.Mvec.poly_reduce ((Array256.init (fun i => r.[0 + i])));
     r <- Array1024.init
          (fun i => if 0 <= i < 0 + 256 then aux.[i-0] else r.[i]);
-    aux <@ MLKEM_Poly_avx2.Mvec.poly_reduce ((Array256.init (fun i => r.[256 + i])));
+    aux <@ MLKEM_Poly_avx2I.Mvec.poly_reduce ((Array256.init (fun i => r.[256 + i])));
     r <- Array1024.init
          (fun i => if 256 <= i < 256 + 256 then aux.[i-256] else r.[i]);
-    aux <@ MLKEM_Poly_avx2.Mvec.poly_reduce ((Array256.init (fun i => r.[(2 * 256) + i])));
+    aux <@ MLKEM_Poly_avx2I.Mvec.poly_reduce ((Array256.init (fun i => r.[(2 * 256) + i])));
     r <- Array1024.init
          (fun i => if (2 * 256) <= i < (2 * 256) + 256 then aux.[i-(2 * 256)]
          else r.[i]);
-    aux <@ MLKEM_Poly_avx2.Mvec.poly_reduce ((Array256.init (fun i => r.[(3 * 256) + i])));
+    aux <@ MLKEM_Poly_avx2I.Mvec.poly_reduce ((Array256.init (fun i => r.[(3 * 256) + i])));
     r <- Array1024.init
          (fun i => if (3 * 256) <= i < (3 * 256) + 256 then aux.[i-(3 * 256)]
          else r.[i]);
@@ -230,7 +230,6 @@ from JazzEC require import Jkem_avx2.
 
 
 
-require import Fq_avx2.
 
 require import NTT_avx2.
 require import MLKEMFCLib.

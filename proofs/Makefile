@@ -8,7 +8,7 @@ ECFLAGS   ?=
 ECRUNTEST ?= $(EASYCRYPT) runtest $(if $(JOBS),-jobs $(JOBS),) $(ECFLAGS)
 
 CONFIG    := tests.config
-SCENARIOS := core fips202 mldsa mlkem mlkem-avx2-768 mlkem-avx2-1024
+SCENARIOS := core fips202 mldsa mlkem mlkem-avx2-generic mlkem-avx2-768 mlkem-avx2-1024
 
 # --------------------------------------------------------------------
 .PHONY: default check all $(SCENARIOS) clean

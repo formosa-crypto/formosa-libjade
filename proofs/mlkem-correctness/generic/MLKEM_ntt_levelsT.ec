@@ -12,15 +12,21 @@
   holds (`bf_inv`).
 *)
 
-(* ==================================================================== *)
 require import AllCore List Int IntDiv StdOrder.
-(*---*) import IntOrder.
-
 from Jasmin require import JModel.
 from JazzEC require import Array16 Array256 Array400 WArray32 WArray512 WArray800.
-from JazzEC require import Jkem_avx2.
-
 require import Montgomery16 MLKEMFCLib NttKem.
+require import JkemConstants.
+require BaseT.
+
+abstract theory MLKEM_ntt_levelsT.
+
+clone import BaseT.BaseT as B.
+import R.
+
+(* ==================================================================== *)
+
+(*---*) import IntOrder.
 
 (* ==================================================================== *)
 (* Lanes                                                                *)
@@ -558,7 +564,6 @@ by move=> rgh; (have [] ->> : h = 0 \/ h = 1 by smt());
   with hint +listred (cbv delta).
 qed.
 
-
 (* ==================================================================== *)
 (* The forward NTT: levels as register-file transformations             *)
 (* ==================================================================== *)
@@ -670,3 +675,5 @@ move=> hpos hinv; have hchk : bfok 7 0 [0;1;2;3;4;5;6;7] (zb 0) (zb 0) (zb 4) (z
 - by case: hpos => ->; [exact chk7a | exact chk7b].
 by apply: (bf_inv _ _ _ _ _ _ _ _ _ _ _ _ perm_id8 hchk).
 qed.
+
+end MLKEM_ntt_levelsT.

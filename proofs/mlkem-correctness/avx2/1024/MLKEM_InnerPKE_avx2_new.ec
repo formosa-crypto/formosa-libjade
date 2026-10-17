@@ -6,16 +6,13 @@ from JazzEC require import WArray64 WArray1568 WArray512 WArray128 WArray384 WAr
 require import AVX2_Ops W16extra.
 from JazzEC require import Jkem_avx2.
 require import MLKEM_PolyVec_avx2.
-require import MLKEM_Poly_avx2.
-require import MLKEM_Poly_avx2_circuit MLKEM_Poly_avx2_circuit_1024 MLKEM_PolyVec_avx2_circuit.
-require import NTT_avx2 NTT_avx2_poly.
+require import Instances1024.
+require import MLKEM_Poly_avx2_circuit_1024 MLKEM_PolyVec_avx2_circuit.
+require import NTT_avx2.
 require import MLKEM_W16_Rep.
 require import MLKEM1024_prelude.
-require import Fq_avx2.
 require import AVX2_Ops MLKEMFCLib.
-require import MLKEM_Poly_avx2.
 require import MLKEM_PolyVec_avx2.
-require import MLKEM_Poly_avx2.
 require import MLKEM_PolyVec_avx2.
 require import MLKEMFCLib.
 import MLKEMFCLib1024.
@@ -31,7 +28,6 @@ import PolyVec PolyMat KMatrix.
 
 import Zq.
 import ZModP.
-import Fq_avx2.
 import NTT_Avx2.
 
 import MLKEM_PolyAVX.
@@ -60,7 +56,7 @@ lemma poly_add_corr_avx ab bb :
 proof.
   move => abbnd bbbnd _a _b.
   bypr => &m Hpre.
-  have ->: 1%r = Pr[MLKEM_Poly_avx2.Mprevec.poly_add2(rp{m}, bp{m}) @ &m :
+  have ->: 1%r = Pr[MLKEM_Poly_avx2I.Mprevec.poly_add2(rp{m}, bp{m}) @ &m :
                 signed_bound_cxq res 0 256 (ab + bb) /\
                 forall k, 0 <= k < 256 => incoeff (to_sint res.[k]) = _a.[k] + _b.[k]].
   + by byphoare (MLKEM_PolyAVX.poly_add_corr _a _b ab bb abbnd bbbnd) => //=; smt().
@@ -80,7 +76,7 @@ lemma poly_sub_corr_avx ab bb :
 proof.
   move => abbnd bbbnd _a _b.
   bypr => &m Hpre.
-  have ->: 1%r = Pr[MLKEM_Poly_avx2.Mprevec.poly_sub(rp{m}, ap{m}, bp{m}) @ &m :
+  have ->: 1%r = Pr[MLKEM_Poly_avx2I.Mprevec.poly_sub(rp{m}, ap{m}, bp{m}) @ &m :
                 signed_bound_cxq res 0 256 (ab + bb) /\
                 forall k, 0 <= k < 256 => incoeff (to_sint res.[k]) = _a.[k] - _b.[k]].
   + by byphoare (MLKEM_PolyAVX.poly_sub_corr _a _b ab bb abbnd bbbnd) => //=; smt().
@@ -116,7 +112,7 @@ lemma poly_reduce_corr_avx ap :
     forall k, 0 <= k < 256 => bpos16 res.[k] (2*q)] = 1%r.
 proof.
   bypr => &m Hpre.
-  have ->: 1%r = Pr[MLKEM_Poly_avx2.Mprevec.poly_reduce(rp{m}) @ &m :
+  have ->: 1%r = Pr[MLKEM_Poly_avx2I.Mprevec.poly_reduce(rp{m}) @ &m :
                 ap = lift_array256 res /\
                 forall k, 0 <= k < 256 => bpos16 res.[k] (2*q)].
   + by byphoare (MLKEM_PolyAVX.poly_reduce_corr ap) => //=; smt().
@@ -131,7 +127,7 @@ lemma poly_frommont_corr_avx ap :
       map (fun x => SignedReductions_W16.SREDC (x * ((Ring.IntID.(^) SignedReductions_W16.R 2) %% q))) ap] = 1%r.
 proof.
   bypr => &m Hpre.
-  have ->: 1%r = Pr[MLKEM_Poly_avx2.Mprevec.poly_frommont(rp{m}) @ &m :
+  have ->: 1%r = Pr[MLKEM_Poly_avx2I.Mprevec.poly_frommont(rp{m}) @ &m :
                 map W16.to_sint res =
                   map (fun x => SignedReductions_W16.SREDC (x * ((Ring.IntID.(^) SignedReductions_W16.R 2) %% q))) ap].
   + by byphoare (MLKEM_PolyAVX.poly_frommont_corr ap) => //=; smt().

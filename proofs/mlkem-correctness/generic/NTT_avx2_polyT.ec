@@ -1,16 +1,24 @@
 require import AllCore List Int IntDiv CoreMap Real Number Ring StdOrder BitEncoding.
-
 from Jasmin require import JModel.
 from JazzEC require import Array256 Array128 Array32 Array16.
-from JazzEC require import Jkem_avx2.
-
 require import MLKEMFCLib.
 require import AVX2_Ops.
 require import Montgomery16 W16extra.
-require NttKem MLKEM_ntt_levels MLKEM_ntt_avx2 MLKEM_invntt_levels MLKEM_invntt_avx2.
-require MLKEM_basemul_avx2.
-
+require NttKem.
 from Spec require import GFq Rq Serialization Correctness.
+require import JkemConstants.
+require BaseT MLKEM_ntt_levelsT MLKEM_ntt_avx2T MLKEM_invntt_levelsT MLKEM_invntt_avx2T MLKEM_basemul_avx2T.
+
+abstract theory NTT_avx2_polyT.
+
+clone import BaseT.BaseT as B.
+import R.
+clone import MLKEM_ntt_levelsT.MLKEM_ntt_levelsT as MLKEM_ntt_levels with theory B <- B.
+clone import MLKEM_ntt_avx2T.MLKEM_ntt_avx2T as MLKEM_ntt_avx2 with theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels.
+clone import MLKEM_invntt_levelsT.MLKEM_invntt_levelsT as MLKEM_invntt_levels with theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels.
+clone import MLKEM_invntt_avx2T.MLKEM_invntt_avx2T as MLKEM_invntt_avx2 with theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels, theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2, theory MLKEM_invntt_levels <- MLKEM_invntt_levels.
+clone import MLKEM_basemul_avx2T.MLKEM_basemul_avx2T as MLKEM_basemul_avx2 with theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels, theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2.
+
 import Zq IntOrder BitReverse.
 
 abbrev nttpack_idx = Array256.of_list witness
@@ -100,7 +108,6 @@ lemma all_iota P (v : 'a Array256.t) :
    Array256.all P v <=> all P (map (fun i => v.[i]) (iotared 0 256)).
 rewrite iotaredE all_map /= /preim /= /#.
 qed.
-
 
 lemma nttpack_bnd : 
   all (fun x => 0 <= x < 256) nttpack_idx by rewrite all_iota /=.
@@ -201,7 +208,6 @@ proof.
   move : (H2 Hi). smt().
 qed.
 
-
 lemma pack128_bounds (p: W16.t Array256.t) k l h:
       0 <= k < 3 => (forall i, 0 <= i < 128 * k => l <= to_sint p.[i] < h) => (forall i, 0 <= i < 128 * k => l <= to_sint (nttpack p).[i] < h).
 proof.
@@ -258,7 +264,6 @@ proof.
       by do (rewrite Hi 1://=).
     + apply pack_boundsi.
 qed.
-
 
 lemma unpack128_boundsi (p: ipoly) k l h:
       0 <= k < 3 => (forall i, 0 <= i < 128 * k => l <= p.[i] < h) => (forall i, 0 <= i < 128 * k => l <= (nttunpack p).[i] < h).
@@ -337,7 +342,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 (* The base multiplication, from MLKEM_basemul_avx2                     *)
-lemma poly_basemul_ll : islossless Jkem_avx2.M._poly_basemul.
+lemma poly_basemul_ll : islossless M._poly_basemul.
 proof. by proc; inline *; auto. qed.
 
 (* the pairs of the code, in the order of the specification *)
@@ -361,7 +366,7 @@ by rewrite bmiE //; smt().
 qed.
 
 phoare poly_basemul_avx2_ph _a _b:
- [Jkem_avx2.M._poly_basemul:
+ [M._poly_basemul:
     (lift_array256 ap) = nttunpack _a /\ signed_bound_cxq ap 0 256 2
     /\ (lift_array256 bp) = nttunpack _b /\ signed_bound_cxq bp 0 256 2
    ==>
@@ -393,7 +398,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 (* The forward NTT, from the level-by-level proof (MLKEM_ntt_avx2)      *)
-lemma poly_ntt_ll : islossless Jkem_avx2.M._poly_ntt.
+lemma poly_ntt_ll : islossless M._poly_ntt.
 proof.
 proc; inline *; wp; while (true) (2 - i); first by move=> z; auto => /> /#.
 by auto => /> /#.
@@ -418,7 +423,7 @@ by split; [apply/eq_incoeff; rewrite /coeffcgr qE | rewrite qE].
 qed.
 
 lemma poly_ntt_avx2_corr _r :
-  phoare [Jkem_avx2.M._poly_ntt :
+  phoare [M._poly_ntt :
     rp = _r /\ signed_bound_cxq rp 0 256 2 ==>
     ntt (lift_array256 _r) = lift_array256 (nttpack res) /\
     pos_bound256_cxq res 0 256 2] = 1%r.
@@ -442,7 +447,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 (* The inverse NTT, from the level-by-level proof (MLKEM_invntt_avx2)   *)
-lemma poly_invntt_ll : islossless Jkem_avx2.M._poly_invntt.
+lemma poly_invntt_ll : islossless M._poly_invntt.
 proof.
 proc; inline *; wp; while (true) (2 - i); first by move=> z; auto => /> /#.
 by wp; while (true) (2 - i); [move=> z; auto => /> /# | auto => /> /#].
@@ -457,7 +462,7 @@ by rewrite /MLKEM_invntt_levels.pkidx -iotaredE.
 qed.
 
 lemma poly_invntt_avx2_corr _r :
-  phoare [Jkem_avx2.M._poly_invntt :
+  phoare [M._poly_invntt :
     lift_array256 (nttpack rp) = lift_array256 _r /\ signed_bound_cxq rp 0 256 4 ==>
     mul1x256 (incoeff W16.modulus) (invntt (lift_array256 _r)) = (lift_array256 res) /\
     signed_bound_cxq res 0 256 1] = 1%r.
@@ -531,3 +536,4 @@ op shuf1 (a b: 'a Array16.t) : ('a Array16.t * 'a Array16.t) =
   let br = Array16.init (fun i => cr.[i + 16]) in
   (ar, br).
 
+end NTT_avx2_polyT.

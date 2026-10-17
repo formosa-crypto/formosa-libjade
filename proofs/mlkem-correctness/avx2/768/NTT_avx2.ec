@@ -15,7 +15,7 @@ import MLKEMFCLib768.
 
 import Zq IntOrder BitReverse.
 import PolyVec PolyMat.
-require import NTT_avx2_poly.
+require import Instances768.
 
 theory NTT_Avx2.
 

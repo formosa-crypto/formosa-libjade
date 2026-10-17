@@ -9,16 +9,24 @@
   memory.
 *)
 
-(* ==================================================================== *)
 require import AllCore List Int IntDiv StdOrder.
-(*---*) import IntOrder.
-
 from Jasmin require import JModel.
 from JazzEC require import Array16 Array256 Array400 WArray32 WArray512 WArray800.
-from JazzEC require import Jkem_avx2.
+require import Montgomery16 MLKEMFCLib NttKem.
+require import JkemConstants.
+require BaseT MLKEM_ntt_levelsT MLKEM_ntt_avx2T MLKEM_invntt_levelsT.
 
-require import Montgomery16 MLKEMFCLib NttKem MLKEM_ntt_levels MLKEM_ntt_avx2.
-require import MLKEM_invntt_levels.
+abstract theory MLKEM_invntt_avx2T.
+
+clone import BaseT.BaseT as B.
+import R.
+clone import MLKEM_ntt_levelsT.MLKEM_ntt_levelsT as MLKEM_ntt_levels with theory B <- B.
+clone import MLKEM_ntt_avx2T.MLKEM_ntt_avx2T as MLKEM_ntt_avx2 with theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels.
+clone import MLKEM_invntt_levelsT.MLKEM_invntt_levelsT as MLKEM_invntt_levels with theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels.
+
+(* ==================================================================== *)
+
+(*---*) import IntOrder.
 
 (* ==================================================================== *)
 (* The computation                                                      *)
@@ -591,3 +599,5 @@ rewrite r1 (icgr_top p W i c8 rgi) modzMml /F (: 2^(8-1) = 128) //.
 rewrite (: 2^16 = 65536) //.
 by rewrite (: 128 * W16.to_sint p.[i] * 512 = 65536 * W16.to_sint p.[i]) 1:#ring.
 qed.
+
+end MLKEM_invntt_avx2T.

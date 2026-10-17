@@ -7,15 +7,22 @@
   polynomial in registers (`MLKEM_ntt_levels`).
 *)
 
-(* ==================================================================== *)
 require import AllCore List Int IntDiv StdOrder.
-(*---*) import IntOrder.
-
 from Jasmin require import JModel.
 from JazzEC require import Array16 Array256 Array400 WArray32 WArray512 WArray800.
-from JazzEC require import Jkem_avx2.
+require import Montgomery16 MLKEMFCLib NttKem.
+require import JkemConstants.
+require BaseT MLKEM_ntt_levelsT.
 
-require import Montgomery16 MLKEMFCLib NttKem MLKEM_ntt_levels.
+abstract theory MLKEM_ntt_avx2T.
+
+clone import BaseT.BaseT as B.
+import R.
+clone import MLKEM_ntt_levelsT.MLKEM_ntt_levelsT as MLKEM_ntt_levels with theory B <- B.
+
+(* ==================================================================== *)
+
+(*---*) import IntOrder.
 
 (* ==================================================================== *)
 (* Constants, loads, stores and the final reduction                     *)
@@ -66,7 +73,6 @@ op layout (h : int) (pos bs : int list) =
   all (fun i =>
        0 <= nth 0 bs (i %/ 16) < 16
     /\ 128 * h + nth 0 pos i = 16 * nth 0 bs (i %/ 16) + i %% 16) (iota_ 0 128).
-
 
 op stl (q : wpoly) (bs : int list) (rf : W256.t list) : wpoly =
   foldl (fun p (x : int * W256.t) => st p x.`1 x.`2) q (zip bs rf).
@@ -369,3 +375,5 @@ split => [j ge0j ltj | ].
 split => [j ge0j ltj _ | /#].
 by rewrite (st8E _ (nttres _r)) 1,2:/# // ifF 1:/# hrest // reduce_tree_step // reduce_tree8.
 qed.
+
+end MLKEM_ntt_avx2T.

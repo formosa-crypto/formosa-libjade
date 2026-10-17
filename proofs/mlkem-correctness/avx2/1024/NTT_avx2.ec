@@ -15,7 +15,7 @@ import VecMat Serialization.
 
 import Zq IntOrder BitReverse.
 import PolyVec PolyMat.
-require import NTT_avx2_poly.
+require import Instances1024.
 
 theory NTT_Avx2.
 

@@ -5,7 +5,7 @@ from Jasmin require import JModel.
 from JazzEC require import WArray512 WArray256 WArray128 WArray8 WArray2 WArray32.
 from JazzEC require import Array2 Array8 Array16 Array25 Array32 Array33 Array128 Array136 Array768 Array960 Array1024 Array1088 Array2304 Array2144 Array536 Array256.
 
-require import MLKEM_W16_Rep NTT_avx2 NTT_avx2_poly MLKEMFCLib AVX2_Ops MLKEM_Poly_avx2.
+require import MLKEM_W16_Rep NTT_avx2 MLKEMFCLib AVX2_Ops Instances768.
 require import MLKEM768_prelude.
 import MLKEMFCLib768.
 

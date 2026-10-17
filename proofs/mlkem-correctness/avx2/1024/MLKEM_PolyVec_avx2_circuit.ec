@@ -7,9 +7,9 @@ from JazzEC require import Jkem_avx2.
 
 require import AVX2_Ops W16extra.
 require import Fq MLKEMFCLib MLKEM_W16_Rep MLKEM1024_prelude.
-require import Fq_avx2 NTT_avx2 NTT_avx2_poly AVX2_Ops MLKEMFCLib.
-require import MLKEM_Poly_avx2 MLKEM_PolyVec_avx2.
-require import MLKEM_Poly_avx2_circuit MLKEM_Poly_avx2_circuit_1024.
+require import NTT_avx2 AVX2_Ops MLKEMFCLib Instances1024.
+require import MLKEM_PolyVec_avx2.
+require import MLKEM_Poly_avx2_circuit_1024.
 require import Mlkem_bindings CircuitBindings.
 require import XWord11 XWord12.
 require import XArray4 XArray8 XArray16 XArray32 XArray256 XArray384 XArray1024 XArray1408 XArray1536 XArray1568 XArray1410.
@@ -20,7 +20,7 @@ import BitChunking BS2Int.
 import Fq.
 import GFq Rq Serialization VecMat.
 import Zq ZModP.
-import Fq_avx2 NTT_Avx2.
+import NTT_Avx2.
 import MLKEMFCLib1024.
 import MLKEM_PolyAVX MLKEM_PolyvecAVX MLKEM_PolyAVXVec.
 import PolyVec PolyMat.

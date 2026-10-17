@@ -1,25 +1,27 @@
 require import AllCore List Int IntDiv CoreMap Real Number.
-
 from Jasmin require import JModel JWord.
 from JazzEC require import Array16 WArray512 WArray32 WArray16.
-
 require import W16extra.
-
 require import Fq MLKEMFCLib.
 require import AVX2_Ops.
 require import Montgomery16.
+from Spec require import GFq.
+from Spec require import GFq Correctness.
+require import JkemConstants.
+require BaseT.
+
+abstract theory Fq_avx2T.
+
+clone import BaseT.BaseT as B.
+import R.
 
 import Fq.
 import SignedReductions_W16.
 
 (* relocated from ref's MLKEM_Poly.ec (pure Zq/Montgomery fact). *)
-from Spec require import GFq.
+
 import Zq.
 lemma rrinvcoeff : incoeff R * incoeff 169 = Zq.one by rewrite -incoeffM -eq_incoeff; apply RRinv.
-
-theory Fq_avx2.
-
-from JazzEC require import Jkem_avx2.
 
 (*
 import MLKEM.
@@ -62,7 +64,6 @@ module MLKEM_avx2_encdec = {
     return (r);
   }
 }.
-
 
 (* Tier-0 SIMD field ops (Array16), lifted out of MLKEM_Poly_avx2_prevec.Mprevec so
    Fq_avx2 is self-contained common: the poly-level prevec now calls these. *)
@@ -474,7 +475,6 @@ proof.
     rewrite initiE 1:x_i //=.
     smt().
 
-
   apply Array16.ext_eq => x x_i.
   do (rewrite initiE 1:x_i //=).
   rewrite qx16_def 1:x_i qinvx16_def 1:x_i.
@@ -499,7 +499,6 @@ proof.
   pose abxuexp := W16.smod (abxu * 62209 %% 65536) * 3329.
 
   pose abxsexp := W32.smod (abxs * 62209 %% 65536 * 65536) %/ 65536 * 3329.
-
 
   have -> : abxsexp = abxuexp.
   + rewrite /abxsexp /abxuexp /W16.smod /W32.smod /=; congr.
@@ -704,7 +703,6 @@ case (k = 15); 1: by move => *; rewrite Array16.set_eqiE /#.
 by smt().
 qed.
 
-
 lemma fqmulx16_corr_hh _a _b:
   hoare [MprevecT0.fqmulx16 :
           _a = lift_array16 a /\
@@ -729,7 +727,6 @@ have -> : Pr[MprevecT0.fqmulx16(a{m}, b{m}, qx16{m}, qinvx16{m}) @ &m : true] = 
 byphoare => //; apply fqmulx16_ll.
 qed.
 
-from Spec require import GFq Correctness.
 import Zq.
 
-end Fq_avx2.
+end Fq_avx2T.

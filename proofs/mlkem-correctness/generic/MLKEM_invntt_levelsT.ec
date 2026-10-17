@@ -11,15 +11,22 @@
   reduction of their positions (`rfinv_red`).
 *)
 
-(* ==================================================================== *)
 require import AllCore List Int IntDiv StdOrder.
-(*---*) import IntOrder.
-
 from Jasmin require import JModel.
 from JazzEC require import Array16 Array256 Array400 WArray32 WArray512 WArray800.
-from JazzEC require import Jkem_avx2.
+require import Montgomery16 MLKEMFCLib NttKem.
+require import JkemConstants.
+require BaseT MLKEM_ntt_levelsT.
 
-require import Montgomery16 MLKEMFCLib NttKem MLKEM_ntt_levels.
+abstract theory MLKEM_invntt_levelsT.
+
+clone import BaseT.BaseT as B.
+import R.
+clone import MLKEM_ntt_levelsT.MLKEM_ntt_levelsT as MLKEM_ntt_levels with theory B <- B.
+
+(* ==================================================================== *)
+
+(*---*) import IntOrder.
 
 (* ==================================================================== *)
 (* The inverse butterfly                                                *)
@@ -435,3 +442,4 @@ rewrite -ip6P; do 4! (apply shuf_inv; [by [] | by [] | by [] | by [] |]).
 exact hinv.
 qed.
 
+end MLKEM_invntt_levelsT.

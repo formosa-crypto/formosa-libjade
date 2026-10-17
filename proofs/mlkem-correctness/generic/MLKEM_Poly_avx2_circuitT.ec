@@ -1,34 +1,43 @@
 require import AllCore List Int IntDiv CoreMap Real Number Ring StdOrder BitEncoding.
-
 from Jasmin require import JModel.
 from JazzEC require import Array400 Array384 Array256 Array128 Array64 Array32 Array16 Array8 Array4 Array2.
 from JazzEC require import WArray512 WArray128 WArray384 WArray32 WArray16.
-from JazzEC require import Jkem_avx2.
-
 require import AVX2_Ops W16extra.
 require import Fq MLKEMFCLib.
-require import Fq_avx2 NTT_avx2_poly.
-require import MLKEM_Poly_avx2.
 require import Mlkem_bindings CircuitBindings.
 require import XArray4 XArray16 XArray32 XArray256.
 require import Circuit_semantics.
 from Spec require import GFq Rq Serialization VecMat Sampling EncDecCorrectness Correctness.
+require import JkemConstants.
+require BaseT Fq_avx2T MLKEM_ntt_levelsT MLKEM_ntt_avx2T MLKEM_invntt_levelsT MLKEM_invntt_avx2T MLKEM_basemul_avx2T NTT_avx2_polyT MLKEM_Poly_avx2T.
+
+abstract theory MLKEM_Poly_avx2_circuitT.
+
+clone import BaseT.BaseT as B.
+import R.
+clone import Fq_avx2T.Fq_avx2T as Fq_avx2 with theory B <- B.
+clone import MLKEM_ntt_levelsT.MLKEM_ntt_levelsT as MLKEM_ntt_levels with theory B <- B.
+clone import MLKEM_ntt_avx2T.MLKEM_ntt_avx2T as MLKEM_ntt_avx2 with theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels.
+clone import MLKEM_invntt_levelsT.MLKEM_invntt_levelsT as MLKEM_invntt_levels with theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels.
+clone import MLKEM_invntt_avx2T.MLKEM_invntt_avx2T as MLKEM_invntt_avx2 with theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels, theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2, theory MLKEM_invntt_levels <- MLKEM_invntt_levels.
+clone import MLKEM_basemul_avx2T.MLKEM_basemul_avx2T as MLKEM_basemul_avx2 with theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels, theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2.
+clone import NTT_avx2_polyT.NTT_avx2_polyT as NTT_avx2_poly with theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels, theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2, theory MLKEM_invntt_levels <- MLKEM_invntt_levels, theory MLKEM_invntt_avx2 <- MLKEM_invntt_avx2, theory MLKEM_basemul_avx2 <- MLKEM_basemul_avx2.
+clone import MLKEM_Poly_avx2T.MLKEM_Poly_avx2T as MLKEM_Poly_avx2 with theory B <- B, theory Fq_avx2 <- Fq_avx2, theory MLKEM_ntt_levels <- MLKEM_ntt_levels, theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2, theory MLKEM_invntt_levels <- MLKEM_invntt_levels, theory MLKEM_invntt_avx2 <- MLKEM_invntt_avx2, theory MLKEM_basemul_avx2 <- MLKEM_basemul_avx2, theory NTT_avx2_poly <- NTT_avx2_poly.
 
 import BitChunking BS2Int.
 import Fq.
 import GFq Rq Serialization VecMat.
 import Zq ZModP.
-import Fq_avx2.
+
 import MLKEM_PolyAVX.
 
-
 lemma poly_csubq_avx2_ll :
-   islossless Jkem_avx2.M._poly_csubq.
+   islossless M._poly_csubq.
 by proc;inline *;unroll for ^while;auto.
 qed.
 
 lemma poly_csubq_avx2_corr_h (_aw : W16.t Array256.t):
-    hoare[ Jkem_avx2.M._poly_csubq  :
+    hoare[ M._poly_csubq  :
              rp = _aw /\
              pos_bound256_cxq rp 0 256 2 ==> 
              lift_array256 res = lift_array256 _aw /\
@@ -79,13 +88,12 @@ have ->/= : !32768 <= to_uint _aw.[i] - 3329;  by smt(W16.to_uint_cmp).
 qed.
 
 lemma poly_csubq_avx2_corr (_aw : W16.t Array256.t):
-    phoare[ Jkem_avx2.M._poly_csubq  :
+    phoare[ M._poly_csubq  :
              rp = _aw /\
              pos_bound256_cxq rp 0 256 2 ==> 
              lift_array256 res = lift_array256 _aw /\
              pos_bound256_cxq res 0 256 1] = 1%r
   by conseq poly_csubq_avx2_ll (poly_csubq_avx2_corr_h _aw).
-
 
 lemma poly_add_corr_avx_impl ab bb :
     0 <= ab <= 6 => 0 <= bb <= 3 => 
@@ -101,11 +109,11 @@ lemma poly_add_corr_avx_impl ab bb :
               incoeff (to_sint res.[k]) = _a.[k] + _b.[k]] = 1%r
    by move => abb bbb _a _b; apply (MLKEM_PolyAVX.poly_add_corr _a _b ab bb abb bbb).
 
-lemma poly_frommsg_ll : islossless Jkem_avx2.M._i_poly_frommsg 
+lemma poly_frommsg_ll : islossless M._i_poly_frommsg 
  by proc; inline *;wp;while (0 <= i <= 32) (32-i);  by  auto =>  /> /#.
 
 lemma poly_frommsg_corr_h (_m : W8.t Array32.t): 
-    hoare [Jkem_avx2.M._i_poly_frommsg :
+    hoare [M._i_poly_frommsg :
              ap =  _m 
               ==>
              lift_array256 res = decompress_poly 1 (decode1 _m) /\
@@ -124,10 +132,8 @@ proc change ^while.25 : { rp <- if (0 <= (32*(2*i+8))*8 <= 256*16-256) then BSWA
 proc change ^while.26 : { rp <- if (0 <= (32*(2*i+9))*8 <= 256*16-256) then BSWAS_256u16_256.sliceset rp ((32*(2*i+9))*8) g3 else Array256.init (fun (i0:int) => WArray512.get16 (WArray512.set256 (WArray512.init16 (fun (i_0 : int) => rp.[i_0])) (2*i+9) g3) i0) ;};
 1: by auto; move => &1 &2 [#] -> -> ->; case (0 <= (32*(2*i{2}+9))*8 <= 256*16-256); [ move => ?; rewrite BSWAS_256u16_256_slicesetE // | by auto ].
 
-
 unroll for ^while.
 wp -1.
-
 
 conseq (: _ ==> rp = BSWA_256u16.init (fun i => decompress1_circuit _m.[i %/ 8].[i %% 8]));
  2: by circuit.
@@ -146,19 +152,17 @@ rewrite /BSWA_256u16.init initiE 1:/# /=.
 by smt(decompress1_circuit_rng).
 qed.
 
-
 (********** END BDEP PROOF OF FROMMSG **************)
 
-
 lemma poly_frommsg_corr (_m : W8.t Array32.t): 
-    phoare [Jkem_avx2.M._i_poly_frommsg :
+    phoare [M._i_poly_frommsg :
              ap =  _m 
               ==>
              lift_array256 res = decompress_poly 1 (decode1 _m) /\
              pos_bound256_cxq res 0 256 1 ] = 1%r
   by conseq poly_frommsg_ll (poly_frommsg_corr_h _m).
 
-lemma poly_tomsg_ll : islossless Jkem_avx2.M._i_poly_tomsg.
+lemma poly_tomsg_ll : islossless M._i_poly_tomsg.
 proc.
 cfold 7.
 inline *.
@@ -168,9 +172,8 @@ qed.
 
 (********** BEGIN BDEP PROOF OF TOMSG **************)
 
-
 lemma poly_tomsg_corr_h _aw : 
-    hoare [Jkem_avx2.M._i_poly_tomsg :
+    hoare [M._i_poly_tomsg :
              pos_bound256_cxq a 0 256 2 /\ 
               a = _aw
               ==>
@@ -191,13 +194,11 @@ proc change ^while{2}.2: { f1 <- if (0 <= (32*(2*i+1))*8 <= 256*16-256) then BSW
 proc change ^while{2}.14 : { rp <- if (0 <= (4*i)*8 <= 8*32-32) then BSWAS_32u8_32.sliceset rp ((4*i)*8) c else Array32.init (WArray32.get8 (WArray32.set32_direct (WArray32.init8 (fun (i_0 : int) => rp.[i_0])) (4*i) c)) ;};
 1: by auto; move => &1 &2 [#] -> -> ->; case (0 <= (4*i{2})*8 <= 8*32-32); [ move => ?; rewrite BSWAS_32u8_32_slicesetE // | by auto ].
 
-
 cfold 11.
 unroll for ^while.
 cfold ^i0<-.
 unroll for ^while.
 wp -3. 
-
 
 conseq (: a = _aw /\
    Array256.all (fun bv => W16.zero \sle bv /\ bv \sle (of_int (2 * 3329))) a ==> rp = BSWA_32u8.init (fun i => W8.init (fun j => compress1_circuit _aw.[i*8+j]))); last  by circuit.
@@ -214,14 +215,14 @@ rewrite encode_compress_bits //=.
 by apply compress1_circuit_sem.
 qed.
 
-
 (********** END BDEP PROOF OF TOMSG **************)
 
-
 lemma poly_tomsg_corr _aw : 
-    phoare [Jkem_avx2.M._i_poly_tomsg :
+    phoare [M._i_poly_tomsg :
              pos_bound256_cxq a 0 256 2 /\ 
               a = _aw
               ==>
              res.`1 = encode1 (compress_poly 1 (lift_array256 _aw))  ] = 1%r
   by conseq poly_tomsg_ll (poly_tomsg_corr_h _aw).
+
+end MLKEM_Poly_avx2_circuitT.
