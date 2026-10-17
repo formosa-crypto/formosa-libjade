@@ -1,7 +1,7 @@
-(* ML-KEM-768 variant pinning for the avx2 correctness proofs.
-   Mirrors formosa-mldsa-correctness's mldsa_65_prelude.ec (axiom kvec = 6).
-   With kvec pinned, param_sets (Parameters.ec) determines du/dv/eta1/eta2. *)
+(* The ML-KEM-768 instance of the specification and its properties, for the
+   avx2 correctness proofs: requiring this file brings its names in scope. *)
 require import AllCore.
-from Spec require import Parameters.
+from Spec require import Spec768.
+export MLKEM768.
 
-axiom kvec_val : kvec = 3.
+lemma kvec_val : kvec = 3 by done.

@@ -7,9 +7,12 @@ require import Symmetric.
 require import KPKE.
 
 (* ------------------------------------------------------------------ *)
-(* FIPS-203 ML-KEM (the FO/KEM layer over K-PKE), parametric over the global
-   variant params via the K-PKE layer.  One variant per EC run. *)
+(* FIPS-203 ML-KEM (the FO/KEM layer over K-PKE), parametric over the
+   parameters of ParamsT. *)
 (* ------------------------------------------------------------------ *)
+abstract theory MLKEMT.
+
+clone include KPKET.
 
 type publickey = pkey.
 type secretkey = skey * pkey * W8.t Array32.t * W8.t Array32.t.
@@ -49,3 +52,5 @@ module MLKEM = {
     return _K;
   }
 }.
+
+end MLKEMT.

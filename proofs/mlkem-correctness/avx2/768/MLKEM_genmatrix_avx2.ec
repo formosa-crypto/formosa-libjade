@@ -15,7 +15,7 @@ import NTT_Avx2.
 
 from JazzEC require import Jkem_avx2.
 
-import GFq Rq Sampling Serialization Symmetric VecMat KPKE MLKEM Fq Correctness Parameters.
+import GFq Rq Sampling Serialization Symmetric VecMat KPKE MLKEM Fq Correctness.
 import Symmetric Serialization VecMat PolyMat.
 import KMatrix.Matrix.
 import MLKEM_PolyAVXVec.
@@ -379,7 +379,7 @@ proof.
 move=> Hpos Hk ->.
 have: _k \in iotared 0 4 by smt().
 move: {Hk} _k; apply /List.allP => /=.
-by case: _t; case: Hpos; rewrite ?b2i1 ?b2i0 /pos2ji kvec_val /sub /mkseq -iotaredE.
+by case: _t; case: Hpos; rewrite ?b2i1 ?b2i0 /pos2ji ?kvec_val /sub /mkseq -iotaredE.
 qed.
 
 op subarray1024 ['a] (x : 'a Array2304.t) (i : int) : 'a Array1024.t = 

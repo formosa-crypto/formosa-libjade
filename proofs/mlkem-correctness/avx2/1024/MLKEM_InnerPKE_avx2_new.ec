@@ -334,7 +334,7 @@ by rewrite /B1 Hvb /lift_polyvec KVec.initiE; smt(kvec_val).
 by rewrite /B2 Hvb /lift_polyvec KVec.initiE; smt(kvec_val).
 by rewrite /B3 Hvb /lift_polyvec KVec.initiE; smt(kvec_val).
 move => &hr Hpre result; have ->: nttunpack (scale (ntt (dotpw va vb)) (incoeff 169)) = nttunpack R; last done.
-congr; rewrite dotpwE mulvec kvec_val.
+congr; rewrite dotpwE mulvec ?kvec_val.
 rewrite (Big.BAdd.big_int_recl 3) // (Big.BAdd.big_int_recl 2) // (Big.BAdd.big_int_recl 1) // (Big.BAdd.big_int_recl 0) // Big.BAdd.big_geq //=.
 rewrite !add_comm_ntt !nttK.
 rewrite !poly2algE.
@@ -399,8 +399,8 @@ lemma encode12_vec_tobytes_bridge (X : W16.t Array1024.t) :
       (Array1536.of_list W8.zero
          (ByteEncode 12 (to_list (map asint (lift_array1024 X))))).[i]).
 proof.
-have Hk1024 : 256 * Parameters.kvec = 1024 by smt(kvec_val).
-have H1536 : 384 * Parameters.kvec = 1536 by smt(kvec_val).
+have Hk1024 : 256 * kvec = 1024 by smt(kvec_val).
+have H1536 : 384 * kvec = 1536 by smt(kvec_val).
 rewrite /encode12_vec toipolivec_lift.
 have ->: to_list (IPVec.init (fun (idx : int) => asint (lift_array1024 X).[idx]))
        = to_list (map asint (lift_array1024 X)).
@@ -674,8 +674,8 @@ qed.
 lemma decode_vec_c1_bridge (f : int -> W8.t) :
   decode_vec (BytesCtVec.init f) = Circuit_sem_1024.decode11_vec (Array1408.init f).
 proof.
-have Hdu : Parameters.du = 11 by smt(Parameters.param_sets kvec_val).
-have Hsz : 32 * Parameters.du * Parameters.kvec = 1408 by smt(Parameters.param_sets kvec_val).
+have Hdu : du = 11 by smt(param_sets kvec_val).
+have Hsz : 32 * du * kvec = 1408 by smt(param_sets kvec_val).
 rewrite /decode_vec Hdu; congr; congr.
 apply (eq_from_nth witness).
 + rewrite BytesCtVec.size_to_list Array1408.size_to_list; smt().
@@ -687,8 +687,8 @@ qed.
 lemma decode_poly_c2_bridge (f : int -> W8.t) :
   decode_poly (BytesPoly.init f) = Circuit_sem_1024.decode5 (Array160.init f).
 proof.
-have Hdv : Parameters.dv = 5 by smt(Parameters.param_sets kvec_val).
-have Hsz : 32 * Parameters.dv = 160 by smt(Parameters.param_sets kvec_val).
+have Hdv : dv = 5 by smt(param_sets kvec_val).
+have Hsz : 32 * dv = 160 by smt(param_sets kvec_val).
 rewrite /decode_poly Hdv; congr; congr.
 apply (eq_from_nth witness).
 + rewrite BytesPoly.size_to_list Array160.size_to_list; smt().
@@ -709,8 +709,7 @@ have Hbytes : to_list (Array1536.init f) = to_list (BytesPKVec.init f).
 + apply (eq_from_nth witness); 1: (rewrite Array1536.size_to_list BytesPKVec.size_to_list; smt(kvec_val)).
   move => i; rewrite Array1536.size_to_list => Hi.
   rewrite Array1536.get_to_list BytesPKVec.get_to_list.
-  rewrite Array1536.initiE //= BytesPKVec.initiE //=.
-  smt(kvec_val).
+  by rewrite Array1536.initiE //= BytesPKVec.initiE //=; smt(kvec_val).
 apply Array1024.tP => k Hk.
 rewrite get_of_list 1:/# (nth_map 0).
 + by rewrite Hd.
@@ -862,7 +861,7 @@ seq 7 0 : (#{/~forall i, 0 <= i < 4 =>
   have Hep_eq : e1{2} = (prg_enc_inner r{2}).`2 by smt().
   do split.
   + (* lift_polyvec sp_0 = rv{2} *)
-    have Hrv : forall i, 0 <= i < Parameters.kvec => rv{2}.[i] = samplePolyCBD (PRF r{2} (W8.of_int i)).
+    have Hrv : forall i, 0 <= i < kvec => rv{2}.[i] = samplePolyCBD (PRF r{2} (W8.of_int i)).
     + move => i Hi.
       have ->: rv{2}.[i] = (prg_enc_inner r{2}).`1.[i] by rewrite Hrv_eq.
       by rewrite /prg_enc_inner /= KVec.initiE 1:/# /=.
@@ -880,19 +879,19 @@ seq 7 0 : (#{/~forall i, 0 <= i < 4 =>
     case (i = 0) => Ci0.
     + rewrite Ci0 /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= ifF 1:/# ifF 1:/# ifF 1:/# ifT 1:/#.
       have := Hr1; rewrite /lift_array256 tP => /(_ k _); 1: smt(); rewrite mapiE 1:/# /= => ->.
-      by congr; rewrite Hep_eq /prg_enc_inner /= KVec.initiE 1:/# /= /PRF kvec_val /=.
+      by congr; rewrite Hep_eq /prg_enc_inner /= KVec.initiE 1:/# /= /PRF ?kvec_val /=.
     case (i = 1) => Ci1.
     + rewrite Ci1 /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= ifF 1:/# ifF 1:/# ifT 1:/#.
       have := Hr2; rewrite /lift_array256 tP => /(_ k _); 1: smt(); rewrite mapiE 1:/# /= => ->.
-      by congr; rewrite Hep_eq /prg_enc_inner /= KVec.initiE 1:/# /= /PRF kvec_val /=.
+      by congr; rewrite Hep_eq /prg_enc_inner /= KVec.initiE 1:/# /= /PRF ?kvec_val /=.
     case (i = 2) => Ci2.
     + rewrite Ci2 /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= ifF 1:/# ifT 1:/#.
       have := Hr3; rewrite /lift_array256 tP => /(_ k _); 1: smt(); rewrite mapiE 1:/# /= => ->.
-      by congr; rewrite Hep_eq /prg_enc_inner /= KVec.initiE 1:/# /= /PRF kvec_val /=.
+      by congr; rewrite Hep_eq /prg_enc_inner /= KVec.initiE 1:/# /= /PRF ?kvec_val /=.
     have ->: i = 3 by smt(kvec_val).
     rewrite /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= ifT 1:/#.
     have := Hr4; rewrite /lift_array256 tP => /(_ k _); 1: smt(); rewrite mapiE 1:/# /= => ->.
-    by congr; rewrite Hep_eq /prg_enc_inner /= KVec.initiE 1:/# /= /PRF kvec_val /=.
+    by congr; rewrite Hep_eq /prg_enc_inner /= KVec.initiE 1:/# /= /PRF ?kvec_val /=.
   + (* signed_bound1024_cxq sp_0 *)
     rewrite /signed_bound1024_cxq => k Hk; rewrite initiE 1:/# /=.
     case (768 <= k < 1024) => Ck4; first by smt(qE).
@@ -1188,19 +1187,19 @@ seq 1 0 : (#{/~signed_bound_cxq v{1} 0 256 3}pre /\
 wp; ecall {1} (i_poly_compress_corr v{1}).
 wp; ecall {1} (polyvec_compress_avx2_corr bp{1}).
 auto =>  |>  &1 &2 ?? Hpkv Hpkb Hkv Hkb; rewrite /prg_enc_inner => [#] Hrv Hep Hepp Hmb Hepb Heppb Hrvv Hspb Hbpv Hvv Hvb Hbpb result Hresv result0 Hres0.
-have Hbnd : 32 * Parameters.du * Parameters.kvec = 1408 by smt(Parameters.param_sets kvec_val).
-have Hdu : Parameters.du = 11 by smt(Parameters.param_sets kvec_val).
-have Hdv : Parameters.dv = 5 by smt(Parameters.param_sets kvec_val).
+have Hbnd : 32 * du * kvec = 1408 by smt(param_sets kvec_val).
+have Hdu : du = 11 by smt(param_sets kvec_val).
+have Hdv : dv = 5 by smt(param_sets kvec_val).
 split.
 + rewrite tP => k kn.
-  rewrite initiE 1:/# /= initiE 1:/# /= initiE /=;1:smt(Parameters.param_sets kvec_val).
+  rewrite initiE 1:/# /= initiE 1:/# /= initiE /=;1:smt(param_sets kvec_val).
   rewrite ifF 1:/# initiE 1:/# /= ifT 1:/#.
   have := Hresv; rewrite tP => Hresvk.
   rewrite Hbnd in kn.
   have := Hresvk k kn; rewrite initiE 1:/# /= => ->.
   rewrite get_of_list 1:/# /=;do congr;smt().
 rewrite tP => k kb.
-rewrite initiE 1:/# /= initiE 1:/# /= initiE /=;1:smt(Parameters.param_sets kvec_val).
+rewrite initiE 1:/# /= initiE 1:/# /= initiE /=;1:smt(param_sets kvec_val).
 rewrite ifT 1:/# /= Hres0.
 rewrite initiE 1:/# /=;do congr;smt().
 qed.
@@ -1269,12 +1268,12 @@ seq 16 5 : (#pre /\ publicseed{1} = rho{2} /\
              s{2} = (prg_kg_inner coins{2}).`2 /\
               e{2} = (prg_kg_inner coins{2}).`3 /\
              inbuf{1} = Array33.init (fun k => if k < 32 then coins{2}.[k]
-                                               else W8.of_int Parameters.kvec) /\
+                                               else W8.of_int kvec) /\
              to_list buf{1} = SHA3_512 (to_list inbuf{1})).
   + wp; ecall {1} (sha3_512A_A33_ph inbuf{1}); auto => />.
     move => &1 &2 Hbnd r Hr; rewrite tP => k kb; rewrite initiE 1:/# /= get_setE 1:/#.
     case (k = 32) => Hk.
-    + by rewrite ifF 1:/# kvec_val.
+    + by rewrite ifF 1:/# ?kvec_val.
     by rewrite ifT 1:/# Hbnd /#.
   sp 2 0; conseq />.
   while {1} (0 <= i{1} <= inc{1} /\ inc{1} = 4 /\
@@ -1392,9 +1391,9 @@ seq 6 0 : (#pre /\
   ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 4)).
   auto => |>.
   move => &1 &2 Haab Hskpv Hskpvb result Hr1 Hr2 Hr3 Hr4 Hb1 Hb2 Hb3 Hb4.
-  have Hs2v : forall i, 0 <= i < Parameters.kvec => (prg_kg_inner coins{2}).`2.[i] = samplePolyCBD (PRF (G_coins_ds coins{2}).`2 (W8.of_int i)).
+  have Hs2v : forall i, 0 <= i < kvec => (prg_kg_inner coins{2}).`2.[i] = samplePolyCBD (PRF (G_coins_ds coins{2}).`2 (W8.of_int i)).
   + by move => i Hi; rewrite /prg_kg_inner /= KVec.initiE 1:/# /=.
-  have He3v : forall i, 0 <= i < Parameters.kvec => (prg_kg_inner coins{2}).`3.[i] = samplePolyCBD (PRF (G_coins_ds coins{2}).`2 (W8.of_int (i + Parameters.kvec))).
+  have He3v : forall i, 0 <= i < kvec => (prg_kg_inner coins{2}).`3.[i] = samplePolyCBD (PRF (G_coins_ds coins{2}).`2 (W8.of_int (i + kvec))).
   + by move => i Hi; rewrite /prg_kg_inner /= KVec.initiE 1:/# /=.
   do split.
   + (* lift_polyvec skpv = (prg_kg_inner coins).`2 *)
@@ -1412,19 +1411,19 @@ seq 6 0 : (#pre /\
     case (i = 0) => Ci0.
     + rewrite Ci0 /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= ifF 1:/# ifF 1:/# ifF 1:/# ifT 1:/#.
       have := Hr1; rewrite /lift_array256 tP => /(_ k _); 1: smt(); rewrite mapiE 1:/# /= => ->.
-      by congr; rewrite kvec_val /#.
+      by congr; rewrite ?kvec_val /#.
     case (i = 1) => Ci1.
     + rewrite Ci1 /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= ifF 1:/# ifF 1:/# ifT 1:/#.
       have := Hr2; rewrite /lift_array256 tP => /(_ k _); 1: smt(); rewrite mapiE 1:/# /= => ->.
-      by congr; rewrite kvec_val /#.
+      by congr; rewrite ?kvec_val /#.
     case (i = 2) => Ci2.
     + rewrite Ci2 /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= ifF 1:/# ifT 1:/#.
       have := Hr3; rewrite /lift_array256 tP => /(_ k _); 1: smt(); rewrite mapiE 1:/# /= => ->.
-      by congr; rewrite kvec_val /#.
+      by congr; rewrite ?kvec_val /#.
     have ->: i = 3 by smt(kvec_val).
     rewrite /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= ifT 1:/#.
     have := Hr4; rewrite /lift_array256 tP => /(_ k _); 1: smt(); rewrite mapiE 1:/# /= => ->.
-    by congr; rewrite kvec_val /#.
+    by congr; rewrite ?kvec_val /#.
   (* signed_bound1024_cxq e -- from Hb1..Hb4 *)
   rewrite /signed_bound1024_cxq => k Hk; rewrite initiE 1:/# /=.
   case (768 <= k < 1024) => Ck4; first by smt(qE).
@@ -1483,8 +1482,8 @@ seq 7 3 : (
   move => i pk;split;1:smt().
   move => Hi_neg Hi_lo Hi_hi Hpk_low Hpk_high.
   do split.
-  + rewrite tP => k Hk; rewrite initiE 1:/# /= initiE 1:/# /=; smt(kvec_val Parameters.param_sets).
-  rewrite tP => k Hk; rewrite initiE 1:/# /=; smt(kvec_val Parameters.param_sets).
+  + rewrite tP => k Hk; rewrite initiE 1:/# /= initiE 1:/# /=; smt(kvec_val param_sets).
+  rewrite tP => k Hk; rewrite initiE 1:/# /=; smt(kvec_val param_sets).
 
 ecall {1} (polyvec_tobytes_corr pkpv{1}).
 ecall {1} (polyvec_tobytes_corr skpv{1}).
@@ -1700,7 +1699,7 @@ seq 2 3 : (#pre /\ u{2} = lift_polyvec bp{1} /\
 + wp; ecall{1}(polyvec_decompress_corr (Array1408.init (fun (i : int) => ct{1}.[0 + i]))).
   auto => />.
   move => &1 result Hb Hr.
-  have Hdu : Parameters.du = 11 by smt(Parameters.param_sets kvec_val).
+  have Hdu : du = 11 by smt(param_sets kvec_val).
   split.
   + by rewrite decode_vec_c1_bridge Hdu Hr.
   move: Hb; rewrite /pos_bound1024_cxq /signed_bound1024_cxq /bpos16 /b16 /#.
@@ -1715,7 +1714,7 @@ seq 3 2 : (#{/~ct{1}}pre /\ v{2} = lift_array256 v{1} /\
 + wp; ecall{1}(poly_decompress_corr (Array160.init (fun (i : int) => ct{1}.[1408 + i]))).
   auto => />.
   move => &1 Hbp result Hr Hb.
-  have Hdv : Parameters.dv = 5 by smt(Parameters.param_sets kvec_val).
+  have Hdv : dv = 5 by smt(param_sets kvec_val).
   split.
   + by rewrite decode_poly_c2_bridge Hdv Hr.
   move: Hb; rewrite /pos_bound256_cxq /signed_bound_cxq /bpos16 /b16 /#.

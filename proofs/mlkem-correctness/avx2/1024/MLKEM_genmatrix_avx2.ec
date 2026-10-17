@@ -15,7 +15,7 @@ import NTT_Avx2.
 
 from JazzEC require import Jkem_avx2.
 
-import GFq Rq Sampling Serialization Symmetric VecMat KPKE MLKEM Fq Correctness Parameters.
+import GFq Rq Sampling Serialization Symmetric VecMat KPKE MLKEM Fq Correctness.
 import Symmetric Serialization VecMat PolyMat.
 import KMatrix.Matrix.
 import MLKEM_PolyAVXVec.
@@ -385,13 +385,13 @@ proof.
 move=> Hpos Hk ->.
 have: _k \in iotared 0 4 by smt().
 move: {Hk} _k; apply /List.allP => /=.
- case Hpos;1 : by case: _t;rewrite ?b2i1 ?b2i0 /pos2ji kvec_val /sub /mkseq -iotaredE //=. 
+ case Hpos;1 : by case: _t;rewrite ?b2i1 ?b2i0 /pos2ji ?kvec_val /sub /mkseq -iotaredE //=. 
  move => Hpos.
- case Hpos;1 : by case: _t;rewrite ?b2i1 ?b2i0 /pos2ji kvec_val /sub /mkseq -iotaredE //=. 
+ case Hpos;1 : by case: _t;rewrite ?b2i1 ?b2i0 /pos2ji ?kvec_val /sub /mkseq -iotaredE //=. 
  move => Hpos.
- case Hpos;1 : by case: _t;rewrite ?b2i1 ?b2i0 /pos2ji kvec_val /sub /mkseq -iotaredE //=. 
+ case Hpos;1 : by case: _t;rewrite ?b2i1 ?b2i0 /pos2ji ?kvec_val /sub /mkseq -iotaredE //=. 
  move => Hpos.
- by rewrite Hpos;case: _t;rewrite ?b2i1 ?b2i0 /pos2ji kvec_val /sub /mkseq -iotaredE //=. 
+ by rewrite Hpos;case: _t;rewrite ?b2i1 ?b2i0 /pos2ji ?kvec_val /sub /mkseq -iotaredE //=. 
 qed.
 
 

@@ -11,10 +11,7 @@ import BitEncoding BS2Int BitChunking.
 require import GFq.
 import Zq.
 require import Rq.
-require import Parameters.
-import MLKEMParams.
-require import VecMat.
-import VecMat.PolyVec VecMat.PolyMat.
+require VecMat.
 
 type ipoly = int Array256.t.
 op toipoly(p : poly) : ipoly = map asint p.
@@ -33,11 +30,14 @@ op decode12(a : W8.t Array384.t) : ipoly = Array256.of_list 0 (ByteDecode 12 (to
 op decode1(a : W8.t Array32.t) : ipoly =  Array256.of_list 0 (ByteDecode 1 (to_list a)).
 
 (* ------------------------------------------------------------------ *)
-(* Parameterized vector/poly (de)serialization over the global dimension k and
-   the ciphertext compression widths du (vector) / dv (poly).  ipolyvec and the
-   byte outputs are size-(k/du/dv) PolyArray clones; the concrete variant sizes
-   are pinned by the per-variant avx2 prelude axioms (k/du/dv). *)
+(* Vector/poly (de)serialization over the rank k and the ciphertext
+   compression widths du (vector) / dv (poly) of ParamsT.  ipolyvec and the
+   byte outputs are size-(k/du/dv) PolyArray clones. *)
 (* ------------------------------------------------------------------ *)
+abstract theory SerializationT.
+
+clone include VecMat.VecMatT.
+import PolyVec PolyMat.
 
 clone export PolyArray as IPVec with
   op size <- 256 * kvec
@@ -128,3 +128,5 @@ rewrite /fromarray384 /subarray384; apply BytesPKVec.tP => i ib.
 rewrite BytesPKVec.initiE 1:ib /= Array384.initiE 1:/# /=.
 by congr; smt(divz_eq).
 qed.
+
+end SerializationT.

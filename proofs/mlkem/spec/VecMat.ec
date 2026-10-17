@@ -1,9 +1,14 @@
 require import AllCore List IntDiv.
-require import Parameters Rq.
-import MLKEMParams.
+require import Rq.
+require Parameters.
 import Rq.RqTheory.
 
 from Jasmin require import JArray.
+require Matrix.
+
+abstract theory VecMatT.
+
+clone include Parameters.ParamsT.
 
 (* ------------------------------------------------------------------ *)
 (* Algebraic vector/matrix over the poly ring (Rq), at the TOP of the
@@ -12,7 +17,6 @@ from Jasmin require import JArray.
    polyvec); the concrete<->algebraic bridge is poly2alg/alg2poly below.
    Relocated from Correctness768 (was clone KMatrix + getvE/setvE axioms). *)
 (* ------------------------------------------------------------------ *)
-require Matrix.
 clone import Matrix as KMatrix with
     op size <= kvec,
     type ZR.t <= poly,
@@ -40,10 +44,7 @@ clone import Matrix as KMatrix with
 (* ------------------------------------------------------------------ *)
 (* Vector/matrix layer over Zq[X]/(X^256+1), dimension k (FIPS ML-KEM).
 
-   Parametric over the global parameter k (Parameters.ec, constrained by
-   param_sets); the concrete variant is pinned by axioms in the per-variant
-   avx2 prelude (k = 3 for ML-KEM-768, k = 4 for ML-KEM-1024) — mirroring
-   formosa-mldsa-correctness's mldsa_65_prelude.ec (axiom kvec = 6). *)
+   Parametric over the rank k of ParamsT. *)
 (* ------------------------------------------------------------------ *)
 
 clone export PolyArray as KVec with
@@ -130,32 +131,6 @@ op ntt_mmul (m : polymat, v : polyvec) : polyvec =
     foldr (fun (j : int) (a : poly) => basemul m.[i, j] v.[j] &+ a) Rq.zero (iota_ 0 kvec)).
 
 import Vector.
-
-(* `ring` tactic instance for the poly ring (relocated from Correctness768). *)
-instance ring with R
-  op rzero = Rq.zero
-  op rone  = Rq.one
-  op add   = Rq.(&+)
-  op opp   = Rq.(&-)
-  op mul   = Rq.(&*)
-  op expr  = ZR.exp
-  op ofint = ZR.ofint
-
-  proof oner_neq0 by apply ZR.oner_neq0
-  proof addrA     by apply ZR.addrA
-  proof addrC     by apply ZR.addrC
-  proof addr0     by apply ZR.addr0
-  proof addrN     by apply ZR.addrN
-  proof mulr1     by apply ZR.mulr1
-  proof mulrA     by apply ZR.mulrA
-  proof mulrC     by apply ZR.mulrC
-  proof mulrDl    by apply ZR.mulrDl
-  proof expr0     by apply ZR.expr0
-  proof ofint0    by apply ZR.ofint0
-  proof ofint1    by apply ZR.ofint1
-  proof exprS     by apply ZR.exprS
-  proof ofintS    by apply ZR.ofintS
-  proof ofintN    by apply ZR.ofintN.
 
 (* ------------------------------------------------------------------ *)
 (* Concrete <-> algebraic vector bridge.  Replaces the old
@@ -246,3 +221,5 @@ apply eq_vectorP => i ib.
 rewrite /poly2alg !offunvE //= /ntt_mmul KVec.initiE //=.
 by rewrite nttsum_big /range /=.
 qed.
+
+end VecMatT.

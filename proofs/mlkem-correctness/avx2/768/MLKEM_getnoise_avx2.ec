@@ -13,6 +13,7 @@ from JazzEC require import Array8 Array16 Array32 Array33 Array128 Array256.
 from JazzEC require import WArray128.
 from JazzEC require import Jkem_avx2.
 from Spec require import GFq Rq Sampling Symmetric InnerPKE_Op.
+require import MLKEM768_prelude.
 require import MLKEMFCLib AVX2_Ops Montgomery16.
 import MLKEMFCLib768.
 require import MLKEM_keccak_avx2.

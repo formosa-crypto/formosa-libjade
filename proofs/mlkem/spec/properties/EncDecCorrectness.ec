@@ -7,8 +7,7 @@ from JazzEC require import Array32 Array256 Array384.
 from Spec require import GFq Rq Serialization.
 require import EclibExtra.
 require import JWordList.
-from Spec require import Parameters.
-import MLKEMParams.
+from Spec require Correctness.
 require import BitEncoding.
 import BitChunking BS2Int.
 (*---*) import IntID.
@@ -183,19 +182,51 @@ rewrite -decodeK 1:/#;1:smt().
 by apply Array32.to_listK.
 qed.
 
+lemma sem_decode12K  : cancel decode12  encode12.
+rewrite /cancel /encode12 /decode12 => x.
+rewrite of_listK;1: by rewrite (size_decode 1 12); [by smt() | by smt()|  by rewrite Array384.size_to_list /= | ].
+rewrite -decodeK 1:/#;1: smt(Array384.size_to_list).
+by apply Array384.to_listK.
+qed.
+
+require import StdOrder.
+import IntOrder.
+
+lemma sem_encode1K (x : ipoly) :
+   (forall i, 0 <= i < 256 => 0 <= x.[i] < 2) =>
+     x = (decode1 (encode1 x)).
+move => Hi;rewrite /encode1 /decode1.
+apply Array256.tP => k kb.
+rewrite get_of_list // of_listK; 1: by rewrite (size_encode 1 1) /=;  [by smt() | by smt()|  by rewrite Array256.size_to_list /= | ].
+rewrite -encodeK 1:/#;[smt(Array256.size_to_list) | rewrite /= allP /= /to_list;smt(mkseqP) | ].
+rewrite -(get_to_list ).
+by rewrite (nth_change_dfl witness 0);1: smt(Array256.size_to_list).
+qed.
+
+require import BitEncoding.
+import BS2Int BitChunking.
+lemma decode1_bnd a k : 0<=k<256 => 0<= (decode1 a).[k] < 2.
+proof.
+move => ?; rewrite /decode1 get_of_list // /ByteDecode (nth_map witness).
++ by rewrite size_chunk 1:/# size_BytesToBits size_to_list //=.
+have := bs2int_le2Xs (nth witness (chunk 1 (BytesToBits (to_list a))) k).
+rewrite size_nth_chunk //=;1: by rewrite size_BytesToBits size_to_list //=.
+by smt(bs2int_ge0).
+qed.
+
+(* ==================================================================== *)
+(* The vector and parameter-width encodings                             *)
+(* ==================================================================== *)
+abstract theory EncDecCorrectnessT.
+
+clone include Correctness.CorrectnessT.
+
 lemma sem_decode_polyK  : cancel decode_poly  encode_poly.
 have dvb : 1 <= dv <= 12 by smt(gt0_dv dv_le12).
 rewrite /cancel /encode_poly /decode_poly => x.
 rewrite of_listK;1: by rewrite (size_decode 1 dv); [by smt() | by smt()|  by rewrite BytesPoly.size_to_list /= | ].
 rewrite -decodeK 1:/#;1: smt(BytesPoly.size_to_list).
 by apply BytesPoly.to_listK.
-qed.
-
-lemma sem_decode12K  : cancel decode12  encode12.
-rewrite /cancel /encode12 /decode12 => x.
-rewrite of_listK;1: by rewrite (size_decode 1 12); [by smt() | by smt()|  by rewrite Array384.size_to_list /= | ].
-rewrite -decodeK 1:/#;1: smt(Array384.size_to_list).
-by apply Array384.to_listK.
 qed.
 
 lemma sem_decode12_vecK  : cancel decode12_vec  encode12_vec.
@@ -208,9 +239,6 @@ rewrite (nth_change_dfl witness W8.zero);1: smt(BytesPKVec.size_to_list).
 by smt().
 qed.
 
-require import StdOrder.
-import IntOrder.
-
 lemma sem_decode_vecK  : cancel decode_vec  encode_vec.
 have dub : 1 <= du <= 12 by smt(gt0_du du_le12).
 have kb4 : 1 <= kvec <= 4 by smt(gt0_k param_sets).
@@ -221,17 +249,6 @@ rewrite of_listK /=;1: by rewrite (size_decode kvec du); smt(gt0_k gt0_du du_le1
 rewrite -decodeK 1:/#;1: by smt(BytesCtVec.size_to_list param_sets).
 rewrite (nth_change_dfl witness W8.zero);1: smt(BytesCtVec.size_to_list).
 by smt().
-qed.
-
-lemma sem_encode1K (x : ipoly) :
-   (forall i, 0 <= i < 256 => 0 <= x.[i] < 2) =>
-     x = (decode1 (encode1 x)).
-move => Hi;rewrite /encode1 /decode1.
-apply Array256.tP => k kb.
-rewrite get_of_list // of_listK; 1: by rewrite (size_encode 1 1) /=;  [by smt() | by smt()|  by rewrite Array256.size_to_list /= | ].
-rewrite -encodeK 1:/#;[smt(Array256.size_to_list) | rewrite /= allP /= /to_list;smt(mkseqP) | ].
-rewrite -(get_to_list ).
-by rewrite (nth_change_dfl witness 0);1: smt(Array256.size_to_list).
 qed.
 
 lemma sem_encode_polyK (x : ipoly) :
@@ -272,14 +289,4 @@ rewrite mkseqP => H;elim H;1: smt(param_sets).
 by rewrite -(get_to_list ) (nth_change_dfl witness 0);1: smt(IPVec.size_to_list).
 qed.
 
-
-require import BitEncoding.
-import BS2Int BitChunking.
-lemma decode1_bnd a k : 0<=k<256 => 0<= (decode1 a).[k] < 2.
-proof.
-move => ?; rewrite /decode1 get_of_list // /ByteDecode (nth_map witness).
-+ by rewrite size_chunk 1:/# size_BytesToBits size_to_list //=.
-have := bs2int_le2Xs (nth witness (chunk 1 (BytesToBits (to_list a))) k).
-rewrite size_nth_chunk //=;1: by rewrite size_BytesToBits size_to_list //=.
-by smt(bs2int_ge0).
-qed.
+end EncDecCorrectnessT.

@@ -115,7 +115,8 @@ auto => /> &1 &2; rewrite !tP => ? hcoins2 ?Hpk1 ??? hsk pp H H0;do split.
   + rewrite tP => *; rewrite initiE 1:/# /=.
     have -> : pp = pk{2}.`1 by smt().
     rewrite Hpk1;  smt(kvec_val BytesPKVec.initiE).
-  + by move => *; rewrite tP => *; rewrite initiE 1:/# /=  ; smt(Array32.initiE).
+  + have -> : H = pk{2}.`2 by smt().
+    by rewrite tP => j jb; rewrite initiE 1:/# /=; smt(Array32.initiE).
   + move => *; rewrite initiE 1:/# /=;smt(Array32.initiE).
   + by move => j hj; rewrite hcoins2 1:// !initE hj /= hsk 1:// addzC.
 qed.
@@ -386,10 +387,10 @@ seq 1 1 : (#pre /\
   move => /= ?  bufv ? krv rl [rr1 rr2] /=;rewrite !tP => [#Hl Hr] i ib.
   rewrite !initiE 1:/# /=.
   case (i < 1408) =>*.
-  + rewrite Hl;1:smt(kvec_val Parameters.param_sets).
-    rewrite initiE /=; by  smt(Parameters.param_sets Array160.initiE Array1408.initiE  kvec_val).
-  rewrite Hr;1:smt(kvec_val Parameters.param_sets).
-  rewrite initiE /=; by  smt(Parameters.param_sets Array160.initiE Array1408.initiE  kvec_val).
+  + rewrite Hl;1:smt(kvec_val param_sets).
+    rewrite initiE /=; by  smt(param_sets Array160.initiE Array1408.initiE  kvec_val).
+  rewrite Hr;1:smt(kvec_val param_sets).
+  rewrite initiE /=; by  smt(param_sets Array160.initiE Array1408.initiE  kvec_val).
 
 
 seq 2 0 : (#pre /\
@@ -404,29 +405,29 @@ seq 2 0 : (#pre /\
    + move => ceq; rewrite (Heq _); last by done.
      move => i0 ib; rewrite !initiE //=. 
      case (i0 < 1408).
-     + move => ibb; rewrite ceq cphv1;1:smt(kvec_val Parameters.param_sets).
-    rewrite initiE /=; by smt(Parameters.param_sets Array160.initiE Array1408.initiE  kvec_val).
-     move => ibb; rewrite ceq cphv2;1:smt(kvec_val Parameters.param_sets).
-    rewrite initiE /=; by  smt(Parameters.param_sets Array160.initiE Array1408.initiE  kvec_val).
+     + move => ibb; rewrite ceq cphv1;1:smt(kvec_val param_sets).
+    rewrite initiE /=; by smt(param_sets Array160.initiE Array1408.initiE  kvec_val).
+     move => ibb; rewrite ceq cphv2;1:smt(kvec_val param_sets).
+    rewrite initiE /=; by  smt(param_sets Array160.initiE Array1408.initiE  kvec_val).
    move => neq;rewrite Hdiff.
    have : exists i0, 0<= i0 < 1568 /\
      ct{1}.[i0] <>
      (Array1568.init (fun (i1 : int) => if i1 < 1408 then c{2}.`1.[i1] else c{2}.`2.[i1 - 1408])).[i0]; last by smt().
    case (c{2}.`1 <> cph{2}.`1).
    + move => neq1. rewrite tP in neq1.
-     have [k kb] : exists k, 0<=k<1408 /\ c{2}.`1.[k] <> cph{2}.`1.[k] by smt(kvec_val Parameters.param_sets).
+     have [k kb] : exists k, 0<=k<1408 /\ c{2}.`1.[k] <> cph{2}.`1.[k] by smt(kvec_val param_sets).
      exists k; split; 1: by smt().
      rewrite initiE /= 1:/#.
-     move : (cphv1 k _); 1: smt(kvec_val Parameters.param_sets).
-     rewrite initiE /=;smt(kvec_val Parameters.param_sets).
+     move : (cphv1 k _); 1: smt(kvec_val param_sets).
+     rewrite initiE /=;smt(kvec_val param_sets).
    + move => eq1.
      have neq2 : c{2}.`2 <> cph{2}.`2 by move : neq eq1; smt().
      rewrite tP in neq2.
-     have [k kb] : exists k, 0<=k<160 /\ c{2}.`2.[k] <> cph{2}.`2.[k] by smt(kvec_val Parameters.param_sets).
-     exists (k + 1408); split; 1: by smt(kvec_val Parameters.param_sets).
+     have [k kb] : exists k, 0<=k<160 /\ c{2}.`2.[k] <> cph{2}.`2.[k] by smt(kvec_val param_sets).
+     exists (k + 1408); split; 1: by smt(kvec_val param_sets).
      rewrite initiE /= 1:/#.
-     move : (cphv2 k _); 1: smt(kvec_val Parameters.param_sets).
-     by rewrite initiE /=; smt(kvec_val Parameters.param_sets).
+     move : (cphv2 k _); 1: smt(kvec_val param_sets).
+     by rewrite initiE /=; smt(kvec_val param_sets).
   done.
 
 
@@ -474,22 +475,22 @@ split.
       + apply (eq_from_nth witness); first by rewrite !size_to_list.
         move => k0; rewrite size_to_list => Kb; rewrite !get_to_list !initiE 1,2:/# eq_zp_ct_sk 1:/#; smt().
       apply (eq_from_nth witness).
-      + rewrite !size_to_list; smt(kvec_val Parameters.param_sets).
+      + rewrite !size_to_list; smt(kvec_val param_sets).
       move => k0; rewrite size_to_list => Kb; rewrite !get_to_list.
       rewrite Array1408.initiE 1:/#.
       rewrite /= eq_zp_ct_ct 1:/#.
       rewrite cphv1.
-      + smt(kvec_val Parameters.param_sets).
-      rewrite BytesCtVec.initiE; smt(kvec_val Parameters.param_sets).
-    + apply (eq_from_nth witness); first by rewrite !size_to_list; smt(kvec_val Parameters.param_sets).
+      + smt(kvec_val param_sets).
+      rewrite BytesCtVec.initiE; smt(kvec_val param_sets).
+    + apply (eq_from_nth witness); first by rewrite !size_to_list; smt(kvec_val param_sets).
       move => k0; rewrite size_to_list => Kb; rewrite !get_to_list.
       rewrite Array160.initiE 1:/# /=.
       have ->: 1440 + k0 = 32 + (1408 + k0) by ring.
       rewrite eq_zp_ct_ct 1:/#.
       rewrite cphv2.
-      + smt(kvec_val Parameters.param_sets).
+      + smt(kvec_val param_sets).
       rewrite BytesPoly.initiE.
-      + smt(kvec_val Parameters.param_sets).
+      + smt(kvec_val param_sets).
       by rewrite /=; smt().
 
   move => Hgc result0 c0 c1.

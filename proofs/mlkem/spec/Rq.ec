@@ -245,3 +245,57 @@ qed.
 (* Fix me PY: We currently don't care about inverting polynomials *)
 op unit(p : poly) = exists q, q &* p = one.
 op invr(p : poly) = choiceb (fun q => q &* p = one) p.
+
+
+(* ------------------------------------------------------------------ *)
+(* The ring of polynomials, for the `ring` tactic                       *)
+(* ------------------------------------------------------------------ *)
+op pzero : poly = zero.
+op pone  : poly = one.
+
+clone Ring.ComRing as RqRing with
+    type t <= poly,
+    op zeror <= pzero,
+    op oner <= pone,
+    pred unit = unit,
+    op ( + ) <= (&+),
+    op [ - ] <= (&-),
+    op ( * ) <= (&*),
+    op invr <= invr
+    proof addrA by smt(add_lift poly2polyrK RqTheory.addrA)
+    proof addrC by smt(add_lift poly2polyrK RqTheory.addrC)
+    proof add0r by smt(zero_lift add_lift poly2polyrK RqTheory.add0r polyr2polyK)
+    proof addNr by smt(zero_lift sub_lift add_lift poly2polyrK RqTheory.addNr polyr2polyK)
+    proof oner_neq0 by smt(zero_lift poly2polyrK one_lift RqTheory.oner_neq0)
+    proof mulrA by smt(mul_lift poly2polyrK RqTheory.mulrA)
+    proof mulrC by smt(mul_lift poly2polyrK RqTheory.mulrC)
+    proof mul1r by smt(one_lift mul_lift poly2polyrK RqTheory.mul1r polyr2polyK)
+    proof mulrDl by smt(add_lift mul_lift poly2polyrK RqTheory.mulrDl polyr2polyK)
+    proof mulVr by smt(choicebP)
+    proof unitP by smt()
+    proof unitout by (move=> x H; rewrite /invr choiceb_dfl // /#).
+
+instance ring with poly
+  op rzero = pzero
+  op rone  = pone
+  op add   = (&+)
+  op opp   = (&-)
+  op mul   = (&*)
+  op expr  = RqRing.exp
+  op ofint = RqRing.ofint
+
+  proof oner_neq0 by apply RqRing.oner_neq0
+  proof addrA     by apply RqRing.addrA
+  proof addrC     by apply RqRing.addrC
+  proof addr0     by apply RqRing.addr0
+  proof addrN     by apply RqRing.addrN
+  proof mulr1     by apply RqRing.mulr1
+  proof mulrA     by apply RqRing.mulrA
+  proof mulrC     by apply RqRing.mulrC
+  proof mulrDl    by apply RqRing.mulrDl
+  proof expr0     by apply RqRing.expr0
+  proof ofint0    by apply RqRing.ofint0
+  proof ofint1    by apply RqRing.ofint1
+  proof exprS     by apply RqRing.exprS
+  proof ofintS    by apply RqRing.ofintS
+  proof ofintN    by apply RqRing.ofintN.

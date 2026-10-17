@@ -7,18 +7,16 @@ from JazzEC require import Array32 Array33.
 
 (* Imports of "lower-level" MLKEM spec parts *)
 require import Rq.
-require import Parameters.
 require import Sampling.
-require import VecMat.
-import VecMat.PolyVec VecMat.PolyMat.
-require import Serialization.
-require import Symmetric.
+require import Serialization Symmetric.
 
 (* ------------------------------------------------------------------ *)
-(* FIPS-203 K-PKE, parametric over the global variant params (k, du, dv).
-   One variant per EC run; the concrete sizes are pinned by the per-variant
-   avx2 prelude axioms. *)
+(* FIPS-203 K-PKE, parametric over the parameters (k, du, dv) of ParamsT. *)
 (* ------------------------------------------------------------------ *)
+abstract theory KPKET.
+
+clone include SymmetricT.
+import PolyVec PolyMat.
 
 type pkey = W8.t BytesPKVec.t * W8.t Array32.t.
 type skey = W8.t BytesPKVec.t.
@@ -142,3 +140,5 @@ module KPKE = {
     return m;
   }
 }.
+
+end KPKET.

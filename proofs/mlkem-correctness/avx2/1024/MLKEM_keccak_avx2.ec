@@ -10,6 +10,7 @@ from Keccak require import Keccakf1600.
 from CryptoSpecs require export Keccak1600_Spec Keccakf1600_Spec.
 
 from Spec require import Symmetric.
+require import MLKEM1024_prelude.
 require import MLKEMFCLib.
 import MLKEMFCLib1024.
 

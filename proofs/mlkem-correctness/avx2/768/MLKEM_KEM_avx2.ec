@@ -386,10 +386,10 @@ seq 1 1 : (#pre /\
   move => /= ?  bufv ? krv rl [rr1 rr2] /=;rewrite !tP => [#Hl Hr] i ib. 
   rewrite !initiE 1:/# /=.
   case (i < 960) =>*.
-  + rewrite Hl;1:smt(kvec_val Parameters.param_sets).
-    rewrite initiE /=; by  smt(Parameters.param_sets Array128.initiE Array960.initiE  kvec_val).
-  rewrite Hr;1:smt(kvec_val Parameters.param_sets).
-  rewrite initiE /=; by  smt(Parameters.param_sets Array128.initiE Array960.initiE  kvec_val).
+  + rewrite Hl;1:smt(kvec_val param_sets).
+    rewrite initiE /=; by  smt(param_sets Array128.initiE Array960.initiE  kvec_val).
+  rewrite Hr;1:smt(kvec_val param_sets).
+  rewrite initiE /=; by  smt(param_sets Array128.initiE Array960.initiE  kvec_val).
 seq 2 0 : (#pre /\
                   (c{2}  = cph{2} => cnd{1} = W64.of_int 0) /\
                   (c{2}  <> cph{2} => cnd{1} = W64.of_int 1)).
@@ -402,29 +402,29 @@ seq 2 0 : (#pre /\
    + move => ceq; rewrite (Heq _); last by done.
      move => i0 ib; rewrite !initiE //=. 
      case (i0 < 960).
-     + move => ibb; rewrite ceq cphv1;1:smt(kvec_val Parameters.param_sets).
-    rewrite initiE /=; by smt(Parameters.param_sets Array128.initiE Array960.initiE  kvec_val). 
-     move => ibb; rewrite ceq cphv2;1:smt(kvec_val Parameters.param_sets).
-    rewrite initiE /=; by  smt(Parameters.param_sets Array128.initiE Array960.initiE  kvec_val). 
+     + move => ibb; rewrite ceq cphv1;1:smt(kvec_val param_sets).
+    rewrite initiE /=; by smt(param_sets Array128.initiE Array960.initiE  kvec_val). 
+     move => ibb; rewrite ceq cphv2;1:smt(kvec_val param_sets).
+    rewrite initiE /=; by  smt(param_sets Array128.initiE Array960.initiE  kvec_val). 
    move => neq;rewrite Hdiff.
    have : exists i0, 0<= i0 < 1088 /\ 
      ct{1}.[i0] <>
      (Array1088.init (fun (i1 : int) => if i1 < 960 then c{2}.`1.[i1] else c{2}.`2.[i1 - 960])).[i0]; last by smt().
    case (c{2}.`1 <> cph{2}.`1).
    + move => neq1. rewrite tP in neq1.   
-     have [k kb] : exists k, 0<=k<960 /\ c{2}.`1.[k] <> cph{2}.`1.[k] by smt(kvec_val Parameters.param_sets).
+     have [k kb] : exists k, 0<=k<960 /\ c{2}.`1.[k] <> cph{2}.`1.[k] by smt(kvec_val param_sets).
      exists k; split; 1: by smt().
      rewrite initiE /= 1:/#. 
-     move : (cphv1 k _); 1: smt(kvec_val Parameters.param_sets).
-     rewrite initiE /=;smt(kvec_val Parameters.param_sets).
+     move : (cphv1 k _); 1: smt(kvec_val param_sets).
+     rewrite initiE /=;smt(kvec_val param_sets).
    + move => eq1. 
      have neq2 : c{2}.`2 <> cph{2}.`2 by move : neq eq1; smt().
      rewrite tP in neq2.   
-     have [k kb] : exists k, 0<=k<128 /\ c{2}.`2.[k] <> cph{2}.`2.[k] by smt(kvec_val Parameters.param_sets).
-     exists (k + 960); split; 1: by smt(kvec_val Parameters.param_sets).
+     have [k kb] : exists k, 0<=k<128 /\ c{2}.`2.[k] <> cph{2}.`2.[k] by smt(kvec_val param_sets).
+     exists (k + 960); split; 1: by smt(kvec_val param_sets).
      rewrite initiE /= 1:/#. 
-     move : (cphv2 k _); 1: smt(kvec_val Parameters.param_sets).
-     by rewrite initiE /=; smt(kvec_val Parameters.param_sets).
+     move : (cphv2 k _); 1: smt(kvec_val param_sets).
+     by rewrite initiE /=; smt(kvec_val param_sets).
   done.
 
 
@@ -472,22 +472,22 @@ split.
       + apply (eq_from_nth witness); first by rewrite !size_to_list.
         move => k0; rewrite size_to_list => Kb; rewrite !get_to_list !initiE 1,2:/# eq_zp_ct_sk 1:/#; smt().
       apply (eq_from_nth witness).
-      + rewrite !size_to_list; smt(kvec_val Parameters.param_sets).
+      + rewrite !size_to_list; smt(kvec_val param_sets).
       move => k0; rewrite size_to_list => Kb; rewrite !get_to_list.
       rewrite Array960.initiE 1:/#.
       rewrite /= eq_zp_ct_ct 1:/#.
       rewrite cphv1.
-      + smt(kvec_val Parameters.param_sets).
-      rewrite BytesCtVec.initiE; smt(kvec_val Parameters.param_sets).
-    + apply (eq_from_nth witness); first by rewrite !size_to_list; smt(kvec_val Parameters.param_sets).
+      + smt(kvec_val param_sets).
+      rewrite BytesCtVec.initiE; smt(kvec_val param_sets).
+    + apply (eq_from_nth witness); first by rewrite !size_to_list; smt(kvec_val param_sets).
       move => k0; rewrite size_to_list => Kb; rewrite !get_to_list.
       rewrite Array128.initiE 1:/# /=.
       have ->: 992 + k0 = 32 + (960 + k0) by ring.
       rewrite eq_zp_ct_ct 1:/#.
       rewrite cphv2.
-      + smt(kvec_val Parameters.param_sets).
+      + smt(kvec_val param_sets).
       rewrite BytesPoly.initiE.
-      + smt(kvec_val Parameters.param_sets).
+      + smt(kvec_val param_sets).
       by rewrite /=; smt().
 
   move => Hgc result0 c0 c1.

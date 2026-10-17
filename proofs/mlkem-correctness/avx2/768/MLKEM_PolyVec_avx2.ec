@@ -185,6 +185,7 @@ import MLKEMFCLib768.
 require import AVX2_Ops MLKEMFCLib.
 
 from Spec require import GFq Rq VecMat Serialization Correctness.
+require import MLKEM768_prelude.
 import Serialization VecMat.
 
 theory MLKEM_PolyvecAVX.

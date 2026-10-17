@@ -10,11 +10,9 @@ from JazzEC require import Array25 Array256 Array384 Array128 Array168  Array32.
 
 require import MLKEMLib DistrExtra.
 require NttResidue.
-from Spec require import GFq Rq Parameters Symmetric Sampling VecMat  Serialization KPKE MLKEM.
-import Zq MLKEMParams PolyVec PolyMat.
-
-(* Signed representation: could go in coeff *)
-
+from Spec require import GFq Rq Symmetric Sampling Serialization.
+from Spec require MLKEM.
+import Zq.
 lemma as_sintK x:
  incoeff (as_sint x) = x.
 proof. by smt(asintK). qed.
@@ -659,34 +657,6 @@ by smt(dR_fu duni_elem_fu).
 (****************************************************************************)
 
 
-lemma ofipolyvecK_small (x : ipolyvec) :
-    (forall k, 0 <= k < 256 * kvec => 0 <= x.[k] < q) =>  toipolyvec (ofipolyvec x) = x.
-move => bnd.
-apply IPVec.tP => k kb.
-rewrite /toipolyvec IPVec.initiE //= /ofipolyvec KVec.initiE 1:/# /=.
-rewrite /subarray256 mapiE 1:/# initiE 1:/# /=.
-have ->: 256 * (k %/ 256) + k %% 256 = k by smt(divz_eq).
-rewrite incoeffK; smt(modz_small).
-qed.
-
-lemma toipolyvecK (x : PolyVec.polyvec) :
-   ofipolyvec (toipolyvec x) = x.
-apply KVec.tP => i ib.
-rewrite /ofipolyvec KVec.initiE //=.
-apply Array256.tP => j jb.
-rewrite /subarray256 mapiE 1:/# initiE 1:/# /=.
-rewrite /toipolyvec IPVec.initiE 1:/# /=.
-have ->: (256 * i + j) %/ 256 = i by smt(divzMDl).
-have ->: (256 * i + j) %% 256 = j by smt(modzMDl).
-by rewrite asintK.
-qed.
-
-(************************************)
-(************************************)
-(* SAMPLING PROCEDURES CORRECTNESS  *)
-(************************************)
-(************************************)
-
 require import IntMin.
 require import EclibExtra.
 require import JWordList.
@@ -949,12 +919,6 @@ proof.
 by rewrite size_takel //=; apply needed_blocksP.
 qed.
 
-abbrev idx_from_pos pos = ((* row *) pos %/ kvec, (* column *) pos %% kvec).
-
-op pos2ji (pos: int) (t: bool): W8.t*W8.t =
- let rc = idx_from_pos pos  in
- if t then (W8.of_int rc.`1, W8.of_int rc.`2) else (W8.of_int rc.`2, W8.of_int rc.`1).
-
 op plist ['a] (pol: 'a Array256.t) n = mkseq ("_.[_]" pol) n.
 
 lemma size_plist ['a] (pol : 'a Array256.t) n:
@@ -1169,126 +1133,6 @@ move=> st aa0 j0; split.
 move=> hj nb hnb [ge0nb [_ [hag hj0]]]; apply Array256.ext_eq => idx rgidx.
 have hsz : 256 <= size (R nb) by smt().
 by rewrite (agree_nth witness _ _ _ hsz hag rgidx) (parseE _ _ _ nb).
-qed.
-
-
-module Hmodule = {
-    proc sampleA(sd : W8.t Array32.t) : polymat = {
-     var i,j,c;
-     var a : polymat;
-     a <- witness;
-     i <- 0;
-     while (i < kvec) {
-        j <- 0;
-        while (j < kvec) {
-           c <- parse sd (W8.of_int j) (W8.of_int i);
-           a.[(i,j)] <- c;
-           j <- j + 1;
-        }
-        i <- i + 1;
-     }
-     return a;
-    }
-
-    proc sampleAT(sd : W8.t Array32.t) : polymat = {
-     var i,j,c;
-     var a : polymat;
-     a <- witness;
-     i <- 0;
-     while (i < kvec) {
-        j <- 0;
-        while (j < kvec) {
-           c <- parse sd (W8.of_int i) (W8.of_int j);
-           a.[(i,j)] <- c;
-           j <- j + 1;
-        }
-        i <- i + 1;
-     }
-     return a;
-    }
-
-}.
-
-lemma KSamplerA_ll  : islossless Hmodule.sampleA.
-proc;while(0<=i<=kvec) (kvec - i) => *; last by auto => *; smt(gt0_k).
-move => *;wp;while(0<=i<kvec && 0<=j<=kvec) (kvec - j) => *; last by auto => *; smt(gt0_k).
-by move => *;inline *;auto => /> /#.
-qed.
-
-lemma KSamplerAT_ll : islossless Hmodule.sampleAT.
-proc;while(0<=i<=kvec) (kvec - i) => *; last by auto => *; smt(gt0_k).
-move => *;wp;while(0<=i<kvec && 0<=j<=kvec) (kvec - j) => *; last by auto => *; smt(gt0_k).
-by move => *;inline *;auto => /> /#.
-qed.
-
-import KMatrix.Vector.
-
-(* spec-level matrix sampling: concrete and parametric over kvec.
-   sampleA.[(i,j)] = parse sd j i  (matches the Hmodule.sampleA proc). *)
-op sampleA(sd : W8.t Array32.t) : polymat =
-  KMat.init (fun f => parse sd (W8.of_int (f %% kvec)) (W8.of_int (f %/ kvec))).
-
-lemma sampleAE sd i j : 0 <= i < kvec => 0 <= j < kvec =>
-  (sampleA sd).[(i,j)] = parse sd (W8.of_int j) (W8.of_int i).
-proof.
-move=> hi hj; rewrite /sampleA {1}/PolyMat."_.[_]" KMat.initiE 1:/# /=.
-by rewrite modzMDl modz_small 1:/# divzMDl 1:/# divz_small 1:/#.
-qed.
-
-lemma sampleA_sem _sd :
-  phoare [ Hmodule.sampleA : arg = _sd ==> res = sampleA _sd ] = 1%r.
-proof.
-proc; sp.
-while (sd = _sd /\ 0 <= i <= kvec /\
-       forall i0 j0, 0 <= i0 < i => 0 <= j0 < kvec =>
-         a.[(i0,j0)] = parse _sd (W8.of_int j0) (W8.of_int i0)) (kvec - i).
-+ move=> z; wp; sp.
-  while (sd = _sd /\ 0 <= i < kvec /\ 0 <= j <= kvec /\
-         (forall i0 j0, 0 <= i0 < i => 0 <= j0 < kvec =>
-            a.[(i0,j0)] = parse _sd (W8.of_int j0) (W8.of_int i0)) /\
-         (forall j0, 0 <= j0 < j =>
-            a.[(i,j0)] = parse _sd (W8.of_int j0) (W8.of_int i))) (kvec - j).
-  - move=> z'; auto => /> &hr hi1 hi2 hj0 hjle Hprev Hrow hjlt; split; last by smt().
-    split; first by smt().
-    split.
-    + move=> i0 j0 ????; case (i0 = i{hr} /\ j0 = j{hr}) => h; smt(get_setmE).
-    move=> j0 ??; case (j0 = j{hr}) => h; smt(get_setmE).
-  auto => /> /#.
-auto => />; split; 1: smt(gt0_k).
-move=> a0 i0; split; 1: smt().
-move=> hexit hi0 hi0le Hinv; apply eq_polymatP => i0' j0' ??.
-rewrite sampleAE 1,2:/#; smt().
-qed.
-
-lemma sampleAT_sem _sd :
-  phoare [ Hmodule.sampleAT : arg = _sd ==> res = trmx (sampleA _sd) ] = 1%r.
-proof.
-proc; sp.
-while (sd = _sd /\ 0 <= i <= kvec /\
-       forall i0 j0, 0 <= i0 < i => 0 <= j0 < kvec =>
-         a.[(i0,j0)] = parse _sd (W8.of_int i0) (W8.of_int j0)) (kvec - i).
-+ move=> z; wp; sp.
-  while (sd = _sd /\ 0 <= i < kvec /\ 0 <= j <= kvec /\
-         (forall i0 j0, 0 <= i0 < i => 0 <= j0 < kvec =>
-            a.[(i0,j0)] = parse _sd (W8.of_int i0) (W8.of_int j0)) /\
-         (forall j0, 0 <= j0 < j =>
-            a.[(i,j0)] = parse _sd (W8.of_int i) (W8.of_int j0))) (kvec - j).
-  - move=> z'; auto => /> &hr hi1 hi2 hj0 hjle Hprev Hrow hjlt; split; last by smt().
-    split; first by smt().
-    split.
-    + move=> i0 j0 ????; case (i0 = i{hr} /\ j0 = j{hr}) => h; smt(get_setmE).
-    move=> j0 ??; case (j0 = j{hr}) => h; smt(get_setmE).
-  auto => /> /#.
-auto => />; split; 1: smt(gt0_k).
-move=> a0 i0; split; 1: smt().
-move=> hexit hi0 hi0le Hinv; apply eq_polymatP => i0' j0' ??.
-rewrite trmxE 1,2:/# sampleAE 1,2:/#; smt().
-qed.
-
-equiv H_sem_equiv :
- Hmodule.sampleAT  ~ Hmodule.sampleA : ={arg} ==> res{1} = trmx res{2}.
-proof.
-proc*; ecall {2} (sampleA_sem sd{2}); ecall {1} (sampleAT_sem sd{1}); auto => /#.
 qed.
 
 
@@ -1639,80 +1483,6 @@ clone DMapSampling as MSwlw128 with
  type t1 <- W8.t list,
  type t2 <- W8.t Array128.t.
 
-import PolyVec PolyMat.
-module CBD2rnd = {
-   proc sampleL_real() : poly = {
-      var i,a,b,bytes;
-      var p : poly;
-      var l: coeff list;
-      bytes <@ MSwlw128.S.sample(dlist W8.dword 128, Array128.of_list witness);
-      l <- [];
-      i <- 0;
-      while (i < 128) {
-        a <- b2i bytes.[i].[0] + b2i bytes.[i].[1];
-        b <- b2i bytes.[i].[2] + b2i bytes.[i].[3];
-        l <- rcons l (incoeff  (a - b));
-        a <- b2i bytes.[i].[4] + b2i bytes.[i].[5];
-        b <- b2i bytes.[i].[6] + b2i bytes.[i].[7];
-        l <- rcons l (incoeff  (a - b));
-        i <- i + 1;
-      }
-      p <- Array256.of_list witness l;
-      return p;
-   }
-   proc sample_real() : poly = {
-      var i,a,b,bytes;
-      var p : poly;
-      p <- witness;
-      bytes <@ MSwlw128.S.sample(dlist W8.dword 128, Array128.of_list witness);
-      i <- 0;
-      while (i < 128) {
-        a <- b2i bytes.[i].[0] + b2i bytes.[i].[1];
-        b <- b2i bytes.[i].[2] + b2i bytes.[i].[3];
-        p.[2*i] <- incoeff  (a - b);
-        a <- b2i bytes.[i].[4] + b2i bytes.[i].[5];
-        b <- b2i bytes.[i].[6] + b2i bytes.[i].[7];
-        p.[2*i+1] <- incoeff  (a - b);
-        i <- i + 1;
-      }
-      return p;
-   }
-   proc sample_ideal() : poly = {
-     var p;
-     p <$ dshort_R;
-     return p;
-   }
-   proc sampleL_vec_real() : polyvec = {
-     var i, l, p, v;
-     l <- [];
-     i <- 0;
-     while (i < kvec) {
-       p <@ sample_real();
-       l <- rcons l p;
-       i <- i + 1;
-     }
-     v <- KVec.init (nth witness l);
-     return v;
-   }
-   proc sample_vec_real() : polyvec = {
-     var i, p;
-     var v : polyvec;
-     v <- witness;
-     i <- 0;
-     while (i < kvec) {
-       p <@ sample_real();
-       v <- v.[i<-p];
-       i <- i + 1;
-     }
-     return v;
-   }
-   proc sample_vec_ideal() : polyvec = {
-     var v;
-     v <$ dmap (dlist dshort_R kvec) (fun l => KVec.init (nth witness l));
-     return v;
-   }
-}.
-
 op fcbd2 (w: W8.t) : coeff list =
  [ incoeff (b2i w.[0] + b2i w.[1] - b2i w.[2] - b2i w.[3])
  ; incoeff (b2i w.[4] + b2i w.[5] - b2i w.[6] - b2i w.[7]) ].
@@ -1740,145 +1510,9 @@ clone DMapSampling as MSwlpoly with
  type t1 <- W8.t list,
  type t2 <- poly.
 
-equiv CBD2rnd_sampleL_eq:
- CBD2rnd.sample_real ~ CBD2rnd.sampleL_real:
- true ==> ={res}.
-proof.
-proc.
-wp; while (={i,bytes} /\ (0 <= i{1} <= 128) /\ a256l p{1} l{2} (2*i{1})).
- wp; skip => |> &1 &2 *.
- split; first smt().
- rewrite (_:2 * (i{2} + 1) = 2*i{2} + 1 + 1) 1:/#.
- apply a256l_rcons; first smt().
- apply a256l_rcons => //; smt().
-wp; call (_:true); first by auto.
-wp; skip => |> *.
-split; first smt().
-move => |> p i l ???.
-have ->: i=128 by smt().
-by apply a256l_of_list. 
-qed.
-
-(** CBD2 proc. (over a random oracle) samples acording
-    to the binomial distribution *)
-equiv CBD2rnd_equiv:
- CBD2rnd.sample_real ~ CBD2rnd.sample_ideal:
- true ==> ={res}.
-proof.
-transitivity CBD2rnd.sampleL_real
- (true ==> ={res}) (true ==> ={res}) => //.
- by apply CBD2rnd_sampleL_eq.
-proc.
-transitivity {2}
- { p <@ MSwlpoly.S.sample(dlist W8.dword 128,
-                         Array256.of_list witness \o flatten \o List.map fcbd2); }
- ( true ==> ={p} ) ( true ==> ={p} ) => //; last first.
- inline*; wp; rnd; wp; auto => /> *; smt(dshort_R_sample).
-transitivity {2}
- { p <@ MSwlpoly.S.map(dlist W8.dword 128,
-                      Array256.of_list witness \o flatten \o List.map fcbd2); }
- ( true ==> ={p} ) ( true ==> ={p} ) => //; last first.
- by symmetry; call MSwlpoly.sample.
-inline MSwlpoly.S.map; swap{2} 2 1.
-seq 1 2: (to_list bytes{1} = r1{2}).
- transitivity {1}
-  { bytes <@ MSwlw128.S.map(dlist W8.dword 128,
-                           (of_list witness)%Array128); }
-  ( true ==> ={bytes} ) ( true ==> to_list bytes{1} = r1{2} ) => //.
-  by call MSwlw128.sample.
- inline*; wp; rnd; wp; auto => /> l; rewrite supp_dlist //.
- by move=> [?_]; rewrite of_listK.
-wp; while {1} 
-     (0 <= i{1} <= 128 /\ 
-      to_list bytes{1} = r1{2} /\
-      l{1} = flatten (List.map fcbd2 (take i{1} r1{2})))
-     (128-i{1}).
- move=> &m z.
- wp; skip => /> &hr *; split; last smt().
- split. smt().
- rewrite (take_nth witness); first smt(Array128.size_to_list).
- rewrite map_rcons flatten_rcons.
- rewrite Array128.get_to_list -!cats1 -catA /=; congr. 
- rewrite /fcbd2; congr; smt().
-wp; skip => /> &1; split.
- by rewrite take0 /= flatten_nil.
-move=> i; split; first smt().
-move=> *; have ->: i = size (to_list bytes{1}) by smt(Array128.size_to_list).
-by rewrite /(\o) /= take_size.
-qed.
-
-equiv CBD2rnd_sampleL_vec_eq:
- CBD2rnd.sample_vec_real ~ CBD2rnd.sampleL_vec_real:
- true ==> ={res}.
-proof.
-proc.
-wp; while (={i} /\ (0 <= i{1} <= kvec) /\
-       size l{2}=i{2} /\ forall k, 0 <= k < i{1} => v{1}.[k] = nth witness l{2} k).
- wp; call (_: true); first by sim.
- skip => |> &1 &2 hge hle H hlt result; split; first smt().
- split; first by rewrite size_rcons.
- move=> k ??; rewrite KVec.get_setE 1:/# nth_rcons; smt().
-wp; skip => |>; split; first smt(gt0_k).
-move=> i_L v_L i_R l_R he1 he2 Hinv; apply KVec.tP => i Hi; rewrite KVec.initiE 1:/#; smt().
-qed.
-
-clone DMapSampling as MSvkvec with
- type t1 <- poly list,
- type t2 <- polyvec.
-
 clone Program as LSvec with
  type t <- poly,
  op d <- dshort_R.
-
-equiv CBD2rnd_vec_equiv:
- CBD2rnd.sample_vec_real ~ CBD2rnd.sample_vec_ideal:
- true ==> ={res}.
-proof.
-transitivity CBD2rnd.sampleL_vec_real
- (true ==> ={res}) (true ==> ={res}) => //.
- by apply CBD2rnd_sampleL_vec_eq.
-proc.
-transitivity {1}
- { l <- [];
-   i <- 0;
-   while (i<kvec) {
-    p <@ CBD2rnd.sample_ideal();
-    l <- rcons l p;
-    i <- i+1;
-   }
-   v <- KVec.init (nth witness l); }
- ( true ==> ={v}) (true ==> ={v} ) => //=.
-- wp; while (={i,l} /\ 0 <= i{2} <= kvec).
-   by wp; call CBD2rnd_equiv; auto => /> /#.
-  by auto.
-transitivity {1}
- { l <@ LSvec.LoopSnoc.sample(kvec);
-   v <- KVec.init (nth witness l); }
- ( true ==> ={v}) (true ==> ={v} ) => //=.
-- inline*; wp.
-  while ((i,l){1}=(i0,l0){2} /\ n{2}=kvec /\ 0 <= i{1} <= kvec).
-   wp; rnd; auto; smt(cats1).
-  by auto.
-transitivity {1}
- { l <@ LSvec.Sample.sample(kvec);
-   v <- KVec.init (nth witness l); }
- ( true ==> ={v}) (true ==> ={v} ) => //=.
-- by symmetry; wp; call LSvec.Sample_LoopSnoc_eq; auto.
-transitivity {2} { v <@ MSvkvec.S.map(dlist dshort_R kvec, fun (l:poly list) => KVec.init (nth witness l)); }
- ( true ==> ={v}) (true ==> ={v} ) => //=.
- by inline*; wp; rnd; auto. 
-transitivity {1} { v <@ MSvkvec.S.sample(dlist dshort_R kvec, fun (l:poly list) => KVec.init (nth witness l)); }
- ( true ==> ={v}) (true ==> ={v} ) => //=.
- by symmetry; call MSvkvec.sample; auto.
-by inline*; wp; rnd; auto => />; rewrite /dvector -dlist_djoin /#.
-qed.
-
-
-
-
-(*************************************************************************)
-(**   Properties related to the NTT formalisation                       **)
-(*************************************************************************)
 
 lemma exp_neg1_2 :
   ZqRing.exp (incoeff (-1)) 2 = Zq.one.
@@ -2285,34 +1919,6 @@ proof.
   by rewrite ZqRing.mul1r mulrC {2}(divz_eq i 2) eq_mod.
 qed.
 
-lemma nttvK : cancel invnttv nttv.
-proof.
-move=> v; apply KVec.tP => i ib.
-rewrite /nttv /invnttv /mapv KVec.mapiE 1:/# KVec.mapiE 1:/#.
-smt(nttK).
-qed.
-
-lemma invnttvK : cancel nttv invnttv.
-proof.
-move=> v; apply KVec.tP => i ib.
-rewrite /nttv /invnttv /mapv KVec.mapiE 1:/# KVec.mapiE 1:/#.
-smt(invnttK).
-qed.
-
-lemma nttmK : cancel invnttm nttm.
-proof.
-move=> m; apply KMat.tP => i ib.
-rewrite /nttm /invnttm /mapm KMat.mapiE 1:/# KMat.mapiE 1:/#.
-smt(nttK).
-qed.
-
-lemma invnttmK : cancel nttm invnttm.
-proof.
-move=> m; apply KMat.tP => i ib.
-rewrite /nttm /invnttm /mapm KMat.mapiE 1:/# KMat.mapiE 1:/#.
-smt(invnttK).
-qed.
-
 lemma invntt_scale p c : invntt (scale p c) = scale (invntt p) c.
 proof.
 rewrite (_: p = ntt (invntt p)); first by rewrite nttK.
@@ -2419,6 +2025,410 @@ qed.
 lemma invnttzero : invntt Rq.zero = Rq.zero by 
    smt(invnttK nttZero).
 
+(* ==================================================================== *)
+(* The properties at the parameters of a set: vectors, matrices and     *)
+(* their sampling                                                       *)
+(* ==================================================================== *)
+abstract theory CorrectnessT.
+
+clone include MLKEM.MLKEMT.
+import PolyVec PolyMat.
+
+
+(* Signed representation: could go in coeff *)
+
+lemma ofipolyvecK_small (x : ipolyvec) :
+    (forall k, 0 <= k < 256 * kvec => 0 <= x.[k] < q) =>  toipolyvec (ofipolyvec x) = x.
+move => bnd.
+apply IPVec.tP => k kb.
+rewrite /toipolyvec IPVec.initiE //= /ofipolyvec KVec.initiE 1:/# /=.
+rewrite /subarray256 mapiE 1:/# initiE 1:/# /=.
+have ->: 256 * (k %/ 256) + k %% 256 = k by smt(divz_eq).
+rewrite incoeffK; smt(modz_small).
+qed.
+
+lemma toipolyvecK (x : PolyVec.polyvec) :
+   ofipolyvec (toipolyvec x) = x.
+apply KVec.tP => i ib.
+rewrite /ofipolyvec KVec.initiE //=.
+apply Array256.tP => j jb.
+rewrite /subarray256 mapiE 1:/# initiE 1:/# /=.
+rewrite /toipolyvec IPVec.initiE 1:/# /=.
+have ->: (256 * i + j) %/ 256 = i by smt(divzMDl).
+have ->: (256 * i + j) %% 256 = j by smt(modzMDl).
+by rewrite asintK.
+qed.
+
+(************************************)
+(************************************)
+(* SAMPLING PROCEDURES CORRECTNESS  *)
+(************************************)
+(************************************)
+
+abbrev idx_from_pos pos = ((* row *) pos %/ kvec, (* column *) pos %% kvec).
+
+op pos2ji (pos: int) (t: bool): W8.t*W8.t =
+ let rc = idx_from_pos pos  in
+ if t then (W8.of_int rc.`1, W8.of_int rc.`2) else (W8.of_int rc.`2, W8.of_int rc.`1).
+
+module Hmodule = {
+    proc sampleA(sd : W8.t Array32.t) : polymat = {
+     var i,j,c;
+     var a : polymat;
+     a <- witness;
+     i <- 0;
+     while (i < kvec) {
+        j <- 0;
+        while (j < kvec) {
+           c <- parse sd (W8.of_int j) (W8.of_int i);
+           a.[(i,j)] <- c;
+           j <- j + 1;
+        }
+        i <- i + 1;
+     }
+     return a;
+    }
+
+    proc sampleAT(sd : W8.t Array32.t) : polymat = {
+     var i,j,c;
+     var a : polymat;
+     a <- witness;
+     i <- 0;
+     while (i < kvec) {
+        j <- 0;
+        while (j < kvec) {
+           c <- parse sd (W8.of_int i) (W8.of_int j);
+           a.[(i,j)] <- c;
+           j <- j + 1;
+        }
+        i <- i + 1;
+     }
+     return a;
+    }
+
+}.
+
+lemma KSamplerA_ll  : islossless Hmodule.sampleA.
+proc;while(0<=i<=kvec) (kvec - i) => *; last by auto => *; smt(gt0_k).
+move => *;wp;while(0<=i<kvec && 0<=j<=kvec) (kvec - j) => *; last by auto => *; smt(gt0_k).
+by move => *;inline *;auto => /> /#.
+qed.
+
+lemma KSamplerAT_ll : islossless Hmodule.sampleAT.
+proc;while(0<=i<=kvec) (kvec - i) => *; last by auto => *; smt(gt0_k).
+move => *;wp;while(0<=i<kvec && 0<=j<=kvec) (kvec - j) => *; last by auto => *; smt(gt0_k).
+by move => *;inline *;auto => /> /#.
+qed.
+
+import KMatrix.Vector.
+
+(* spec-level matrix sampling: concrete and parametric over kvec.
+   sampleA.[(i,j)] = parse sd j i  (matches the Hmodule.sampleA proc). *)
+op sampleA(sd : W8.t Array32.t) : polymat =
+  KMat.init (fun f => parse sd (W8.of_int (f %% kvec)) (W8.of_int (f %/ kvec))).
+
+lemma sampleAE sd i j : 0 <= i < kvec => 0 <= j < kvec =>
+  (sampleA sd).[(i,j)] = parse sd (W8.of_int j) (W8.of_int i).
+proof.
+move=> hi hj; rewrite /sampleA {1}/PolyMat."_.[_]" KMat.initiE 1:/# /=.
+by rewrite modzMDl modz_small 1:/# divzMDl 1:/# divz_small 1:/#.
+qed.
+
+lemma sampleA_sem _sd :
+  phoare [ Hmodule.sampleA : arg = _sd ==> res = sampleA _sd ] = 1%r.
+proof.
+proc; sp.
+while (sd = _sd /\ 0 <= i <= kvec /\
+       forall i0 j0, 0 <= i0 < i => 0 <= j0 < kvec =>
+         a.[(i0,j0)] = parse _sd (W8.of_int j0) (W8.of_int i0)) (kvec - i).
++ move=> z; wp; sp.
+  while (sd = _sd /\ 0 <= i < kvec /\ 0 <= j <= kvec /\
+         (forall i0 j0, 0 <= i0 < i => 0 <= j0 < kvec =>
+            a.[(i0,j0)] = parse _sd (W8.of_int j0) (W8.of_int i0)) /\
+         (forall j0, 0 <= j0 < j =>
+            a.[(i,j0)] = parse _sd (W8.of_int j0) (W8.of_int i))) (kvec - j).
+  - move=> z'; auto => /> &hr hi1 hi2 hj0 hjle Hprev Hrow hjlt; split; last by smt().
+    split; first by smt().
+    split.
+    + move=> i0 j0 ????; case (i0 = i{hr} /\ j0 = j{hr}) => h; smt(get_setmE).
+    move=> j0 ??; case (j0 = j{hr}) => h; smt(get_setmE).
+  auto => /> /#.
+auto => />; split; 1: smt(gt0_k).
+move=> a0 i0; split; 1: smt().
+move=> hexit hi0 hi0le Hinv; apply eq_polymatP => i0' j0' ??.
+rewrite sampleAE 1,2:/#; smt().
+qed.
+
+lemma sampleAT_sem _sd :
+  phoare [ Hmodule.sampleAT : arg = _sd ==> res = trmx (sampleA _sd) ] = 1%r.
+proof.
+proc; sp.
+while (sd = _sd /\ 0 <= i <= kvec /\
+       forall i0 j0, 0 <= i0 < i => 0 <= j0 < kvec =>
+         a.[(i0,j0)] = parse _sd (W8.of_int i0) (W8.of_int j0)) (kvec - i).
++ move=> z; wp; sp.
+  while (sd = _sd /\ 0 <= i < kvec /\ 0 <= j <= kvec /\
+         (forall i0 j0, 0 <= i0 < i => 0 <= j0 < kvec =>
+            a.[(i0,j0)] = parse _sd (W8.of_int i0) (W8.of_int j0)) /\
+         (forall j0, 0 <= j0 < j =>
+            a.[(i,j0)] = parse _sd (W8.of_int i) (W8.of_int j0))) (kvec - j).
+  - move=> z'; auto => /> &hr hi1 hi2 hj0 hjle Hprev Hrow hjlt; split; last by smt().
+    split; first by smt().
+    split.
+    + move=> i0 j0 ????; case (i0 = i{hr} /\ j0 = j{hr}) => h; smt(get_setmE).
+    move=> j0 ??; case (j0 = j{hr}) => h; smt(get_setmE).
+  auto => /> /#.
+auto => />; split; 1: smt(gt0_k).
+move=> a0 i0; split; 1: smt().
+move=> hexit hi0 hi0le Hinv; apply eq_polymatP => i0' j0' ??.
+rewrite trmxE 1,2:/# sampleAE 1,2:/#; smt().
+qed.
+
+equiv H_sem_equiv :
+ Hmodule.sampleAT  ~ Hmodule.sampleA : ={arg} ==> res{1} = trmx res{2}.
+proof.
+proc*; ecall {2} (sampleA_sem sd{2}); ecall {1} (sampleAT_sem sd{1}); auto => /#.
+qed.
+
+
+import PolyVec PolyMat.
+module CBD2rnd = {
+   proc sampleL_real() : poly = {
+      var i,a,b,bytes;
+      var p : poly;
+      var l: coeff list;
+      bytes <@ MSwlw128.S.sample(dlist W8.dword 128, Array128.of_list witness);
+      l <- [];
+      i <- 0;
+      while (i < 128) {
+        a <- b2i bytes.[i].[0] + b2i bytes.[i].[1];
+        b <- b2i bytes.[i].[2] + b2i bytes.[i].[3];
+        l <- rcons l (incoeff  (a - b));
+        a <- b2i bytes.[i].[4] + b2i bytes.[i].[5];
+        b <- b2i bytes.[i].[6] + b2i bytes.[i].[7];
+        l <- rcons l (incoeff  (a - b));
+        i <- i + 1;
+      }
+      p <- Array256.of_list witness l;
+      return p;
+   }
+   proc sample_real() : poly = {
+      var i,a,b,bytes;
+      var p : poly;
+      p <- witness;
+      bytes <@ MSwlw128.S.sample(dlist W8.dword 128, Array128.of_list witness);
+      i <- 0;
+      while (i < 128) {
+        a <- b2i bytes.[i].[0] + b2i bytes.[i].[1];
+        b <- b2i bytes.[i].[2] + b2i bytes.[i].[3];
+        p.[2*i] <- incoeff  (a - b);
+        a <- b2i bytes.[i].[4] + b2i bytes.[i].[5];
+        b <- b2i bytes.[i].[6] + b2i bytes.[i].[7];
+        p.[2*i+1] <- incoeff  (a - b);
+        i <- i + 1;
+      }
+      return p;
+   }
+   proc sample_ideal() : poly = {
+     var p;
+     p <$ dshort_R;
+     return p;
+   }
+   proc sampleL_vec_real() : polyvec = {
+     var i, l, p, v;
+     l <- [];
+     i <- 0;
+     while (i < kvec) {
+       p <@ sample_real();
+       l <- rcons l p;
+       i <- i + 1;
+     }
+     v <- KVec.init (nth witness l);
+     return v;
+   }
+   proc sample_vec_real() : polyvec = {
+     var i, p;
+     var v : polyvec;
+     v <- witness;
+     i <- 0;
+     while (i < kvec) {
+       p <@ sample_real();
+       v <- v.[i<-p];
+       i <- i + 1;
+     }
+     return v;
+   }
+   proc sample_vec_ideal() : polyvec = {
+     var v;
+     v <$ dmap (dlist dshort_R kvec) (fun l => KVec.init (nth witness l));
+     return v;
+   }
+}.
+
+equiv CBD2rnd_sampleL_eq:
+ CBD2rnd.sample_real ~ CBD2rnd.sampleL_real:
+ true ==> ={res}.
+proof.
+proc.
+wp; while (={i,bytes} /\ (0 <= i{1} <= 128) /\ a256l p{1} l{2} (2*i{1})).
+ wp; skip => |> &1 &2 *.
+ split; first smt().
+ rewrite (_:2 * (i{2} + 1) = 2*i{2} + 1 + 1) 1:/#.
+ apply a256l_rcons; first smt().
+ apply a256l_rcons => //; smt().
+wp; call (_:true); first by auto.
+wp; skip => |> *.
+split; first smt().
+move => |> p i l ???.
+have ->: i=128 by smt().
+by apply a256l_of_list. 
+qed.
+
+(** CBD2 proc. (over a random oracle) samples acording
+    to the binomial distribution *)
+equiv CBD2rnd_equiv:
+ CBD2rnd.sample_real ~ CBD2rnd.sample_ideal:
+ true ==> ={res}.
+proof.
+transitivity CBD2rnd.sampleL_real
+ (true ==> ={res}) (true ==> ={res}) => //.
+ by apply CBD2rnd_sampleL_eq.
+proc.
+transitivity {2}
+ { p <@ MSwlpoly.S.sample(dlist W8.dword 128,
+                         Array256.of_list witness \o flatten \o List.map fcbd2); }
+ ( true ==> ={p} ) ( true ==> ={p} ) => //; last first.
+ inline*; wp; rnd; wp; auto => /> *; smt(dshort_R_sample).
+transitivity {2}
+ { p <@ MSwlpoly.S.map(dlist W8.dword 128,
+                      Array256.of_list witness \o flatten \o List.map fcbd2); }
+ ( true ==> ={p} ) ( true ==> ={p} ) => //; last first.
+ by symmetry; call MSwlpoly.sample.
+inline MSwlpoly.S.map; swap{2} 2 1.
+seq 1 2: (to_list bytes{1} = r1{2}).
+ transitivity {1}
+  { bytes <@ MSwlw128.S.map(dlist W8.dword 128,
+                           (of_list witness)%Array128); }
+  ( true ==> ={bytes} ) ( true ==> to_list bytes{1} = r1{2} ) => //.
+  by call MSwlw128.sample.
+ inline*; wp; rnd; wp; auto => /> l; rewrite supp_dlist //.
+ by move=> [?_]; rewrite of_listK.
+wp; while {1} 
+     (0 <= i{1} <= 128 /\ 
+      to_list bytes{1} = r1{2} /\
+      l{1} = flatten (List.map fcbd2 (take i{1} r1{2})))
+     (128-i{1}).
+ move=> &m z.
+ wp; skip => /> &hr *; split; last smt().
+ split. smt().
+ rewrite (take_nth witness); first smt(Array128.size_to_list).
+ rewrite map_rcons flatten_rcons.
+ rewrite Array128.get_to_list -!cats1 -catA /=; congr. 
+ rewrite /fcbd2; congr; smt().
+wp; skip => /> &1; split.
+ by rewrite take0 /= flatten_nil.
+move=> i; split; first smt().
+move=> *; have ->: i = size (to_list bytes{1}) by smt(Array128.size_to_list).
+by rewrite /(\o) /= take_size.
+qed.
+
+equiv CBD2rnd_sampleL_vec_eq:
+ CBD2rnd.sample_vec_real ~ CBD2rnd.sampleL_vec_real:
+ true ==> ={res}.
+proof.
+proc.
+wp; while (={i} /\ (0 <= i{1} <= kvec) /\
+       size l{2}=i{2} /\ forall k, 0 <= k < i{1} => v{1}.[k] = nth witness l{2} k).
+ wp; call (_: true); first by sim.
+ skip => |> &1 &2 hge hle H hlt result; split; first smt().
+ split; first by rewrite size_rcons.
+ move=> k ??; rewrite KVec.get_setE 1:/# nth_rcons; smt().
+wp; skip => |>; split; first smt(gt0_k).
+move=> i_L v_L i_R l_R he1 he2 Hinv; apply KVec.tP => i Hi; rewrite KVec.initiE 1:/#; smt().
+qed.
+
+clone DMapSampling as MSvkvec with
+ type t1 <- poly list,
+ type t2 <- polyvec.
+
+equiv CBD2rnd_vec_equiv:
+ CBD2rnd.sample_vec_real ~ CBD2rnd.sample_vec_ideal:
+ true ==> ={res}.
+proof.
+transitivity CBD2rnd.sampleL_vec_real
+ (true ==> ={res}) (true ==> ={res}) => //.
+ by apply CBD2rnd_sampleL_vec_eq.
+proc.
+transitivity {1}
+ { l <- [];
+   i <- 0;
+   while (i<kvec) {
+    p <@ CBD2rnd.sample_ideal();
+    l <- rcons l p;
+    i <- i+1;
+   }
+   v <- KVec.init (nth witness l); }
+ ( true ==> ={v}) (true ==> ={v} ) => //=.
+- wp; while (={i,l} /\ 0 <= i{2} <= kvec).
+   by wp; call CBD2rnd_equiv; auto => /> /#.
+  by auto.
+transitivity {1}
+ { l <@ LSvec.LoopSnoc.sample(kvec);
+   v <- KVec.init (nth witness l); }
+ ( true ==> ={v}) (true ==> ={v} ) => //=.
+- inline*; wp.
+  while ((i,l){1}=(i0,l0){2} /\ n{2}=kvec /\ 0 <= i{1} <= kvec).
+   wp; rnd; auto; smt(cats1).
+  by auto.
+transitivity {1}
+ { l <@ LSvec.Sample.sample(kvec);
+   v <- KVec.init (nth witness l); }
+ ( true ==> ={v}) (true ==> ={v} ) => //=.
+- by symmetry; wp; call LSvec.Sample_LoopSnoc_eq; auto.
+transitivity {2} { v <@ MSvkvec.S.map(dlist dshort_R kvec, fun (l:poly list) => KVec.init (nth witness l)); }
+ ( true ==> ={v}) (true ==> ={v} ) => //=.
+ by inline*; wp; rnd; auto. 
+transitivity {1} { v <@ MSvkvec.S.sample(dlist dshort_R kvec, fun (l:poly list) => KVec.init (nth witness l)); }
+ ( true ==> ={v}) (true ==> ={v} ) => //=.
+ by symmetry; call MSvkvec.sample; auto.
+by inline*; wp; rnd; auto => />; rewrite /dvector -dlist_djoin /#.
+qed.
+
+
+
+
+(*************************************************************************)
+(**   Properties related to the NTT formalisation                       **)
+(*************************************************************************)
+
+lemma nttvK : cancel invnttv nttv.
+proof.
+move=> v; apply KVec.tP => i ib.
+rewrite /nttv /invnttv /mapv KVec.mapiE 1:/# KVec.mapiE 1:/#.
+smt(nttK).
+qed.
+
+lemma invnttvK : cancel nttv invnttv.
+proof.
+move=> v; apply KVec.tP => i ib.
+rewrite /nttv /invnttv /mapv KVec.mapiE 1:/# KVec.mapiE 1:/#.
+smt(invnttK).
+qed.
+
+lemma nttmK : cancel invnttm nttm.
+proof.
+move=> m; apply KMat.tP => i ib.
+rewrite /nttm /invnttm /mapm KMat.mapiE 1:/# KMat.mapiE 1:/#.
+smt(nttK).
+qed.
+
+lemma invnttmK : cancel nttm invnttm.
+proof.
+move=> m; apply KMat.tP => i ib.
+rewrite /nttm /invnttm /mapm KMat.mapiE 1:/# KMat.mapiE 1:/#.
+smt(invnttK).
+qed.
+
 lemma nttv_add (v1 v2 : polyvec) :
    nttv (v1 + v2)%PolyVec = (nttv v1 + nttv v2)%PolyVec.
 proof. apply KVec.tP => i ib; smt(nttvE polyvec_addE add_comm_ntt). qed.
@@ -2476,4 +2486,4 @@ qed.
 lemma nttvecinv v i: 0 <= i < kvec => ntt ((invnttv v).[i])%PolyVec = (v.[i])%PolyVec
   by move => ib; rewrite invnttvE 1:/#; smt(nttK invnttK).
 
-
+end CorrectnessT.

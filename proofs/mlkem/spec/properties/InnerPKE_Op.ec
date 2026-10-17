@@ -3,13 +3,16 @@ from Jasmin require import JWord.
 from JazzEC require import Array25 Array32 Array33 Array64 Array128 Array168
                             Array256 Array384.
 
-from Spec require import GFq Rq Parameters VecMat Sampling Symmetric Serialization.
-from Spec require import KPKE Correctness EncDecCorrectness
-                          MLKEMLib.
+from Spec require import GFq Rq Sampling Symmetric Serialization.
+from Spec require import Correctness MLKEMLib.
+from Spec require import EncDecCorrectness.
 
-import Zq MLKEMParams PolyVec PolyMat Serialization KPKE.
-import KMatrix Vector.
-import Symmetric.
+import Zq Serialization Symmetric.
+
+abstract theory InnerPKE_OpT.
+
+clone include EncDecCorrectness.EncDecCorrectnessT.
+import PolyVec PolyMat KMatrix Vector.
 
 (* H is just a renaming wrapper: sampleA factored through inverse-NTT.
    nttm (H rho) = sampleA rho via nttmK. *)
@@ -346,3 +349,5 @@ qed.
    If we want symmetry, we can define InnerPKE_Op.dec as a literal copy
    (modulo the plaintext type) and prove a trivial equiv -- skipped for
    now since the dec AVX2 proof already lands directly on InnerPKE768.dec. *)
+
+end InnerPKE_OpT.

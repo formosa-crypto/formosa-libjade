@@ -4,11 +4,18 @@ from Jasmin require import JWord.
 from JazzEC require import Array25 Array32 Array33 Array64 Array128 Array168 Array256 Array384.
 from JazzEC require import Array768 Array960 Array1024 Array1152.
 
-from Spec require import GFq Rq Parameters VecMat Sampling Symmetric Serialization.
-from Spec require import KPKE MLKEM Correctness EncDecCorrectness MLKEMLib.
+from Spec require import GFq Rq Sampling Symmetric Serialization.
+from Spec require import Correctness MLKEMLib.
+from Spec require import EncDecCorrectness.
 
 require import MLWE_PKE_Hash.
-import Zq MLKEMParams VecMat PolyVec PolyMat Symmetric Serialization KPKE.
+require FLPRG PRF.
+import Zq Symmetric Serialization.
+
+abstract theory MLKEMSecurityT.
+
+clone include EncDecCorrectness.EncDecCorrectnessT.
+import PolyVec PolyMat.
 
 (* ML-KEM security/correctness proof, parametric over the variant: it holds for
    every (kvec,du,dv,eta1,eta2) admitted by param_sets (both 768 and 1024).  The
@@ -73,7 +80,6 @@ qed.
 op G_coins768(s : W8.t Array32.t) : W8.t Array32.t * W8.t Array32.t =
     G_coins (Array33.init (fun (i2 : int) => if i2 < 32 then s.[i2] else W8.of_int kvec)).
 
-require FLPRG PRF. 
 clone FLPRG as HS_DEFS with
   type seed <- W8.t Array32.t, 
   type output <- W8.t Array32.t * W8.t Array32.t,
@@ -1835,3 +1841,5 @@ by smt().
 qed. 
 
 end section.
+
+end MLKEMSecurityT.
