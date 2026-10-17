@@ -287,8 +287,53 @@ lemma size_izetasL7 : size (izetasL 7) = 1.
 proof. hint +listred. by rewrite /izetasL. qed.
 
 (* -------------------------------------------------------------------- *)
-op ireduce_level (p : wpoly) (k : int) =
-  ireduce_n p 0 (2^k) (izetasL k).
+(* The implementation tables are the inverse twiddles of the tree, by   *)
+(* computation.                                                         *)
+section.
+hint simplify BS2Int.bs2int_nil, BS2Int.bs2int_cons.
+
+lemma izetasL0E : izetasL 0 = izetaW 0.
+proof. hint +listred. by rewrite /izetasL /izetaW; cbv delta. qed.
+
+lemma izetasL1E : izetasL 1 = izetaW 1.
+proof. hint +listred. by rewrite /izetasL /izetaW; cbv delta. qed.
+
+lemma izetasL2E : izetasL 2 = izetaW 2.
+proof. hint +listred. by rewrite /izetasL /izetaW; cbv delta. qed.
+
+lemma izetasL3E : izetasL 3 = izetaW 3.
+proof. hint +listred. by rewrite /izetasL /izetaW; cbv delta. qed.
+
+lemma izetasL4E : izetasL 4 = izetaW 4.
+proof. hint +listred. by rewrite /izetasL /izetaW; cbv delta. qed.
+
+lemma izetasL5E : izetasL 5 = izetaW 5.
+proof. hint +listred. by rewrite /izetasL /izetaW; cbv delta. qed.
+
+lemma izetasL6E : izetasL 6 = izetaW 6.
+proof. hint +listred. by rewrite /izetasL /izetaW; cbv delta. qed.
+
+lemma izetasL7E : izetasL 7 = izetaW 7.
+proof. hint +listred. by rewrite /izetasL /izetaW; cbv delta. qed.
+
+lemma izetasLE (k : int) : 0 <= k < 8 => izetasL k = izetaW k.
+proof.
+move=> rgk; have : k \in range 0 8 by apply/mem_range.
+rewrite /range -iotaredE /= => [#|] ->.
+- by apply izetasL0E.
+- by apply izetasL1E.
+- by apply izetasL2E.
+- by apply izetasL3E.
+- by apply izetasL4E.
+- by apply izetasL5E.
+- by apply izetasL6E.
+- by apply izetasL7E.
+qed.
+end section.
+
+lemma ireduce_levelE (p : wpoly) (k : int) : 0 <= k < 8 =>
+  ireduce_level p k = ireduce_n p 0 (2^k) (izetasL k).
+proof. by move=> rgk; rewrite /ireduce_level izetasLE. qed.
 
 (* Levels applied in program order: layer 0 first, then 1, ..., up to   *)
 (* (excluding) i. The full inverse butterfly network is [invtree p 8].  *)

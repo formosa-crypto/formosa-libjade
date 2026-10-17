@@ -386,7 +386,7 @@ sp; while (
 ); last first.
 - auto=> &hr |> *.
   rewrite take_oversize ?Array16.size_to_list 1://#.
-  by rewrite /ireduce_level /izetasL /=.
+  by rewrite ireduce_levelE // /izetasL /=.
 sp; exlim i, zetas => i_ zetas_.
 case@[ambient]: (0 <= i_ < 16) => ?; last first.
 - by conseq (_ : false ==> _); [smt() | exfalso].
@@ -413,7 +413,7 @@ sp; while (
 ); last first.
 - auto=> &hr |> *.
   rewrite take_oversize ?Array16.size_to_list 1://#.
-  by rewrite /ireduce_level /izetasL /=.
+  by rewrite ireduce_levelE // /izetasL /=.
 sp; exlim i, zetas => i_ zetas_.
 case@[ambient]: (0 <= i_ < 16) => ?; last first.
 - by conseq (_ : false ==> _); [smt() | exfalso].
@@ -444,7 +444,7 @@ sp; while (
 ); last first.
 - auto=> &hr |> *.
   rewrite take_oversize ?Array16.size_to_list 1://#.
-  by rewrite /ireduce_level /izetasL /=.
+  by rewrite ireduce_levelE // /izetasL /=.
 sp; exlim i, zetas => i_ zetas_.
 case@[ambient]: (0 <= i_ < 16) => ?; last first.
 - by conseq (_ : false ==> _); [smt() | exfalso].
@@ -475,7 +475,7 @@ sp; while (
 ); last first.
 - auto=> &hr |> *; do! (split=> *).
   - by rewrite take0 ireduce_n0.
-  - by rewrite take_oversize ?size_izetasL3 //#.
+  - by rewrite ireduce_levelE // take_oversize ?size_izetasL3 //#.
 sp; exlim i, zeta_0 => i_ zeta0_.
 case@[ambient]: (0 <= i_ < 16) => ?; last first.
 - by conseq (_ : false ==> _); [smt() | exfalso].
@@ -503,7 +503,7 @@ sp; while (
 ); last first.
 - auto=> &hr |> *; do! (split=> *).
   - by rewrite take0 ireduce_n0.
-  - by rewrite take_oversize ?size_izetasL4 //#.
+  - by rewrite ireduce_levelE // take_oversize ?size_izetasL4 //#.
 sp; exlim i, zeta_0 => i_ zeta0_.
 case@[ambient]: (0 <= i_ < 8) => ?; last first.
 - by conseq (_ : false ==> _); [smt() | exfalso].
@@ -531,7 +531,7 @@ sp; while (
 ); last first.
 - auto=> &hr |> *; do! (split=> *).
   - by rewrite take0 ireduce_n0.
-  - by rewrite take_oversize ?size_izetasL5 //#.
+  - by rewrite ireduce_levelE // take_oversize ?size_izetasL5 //#.
 sp; exlim i, zeta_0 => i_ zeta0_.
 case@[ambient]: (0 <= i_ < 4) => ?; last first.
 - by conseq (_ : false ==> _); [smt() | exfalso].
@@ -559,7 +559,7 @@ sp; while (
 ); last first.
 - auto=> &hr |> *; do! (split=> *).
   - by rewrite take0 ireduce_n0.
-  - by rewrite take_oversize ?size_izetasL6 //#.
+  - by rewrite ireduce_levelE // take_oversize ?size_izetasL6 //#.
 sp; exlim i, zeta_0 => i_ zeta0_.
 case@[ambient]: (0 <= i_ < 2) => ?; last first.
 - by conseq (_ : false ==> _); [smt() | exfalso].
@@ -587,7 +587,7 @@ sp; while (
 ); last first.
 - auto=> &hr |> *; do! (split=> *).
   - by rewrite take0 ireduce_n0.
-  - by rewrite take_oversize ?size_izetasL7 //#.
+  - by rewrite ireduce_levelE // take_oversize ?size_izetasL7 //#.
 sp; exlim i, zeta_0 => i_ zeta0_.
 case@[ambient]: (0 <= i_ < 1) => ?; last first.
 - by conseq (_ : false ==> _); [smt() | exfalso].

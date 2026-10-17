@@ -103,7 +103,7 @@ proc; sp; while (
 ); last first.
 - auto=> &hr |>; rewrite take0 /= reduce_0 /=.
   move=> j *; have ->> /=: j = 16 by smt().
-  by rewrite take_oversize.
+  by rewrite reduce_levelE // take_oversize.
 
 proc rewrite 2 LAYER_0_ZETASE.
 wp; do 2! (cfold 1; kill -1; first by auto).
@@ -218,7 +218,7 @@ proc; sp; while (
 ); last first.
 - auto=> &hr |>; rewrite take0 /= reduce_0 /=.
   move=> j *; have ->> /=: j = 16 by smt().
-  by rewrite take_oversize.
+  by rewrite reduce_levelE // take_oversize.
 
 proc rewrite 2 LAYER_1_ZETASE.
 wp; do 2! (cfold 1; kill -1; first by auto).
@@ -329,7 +329,7 @@ proc; sp; while (
 ); last first.
 - auto=> &hr |>; rewrite take0 /= reduce_0 /=.
   move=> j *; have ->> /=: j = 16 by smt().
-  by rewrite take_oversize.
+  by rewrite reduce_levelE // take_oversize.
 
 proc rewrite 2 LAYER_2_ZETASE.
 wp; do 2! (cfold 1; kill -1; first by auto).
@@ -512,7 +512,7 @@ sp; while (
 ); last first.
 - auto=> &hr |> *; do! (split=> *).
   - by rewrite take0 reduce_0.
-  - by rewrite take_oversize //#.
+  - by rewrite reduce_levelE // take_oversize //#.
 
 sp; exlim i, zetas => i_ zetas_.
 case@[ambient]: (0 <= i_ < 16) => ?; last first.
@@ -555,7 +555,7 @@ sp; while (
 ); last first.
 - auto=> &hr |> *; do! (split=> *).
   - by rewrite take0 reduce_0.
-  - by rewrite take_oversize //#.
+  - by rewrite reduce_levelE // take_oversize //#.
 
 sp; exlim i, zetas => i_ zetas_.
 case@[ambient]: (0 <= i_ < 8) => ?; last first.
@@ -598,7 +598,7 @@ sp; while (
 ); last first.
 - auto=> &hr |> *; do! (split=> *).
   - by rewrite take0 reduce_0.
-  - by rewrite take_oversize //#.
+  - by rewrite reduce_levelE // take_oversize //#.
 
 sp; exlim i, zetas => i_ zetas_.
 case@[ambient]: (0 <= i_ < 4) => ?; last first.
@@ -755,14 +755,14 @@ op [opaque] players : player list = [
 
 lemma reduce7E (p : wpoly) :
   reduce_level p 7 = reduce p 0 128 (W32.of_int zeta7).
-proof. hint +listred. by rewrite /reduce_level zeta_L7E /= reduce_seq1. qed.
+proof. hint +listred. by rewrite reduce_levelE // zeta_L7E /= reduce_seq1. qed.
 
 lemma reduce6E (p : wpoly) :
   reduce_level p 6 =
     reduce
       (reduce p 0 64 (W32.of_int zeta6L))
       128 64 (W32.of_int zeta6R).
-proof. hint +listred. by rewrite /reduce_level zeta_L6E /= reduce_seq2. qed.
+proof. hint +listred. by rewrite reduce_levelE // zeta_L6E /= reduce_seq2. qed.
 
 lemma reduce_playersE (p : wpoly) :
   reduce_players p players = reduce_tree p 6.

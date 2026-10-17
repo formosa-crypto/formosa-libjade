@@ -4,8 +4,8 @@
 
   Word arrays are linked to polynomials over Zq in the ambient logic:
   `pofw a` is the polynomial with coefficients `inzmod (to_sint a.[i])`.
-  The forward invariant of `Nttalg`/`Fnttalg` is restated as a
-  congruence of `Crspoly`:
+  The forward invariant of the tree (`reduce_tree_alg`, instantiated in
+  `Nttspec`) is restated as a congruence of `Crspoly`:
 
       peqm (basis k j) (pofw p) (pofw_blk (reduce_tree p k) (j*2^k) (2^k))
 
@@ -27,7 +27,7 @@ require import AllCore List Ring IntDiv BitEncoding StdOrder StdBigop.
 (*---*) import Bigint BIA IntOrder.
 
 (* -------------------------------------------------------------------- *)
-require import Nttlogspec Nttspec Nttzetas Nttalg Fnttalg Inttalg.
+require import Nttlogspec Nttspec Nttzetas Inttalg.
 require import Crspoly.
 (*---*) import Zq ZqP ZqP.BigCf ZqP.Lagrange ZqCA.
 
@@ -452,10 +452,10 @@ qed.
 (* ==================================================================== *)
 (* Distinctness of the leaf roots                                       *)
 (* ==================================================================== *)
-lemma bitrev8_invol (x : int) : 0 <= x < 256 => bitrev8 (bitrev8 x) = x.
+lemma bitrev_invol (x : int) : 0 <= x < 256 => bitrev (bitrev x) = x.
 proof.
 move=> rgx.
-rewrite /bitrev8.
+rewrite /bitrev /=.
 have -> : BS2Int.int2bs 8 (BS2Int.bs2int (rev (BS2Int.int2bs 8 x)))
         = rev (BS2Int.int2bs 8 x).
 - have := BS2Int.bs2intK (rev (BS2Int.int2bs 8 x)).
@@ -468,16 +468,15 @@ lemma E0_inj (j1 j2 : int) :
   0 <= j1 < 256 => 0 <= j2 < 256 => E 0 j1 = E 0 j2 => j1 = j2.
 proof.
 move=> rg1 rg2.
-rewrite /E !ifF 1,2:// => heq.
+rewrite /E !ifF 1,2:// /= => heq.
 have hpar : j1 %% 2 = j2 %% 2 by smt(bitrev8_rg).
-move: heq; rewrite /= => heq.
-have hbr : bitrev8 (j1 %/ 2 + 128) = bitrev8 (j2 %/ 2 + 128) by smt(bitrev8_rg).
-have h2 : bitrev8 (bitrev8 (j1 %/ 2 + 128)) = bitrev8 (bitrev8 (j2 %/ 2 + 128)).
+have hbr : bitrev (j1 %/ 2 + 128) = bitrev (j2 %/ 2 + 128) by smt(bitrev8_rg).
+have h2 : bitrev (bitrev (j1 %/ 2 + 128)) = bitrev (bitrev (j2 %/ 2 + 128)).
 - by rewrite hbr.
-have e1 : bitrev8 (bitrev8 (j1 %/ 2 + 128)) = j1 %/ 2 + 128.
-- by apply bitrev8_invol; smt().
-have e2 : bitrev8 (bitrev8 (j2 %/ 2 + 128)) = j2 %/ 2 + 128.
-- by apply bitrev8_invol; smt().
+have e1 : bitrev (bitrev (j1 %/ 2 + 128)) = j1 %/ 2 + 128.
+- by apply bitrev_invol; smt().
+have e2 : bitrev (bitrev (j2 %/ 2 + 128)) = j2 %/ 2 + 128.
+- by apply bitrev_invol; smt().
 by smt().
 qed.
 
@@ -767,7 +766,7 @@ lemma pwmul_cgr (a b : wpoly) (j : int) :
 proof.
 move=> rgj.
 rewrite /pwmul initiE //=.
-by apply mmr_cgr.
+by apply mmr_mont.
 qed.
 
 (* on inputs holding the evaluations of pofw p1, pofw p2 at the leaf    *)

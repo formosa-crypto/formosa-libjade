@@ -15,11 +15,18 @@
   This machine-level model is intended to be linked upward to the clean
   algebraic specification, enabling a correctness proof that connects the
   concrete implementation to its mathematical meaning.
+
+  The butterfly operators and their algebra (`reduce_level`,
+  `ireduce_level`, `nttsum`, `ntt_alg`, `icgr_step`) are those of the
+  generic tree `NttTree`, instantiated here with q = 8380417,
+  zeta = 1753, 32-bit words, leaves of size 1 and the Montgomery
+  multiplication `mmr` against the table encoding `tw32`.
 *)
 
 (* ==================================================================== *)
-require import AllCore CoreUtils List IntDiv BitEncoding.
-(*---*) import BS2Int.
+require import AllCore CoreUtils List Ring IntDiv BitEncoding.
+require import StdRing StdOrder StdBigop.
+(*---*) import BS2Int Bigint IntOrder.
 
 (* -------------------------------------------------------------------- *)
 require import ListExtra Nttlogspec.
@@ -31,10 +38,7 @@ from Jasmin require import JUtils JWord.
 require import Array256 XArray256.
 
 (* -------------------------------------------------------------------- *)
-require import Listred.
-
-(* -------------------------------------------------------------------- *)
-type wpoly = W32.t Array256.t.
+require import Listred NttTree.
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: Should be defined in a generic way                            *)
@@ -96,278 +100,373 @@ by rewrite -(modzMmr _ (58728449 * 8380417)) (: W32.modulus = 2^32) 1:// /=.
 qed.
 
 (* ==================================================================== *)
-op reduce_coeff (p : wpoly) (base len plen : int) (z_ : W32.t) =
-  let p1 = mkseq (fun i => p.[base       + i]) plen in
-  let p2 = mkseq (fun i => p.[base + len + i]) plen in
-  let r1 = map (fun (w : _ * _) => w.`1 + mmr w.`2 z_) (zip p1 p2) in
-  let r2 = map (fun (w : _ * _) => w.`1 - mmr w.`2 z_) (zip p1 p2) in
-  (r1, r2).
-
-(* -------------------------------------------------------------------- *)
-op reduce_coeff_flatten (p : wpoly) (base len : int) (z_ : W32.t) =
-  let r = reduce_coeff p base len len z_ in
-  r.`1 ++ r.`2.
-
-(* -------------------------------------------------------------------- *)
-op reduce_partial (p : wpoly) (base len plen : int) (z_ : W32.t) : wpoly =
-  let r = reduce_coeff p base len plen z_ in
-  let p = replace_ p base r.`1 in
-  let p = replace_ p (base + len) r.`2 in
-  p.
+(* Interpretation of word-level data                                    *)
+(* ==================================================================== *)
+abbrev sval (w : W32.t) = W32.to_sint w.
 
 (* ==================================================================== *)
-lemma reduce_coeffLE (p : wpoly) (base len plen : int) (z_ : W32.t) :
-  (reduce_coeff p base len plen z_).`1 =
-    mkseq (fun i => p.[base + i] + mmr p.[base + len + i] z_) plen.
+(* Basic facts about q                                                  *)
+(* ==================================================================== *)
+lemma lt_q_2p23 : q < 2^23.
+proof. by rewrite /q. qed.
+
+(* ==================================================================== *)
+(* Word-level arithmetic (no-overflow conditions)                       *)
+(* ==================================================================== *)
+lemma to_sintD_small (a b : W32.t) :
+  `|sval a + sval b| < 2^31 => sval (a + b) = sval a + sval b.
+proof. by move=> h; apply: W32.to_sintD_small; move: h => /= /#. qed.
+
+lemma to_sintB_small (a b : W32.t) :
+  `|sval a - sval b| < 2^31 => sval (a - b) = sval a - sval b.
+proof. by move=> h; apply: W32.to_sintB_small; move: h => /= /#. qed.
+
+(* ==================================================================== *)
+(* qcenter / mrepr                                                      *)
+(* ==================================================================== *)
+lemma qcenter_cgr (x : int) : qcenter x %% q = x %% q.
+proof. by rewrite /q; smt(). qed.
+
+lemma qcenter_bnd (x : int) : 2 * `|qcenter x| < q.
+proof. by rewrite /q; smt(). qed.
+
+(* table entries are read back exactly by to_sint *)
+lemma to_sint_qcenter (x : int) :
+  sval (W32.of_int (qcenter x)) = qcenter x.
+proof. by rewrite W32.to_sintK_small; smt(qcenter_bnd lt_q_2p23). qed.
+
+lemma mrepr_cgr (w : int) : mrepr w %% q = (w * 2^32) %% q.
+proof. by rewrite /mrepr modz_mod. qed.
+
+(* ==================================================================== *)
+(* Montgomery multiply-reduce: congruence and bound                     *)
+(* ==================================================================== *)
+(* master lemma: the word-level mmr computes the exact integer
+   (u*z - T*q) / 2^32, where T is the (signed) low-word multiplier *)
+lemma mmr_svalE (u z : W32.t) :
+  sval (mmr u z)
+    = (sval u * sval z
+        - sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q)
+      %/ 2^32.
 proof.
-rewrite /reduce_coeff /= zip_map /= -map_comp /(\o) /=.
-by rewrite zipss -map_comp /(\o) /= -/(range 0 plen).
+rewrite /mmr /=.
+have hA : W64.to_uint (u \sx z) = (sval u * sval z) %% W64.modulus.
+- by rewrite /(\sx) W64.to_uintM /sigextu64 !W64.of_uintK modzMml modzMmr.
+have hT64 : W64.to_uint
+    (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449) \sx W32.of_int 8380417)
+  = (sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q)
+    %% W64.modulus.
+- rewrite /(\sx) W64.to_uintM /sigextu64 !W64.of_uintK modzMml modzMmr.
+  have -> // : sval (W32.of_int 8380417) = q.
+  rewrite W32.to_sintK_small.
+  - by rewrite /=.
+  by rewrite /q.
+rewrite W32.to_sintE W2u32.to_uint_truncateu32 W64.to_uint_shr //.
+rewrite W64.to_uintD W64.to_uintN hA hT64.
+have -> : (sval u * sval z %% JModel_x86.ptr_modulus +
+    (- sval (truncateu32 ((u \sx z) * of_int 58728449)) * q %%
+       JModel_x86.ptr_modulus) %%
+    JModel_x86.ptr_modulus) %% JModel_x86.ptr_modulus
+  = (sval u * sval z - sval (truncateu32 ((u \sx z) * of_int 58728449)) * q)
+    %% JModel_x86.ptr_modulus.
+- by smt(modzBm modz_mod modzNm modzDml modzDmr).
+rewrite (: JModel_x86.ptr_modulus = 2^64) 1:// (: W32.modulus = 2^32) 1://.
+rewrite modz_pow2_div 1:// (: 64 - 32 = 32) 1:// modz_mod.
+have c1 : `|sval u| <= 2147483648.
+- by have := W32.to_sint_cmp u => /= /#.
+have c2 : `|sval z| <= 2147483648.
+- by have := W32.to_sint_cmp z => /= /#.
+have c3 : `|sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449))| <= 2147483648.
+- by have := W32.to_sint_cmp (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) => /= /#.
+have habs : `|sval u * sval z| <= 2147483648 * 2147483648.
+- by rewrite normrM; apply IntOrder.ler_pmul; smt(IntOrder.normr_ge0).
+have habsT : `|sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q|
+    <= 2147483648 * q.
+- rewrite normrM (: `|q| = q) 1:/q //.
+  by apply IntOrder.ler_pmul; smt(IntOrder.normr_ge0).
+rewrite /W32.smod /=.
+smt().
 qed.
 
-(* -------------------------------------------------------------------- *)
-lemma reduce_coeffRE (p : wpoly) (base len plen : int) (z_ : W32.t) :
-  (reduce_coeff p base len plen z_).`2 =
-    mkseq (fun i => p.[base + i] - mmr p.[base + len + i] z_) plen.
+lemma mmr_mont (u z : W32.t) :
+  (2^32 * sval (mmr u z)) %% q = (sval u * sval z) %% q.
 proof.
-rewrite /reduce_coeff /= zip_map /= -map_comp /(\o) /=.
-by rewrite zipss -map_comp /(\o) /= -/(range 0 plen).
+have hA : W64.to_uint (u \sx z) = (sval u * sval z) %% W64.modulus.
+- by rewrite /(\sx) W64.to_uintM /sigextu64 !W64.of_uintK modzMml modzMmr.
+have hu : W32.to_uint (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449))
+    = (sval u * sval z * 58728449) %% 2^32.
+- rewrite W2u32.to_uint_truncateu32 W64.to_uintM hA W64.of_uintK.
+  rewrite modzMml modzMmr (: W64.modulus = 2^64) 1:// (: W32.modulus = 2^32) 1://.
+  by rewrite modz_dvd_pow 1://.
+have hT : sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) %% 2^32
+    = (sval u * sval z * 58728449) %% 2^32.
+- rewrite W32.to_sintE /W32.smod /=.
+  by case (2147483648 <= W32.to_uint (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449))) => _;
+       rewrite hu; smt().
+have hdvd : 2^32 %|
+    (sval u * sval z - sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q).
+- rewrite dvdzE.
+  rewrite -modzBm -(modzMml (sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449))) q) hT.
+  rewrite (modzMml (sval u * sval z * 58728449) q) modzBm.
+  have -> : sval u * sval z - sval u * sval z * 58728449 * q
+          = (sval u * sval z) * (1 - 58728449 * q) by ring.
+  rewrite -modzMmr.
+  have -> : (1 - 58728449 * q) %% W32.modulus = 0.
+  - by rewrite /q /=.
+  by rewrite /=.
+rewrite mmr_svalE.
+have -> : 2^32 * ((sval u * sval z
+      - sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q) %/ 2^32)
+  = sval u * sval z - sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q.
+- by rewrite mulzC divzK.
+rewrite -modzBm modzMl /=.
+by rewrite modz_mod.
 qed.
 
-(* -------------------------------------------------------------------- *)
-lemma reduce_coeff_sizeL (p : wpoly) (base len plen : int) (z_ : W32.t) :
-  0 <= plen => size (reduce_coeff p base len plen z_).`1 = plen.
+lemma mmr_small (u z : W32.t) :
+  2 * `|sval z| < q => `|sval (mmr u z)| < q.
 proof.
-by move=> ? @/reduce_coeff /=; rewrite size_map size_zip !size_mkseq /#.
+move=> hz.
+rewrite mmr_svalE.
+have c1 : `|sval u| <= 2147483648.
+- by have := W32.to_sint_cmp u => /= /#.
+have hsz : `|sval z| <= 4190208.
+- by move: hz; rewrite /q /#.
+have habs : `|sval u * sval z| <= 2147483648 * 4190208.
+- rewrite normrM.
+  apply IntOrder.ler_pmul.
+  - by apply IntOrder.normr_ge0.
+  - by apply IntOrder.normr_ge0.
+  - by apply c1.
+  by apply hsz.
+have c3 : `|sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449))| <= 2147483648.
+- by have := W32.to_sint_cmp (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) => /= /#.
+have hq : `|q| = q.
+- by rewrite /q.
+have habsT : `|sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q|
+    <= 2147483648 * q.
+- rewrite normrM hq.
+  apply IntOrder.ler_pmul.
+  - by apply IntOrder.normr_ge0.
+  - by rewrite /q.
+  - by apply c3.
+  by done.
+(* bound the dividend, then conclude by monotonicity of division:
+   no division reasoning is left to the provers *)
+have hDu : sval u * sval z
+    - sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q
+    <= 26995211632640000.
+- by move: habs habsT; rewrite /q /#.
+have hDl : -26995211632640000
+    <= sval u * sval z
+       - sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q.
+- by move: habs habsT; rewrite /q /#.
+have hup := leq_div2r (2^32)
+  (sval u * sval z - sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q)
+  26995211632640000 hDu _.
+- by apply expr_ge0.
+have hdn := leq_div2r (2^32) (-26995211632640000)
+  (sval u * sval z - sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q)
+  hDl _.
+- by apply expr_ge0.
+move: hup hdn.
+rewrite (: 26995211632640000 %/ 2^32 = 6285312) 1://.
+rewrite (: (-26995211632640000) %/ 2^32 = -6285313) 1://.
+move=> hup hdn.
+apply (IntOrder.ler_lt_trans 6285313).
+- rewrite IntOrder.ler_norml.
+  split.
+  - by apply hdn.
+  move=> _.
+  apply (IntOrder.ler_trans 6285312).
+  - by apply hup.
+  by done.
+by rewrite /q.
 qed.
 
-(* -------------------------------------------------------------------- *)
-lemma reduce_coeff_sizeR (p : wpoly) (base len plen : int) (z_ : W32.t) :
-  0 <= plen => size (reduce_coeff p base len plen z_).`2 = plen.
+(* bound with parametric input bounds: enough room in the 64-bit       *)
+(* product keeps the reduced output within [-q, q]                     *)
+lemma mmr_bnd2 (u z : W32.t) (B1 B2 : int) :
+  `|sval u| <= B1 => `|sval z| <= B2 => B1 * B2 <= 2^31 * q =>
+  `|sval (mmr u z)| <= q.
 proof.
-by move=> ? @/reduce_coeff /=; rewrite size_map size_zip !size_mkseq /#.
+move=> hu hz hB.
+rewrite mmr_svalE.
+have habs : `|sval u * sval z| <= 2^31 * q.
+- rewrite normrM.
+  apply (IntOrder.ler_trans (B1 * B2)); 2: by apply hB.
+  apply IntOrder.ler_pmul.
+  - by apply IntOrder.normr_ge0.
+  - by apply IntOrder.normr_ge0.
+  - by apply hu.
+  by apply hz.
+have c3 : `|sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449))| <= 2147483648.
+- by have := W32.to_sint_cmp (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) => /= /#.
+have hq : `|q| = q.
+- by rewrite /q.
+have habsT : `|sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q|
+    <= 2147483648 * q.
+- rewrite normrM hq.
+  apply IntOrder.ler_pmul.
+  - by apply IntOrder.normr_ge0.
+  - by rewrite /q.
+  - by apply c3.
+  by done.
+have hDu : sval u * sval z
+    - sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q
+    <= 2^32 * q.
+- by move: habs habsT; rewrite /q /#.
+have hDl : -(2^32 * q)
+    <= sval u * sval z
+       - sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q.
+- by move: habs habsT; rewrite /q /#.
+have hup := leq_div2r (2^32)
+  (sval u * sval z - sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q)
+  (2^32 * q) hDu _.
+- by apply expr_ge0.
+have hdn := leq_div2r (2^32) (-(2^32 * q))
+  (sval u * sval z - sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) * q)
+  hDl _.
+- by apply expr_ge0.
+move: hup hdn.
+rewrite (: 2^32 * q %/ 2^32 = q) 1:/q 1://.
+rewrite (: (-(2^32 * q)) %/ 2^32 = -q) 1:/q 1://.
+move=> hup hdn.
+rewrite IntOrder.ler_norml.
+split.
+- by apply hdn.
+move=> _.
+by apply hup.
 qed.
 
-(* -------------------------------------------------------------------- *)
-lemma reduce_coeff_flatten_size (p : wpoly) (base len : int) (z_ : W32.t) :
-  0 <= len => size (reduce_coeff_flatten p base len z_) = 2 * len.
+(* the exact reading: the low-word multiplier t makes u*z - t*q        *)
+(* divisible by 2^32, and mmr is the exact quotient                     *)
+lemma mmr_exact (u z : W32.t) : exists t,
+  -2^31 <= t < 2^31 /\ 2^32 * sval (mmr u z) = sval u * sval z - t * q.
 proof.
-move=> ?; rewrite /reduce_coeff_flatten /= size_cat.
-by rewrite !(reduce_coeff_sizeL, reduce_coeff_sizeR) //#.
+pose t := sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)).
+exists t; split.
+- by have := W32.to_sint_cmp (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) => /#.
+have hA : W64.to_uint (u \sx z) = (sval u * sval z) %% W64.modulus.
+- by rewrite /(\sx) W64.to_uintM /sigextu64 !W64.of_uintK modzMml modzMmr.
+have hu : W32.to_uint (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449))
+    = (sval u * sval z * 58728449) %% 2^32.
+- rewrite W2u32.to_uint_truncateu32 W64.to_uintM hA W64.of_uintK.
+  rewrite modzMml modzMmr (: W64.modulus = 2^64) 1:// (: W32.modulus = 2^32) 1://.
+  by rewrite modz_dvd_pow 1://.
+have hT : t %% 2^32 = (sval u * sval z * 58728449) %% 2^32.
+- rewrite /t W32.to_sintE /W32.smod /=.
+  by case (2147483648 <= W32.to_uint (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449))) => _;
+       rewrite hu; smt().
+have hdvd : 2^32 %| (sval u * sval z - t * q).
+- rewrite dvdzE -modzBm -(modzMml t q) hT (modzMml (sval u * sval z * 58728449) q) modzBm.
+  have -> : sval u * sval z - sval u * sval z * 58728449 * q
+          = (sval u * sval z) * (1 - 58728449 * q) by ring.
+  by rewrite -modzMmr (: (1 - 58728449 * q) %% W32.modulus = 0) 1:/q.
+by rewrite mmr_svalE -/t mulzC divzK.
 qed.
 
-(* -------------------------------------------------------------------- *)
-lemma reduce_coeff_size (p : wpoly) (base len plen : int) (z_ : W32.t) (r s : _) :
-     0 <= plen
-  => reduce_coeff p base len plen z_ = (r, s)
-  => size r = plen /\ size s = plen.
+(* the product bound: wide operands are fine as long as their product  *)
+(* is; with |u*z| <= P, |mmr u z| <= (P + 2^31 q) / 2^32                *)
+lemma mmr_bnd_prod (u z : W32.t) (P : int) :
+  `|sval u * sval z| <= P => 2^32 * `|sval (mmr u z)| <= P + 2^31 * q.
 proof.
-move=> ? ^ /(congr1 fst) /= <- /(congr1 snd) /= <-.
-by rewrite !(reduce_coeff_sizeL, reduce_coeff_sizeR).
+move=> hP; have [t [rgt E]] := mmr_exact u z.
+have -> : 2^32 * `|sval (mmr u z)| = `|sval u * sval z - t * q| by rewrite -E normrM.
+by move: hP rgt; rewrite /q /=; smt().
 qed.
 
-(* -------------------------------------------------------------------- *)
-lemma reduce_coeff_eqon (p q : wpoly) (base len plen : int) (z_ : W32.t) :
-     eqon p q (base      ) plen
-  => eqon p q (base + len) plen
-  => reduce_coeff p base len plen z_ = reduce_coeff q base len plen z_.
+(* 2^32 is invertible mod q (q odd): cancellation *)
+lemma cgr_pow2_cancel (a b : int) :
+  (2^32 * a) %% q = (2^32 * b) %% q => a %% q = b %% q.
 proof.
-move=> eq1 eq2 @/reduce_coeff /=.
-pose s1 := mkseq _ _; pose s2 := mkseq _ _.
-pose r1 := mkseq _ _; pose r2 := mkseq _ _.
-have [#] 2-> //: s1 = r1 /\ s2 = r2; split; apply: eq_in_mkseq => /=.
-- by move=> i *; apply/eq1 => /#.
-- by move=> i *; apply/eq2 => /#.
+move=> h.
+have e : (8265825 * 2^32) %% q = 1 by rewrite /q /=.
+have -> : a %% q = ((8265825 * 2^32) %% q * a) %% q.
+- by rewrite e /=.
+have -> : b %% q = ((8265825 * 2^32) %% q * b) %% q.
+- by rewrite e /=.
+rewrite !modzMml.
+have -> : 8265825 * 2^32 * a = 8265825 * (2^32 * a) by ring.
+have -> : 8265825 * 2^32 * b = 8265825 * (2^32 * b) by ring.
+by rewrite -modzMmr h modzMmr.
 qed.
 
-(* -------------------------------------------------------------------- *)
-lemma reduce_coeff0 (p : wpoly) (base len : int) (z : W32.t) :
-  reduce_coeff p base len 0 z = ([], []).
-proof. by rewrite /reduce_coeff /= !mkseq0. qed.
+(* the table entry of a factor x: its centered Montgomery representative *)
+op tw32 (x : int) : W32.t = W32.of_int (qcenter (mrepr x)).
 
-hint simplify reduce_coeff0.
-
-(* -------------------------------------------------------------------- *)
-lemma reduce_coeffD (p : wpoly) (base len plen1 plen2 : int) (z : W32.t) :
-     0 <= plen1
-  => 0 <= plen2
-  =>   reduce_coeff p base len (plen1 + plen2) z
-     = pairxmap (++)
-         (reduce_coeff p (base        ) len plen1 z)
-         (reduce_coeff p (base + plen1) len plen2 z).
+(* mmr against a table entry: the Montgomery factor cancels *)
+lemma mmr_table (u : W32.t) (w : int) :
+  (sval (mmr u (tw32 w)) %% q) = (sval u * w) %% q.
 proof.
-move=> *; rewrite /reduce_coeff /= !mkseq_add ~-1:// /=.
-by rewrite !zip_cat ?size_mkseq ~-1:// !map_cat /=; smt().
+apply cgr_pow2_cancel.
+rewrite mmr_mont /tw32 to_sint_qcenter.
+rewrite -(modzMmr (sval u) (qcenter (mrepr w)) q) qcenter_cgr mrepr_cgr modzMmr.
+by have -> : sval u * (w * 2^32) = 2^32 * (sval u * w) by ring.
 qed.
 
-(* -------------------------------------------------------------------- *)
-lemma reduce_partial0 (p : wpoly) (base len : int) (z_ : W32.t) :
-  reduce_partial p base len 0 z_ = p.
-proof. done. qed.
+lemma mmr_table_bnd (u : W32.t) (w : int) : `|sval (mmr u (tw32 w))| < q.
+proof. by apply mmr_small; rewrite /tw32 to_sint_qcenter qcenter_bnd. qed.
+
+
+(* ==================================================================== *)
+(* The instance of the generic tree                                     *)
+(* ==================================================================== *)
+clone include NttTreeT with
+  op q      <- q,
+  op s      <- 0,
+  op zeta_  <- zeta_,
+  type w    <- W32.t,
+  op sval   <- W32.to_sint,
+  op wmax   <- 2^31,
+  op ( + )  <- W32.( + ),
+  op ( - )  <- fun (a b : W32.t) => a - b,
+  type tw   <- W32.t,
+  op tw_of  <- tw32,
+  op mmr    <- mmr,
+  op isub   <- fun (a b : W32.t) => b - a,
+  op isgn   <- 1
+proof *.
+
+realize gt1_q by rewrite /q.
+realize odd_q by rewrite /q.
+realize rg_s by done.
+realize zeta_half by rewrite /zeta_ /q.
+realize svalD by move=> a b; apply to_sintD_small.
+realize svalB by move=> a b; apply to_sintB_small.
+realize mmr_cgr by apply mmr_table.
+realize mmr_bnd by apply mmr_table_bnd.
+realize isgnP by done.
+realize svalI by move=> a b /= h; rewrite to_sintB_small.
 
 (* -------------------------------------------------------------------- *)
-lemma eqexcept_reduce_partial (p : wpoly) (base len plen : int) (z_ : W32.t) :
-  0 <= plen =>
+(* The forward twiddles, as integers                                    *)
+op [opaque] zetaL (i : int) =
+  if 0 <= i < 8 then
+    mkseq (fun j => qcenter (mrepr (zpow (j + 2^(7-i))))) (2^(7-i))
+  else [].
 
-  forall i,
-       !(base       <= i < base       + plen)
-    => !(base + len <= i < base + len + plen)
-    => (reduce_partial p base len plen z_).[i] = p.[i].
+lemma zetaWE (k : int) : 0 <= k < 8 => zetaW k = map W32.of_int (zetaL k).
+proof. by move=> rgk; rewrite /zetaW /zetaL ifT // map_mkseq. qed.
+
+lemma reduce_levelE (p : wpoly) (k : int) : 0 <= k < 8 =>
+  reduce_level p k = reduce_n p 0 (2^k) (map W32.of_int (zetaL k)).
+proof. by move=> rgk; rewrite /reduce_level zetaWE. qed.
+
+(* -------------------------------------------------------------------- *)
+(* The instance at s = 0, with the powers of 2 computed                 *)
+lemma bitrev8_rg (x : int) : 0 <= bitrev x < 256.
+proof. by have /= := bitrev_rg x. qed.
+
+lemma zpw_256 : zpw 256 %% q = (-1) %% q.
+proof. by have /= := zpw_half. qed.
+
+lemma E_range (k j : int) :
+  0 <= k <= 8 => 0 <= j < 2^(8-k) => 0 <= E k j < 512.
 proof.
-move=> ? i * @/reduce_partial /=.
-case _: (reduce_coeff p base len plen z_) => r s E /=.
-have [??] := reduce_coeff_size _ _ _ _ _ _ _ // E.
-by rewrite !replace_eqexcept //#.
+move=> rgk rgj; have /= := bitrev_rg (j %/ 2 + 2^(7-k)).
+by rewrite /E /=; smt().
 qed.
-
-(* -------------------------------------------------------------------- *)
-lemma reduce_partialD (p : wpoly) (base len plen1 plen2) (z_ : W32.t) :
-     0 <= plen1
-  => 0 <= plen2
-  => plen1 + plen2 <= len
-  =>   reduce_partial p base len (plen1 + plen2) z_
-     = reduce_partial (reduce_partial p base len plen1 z_) (base + plen1) len plen2 z_.
-proof.
-move=> *; rewrite {1}/reduce_partial /= reduce_coeffD ~-1://.
-case _: (reduce_coeff p _ _ plen1 _) => x1 y1 E1 /=.
-case _: (reduce_coeff p _ _ plen2 _) => x2 y2 E2 /=.
-have [??] := reduce_coeff_size _ _ _ _ _ _ _ // E1.
-have [??] := reduce_coeff_size _ _ _ _ _ _ _ // E2.
-rewrite !replace_cat -[replace_ _ (base + len) y1]replace_swap 1:/#.
-(pose rp := reduce_partial p _ _ _ _) => @/reduce_partial.
-rewrite (_ : reduce_coeff rp _ _ _ _ = (x2, y2)).
-- rewrite -E2 &(reduce_coeff_eqon) /rp.
-  - by move=> i ?; rewrite eqexcept_reduce_partial //#.
-  - by move=> i ?; rewrite eqexcept_reduce_partial //#.
-by rewrite /= /rp /reduce_partial E1 /#.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma reduce_partial_swap (p : wpoly) (b1 b2 l1 l2 pl1 pl2) (z1 z2 : W32.t) :
-     0 <= pl1
-  => 0 <= pl2
-  => (forall i,
-          !(b1 <= i < b1 + pl1 \/ b1 + l1 <= i < b1 + l1 + pl1)
-       \/ !(b2 <= i < b2 + pl2 \/ b2 + l2 <= i < b2 + l2 + pl2))
-  =>  
-    reduce_partial (reduce_partial p b1 l1 pl1 z1) b2 l2 pl2 z2
-  = reduce_partial (reduce_partial p b2 l2 pl2 z2) b1 l1 pl1 z1.
-proof.
-move=> + + indep.
-move/lez_eqVlt => -[<<-|?]; first by rewrite !reduce_partial0.
-move/lez_eqVlt => -[<<-|?]; first by rewrite !reduce_partial0.
-rewrite {1}/reduce_partial;
-  (pose r1 := reduce_coeff _ _ _ _ _) => /=; apply/eq_sym.
-rewrite {1}/reduce_partial;
-  (pose r2 := reduce_coeff _ _ _ _ _) => /=; apply/eq_sym.
-have -> {r1}: r1 = reduce_coeff p b2 l2 pl2 z2.
-- apply: reduce_coeff_eqon => /= i rgi; move/(_ i): indep => ?.
-  - smt(eqexcept_reduce_partial).
-  - smt(eqexcept_reduce_partial).
-have -> {r2}: r2 = reduce_coeff p b1 l1 pl1 z1.
-- apply: reduce_coeff_eqon => /= i rgi; move/(_ i): indep => ?.
-  - smt(eqexcept_reduce_partial).
-  - smt(eqexcept_reduce_partial).
-pose r1 := reduce_coeff p b1 l1 pl1 z1.
-pose r2 := reduce_coeff p b2 l2 pl2 z2.
-rewrite /reduce_partial /= -/r1 -/r2.
-rewrite !(replaceC _ _ _ r2.`1).
-- by rewrite !(reduce_coeff_sizeL, reduce_coeff_sizeR) /#.
-- by rewrite !(reduce_coeff_sizeL, reduce_coeff_sizeR) /#.
-rewrite 2?(replaceC _ _ _ r2.`2).
-- by rewrite !(reduce_coeff_sizeL, reduce_coeff_sizeR) /#.
-- by rewrite !(reduce_coeff_sizeL, reduce_coeff_sizeR) /#.
-done.
-qed.
-
-(* -------------------------------------------------------------------- *)
-op [opaque] reduce (p : wpoly) (base len : int) (z_ : W32.t) : wpoly =
-  replace_ p base (reduce_coeff_flatten p base len z_).
-
-(* -------------------------------------------------------------------- *)
-lemma reduce_as_partial (p : wpoly) (base len : int) (z_ : W32.t) :
-  0 <= len => reduce p base len z_ = reduce_partial p base len len z_.
-proof.
-move=> *; rewrite /reduce /reduce_coeff_flatten /reduce_partial /=.
-pose r := reduce_coeff _ _ _ _ _; rewrite replace_cat.
-by rewrite reduce_coeff_sizeL //#.
-qed.
-
-(* -------------------------------------------------------------------- *)
-op reduce_n (p : wpoly) (base len : int) (zs : W32.t list) =
-  foldl
-    (fun p i => reduce p (base + i * 2 * len) len (nth witness zs i))
-    p (range 0 (size zs)).
-
-(* -------------------------------------------------------------------- *)
-op reduce_level (p : wpoly) (i : int) =
-  reduce_n p 0 (2^i) (map W32.of_int (zetaL i)).
-
-(* -------------------------------------------------------------------- *)
-op reduce_tree (p : wpoly) (i : int) =
-  foldr (fun i p => reduce_level p i) p (range i 8).
-
-(* -------------------------------------------------------------------- *)
-lemma reduce_0 (p : wpoly) (base len : int) :
-  reduce_n p base len [] = p.
-proof. by rewrite /reduce_n /= range_geq. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma reduce_seq1 (p : wpoly) (base len : int) (z : W32.t) :
-  reduce_n p base len [z] = reduce p base len z.
-proof. by rewrite /reduce_n /= (rangeS 0). qed.
-
-(* -------------------------------------------------------------------- *)
-lemma reduce_seq2 (p : wpoly) (base len : int) (z1 z2 : W32.t) :
-    reduce_n p base len [z1; z2]
-  = reduce (reduce p base len z1) (base + 2 * len) len z2.
-proof. by rewrite /reduce_n /range /= -iotaredE. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma reduce_n_cat (p : wpoly) (base len : int) (zs1 zs2 : W32.t list) :
-    reduce_n p base len (zs1 ++ zs2)
-  = reduce_n (reduce_n p base len zs1) (base + 2 * len * size zs1) len zs2.
-proof.
-rewrite {1}/reduce_n size_cat (range_cat (size zs1)) ~-1:#smt:(size_ge0).
-rewrite (range_addl 0 _ (size zs1)) addrAC /= foldl_cat.
-rewrite foldl_map &(eq_in_foldl) //=; last first.
-- by apply/eq_in_foldl=> //= w i /mem_range rgi; smt(nth_cat).
-- by move=> w i /mem_range rgi; smt(nth_cat).
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma reduce_rcons (p : wpoly) (base len : int) (zs : W32.t list) (z : W32.t) :
-    reduce_n p base len (rcons zs z)
-  = reduce (reduce_n p base len zs) (base + 2 * len * size zs) len z.
-proof. by rewrite -cats1 reduce_n_cat reduce_seq1. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma reduce_nE (p : wpoly) (base len : int) (zs : W32.t list) : 0 <= len =>
-    reduce_n p base len zs
-  = replace_ p base (flatten (
-      mkseq
-      (fun i => reduce_coeff_flatten p (base + 2 * i * len) len (nth witness zs i))
-      (size zs))).
-proof.
-move=> ?; elim: zs p base => /= [|z zs ih] p base.
-- by rewrite reduce_0 mkseq0.
-rewrite -cat1s reduce_n_cat reduce_seq1.
-rewrite [1+_]addzC mkseqSr 1:size_ge0 /(\o) /=.
-rewrite flatten_cons replace_cat -/(reduce _ _ _ _).
-rewrite reduce_coeff_flatten_size // ih; do 2! congr.
-apply: eq_in_mkseq=> i rgi /=; rewrite ifF 1:/#.
-rewrite mulrDr /= mulrDl addrA /reduce_coeff_flatten.
-pose r1 := reduce_coeff _ _ _ _ _.
-pose r2 := reduce_coeff _ _ _ _ _.
-suff ->: r1 = r2 by done.
-rewrite &(reduce_coeff_eqon) reduce_as_partial //.
-- smt(eqexcept_reduce_partial).
-- smt(eqexcept_reduce_partial).
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma reduce_tree_step (p : wpoly) (n : int) : n < 8 =>
-  reduce_tree p n = reduce_level (reduce_tree p (n + 1)) n.
-proof. by move=> ?; rewrite {1}/reduce_tree (range_ltn) 1:// /=. qed.
 
 (* -------------------------------------------------------------------- *)
 type player = {
@@ -501,243 +600,6 @@ elim: n => [|n ge0_n ih] ? /=; first by rewrite reduce_partial0 mkseq0.
 rewrite mulrDr /= reduce_partialD ~-1:/#.
 rewrite mkseqS ~-1:// /= /reduce_players foldl_rcons.
 by rewrite -/(reduce_players _ _) -ih /#.
-qed.
-
-(* ==================================================================== *)
-(* ==================================================================== *)
-(* Inverse (Gentleman-Sande) butterfly, mirror of Nttspec.reduce.       *)
-(* Code (invert_ntt_round): with a = coeffs_i, b = coeffs_{i+len},      *)
-(*   coeffs_i        <- a + b                                            *)
-(*   coeffs_{i+len}  <- mmr (b - a) z                                    *)
-(* ==================================================================== *)
-op ireduce_coeff (p : wpoly) (base len plen : int) (z_ : W32.t) =
-  let p1 = mkseq (fun i => p.[base       + i]) plen in
-  let p2 = mkseq (fun i => p.[base + len + i]) plen in
-  let r1 = map (fun (w : W32.t * W32.t) => w.`1 + w.`2)       (zip p1 p2) in
-  let r2 = map (fun (w : W32.t * W32.t) => mmr (w.`2 - w.`1) z_) (zip p1 p2) in
-  (r1, r2).
-
-(* -------------------------------------------------------------------- *)
-op ireduce_coeff_flatten (p : wpoly) (base len : int) (z_ : W32.t) =
-  let r = ireduce_coeff p base len len z_ in
-  r.`1 ++ r.`2.
-
-(* -------------------------------------------------------------------- *)
-op ireduce_partial (p : wpoly) (base len plen : int) (z_ : W32.t) : wpoly =
-  let r = ireduce_coeff p base len plen z_ in
-  let p = replace_ p base r.`1 in
-  let p = replace_ p (base + len) r.`2 in
-  p.
-
-(* ==================================================================== *)
-lemma ireduce_coeffLE (p : wpoly) (base len plen : int) (z_ : W32.t) :
-  (ireduce_coeff p base len plen z_).`1 =
-    mkseq (fun i => p.[base + i] + p.[base + len + i]) plen.
-proof.
-hint +listred.
-rewrite /ireduce_coeff /= zip_map /= -map_comp /(\o) /=.
-by rewrite zipss -map_comp /(\o) /= -/(range 0 plen).
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_coeffRE (p : wpoly) (base len plen : int) (z_ : W32.t) :
-  (ireduce_coeff p base len plen z_).`2 =
-    mkseq (fun i => mmr (p.[base + len + i] - p.[base + i]) z_) plen.
-proof.
-hint +listred.
-rewrite /ireduce_coeff /= zip_map /= -map_comp /(\o) /=.
-by rewrite zipss -map_comp /(\o) /= -/(range 0 plen).
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_coeff_sizeL (p : wpoly) (base len plen : int) (z_ : W32.t) :
-  0 <= plen => size (ireduce_coeff p base len plen z_).`1 = plen.
-proof.
-hint +listred.
-by move=> ? @/ireduce_coeff /=; rewrite size_zip !size_mkseq /#.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_coeff_sizeR (p : wpoly) (base len plen : int) (z_ : W32.t) :
-  0 <= plen => size (ireduce_coeff p base len plen z_).`2 = plen.
-proof.
-hint +listred.
-by move=> ? @/ireduce_coeff /=; rewrite size_zip !size_mkseq /#.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_coeff_flatten_size (p : wpoly) (base len : int) (z_ : W32.t) :
-  0 <= len => size (ireduce_coeff_flatten p base len z_) = 2 * len.
-proof.
-hint +listred.
-move=> ?; rewrite /ireduce_coeff_flatten /= size_cat.
-by rewrite !(ireduce_coeff_sizeL, ireduce_coeff_sizeR) //#.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_coeff_size (p : wpoly) (base len plen : int) (z_ : W32.t) (r s : _) :
-     0 <= plen
-  => ireduce_coeff p base len plen z_ = (r, s)
-  => size r = plen /\ size s = plen.
-proof.
-hint +listred.
-move=> ? ^ /(congr1 fst) /= <- /(congr1 snd) /= <-.
-by rewrite !(ireduce_coeff_sizeL, ireduce_coeff_sizeR).
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_coeff_eqon (p q : wpoly) (base len plen : int) (z_ : W32.t) :
-     eqon p q (base      ) plen
-  => eqon p q (base + len) plen
-  => ireduce_coeff p base len plen z_ = ireduce_coeff q base len plen z_.
-proof.
-hint +listred.
-move=> eq1 eq2 @/ireduce_coeff /=.
-pose s1 := mkseq _ _; pose s2 := mkseq _ _.
-pose r1 := mkseq _ _; pose r2 := mkseq _ _.
-have [#] 2-> //: s1 = r1 /\ s2 = r2; split; apply: eq_in_mkseq => /=.
-- by move=> i *; apply/eq1 => /#.
-- by move=> i *; apply/eq2 => /#.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_coeff0 (p : wpoly) (base len : int) (z : W32.t) :
-  ireduce_coeff p base len 0 z = ([], []).
-proof. hint +listred. by rewrite /ireduce_coeff /=. qed.
-
-hint simplify ireduce_coeff0.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_coeffD (p : wpoly) (base len plen1 plen2 : int) (z : W32.t) :
-     0 <= plen1
-  => 0 <= plen2
-  =>   ireduce_coeff p base len (plen1 + plen2) z
-     = pairxmap (++)
-         (ireduce_coeff p (base        ) len plen1 z)
-         (ireduce_coeff p (base + plen1) len plen2 z).
-proof.
-hint +listred.
-move=> *; rewrite /ireduce_coeff /= !mkseq_add ~-1:// /=.
-by rewrite !zip_cat ?size_mkseq ~-1:// !map_cat /=; smt().
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_partial0 (p : wpoly) (base len : int) (z_ : W32.t) :
-  ireduce_partial p base len 0 z_ = p.
-proof. hint +listred. done. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma eqexcept_ireduce_partial (p : wpoly) (base len plen : int) (z_ : W32.t) :
-  0 <= plen =>
-
-  forall i,
-       !(base       <= i < base       + plen)
-    => !(base + len <= i < base + len + plen)
-    => (ireduce_partial p base len plen z_).[i] = p.[i].
-proof.
-hint +listred.
-move=> ? i * @/ireduce_partial /=.
-case _: (ireduce_coeff p base len plen z_) => r s E /=.
-have [??] := ireduce_coeff_size _ _ _ _ _ _ _ // E.
-by rewrite !replace_eqexcept //#.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_partialD (p : wpoly) (base len plen1 plen2) (z_ : W32.t) :
-     0 <= plen1
-  => 0 <= plen2
-  => plen1 + plen2 <= len
-  =>   ireduce_partial p base len (plen1 + plen2) z_
-     = ireduce_partial (ireduce_partial p base len plen1 z_) (base + plen1) len plen2 z_.
-proof.
-hint +listred.
-move=> *; rewrite {1}/ireduce_partial /= ireduce_coeffD ~-1://.
-case _: (ireduce_coeff p _ _ plen1 _) => x1 y1 E1 /=.
-case _: (ireduce_coeff p _ _ plen2 _) => x2 y2 E2 /=.
-have [??] := ireduce_coeff_size _ _ _ _ _ _ _ // E1.
-have [??] := ireduce_coeff_size _ _ _ _ _ _ _ // E2.
-rewrite !replace_cat -[replace_ _ (base + len) y1]replace_swap 1:/#.
-(pose rp := ireduce_partial p _ _ _ _) => @/ireduce_partial.
-rewrite (_ : ireduce_coeff rp _ _ _ _ = (x2, y2)).
-- rewrite -E2 &(ireduce_coeff_eqon) /rp.
-  - by move=> i ?; rewrite eqexcept_ireduce_partial //#.
-  - by move=> i ?; rewrite eqexcept_ireduce_partial //#.
-by rewrite /= /rp /ireduce_partial E1 /#.
-qed.
-
-(* -------------------------------------------------------------------- *)
-op [opaque] ireduce (p : wpoly) (base len : int) (z_ : W32.t) : wpoly =
-  replace_ p base (ireduce_coeff_flatten p base len z_).
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_as_partial (p : wpoly) (base len : int) (z_ : W32.t) :
-  0 <= len => ireduce p base len z_ = ireduce_partial p base len len z_.
-proof.
-hint +listred.
-move=> *; rewrite /ireduce /ireduce_coeff_flatten /ireduce_partial /=.
-pose r := ireduce_coeff _ _ _ _ _; rewrite replace_cat.
-by rewrite ireduce_coeff_sizeL //#.
-qed.
-
-(* -------------------------------------------------------------------- *)
-op ireduce_n (p : wpoly) (base len : int) (zs : W32.t list) =
-  foldl
-    (fun p i => ireduce p (base + i * 2 * len) len (nth witness zs i))
-    p (range 0 (size zs)).
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_n0 (p : wpoly) (base len : int) :
-  ireduce_n p base len [] = p.
-proof. hint +listred. by rewrite /ireduce_n /=. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_seq1 (p : wpoly) (base len : int) (z : W32.t) :
-  ireduce_n p base len [z] = ireduce p base len z.
-proof. hint +listred. by rewrite /ireduce_n /=. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_n_cat (p : wpoly) (base len : int) (zs1 zs2 : W32.t list) :
-    ireduce_n p base len (zs1 ++ zs2)
-  = ireduce_n (ireduce_n p base len zs1) (base + 2 * len * size zs1) len zs2.
-proof.
-hint +listred.
-rewrite {1}/ireduce_n size_cat (range_cat (size zs1)) ~-1:#smt:(size_ge0).
-rewrite (range_addl 0 _ (size zs1)) addrAC /= foldl_cat.
-rewrite foldl_map &(eq_in_foldl) //=; last first.
-- by apply/eq_in_foldl=> //= w i /mem_range rgi; smt(nth_cat).
-- by move=> w i /mem_range rgi; smt(nth_cat).
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma ireduce_rcons (p : wpoly) (base len : int) (zs : W32.t list) (z : W32.t) :
-    ireduce_n p base len (rcons zs z)
-  = ireduce (ireduce_n p base len zs) (base + 2 * len * size zs) len z.
-proof. hint +listred. by rewrite -cats1 ireduce_n_cat ireduce_seq1. qed.
-
-(* ==================================================================== *)
-(* ==================================================================== *)
-lemma ireduce_nE (p : wpoly) (base len : int) (zs : W32.t list) : 0 <= len =>
-    ireduce_n p base len zs
-  = replace_ p base (flatten (
-      mkseq
-      (fun i => ireduce_coeff_flatten p (base + 2 * i * len) len (nth witness zs i))
-      (size zs))).
-proof.
-hint +listred.
-move=> ?; elim: zs p base => /= [|z zs ih] p base.
-- by rewrite ireduce_n0.
-rewrite -cat1s ireduce_n_cat ireduce_seq1.
-rewrite [1+_]addzC mkseqSr 1:size_ge0 /(\o) /=.
-rewrite replace_cat -/(ireduce _ _ _ _).
-rewrite ireduce_coeff_flatten_size // ih; do 2! congr.
-apply: eq_in_mkseq=> i rgi /=; rewrite ifF 1:/#.
-rewrite mulrDr /= mulrDl addrA /ireduce_coeff_flatten.
-pose r1 := ireduce_coeff _ _ _ _ _.
-pose r2 := ireduce_coeff _ _ _ _ _.
-suff ->: r1 = r2 by done.
-rewrite &(ireduce_coeff_eqon) ireduce_as_partial //.
-- smt(eqexcept_ireduce_partial).
-- smt(eqexcept_ireduce_partial).
 qed.
 
 (* ==================================================================== *)

@@ -23,11 +23,6 @@ op q : int = 8380417.
 (* -------------------------------------------------------------------- *)
 op zeta_ : int = 1753.
 
-op bitrev8 (i : int) : int =
-  bs2int (rev (int2bs 8 i)).
-
-op zpow (i : int) = (zeta_ ^ bitrev8 i) %% q.
-
 op qcenter (x : int) : int =    (* FIXME: factor out *)
   let x = x %% q in
   if q %/ 2 < x then x - q else x.
@@ -35,7 +30,3 @@ op qcenter (x : int) : int =    (* FIXME: factor out *)
 op mrepr (x : int) : int =
   (x * 2^32) %% q.
 
-op [opaque] zetaL (i : int) =
-  if 0 <= i < 8 then
-    mkseq (fun j => qcenter (mrepr (zpow (j + 2^(7-i))))) (2^(7-i))
-  else [].

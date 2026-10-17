@@ -991,6 +991,12 @@ op ireduce_coeff_flatten (p : wpoly) (base len : int) (z_ : tw) =
   let r = ireduce_coeff p base len len z_ in
   r.`1 ++ r.`2.
 
+op ireduce_partial (p : wpoly) (base len plen : int) (z_ : tw) : wpoly =
+  let r = ireduce_coeff p base len plen z_ in
+  let p = replace_ p base r.`1 in
+  let p = replace_ p (base + len) r.`2 in
+  p.
+
 op [opaque] ireduce (p : wpoly) (base len : int) (z_ : tw) : wpoly =
   replace_ p base (ireduce_coeff_flatten p base len z_).
 
@@ -1051,6 +1057,80 @@ have [#] 2-> //: s1 = r1 /\ s2 = r2; split; apply: eq_in_mkseq => /=.
 - by move=> i *; apply/eq2 => /#.
 qed.
 
+lemma ireduce_coeff_size (p : wpoly) (base len plen : int) (z_ : tw) (r s : _) :
+     0 <= plen
+  => ireduce_coeff p base len plen z_ = (r, s)
+  => size r = plen /\ size s = plen.
+proof.
+move=> ? ^ /(congr1 fst) /= <- /(congr1 snd) /= <-.
+by rewrite !(ireduce_coeff_sizeL, ireduce_coeff_sizeR).
+qed.
+
+lemma ireduce_coeff0 (p : wpoly) (base len : int) (z : tw) :
+  ireduce_coeff p base len 0 z = ([], []).
+proof. by rewrite /ireduce_coeff /= !mkseq0. qed.
+
+hint simplify ireduce_coeff0.
+
+lemma ireduce_coeffD (p : wpoly) (base len plen1 plen2 : int) (z : tw) :
+     0 <= plen1
+  => 0 <= plen2
+  =>   ireduce_coeff p base len (plen1 + plen2) z
+     = pairxmap (++)
+         (ireduce_coeff p (base        ) len plen1 z)
+         (ireduce_coeff p (base + plen1) len plen2 z).
+proof.
+move=> *; rewrite /ireduce_coeff /= !mkseq_add ~-1:// /=.
+by rewrite !zip_cat ?size_mkseq ~-1:// !map_cat /=; smt().
+qed.
+
+lemma ireduce_partial0 (p : wpoly) (base len : int) (z_ : tw) :
+  ireduce_partial p base len 0 z_ = p.
+proof. done. qed.
+
+lemma eqexcept_ireduce_partial (p : wpoly) (base len plen : int) (z_ : tw) :
+  0 <= plen =>
+
+  forall i,
+       !(base       <= i < base       + plen)
+    => !(base + len <= i < base + len + plen)
+    => (ireduce_partial p base len plen z_).[i] = p.[i].
+proof.
+move=> ? i * @/ireduce_partial /=.
+case _: (ireduce_coeff p base len plen z_) => r s E /=.
+have [??] := ireduce_coeff_size _ _ _ _ _ _ _ // E.
+by rewrite !replace_eqexcept //#.
+qed.
+
+lemma ireduce_partialD (p : wpoly) (base len plen1 plen2) (z_ : tw) :
+     0 <= plen1
+  => 0 <= plen2
+  => plen1 + plen2 <= len
+  =>   ireduce_partial p base len (plen1 + plen2) z_
+     = ireduce_partial (ireduce_partial p base len plen1 z_) (base + plen1) len plen2 z_.
+proof.
+move=> *; rewrite {1}/ireduce_partial /= ireduce_coeffD ~-1://.
+case _: (ireduce_coeff p _ _ plen1 _) => x1 y1 E1 /=.
+case _: (ireduce_coeff p _ _ plen2 _) => x2 y2 E2 /=.
+have [??] := ireduce_coeff_size _ _ _ _ _ _ _ // E1.
+have [??] := ireduce_coeff_size _ _ _ _ _ _ _ // E2.
+rewrite !replace_cat -[replace_ _ (base + len) y1]replace_swap 1:/#.
+(pose rp := ireduce_partial p _ _ _ _) => @/ireduce_partial.
+rewrite (_ : ireduce_coeff rp _ _ _ _ = (x2, y2)).
+- rewrite -E2 &(ireduce_coeff_eqon) /rp.
+  - by move=> i ?; rewrite eqexcept_ireduce_partial //#.
+  - by move=> i ?; rewrite eqexcept_ireduce_partial //#.
+by rewrite /= /rp /ireduce_partial E1 /#.
+qed.
+
+lemma ireduce_as_partial (p : wpoly) (base len : int) (z_ : tw) :
+  0 <= len => ireduce p base len z_ = ireduce_partial p base len len z_.
+proof.
+move=> *; rewrite /ireduce /ireduce_coeff_flatten /ireduce_partial /=.
+pose r := ireduce_coeff _ _ _ _ _; rewrite replace_cat.
+by rewrite ireduce_coeff_sizeL //#.
+qed.
+
 lemma ireduce_n0 (p : wpoly) (base len : int) : ireduce_n p base len [] = p.
 proof. by rewrite /ireduce_n /= range_geq. qed.
 
@@ -1068,6 +1148,11 @@ rewrite foldl_map &(eq_in_foldl) //=; last first.
 - by apply/eq_in_foldl=> //= x i /mem_range rgi; smt(nth_cat).
 - by move=> x i /mem_range rgi; smt(nth_cat).
 qed.
+
+lemma ireduce_rcons (p : wpoly) (base len : int) (zs : tw list) (z : tw) :
+    ireduce_n p base len (rcons zs z)
+  = ireduce (ireduce_n p base len zs) (base + 2 * len * size zs) len z.
+proof. by rewrite -cats1 ireduce_n_cat ireduce_seq1. qed.
 
 lemma ireduce_out (p : wpoly) (base len : int) (z : tw) (i : int) :
   0 <= len => 0 <= i < 256 => ! (base <= i < base + 2 * len) =>

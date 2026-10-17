@@ -1,7 +1,8 @@
 # The algebraic layer: status and plan
 
-The int-level development (`nttalg.ec`, `fnttalg.ec`, `inttalg.ec`)
-is deliberately elementary: statements are integer congruences
+The int-level development (the generic tree `core/ntt/NttTree.ec`,
+instantiated in `nttspec.ec`, and `inttalg.ec`) is deliberately
+elementary: statements are integer congruences
 (`x %% q`) and the polynomial residues exist only through their
 closed-form coefficient sums (`nttsum`).  The algebraic layer links
 those untouched proofs to a polynomial view *in the ambient logic*,

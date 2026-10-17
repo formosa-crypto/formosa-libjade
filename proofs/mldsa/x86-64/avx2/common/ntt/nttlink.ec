@@ -1,7 +1,7 @@
 (**
-  The link between the integer-level NTT development (`Nttalg`,
-  `Fnttalg`, `Inttalg`) and the closed-form transforms of the
-  specification (`Spec.Rq`).
+  The link between the integer-level NTT development (the generic tree
+  instantiated in `Nttspec`, and `Inttalg`) and the closed-form
+  transforms of the specification (`Spec.Rq`).
 
   Read through `lifts_wpoly`, the integer congruences become equations
   in Zq:
@@ -26,7 +26,7 @@ from Jasmin require import JWord.
 require import Array256.
 
 (* -------------------------------------------------------------------- *)
-require import Nttspec Nttzetas Nttalg Fnttalg Inttalg.
+require import Nttspec Nttzetas Inttalg.
 
 from Spec require import Parameters GFq Rq MLDSA_W32_Rep.
 (*---*) import Round ZModQ Zq PolyReduce.BasePoly.BigCf.BCA.
@@ -53,7 +53,7 @@ proof. by move=> rgi; rewrite /lifts_wpoly mapiE. qed.
 (* the implementation evaluates at exactly the specification's points *)
 lemma E0_nttexp (j : int) : 0 <= j < 256 => E 0 j = nttexp j.
 proof.
-move=> rgj; rewrite /E /nttexp /br (_ : Nttlogspec.bitrev8 = BitReverse.bsrev 8) //=.
+move=> rgj; rewrite /E /nttexp /br (_ : bitrev = BitReverse.bsrev 8) //=.
 rewrite (BitReverse.bsrev_cat 1 8 j) //= (BitReverse.bsrev_cat 7 8 (j %/ 2 + 128)) //=.
 rewrite (_ : (j %/ 2 + 128) %/ 128 = 1) 1:/# -(BitReverse.bsrev_mod 7 (j %/ 2 + 128)) /=.
 rewrite (_ : (j %/ 2 + 128) %% 128 = j %/ 2) 1:/# BitReverse.bsrev1 //.
@@ -65,10 +65,9 @@ qed.
 
 (* the closed-form sum of the integer development is the spec's NTT *)
 lemma nttsum_link (p : W32.t Array256.t) (j : int) : 0 <= j < 256 =>
-    incoeff (BIA.bigi predT (fun s => zpw (E 0 j * s) * sval p.[s]) 0 256)
-  = (ntt (lifts_wpoly p)).[j].
+  incoeff (nttsum p 0 j 0) = (ntt (lifts_wpoly p)).[j].
 proof.
-move=> rgj; rewrite incoeff_sum /ntt initiE //= E0_nttexp //.
+move=> rgj; rewrite /nttsum /= incoeff_sum /ntt initiE //= E0_nttexp //.
 apply eq_big_int => s rgs /=.
 by rewrite incoeffM incoeff_zpw lifts_wpolyE // ZModpRing.mulrC.
 qed.
@@ -83,7 +82,8 @@ lemma ntt_link (p : W32.t Array256.t) (B : int) :
 proof.
 move=> ge0B hB hbnd; have [hb hs] := ntt_alg p B ge0B hB hbnd.
 split=> //; apply/Array256.ext_eq => j rgj.
-by rewrite lifts_wpolyE // -nttsum_link // -eq_incoeff /coeffcgr hs.
+have /= hj := hs j 0 _ _; 1,2: smt().
+by rewrite lifts_wpolyE // -nttsum_link // -eq_incoeff /coeffcgr hj.
 qed.
 
 (* ==================================================================== *)
@@ -106,8 +106,7 @@ move=> leqB hB hbnd.
 pose u := invntt (lifts_wpoly v).
 have hv : forall i, 0 <= i < 256 =>
   sval v.[i] %% q = nttsum (unlift_poly u) 0 i 0 %% q.
-- move=> i rgi; rewrite /nttsum /=.
-  rewrite eq_incoeff (nttsum_link (unlift_poly u)) //.
+- move=> i rgi; rewrite eq_incoeff (nttsum_link (unlift_poly u)) //.
   by rewrite lifts_unlift /u nttK lifts_wpolyE.
 have [hb hs] := intt_ntt_alg (unlift_poly u) v B leqB hB hbnd hv.
 split=> //; apply/Array256.ext_eq => i rgi.
@@ -145,7 +144,7 @@ lemma pwmul_link (a b : W32.t Array256.t) :
 proof.
 apply/Array256.ext_eq => i rgi.
 rewrite /liftm_wpoly scaleE // basemulE // !lifts_wpolyE // /pwmul initiE //=.
-by rewrite /mont -!incoeffM -eq_incoeff /coeffcgr mmr_cgr.
+by rewrite /mont -!incoeffM -eq_incoeff /coeffcgr mmr_mont.
 qed.
 
 (* two operands below 9q in magnitude give a reduced product *)

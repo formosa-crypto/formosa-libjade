@@ -21,7 +21,7 @@ from Jasmin require import JWord JArray JModel_x86.
 require import MldsaConstants.
 require Parameters MldsaT.
 require import Array256.
-require import Nttlogspec Nttspec Nttzetas Nttalg Fnttalg Inttalg.
+require import Nttlogspec Nttspec Nttzetas Inttalg.
 require import Crspoly.
 require import Nttpoly.
 require import Fnttcorrect Inttcorrect Pwmulcorrect.
