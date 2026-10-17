@@ -11,6 +11,14 @@ param int MLKEM_ETA2 = 2;
 param int MLKEM_POLYBYTES = 384; /* 256*12/8 */
 param int MLKEM_POLYVECBYTES = (MLKEM_K * MLKEM_POLYBYTES);
 
+/* compressed sizes: d_v bits per coefficient of v, d_u of u */
+param int MLKEM_POLYCOMPRESSEDBYTES = (MLKEM_N * MLKEM_DV) / 8;
+param int MLKEM_POLYVECCOMPRESSEDBYTES = MLKEM_K * ((MLKEM_N * MLKEM_DU) / 8);
+
+/* the 11-bit compression of u stores 8-byte words: it writes 2 bytes past
+   its output, into the compressed v that is written afterwards */
+param int MLKEM_POLYVECCOMPRESSEDPAD = 2 * (MLKEM_DU - 10);
+
 param int MLKEM_INDCPA_MSGBYTES = MLKEM_SYMBYTES;
 param int MLKEM_INDCPA_PUBLICKEYBYTES = MLKEM_POLYVECBYTES + MLKEM_SYMBYTES;
 param int MLKEM_INDCPA_SECRETKEYBYTES = MLKEM_POLYVECBYTES;

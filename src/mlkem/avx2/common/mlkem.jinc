@@ -1,5 +1,6 @@
 require "indcpa.jinc"
-require "../common/verify.jinc"
+require "verify.jinc"
+require "mlkem_keccak_sized.jinc"
 
 #[safety =
    { requires = is_arr_init(randomnessp,0,MLKEM_SYMBYTES*2)
@@ -40,7 +41,7 @@ fn __crypto_kem_keypair_jazz
 
   #spill(sk);
   hpk = sk[MLKEM_POLYVECBYTES + MLKEM_PUBLICKEYBYTES:32];
-  hpk = _sha3_256A_A1568(hpk, pk);
+  hpk = _sha3_256A_APK(hpk, pk);
   #unspill(sk);
   randomnessp = s_randomnessp;
   ms = #init_msf();
@@ -76,7 +77,7 @@ fn __crypto_kem_enc_jazz(
   reg u256 b = randomnessp[#unaligned:u256 0];
   buf[:u256 0] = b;
 
-  buf[MLKEM_SYMBYTES:MLKEM_SYMBYTES] = _sha3_256A_A1568(buf[MLKEM_SYMBYTES:MLKEM_SYMBYTES], pk);
+  buf[MLKEM_SYMBYTES:MLKEM_SYMBYTES] = _sha3_256A_APK(buf[MLKEM_SYMBYTES:MLKEM_SYMBYTES], pk);
 
   kr = _sha3_512A_A64(kr, buf);
 
@@ -100,11 +101,11 @@ fn __crypto_kem_enc_jazz(
    }
  ]
 inline
-fn __crypto_kem_dec_jazz
-( reg ptr u8[MLKEM_SYMBYTES] shk
-, reg ptr u8[MLKEM_CIPHERTEXTBYTES] ct
-, reg ptr u8[MLKEM_SECRETKEYBYTES] sk
-) -> reg ptr u8[MLKEM_SYMBYTES]
+fn __crypto_kem_dec_jazz(
+  reg ptr u8[MLKEM_SYMBYTES] shk,
+  reg ptr u8[MLKEM_CIPHERTEXTBYTES] ct,
+  reg ptr u8[MLKEM_SECRETKEYBYTES] sk)
+  -> reg ptr u8[MLKEM_SYMBYTES]
 {
   stack u8[MLKEM_INDCPA_CIPHERTEXTBYTES] ctc;
   stack u8[2*MLKEM_SYMBYTES] kr buf;
@@ -148,7 +149,7 @@ fn __crypto_kem_dec_jazz
   }
 
   /* fixme: should this be done in memory? */
-  shk = _shake256_A32__A1600(shk, zp_ct);
+  shk = _shake256_A32__AZCT(shk, zp_ct);
 
   #unspill(cnd);
   shk = __cmov(shk, kr[0:MLKEM_SYMBYTES], cnd);

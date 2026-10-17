@@ -778,6 +778,9 @@ seq 2 1 : (#pre /\
          move : (matrix_unlift (trmx (sampleA rho{2}))); smt().
 
 
+(* K = 3: the noise layout of the parameter set *)
+rcondt{1} 1; first by auto.
+
 (* === Step 3: first getnoise_4x call.  Samples (nonce 0,1,2,3) →
      sp_0 slots 0,1,2 (rv side) + ep slot 0 (e1 first poly).
      LHS: nonce<-0; getnoise; 4 slot inits = 6 stmts.  RHS: 0 stmts.
@@ -1350,6 +1353,9 @@ seq 2 1 : (#pre /\ aa{1} = nttunpackm (unlift_matrix a{2}) /\
     last by smt(Array768.allP).
   rewrite nttunpackv_pred allP => kk kkb /=; rewrite /subarray768 initiE 1:/# /=.
   by smt(matrix_unlift).
+
+(* K = 3: the noise layout of the parameter set *)
+rcondt{1} 1; first by auto.
 
 seq 6 0 : (#pre /\
   (forall i, 0 <= i < 3 =>

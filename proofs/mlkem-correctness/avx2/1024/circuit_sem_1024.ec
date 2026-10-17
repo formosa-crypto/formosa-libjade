@@ -432,7 +432,7 @@ lemma vpmaddwd_alt_corr (f0 shift2 : W256.t) :
    (forall i, 0 <= i < 16 => 0<= to_sint (f0 \bits16 i) < 2^11) =>
    VPMADDWD_256 f0 shift2 = VPMADDWD_alt f0 shift2.
 + move => /= H;rewrite /VPMADDWD_256 /VPMADDWD_alt /=. 
-  case (shift2 = VPBROADCAST_4u64 pvc_shift2_s);2: by auto. 
+  case (shift2 = VPBROADCAST_4u64 pvc_shift2_s_du11);2: by auto. 
   move => -> /=; rewrite /VPBROADCAST_4u64 /= -!(iotaredE) /=. 
   pose f00 := (f0 \bits16 0).
   pose f01 := (f0 \bits16 1).

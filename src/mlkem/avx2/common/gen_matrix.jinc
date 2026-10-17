@@ -1,4 +1,5 @@
 require "mlkem_keccak_avx2.jinc"
+require "gen_matrix_globals.jinc"
 
 // BUF_size per entry: 21(rate) + 21(rate) + 25(keccak_state) + 1(pad)
 param int BUF_size = 536; // 168*2+200      (was in u64s: 3*21 + 4 + 1; //544 bytes;
@@ -525,4 +526,63 @@ inline fn __gen_matrix_sample_one_polynomial
   pol, buf = __gen_matrix_fill_polynomial(pol, buf);
 
   return pol, buf;
+}
+
+#[safety =
+   { requires = is_arr_init(rho,0,32) && 0<= transposed && transposed <= 1
+   , ensures = is_arr_init(matrix,0,MLKEM_K * MLKEM_K * MLKEM_N * 2)
+   }
+ ]
+fn _gen_matrix_avx2
+( reg mut ptr u16[MLKEM_K * MLKEM_K * MLKEM_N] matrix
+, reg const ptr u8[32] rho
+, reg u64 transposed
+) -> reg ptr u16[MLKEM_K * MLKEM_K * MLKEM_N]
+{
+  // local variables
+  inline int i j;
+  stack u8[BUF_size * 4] buf_s;
+  reg ptr u8[BUF_size * 4] buf;
+  reg ptr u16[4*MLKEM_N] polx4;
+  reg ptr u16[MLKEM_N] pol;
+  reg u64 pos_entry;
+  reg u16 rc;
+  #[msf] reg u64 ms;
+
+  () = #spill(transposed);
+
+  buf = buf_s;
+
+  // the entries four at a time, ...
+  for i = 0 to (MLKEM_K * MLKEM_K) / 4
+  {
+    pos_entry = 8*i;
+    #spill(matrix,rho);
+    polx4 = matrix[4*i*MLKEM_N:4*MLKEM_N];
+    () = #unspill(transposed);
+    polx4, buf = _gen_matrix_sample_four_polynomials(polx4, buf, rho, pos_entry, transposed);
+    #unspill(matrix,rho);
+    ms = #init_msf();
+    matrix[i*4*MLKEM_N:4*MLKEM_N] = polx4;
+  }
+
+  // ... and the last one, (K-1,K-1), using single-lane code when K is odd
+  if ((MLKEM_K * MLKEM_K) % 4 == 1) {
+    #spill(matrix);
+    pol = matrix[(MLKEM_K * MLKEM_K - 1)*MLKEM_N:MLKEM_N];
+    rc = (MLKEM_K - 1) * 0x0101;
+    pol, buf[BUF_size * 0 : BUF_size] = __gen_matrix_sample_one_polynomial(pol, buf[BUF_size * 0 : BUF_size], rho, rc);
+
+    #unspill(matrix);
+    ms = #init_msf();
+    matrix[(MLKEM_K * MLKEM_K - 1)*MLKEM_N:MLKEM_N] = pol;
+  }
+
+  for i = 0 to MLKEM_K
+  { for j = 0 to MLKEM_K
+    { matrix[i*MLKEM_VECN+j*MLKEM_N:MLKEM_N] = _nttunpack(matrix[i*MLKEM_VECN+j*MLKEM_N:MLKEM_N]);
+    }
+  }
+
+  return matrix;
 }

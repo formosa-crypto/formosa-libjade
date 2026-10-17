@@ -185,7 +185,7 @@ clone KeccakArrayRef as A1568ref
       proof _ASIZE_ge0 by done.
 
 equiv a1568__absorb_eq:
- M.a1568____absorb ~ A1568ref.MM.__absorb
+ M.aPK____absorb ~ A1568ref.MM.__absorb
  : ={arg} ==> ={res}
  by sim.
 
@@ -200,7 +200,7 @@ clone KeccakArrayRef as A1600ref
       proof _ASIZE_ge0 by done.
 
 equiv a1600__absorb_eq:
- M.a1600____absorb ~ A1600ref.MM.__absorb
+ M.aZCT____absorb ~ A1600ref.MM.__absorb
  : ={arg} ==> ={res}
  by sim.
 
@@ -375,7 +375,7 @@ module K = {
     );
     return (st, buf);
   }
-  proc _sha3_256A_A1568 (out:W8.t Array32.t, in_0:W8.t Array1568.t) : 
+  proc _sha3_256A_APK (out:W8.t Array32.t, in_0:W8.t Array1568.t) : 
   W8.t Array32.t = {
     var st:W64.t Array25.t;
     var  _0:int;
@@ -387,7 +387,7 @@ module K = {
     ( _1, out) <@ A32ref.MM.__squeeze (st, out, 136);
     return out;
   }
-  proc _shake256_A32__A1600 (out:W8.t Array32.t, in_0:W8.t Array1600.t) : 
+  proc _shake256_A32__AZCT (out:W8.t Array32.t, in_0:W8.t Array1600.t) : 
   W8.t Array32.t = {
     var st:W64.t Array25.t;
     var  _0:int;
@@ -625,7 +625,7 @@ from JazzEC require import Array1568.
 
 (*********************************************************************************)
 equiv sha3_256A_A1568_eq:
-  Jkem_avx2.M._sha3_256A_A1568 ~ K._sha3_256A_A1568
+  Jkem_avx2.M._sha3_256A_APK ~ K._sha3_256A_APK
  : ={arg} ==> ={res}.
 proof.
 proc; inline{1} M.__KECCAK_F.
@@ -634,7 +634,7 @@ by sim.
 qed.
 
 hoare sha3_256A_A1568_h' _in:
- K._sha3_256A_A1568
+ K._sha3_256A_APK
  : arg.`2 = _in 
  ==> 
    res = SHA3_256_1568_32
@@ -655,7 +655,7 @@ rewrite (:1568=1536+32) 1:// mkseq_add 1..2://; congr.
 by apply eq_in_mkseq => k Hk /=; rewrite initiE /#.
 qed.
 
-lemma sha3_256A_A1568_ll: islossless K._sha3_256A_A1568.
+lemma sha3_256A_A1568_ll: islossless K._sha3_256A_APK.
 proof.
 proc.
 call A32ref.squeeze_ll.
@@ -665,7 +665,7 @@ by auto => />.
 qed.
 
 phoare sha3_256A_A1568_ph' _in:
- [ K._sha3_256A_A1568
+ [ K._sha3_256A_APK
  : arg.`2 = _in 
  ==> 
    res = SHA3_256_1568_32
@@ -675,7 +675,7 @@ phoare sha3_256A_A1568_ph' _in:
 proof. by conseq sha3_256A_A1568_ll (sha3_256A_A1568_h' _in). qed.
 
 phoare sha3_256A_M1568_ph (inp : W8.t Array1568.t):
- [ Jkem_avx2.M._sha3_256A_A1568
+ [ Jkem_avx2.M._sha3_256A_APK
  : arg.`2 = inp 
  ==> 
    res = SHA3_256_1568_32
@@ -694,7 +694,7 @@ from JazzEC require import Array1408 Array160.
 
 (*********************************************************************************)
 equiv shake256_A32__A1600_eq:
-  M._shake256_A32__A1600 ~ K._shake256_A32__A1600
+  M._shake256_A32__AZCT ~ K._shake256_A32__AZCT
  : ={arg, Glob.mem} ==> ={res, Glob.mem}.
 proof.
 proc; inline{1} M.__KECCAK_F.
@@ -703,7 +703,7 @@ by sim.
 qed.
 
 hoare shake256_A32__A1600_h' _in:
- K._shake256_A32__A1600
+ K._shake256_A32__AZCT
  : arg.`2=_in
  ==>
    res = SHAKE_256_1600_32
@@ -732,7 +732,7 @@ rewrite (:1600=32+1408+160) 1:// !mkseq_add 1..4:/#; congr.
 by apply eq_in_mkseq => k Hk /=; rewrite initiE /#.
 qed.
 
-lemma shake256_A32__A1600_ll: islossless K._shake256_A32__A1600.
+lemma shake256_A32__A1600_ll: islossless K._shake256_A32__AZCT.
 proof.
 proc.
 call A32ref.squeeze_ll.
@@ -742,7 +742,7 @@ by auto.
 qed.
 
 phoare shake256_A32__A1600_ph' _in:
- [ K._shake256_A32__A1600
+ [ K._shake256_A32__AZCT
  : arg.`2=_in
  ==>
    res = SHAKE_256_1600_32
@@ -755,7 +755,7 @@ by conseq shake256_A32__A1600_ll (shake256_A32__A1600_h' _in).
 qed.
 
 phoare shake256_A32_A1600_ph (_in : W8.t Array1600.t):
- [ Jkem_avx2.M._shake256_A32__A1600
+ [ Jkem_avx2.M._shake256_A32__AZCT
  : arg.`2=_in
  ==> res = SHAKE_256_1600_32 
                (init (fun (k : int) => _in.[k]))%Array32

@@ -806,6 +806,9 @@ seq 2 1 : (#pre /\
              have [??] := (matrix_unlift (trmx (sampleA rho{2}))); do split;smt().
 
 
+(* K = 4: the noise layout of the parameter set *)
+rcondf{1} 1; first by auto.
+
 (* === Step 3: first getnoise_4x call (1024: fills sp_0 cleanly, no boundary).
      TODO 1024: structure differs from 768 — first call fills sp_0[0..3] entirely
      (4 polys), no e1 first-slot crossover. *)
@@ -1341,6 +1344,9 @@ seq 2 1 : (#pre /\ aa{1} = nttunpackm (unlift_matrix a{2}) /\
     last by smt(Array1024.allP).
   rewrite nttunpackv_pred allP => kk kkb /=; rewrite /subarray1024 initiE 1:/# /=.
   by smt(matrix_unlift).
+
+(* K = 4: the noise layout of the parameter set *)
+rcondf{1} 1; first by auto.
 
 (* === Step 3a: first getnoise_4x — 1024 fills skpv[0..3] cleanly.
      TODO 1024: 4-poly clean fill, no e[0] boundary. *)

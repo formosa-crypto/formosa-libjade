@@ -1,5 +1,34 @@
 require "mlkem_keccak_avx2.jinc"
 
+/* the input sizes of the ML-KEM-768/1024 hashes */
+namespace A1184 {
+  param int _ASIZE = 1184;
+  from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
+}
+
+namespace A1568 {
+  param int _ASIZE = 1568;
+  from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
+}
+
+namespace A1120 {
+  param int _ASIZE = 1120;
+  from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
+}
+
+namespace A1600 {
+  param int _ASIZE = 1600;
+  from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
+}
+
 //
 //
 // FOR TESTING!!!

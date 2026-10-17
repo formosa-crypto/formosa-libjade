@@ -1,0 +1,71 @@
+/* SHA3-256 and SHAKE256 on the parameter-dependent input sizes: the
+   public key (H(pk)) and z || ciphertext (the implicit-rejection key) */
+require "mlkem_keccak_avx2.jinc"
+
+namespace APK {
+  param int _ASIZE = MLKEM_PUBLICKEYBYTES;
+  from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
+}
+
+namespace AZCT {
+  param int _ASIZE = MLKEM_SYMBYTES + MLKEM_CIPHERTEXTBYTES;
+  from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
+}
+
+#[safety =
+   { requires = is_arr_init(in,0,MLKEM_PUBLICKEYBYTES)
+   , ensures = is_arr_init(out,0,32)
+   }
+ ]
+fn _sha3_256A_APK
+( #[spill_to_mmx] reg mut ptr u8[32] out
+, #[spill_to_mmx] reg const ptr u8[MLKEM_PUBLICKEYBYTES] in
+) -> reg ptr u8[32]
+{ inline int KECCAK_F;
+  stack u64[25] st;
+  reg u256[7] state;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  if (KECCAK_F == KECCAK_F1600_AVX2) {
+    state = __state_init_avx2();
+    state, _ = APK::__absorb_avx2(state, 0, in, SHA3, R136);
+    _, out = A32::__squeeze_avx2(state, out, R136);
+  } else {
+    #spill(out);
+    st = __state_init(st);
+    st, _ = APK::__absorb(st, 0, in, SHA3, R136);
+    #unspill(out);
+    _, out = A32::__squeeze(st, out, R136);
+  }
+  return out;
+}
+
+#[ safety =
+   { requires = is_arr_init(in,0,MLKEM_SYMBYTES + MLKEM_CIPHERTEXTBYTES)
+   , ensures = is_arr_init(out,0,32)
+   }
+ ]
+fn _shake256_A32__AZCT
+(  #[spill_to_mmx] reg mut ptr u8[32] out
+,  reg const ptr u8[MLKEM_SYMBYTES + MLKEM_CIPHERTEXTBYTES] in
+) -> reg ptr u8[32]
+{ inline int KECCAK_F;
+  stack u64[25] st;
+  reg u256[7] state;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  if (KECCAK_F == KECCAK_F1600_AVX2) {
+    state = __state_init_avx2();
+    state, _ = AZCT::__absorb_avx2(state, 0, in, SHAKE, R136);
+    _, out = A32::__squeeze_avx2(state, out, R136);
+  } else {
+    #spill(out);
+    st = __state_init(st);
+    st, _ = AZCT::__absorb(st, 0, in, SHAKE, R136);
+    #unspill(out);
+    _, out = A32::__squeeze(st, out, R136);
+  }
+  return out;
+}

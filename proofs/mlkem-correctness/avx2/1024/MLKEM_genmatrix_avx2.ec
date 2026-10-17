@@ -479,6 +479,9 @@ phoare _gen_matrix_avx2_sem _sd b :
                                              else nttunpackm (unlift_matrix (sampleA _sd)) ] = 1%r.
 proof.
 proc => /=. 
+(* K = 4: four batches of four entries *)
+cfold 6; rcondf 8; first by auto.
+wp 9.
 while (0<=i<=4 /\ rho = _sd /\ 
     ((forall kk, 0 <= kk < i => subarray1024 matrix kk = nttunpackv (subarray1024 (unlift_matrix (if b then trmx (sampleA _sd) else (sampleA _sd))) kk))) /\
      (forall kk, i <= kk < 4 => subarray1024 matrix kk = (subarray1024 (unlift_matrix (if b then trmx (sampleA _sd) else (sampleA _sd))) kk))) (kvec-i).
@@ -570,7 +573,7 @@ case (1024 <= k && k < 2048).
   + by move =>? kbb;rewrite -H0 1:/# /subarray1024 initiE 1:/# /=.  
 by move =>?? kbb;rewrite -H0 1:/# /subarray1024 initiE 1:/# /=.
 
-unroll for 6.
+unroll for 7.
 wp;call (sample_four _sd 12 b _).
 wp;call (sample_four _sd 8 b _).
 wp;call (sample_four _sd 4 b _).

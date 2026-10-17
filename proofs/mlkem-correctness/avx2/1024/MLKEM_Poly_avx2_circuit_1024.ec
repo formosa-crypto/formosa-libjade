@@ -27,21 +27,21 @@ import W12.
 abbrev encode5 (a : ipoly) : W8.t Array160.t = Array160.of_list W8.zero (ByteEncode 5 (to_list a)).
 
 
-lemma poly_decompress_ll : islossless Jkem_avx2.M._i_poly_decompress.
+lemma poly_decompress_dv5_ll : islossless Jkem_avx2.M._i_poly_decompress_dv5.
  proc; inline *;wp. cfold 5; unroll for ^while;auto. 
 qed.
 
-lemma poly_decompress_corr_h (_a : W8.t Array160.t): 
-    hoare [Jkem_avx2.M._i_poly_decompress  :
+lemma poly_decompress_dv5_corr_h (_a : W8.t Array160.t): 
+    hoare [Jkem_avx2.M._i_poly_decompress_dv5  :
               arg.`2 = _a
               ==>
              lift_array256 res = decompress_poly 5 (decode5 _a) /\
              pos_bound256_cxq res 0 256 1 ].
 proc; inline *.
 proc change 1: { q <- BSWAS_16u16_256.sliceget jqx16 0;} ; 1: by auto; move => &1 &2 ?; rewrite BSWAS_16u16_256_slicegetE /#.
-proc change 2: { shufbidx <- BSWAS_32u8_256.sliceget pd_jshufbidx 0; }; 1: by auto; move => &1 &2 ?; rewrite BSWAS_32u8_256_slicegetE /#.
-proc change 3: { mask <- BSWAS_16u16_256.sliceget pd_mask_s 0;} ; 1: by auto; move => &1 &2 ?; rewrite BSWAS_16u16_256_slicegetE /#.
-proc change 4: { shift <- BSWAS_16u16_256.sliceget pd_shift_s 0; } ; 1: by auto; move => &1 &2 ?; rewrite BSWAS_16u16_256_slicegetE /#.
+proc change 2: { shufbidx <- BSWAS_32u8_256.sliceget pd_jshufbidx_dv5 0; }; 1: by auto; move => &1 &2 ?; rewrite BSWAS_32u8_256_slicegetE /#.
+proc change 3: { mask <- BSWAS_16u16_256.sliceget pd_mask_s_dv5 0;} ; 1: by auto; move => &1 &2 ?; rewrite BSWAS_16u16_256_slicegetE /#.
+proc change 4: { shift <- BSWAS_16u16_256.sliceget pd_shift_s_dv5 0; } ; 1: by auto; move => &1 &2 ?; rewrite BSWAS_16u16_256_slicegetE /#.
 proc change ^while.1 : { t <- zeroextu128 (if (0 <= (10*i)*8 <= 160*8-64) then BSWAS_160u8_64.sliceget a ((10*i)*8) else get64_direct (WArray160.init8 (fun (i_0 : int) => a.[i_0])) (10*i)); };
 1: by auto; move => &1 &2 [#] -> ->; case (0 <= (10 * i{2}) * 8 <= 160*8-64); [ move => ?; rewrite BSWAS_160u8_64_slicegetE /# | by auto ].
 proc change ^while.10 : { rp <- if (0 <= (32*i)*8 <= 256*16-256) then BSWAS_256u16_256.sliceset rp ((32*i)*8) f else Array256.init (fun (i0:int) => WArray512.get16 (WArray512.set256 (WArray512.init16 (fun (i_0 : int) => rp.[i_0])) i f) i0) ; };
@@ -73,15 +73,15 @@ qed.
 
 (********** END BDEP PROOF OF DECOMPRESS **************)
 
-lemma poly_decompress_corr (_a : W8.t Array160.t): 
-    phoare [Jkem_avx2.M._i_poly_decompress  :
+lemma poly_decompress_dv5_corr (_a : W8.t Array160.t): 
+    phoare [Jkem_avx2.M._i_poly_decompress_dv5  :
               arg.`2 = _a
               ==>
              lift_array256 res = decompress_poly 5 (decode5 _a) /\
              pos_bound256_cxq res 0 256 1 ] = 1%r
-  by conseq poly_decompress_ll (poly_decompress_corr_h _a).
+  by conseq poly_decompress_dv5_ll (poly_decompress_dv5_corr_h _a).
 
-lemma i_poly_compress_corr_ll : islossless Jkem_avx2.M._i_poly_compress.
+lemma i_poly_compress_dv5_corr_ll : islossless Jkem_avx2.M._i_poly_compress_dv5.
 proof.
 proc; inline *.
 cfold 13.
@@ -89,8 +89,8 @@ do 2!(unroll for ^while).
 auto.
 qed.
 
-lemma i_poly_compress_corr_h _aw  : 
-    hoare [Jkem_avx2.M._i_poly_compress  :
+lemma i_poly_compress_dv5_corr_h _aw  : 
+    hoare [Jkem_avx2.M._i_poly_compress_dv5  :
              pos_bound256_cxq a 0 256 2 /\
              a = _aw
               ==>
@@ -104,7 +104,7 @@ proc change ^while.1: { r <- if (0 <= (32*i0)*8 <= 256*16-256) then BSWAS_256u16
 proc change ^while.9: { rp0 <- if (0 <= (32*i0)*8 <= 256*16-256) then BSWAS_256u16_256.sliceset rp0 ((32*i0)*8) r else Array256.init (fun (i1:int) => WArray512.get16 (WArray512.set256 (WArray512.init16 (fun (i_0 : int) => rp0.[i_0])) i0 r) i1) ; };
 1: by auto; move => &1 &2 [#] _ _ -> -> ->; case (0 <= (32*i0{2})*8 <= 256*16-256); [ move => ?; rewrite BSWAS_256u16_256_slicesetE // | by auto ].
 proc change 6: { v <- BSWAS_16u16_256.sliceget jvx16 0; }; 1: by auto; move => &1 &2 ?; rewrite BSWAS_16u16_256_slicegetE /#.
-proc change 12: { shufbidx <- BSWAS_32u8_256.sliceget pc_shufbidx_s 0; }; 1: by auto; move => &1 &2 ?; rewrite BSWAS_32u8_256_slicegetE /#.
+proc change 12: { shufbidx <- BSWAS_32u8_256.sliceget pc_shufbidx_s_dv5 0; }; 1: by auto; move => &1 &2 ?; rewrite BSWAS_32u8_256_slicegetE /#.
 proc change ^while{2}.1: { f0 <- if (0 <= (32*(2*i))*8 <= 256*16-256) then BSWAS_256u16_256.sliceget a ((32*(2*i))*8) else get256_direct (WArray512.init16 (fun (i_0 : int) => a.[i_0])) (32*(2*i)) ; };
 1: by auto; move => &1 &2 [#] -> ->; case (0 <= (32*(2*i{2}))*8 <= 256*16-256); [ move => ?; rewrite BSWAS_256u16_256_slicegetE /# | by auto ].
 proc change ^while{2}.2: { f1 <- if (0 <= (32*(2*i+1))*8 <= 256*16-256) then BSWAS_256u16_256.sliceget a ((32*(2*i+1))*8) else get256_direct (WArray512.init16 (fun (i_0 : int) => a.[i_0])) (32*(2*i+1)) ; };
@@ -144,11 +144,32 @@ qed.
 
 (********** END BDEP PROOF OF COMPRESS **************)
 
+lemma i_poly_compress_dv5_corr _aw  : 
+    phoare [Jkem_avx2.M._i_poly_compress_dv5  :
+             pos_bound256_cxq a 0 256 2 /\
+             a = _aw
+              ==>
+             res.`1 = encode5 (compress_poly 5 (lift_array256 _aw)) 
+             ] = 1%r
+ by conseq i_poly_compress_dv5_corr_ll (i_poly_compress_dv5_corr_h _aw).
+
+(* ==================================================================== *)
+(* The dispatchers, at d_v = 5 *)
+(* ==================================================================== *)
+
+lemma poly_decompress_corr (_a : W8.t Array160.t): 
+    phoare [Jkem_avx2.M._i_poly_decompress  :
+              arg.`2 = _a
+              ==>
+             lift_array256 res = decompress_poly 5 (decode5 _a) /\
+             pos_bound256_cxq res 0 256 1 ] = 1%r.
+proof. by proc; rcondf 1; [auto | call (poly_decompress_dv5_corr _a); auto]. qed.
+
 lemma i_poly_compress_corr _aw  : 
     phoare [Jkem_avx2.M._i_poly_compress  :
              pos_bound256_cxq a 0 256 2 /\
              a = _aw
               ==>
              res.`1 = encode5 (compress_poly 5 (lift_array256 _aw)) 
-             ] = 1%r
- by conseq i_poly_compress_corr_ll (i_poly_compress_corr_h _aw).
+             ] = 1%r.
+proof. by proc; rcondf 1; [auto | call (i_poly_compress_dv5_corr _aw); auto]. qed.

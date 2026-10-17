@@ -493,6 +493,9 @@ phoare _gen_matrix_avx2_sem _sd b :
                                              else nttunpackm (unlift_matrix (sampleA _sd)) ] = 1%r.
 proof.
 proc => /=. 
+(* K = 3: two batches of four entries, then the last one alone *)
+cfold 6; rcondt 8; first by auto.
+wp 16.
 while (0<=i<=3 /\ rho = _sd /\ 
     ((forall kk, 0 <= kk < i => subarray768 matrix kk = nttunpackv (subarray768 (unlift_matrix (if b then trmx (sampleA _sd) else (sampleA _sd))) kk))) /\
      (forall kk, i <= kk < 3 => subarray768 matrix kk = (subarray768 (unlift_matrix (if b then trmx (sampleA _sd) else (sampleA _sd))) kk))) (kvec-i).

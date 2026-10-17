@@ -102,21 +102,21 @@ lemma polyvec_csubq_avx2_corr (_aw : W16.t Array768.t):
 (********** END BDEP PROOF OF CSUBQ **************)
 
 
-lemma polyvec_decompress_ll :
-   islossless Jkem_avx2.M.__i_polyvec_decompress.
+lemma polyvec_decompress_du10_ll :
+   islossless Jkem_avx2.M.__i_polyvec_decompress_du10.
 by proc;inline *;unroll for ^while; do 3!(cfold ^inc<-; unroll for ^while);auto.
 qed.
 (********** BEGIN BDEP PROOF OF DECOMPRESS **************)
 
-lemma polyvec_decompress_corr_h (_aw : W8.t Array960.t):
-    hoare[ Jkem_avx2.M.__i_polyvec_decompress :
+lemma polyvec_decompress_du10_corr_h (_aw : W8.t Array960.t):
+    hoare[ Jkem_avx2.M.__i_polyvec_decompress_du10 :
              Array960.init (fun i => rp.[i]) = _aw ==> pos_bound768_cxq res 0 768 1 /\ lift_polyvec res = decompress_polyvec 10 (decode10_vec _aw)].
 proc; inline *.
-proc change 3: { shufbidx <- BSWAS_32u8_256.sliceget pvd_shufbdidx_s 0;}; 1: by auto; move => &1 &2 ?; rewrite BSWAS_32u8_256_slicegetE /#.
+proc change 2: { shufbidx <- BSWAS_32u8_256.sliceget pvd_shufbdidx_s_du10 0;}; 1: by auto; move => &1 &2 ?; rewrite BSWAS_32u8_256_slicegetE /#.
 proc change ^while.^while.1 : {f <- if (0 <= (320*k+20*i)*8 <= 1088*8-256) then BSWAS_1088u8_256.sliceget rp ((320*k + 20*i)*8) else get256_direct (WArray1088.init8 (fun (i_0 : int) => rp.[i_0])) (320*k+20*i) ;};
-1: by auto; move => &1 &2 [#] _ -> -> ->; case (0 <= (320*k{2}+20*i{2})*8 <= 1088*8-256); [ move => ?; rewrite BSWAS_1088u8_256_slicegetE /# | by auto ].
+1: by auto; move => &1 &2 [#] -> -> ->; case (0 <= (320*k{2}+20*i{2})*8 <= 1088*8-256); [ move => ?; rewrite BSWAS_1088u8_256_slicegetE /# | by auto ].
 proc change ^while.^while.8 : {r <- if (0 <= (32*(16*k+i))*8 <= 16*768-256) then BSWAS_768u16_256.sliceset r ((32*(16*k+i))*8) f else Array768.init (fun (i0:int) => WArray1536.get16 (WArray1536.set256 (WArray1536.init16 (fun (i_0 : int) => r.[i_0])) (16*k+i) f) i0) ;};
-1: by auto; move => &1 &2 [#] _ -> -> -> ->; case (0 <= (32*(16*k{2}+i{2}))*8 <= 16*768-256); [ move => ?; rewrite BSWAS_768u16_256_slicesetE // | by auto ].
+1: by auto; move => &1 &2 [#] -> -> -> ->; case (0 <= (32*(16*k{2}+i{2}))*8 <= 16*768-256); [ move => ?; rewrite BSWAS_768u16_256_slicesetE // | by auto ].
 unroll for ^while.
 cfold ^inc<-.
 do 3!(unroll for ^while).
@@ -153,10 +153,10 @@ qed.
 
 
 
-lemma polyvec_decompress_corr (_aw : W8.t Array960.t):
-    phoare[ Jkem_avx2.M.__i_polyvec_decompress :
+lemma polyvec_decompress_du10_corr (_aw : W8.t Array960.t):
+    phoare[ Jkem_avx2.M.__i_polyvec_decompress_du10 :
              Array960.init (fun i => rp.[i]) = _aw ==> pos_bound768_cxq res 0 768 1 /\ lift_polyvec res = decompress_polyvec 10 (decode10_vec _aw)] = 1%r
- by conseq polyvec_decompress_ll (polyvec_decompress_corr_h _aw).
+ by conseq polyvec_decompress_du10_ll (polyvec_decompress_du10_corr_h _aw).
 
 (********** BEGIN BDEP PROOF OF COMPRESS  **************)
 
@@ -184,12 +184,12 @@ proc __i_polyvec_compress(rp : W8.t Array960.t, a : W16.t Array768.t) : W8.t Arr
     x16p <- jvx16;
     v <- get256 (WArray32.init16 (fun (i_0 : int) => x16p.[i_0])) 0;
     v8 <- VPSLL_16u16 v (W128.of_int 3);
-    off <- VPBROADCAST_16u16 pc_mask_s;
-    shift1 <- VPBROADCAST_16u16 pvc_shift1_s;
-    mask <- VPBROADCAST_16u16 pvc_mask_s;
-    shift2 <- VPBROADCAST_4u64 pvc_shift2_s;
-    sllvdidx <- VPBROADCAST_4u64 pvc_sllvdidx_s;
-    shufbidx <- get256 (WArray32.init8 (fun (i_0 : int) => pvc_shufbidx_s.[i_0])) 0;
+    off <- VPBROADCAST_16u16 pvc_off_s_du10;
+    shift1 <- VPBROADCAST_16u16 pvc_shift1_s_du10;
+    mask <- VPBROADCAST_16u16 pvc_mask_s_du10;
+    shift2 <- VPBROADCAST_4u64 pvc_shift2_s_du10;
+    sllvdidx <- VPBROADCAST_4u64 pvc_sllvdidx_s_du10;
+    shufbidx <- get256 (WArray32.init8 (fun (i_0 : int) => pvc_shufbidx_s_du10.[i_0])) 0;
     inc <- 3 * 256 %/ 16;
     i <- 0;
     while (i < inc){
@@ -249,7 +249,7 @@ proc change ^while.6: { r <- BSWA_768u16.init (fun (i_0 : int) => if 256 * i0 <=
 proc change 7: { v <- BSWAS_16u16_256.sliceget x16p 0;}; 1: by auto; move => &1 &2 ?; rewrite BSWAS_16u16_256_slicegetE /#.
 proc change ^while{2}.1: {f0 <- if (0 <= (32*i)*8 <= 768*16-256) then BSWAS_768u16_256.sliceget a ((32*i)*8) else get256_direct (WArray1536.init16 (fun (i_0 : int) => a.[i_0])) (32*i) ;};
 1: by auto; move => &1 &2 [#] -> ->; case (0 <= (32*i{2})*8 <= 768*16-256); [ move => ?; rewrite BSWAS_768u16_256_slicegetE /# | by auto ].
-proc change 14: { shufbidx <- BSWAS_32u8_256.sliceget pvc_shufbidx_s 0;}; 1: by auto; move => &1 &2 ?; rewrite BSWAS_32u8_256_slicegetE /#.
+proc change 14: { shufbidx <- BSWAS_32u8_256.sliceget pvc_shufbidx_s_du10 0;}; 1: by auto; move => &1 &2 ?; rewrite BSWAS_32u8_256_slicegetE /#.
 proc change ^while{2}.19 : { rp <- if (0 <= 20*i*8 <= 8*960-128) then BSWAS_960u8_128.sliceset rp (20*i*8) t0 else Array960.init (WArray960.get8 (WArray960.set128_direct (WArray960.init8 (fun (i_0 : int) => rp.[i_0])) (20*i) t0)) ;};
 1: by auto; move => &1 &2 [#] -> -> ->; case (0 <= 20*i{2}*8 <= 8*960-128); [ move => ?; rewrite BSWAS_960u8_128_slicesetE // | by auto ].
 proc change ^while{2}.20 : { rp <- if (0 <= (20*i+16)*8 <= 8*960-32) then BSWAS_960u8_32.sliceset rp ((20*i+16)*8) (truncateu32 t1) else Array960.init (WArray960.get8 (WArray960.set32_direct (WArray960.init8 (fun (i_0 : int) => rp.[i_0])) (20*i+16) (VPEXTR_32 t1 W8.zero))) ;};
@@ -294,13 +294,13 @@ lemma auxcompress10_corr (_aw : W16.t Array768.t):
   by conseq auxcompress10_ll (auxcompress10_corr_h _aw).
 
 
-lemma polyvec_compress_avx2_ll : islossless Jkem_avx2.M.__i_polyvec_compress.
+lemma polyvec_compress_du10_ll : islossless Jkem_avx2.M.__i_polyvec_compress_du10.
 proc. cfold 12. unroll for ^while; wp => /=. 
 inline *;unroll for ^while; do 3!(unroll for ^while);auto.
 qed.
 
-lemma polyvec_compress_avx2_corr (_aw : W16.t Array768.t):
-    phoare[ Jkem_avx2.M.__i_polyvec_compress  :
+lemma polyvec_compress_du10_corr (_aw : W16.t Array768.t):
+    phoare[ Jkem_avx2.M.__i_polyvec_compress_du10  :
              a = _aw /\
              pos_bound768_cxq a 0 768 2 ==> 
       res  = encode10_vec (compress_polyvec 10 (lift_polyvec _aw))] = 1%r.
@@ -805,3 +805,20 @@ lemma signed_bound768_cxq_small r (i j:int) :
   i <= j => signed_bound768_cxq r 0 768 i => signed_bound768_cxq r 0 768 j.
 rewrite /signed_bound768_cxq => />Hij H k Hk1 Hk2. move :(H k). rewrite Hk1 Hk2 => />. smt(). qed.
 
+(* ==================================================================== *)
+(* The dispatchers, at d_u = 10 *)
+(* ==================================================================== *)
+
+lemma polyvec_decompress_corr (_aw : W8.t Array960.t):
+    phoare[ Jkem_avx2.M.__i_polyvec_decompress :
+             Array960.init (fun i => rp.[i]) = _aw
+             ==> pos_bound768_cxq res 0 768 1 /\
+                 lift_polyvec res = decompress_polyvec 10 (decode10_vec _aw)] = 1%r.
+proof. by proc; rcondt 1; [auto | call (polyvec_decompress_du10_corr _aw); auto]. qed.
+
+lemma polyvec_compress_avx2_corr (_aw : W16.t Array768.t):
+    phoare[ Jkem_avx2.M.__i_polyvec_compress  :
+             a = _aw /\
+             pos_bound768_cxq a 0 768 2 ==> 
+      res  = encode10_vec (compress_polyvec 10 (lift_polyvec _aw))] = 1%r.
+proof. by proc; rcondt 1; [auto | call (polyvec_compress_du10_corr _aw); auto]. qed.

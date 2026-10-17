@@ -1,4 +1,5 @@
-require "mlkem.jinc"
+require "params.jinc"
+require "../common/mlkem.jinc"
 
 #[safety =
    { requires = is_arr_init(coins,0,2*MLKEM_SYMBYTES)

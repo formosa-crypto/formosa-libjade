@@ -1,6 +1,7 @@
 require "params.jinc"
 require "poly.jinc"
 require "polyvec.jinc"
+require "compress.jinc"
 require "gen_matrix.jinc"
 
 #[safety =
@@ -50,11 +51,21 @@ fn __indcpa_keypair
   transposed = 0;
   aa = _gen_matrix_avx2(aa, publicseed, transposed);
 
-  nonce = 0;
-  skpv[0:MLKEM_N], skpv[MLKEM_N:MLKEM_N], skpv[2*MLKEM_N:MLKEM_N], skpv[3*MLKEM_N:MLKEM_N] = _poly_getnoise_eta1_4x(skpv[0:MLKEM_N], skpv[MLKEM_N:MLKEM_N], skpv[2*MLKEM_N:MLKEM_N], skpv[3*MLKEM_N:MLKEM_N], noiseseed, nonce);
+  // the K + K noise polynomials s, e, four at a time; with K = 3, the
+  // last two lanes are discarded (into pkpv, overwritten below)
+  if (MLKEM_K == 3) {
+    nonce = 0;
+    skpv[0:MLKEM_N], skpv[MLKEM_N:MLKEM_N], skpv[2*MLKEM_N:MLKEM_N], e[0:MLKEM_N] = _poly_getnoise_eta1_4x(skpv[0:MLKEM_N], skpv[MLKEM_N:MLKEM_N], skpv[2*MLKEM_N:MLKEM_N], e[0:MLKEM_N], noiseseed, nonce);
 
-  nonce = 4;
-  e[0:MLKEM_N], e[MLKEM_N:MLKEM_N], e[2*MLKEM_N:MLKEM_N], e[3*MLKEM_N:MLKEM_N] = _poly_getnoise_eta1_4x(e[0:MLKEM_N], e[MLKEM_N:MLKEM_N], e[2*MLKEM_N:MLKEM_N], e[3*MLKEM_N:MLKEM_N], noiseseed, nonce);
+    nonce = 4;
+    e[MLKEM_N:MLKEM_N], e[2*MLKEM_N:MLKEM_N], pkpv[0:MLKEM_N], pkpv[MLKEM_N:MLKEM_N] = _poly_getnoise_eta1_4x(e[MLKEM_N:MLKEM_N], e[2*MLKEM_N:MLKEM_N], pkpv[0:MLKEM_N], pkpv[MLKEM_N:MLKEM_N], noiseseed, nonce);
+  } else {
+    nonce = 0;
+    skpv[0:MLKEM_N], skpv[MLKEM_N:MLKEM_N], skpv[2*MLKEM_N:MLKEM_N], skpv[3*MLKEM_N:MLKEM_N] = _poly_getnoise_eta1_4x(skpv[0:MLKEM_N], skpv[MLKEM_N:MLKEM_N], skpv[2*MLKEM_N:MLKEM_N], skpv[3*MLKEM_N:MLKEM_N], noiseseed, nonce);
+
+    nonce = 4;
+    e[0:MLKEM_N], e[MLKEM_N:MLKEM_N], e[2*MLKEM_N:MLKEM_N], e[3*MLKEM_N:MLKEM_N] = _poly_getnoise_eta1_4x(e[0:MLKEM_N], e[MLKEM_N:MLKEM_N], e[2*MLKEM_N:MLKEM_N], e[3*MLKEM_N:MLKEM_N], noiseseed, nonce);
+  }
 
   skpv = __polyvec_ntt(skpv);
   e    = __polyvec_ntt(e);
@@ -121,24 +132,38 @@ fn __indcpa_enc(
   transposed = 1;
   aat = _gen_matrix_avx2(aat, publicseed, transposed);
 
-  #unspill(noiseseed);
-  ms = #init_msf();
-  nonce = 0;
-  sp[0:MLKEM_N], sp[MLKEM_N:MLKEM_N], sp[2*MLKEM_N:MLKEM_N], sp[3*MLKEM_N:MLKEM_N] = _poly_getnoise_eta1_4x(sp[0:MLKEM_N], sp[MLKEM_N:MLKEM_N], sp[2*MLKEM_N:MLKEM_N], sp[3*MLKEM_N:MLKEM_N], noiseseed, nonce);
+  // the K + K + 1 noise polynomials r, e1, e2, four at a time; with
+  // K = 3, the last lane is discarded (into bp, overwritten below)
+  if (MLKEM_K == 3) {
+    #unspill(noiseseed);
+    ms = #init_msf();
+    nonce = 0;
+    sp[0:MLKEM_N], sp[MLKEM_N:MLKEM_N], sp[2*MLKEM_N:MLKEM_N], ep[0:MLKEM_N] = _poly_getnoise_eta1_4x(sp[0:MLKEM_N], sp[MLKEM_N:MLKEM_N], sp[2*MLKEM_N:MLKEM_N], ep[0:MLKEM_N], noiseseed, nonce);
 
-  #unspill(noiseseed);
-  ms = #init_msf();
-  nonce = 4;
-  ep[0:MLKEM_N], ep[MLKEM_N:MLKEM_N], ep[2*MLKEM_N:MLKEM_N], ep[3*MLKEM_N:MLKEM_N] = _poly_getnoise_eta1_4x(ep[0:MLKEM_N], ep[MLKEM_N:MLKEM_N], ep[2*MLKEM_N:MLKEM_N], ep[3*MLKEM_N:MLKEM_N], noiseseed, nonce);
+    #unspill(noiseseed);
+    ms = #init_msf();
+    nonce = 4;
+    ep[MLKEM_N:MLKEM_N], ep[2*MLKEM_N:MLKEM_N], epp, bp[0:MLKEM_N] = _poly_getnoise_eta1_4x(ep[MLKEM_N:MLKEM_N], ep[2*MLKEM_N:MLKEM_N], epp, bp[0:MLKEM_N], noiseseed, nonce);
+  } else {
+    #unspill(noiseseed);
+    ms = #init_msf();
+    nonce = 0;
+    sp[0:MLKEM_N], sp[MLKEM_N:MLKEM_N], sp[2*MLKEM_N:MLKEM_N], sp[3*MLKEM_N:MLKEM_N] = _poly_getnoise_eta1_4x(sp[0:MLKEM_N], sp[MLKEM_N:MLKEM_N], sp[2*MLKEM_N:MLKEM_N], sp[3*MLKEM_N:MLKEM_N], noiseseed, nonce);
 
-  #unspill(noiseseed);
-  ms = #init_msf();
-  nonce = 8;
-  epp = _poly_getnoise_eta2(epp, noiseseed, nonce);
+    #unspill(noiseseed);
+    ms = #init_msf();
+    nonce = 4;
+    ep[0:MLKEM_N], ep[MLKEM_N:MLKEM_N], ep[2*MLKEM_N:MLKEM_N], ep[3*MLKEM_N:MLKEM_N] = _poly_getnoise_eta1_4x(ep[0:MLKEM_N], ep[MLKEM_N:MLKEM_N], ep[2*MLKEM_N:MLKEM_N], ep[3*MLKEM_N:MLKEM_N], noiseseed, nonce);
+
+    #unspill(noiseseed);
+    ms = #init_msf();
+    nonce = 8;
+    epp = _poly_getnoise_eta2(epp, noiseseed, nonce);
+  }
 
   sp = __polyvec_ntt(sp);
 
-  for w = 0 to MLKEM_K
+  for w=0 to MLKEM_K
   {
     bp[w*MLKEM_N:MLKEM_N] = __polyvec_pointwise_acc(bp[w*MLKEM_N:MLKEM_N], aat[w*MLKEM_VECN:MLKEM_VECN], sp);
   }
@@ -156,7 +181,7 @@ fn __indcpa_enc(
 
   () = #unspill(ct);
   ms = #init_msf();
-  ct[0:MLKEM_POLYVECCOMPRESSEDBYTES+2] = __i_polyvec_compress(ct[0:MLKEM_POLYVECCOMPRESSEDBYTES+2], bp);
+  ct[0:MLKEM_POLYVECCOMPRESSEDBYTES+MLKEM_POLYVECCOMPRESSEDPAD] = __i_polyvec_compress(ct[0:MLKEM_POLYVECCOMPRESSEDBYTES+MLKEM_POLYVECCOMPRESSEDPAD], bp);
   ct[MLKEM_POLYVECCOMPRESSEDBYTES:MLKEM_POLYCOMPRESSEDBYTES], v = _i_poly_compress(ct[MLKEM_POLYVECCOMPRESSEDBYTES:MLKEM_POLYCOMPRESSEDBYTES], v);
 
   return ct;
@@ -177,7 +202,7 @@ fn __indcpa_dec
   stack u16[MLKEM_N] t v mp;
   stack u16[MLKEM_VECN] bp skpv;
 
-  bp = __i_polyvec_decompress(bp,ct);
+  bp = __i_polyvec_decompress(bp, ct);
   v = _i_poly_decompress(v, ct[MLKEM_POLYVECCOMPRESSEDBYTES:MLKEM_POLYCOMPRESSEDBYTES]);
 
   skpv = __i_polyvec_frombytes(sk);
