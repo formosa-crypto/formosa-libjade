@@ -6,7 +6,7 @@ from JazzEC require import WArray512 WArray128 WArray384 WArray32 WArray16.
 from JazzEC require import Jkem_avx2.
 
 require import AVX2_Ops W16extra.
-require import Fq NTT_Fq MLKEMFCLib.
+require import Fq MLKEMFCLib.
 require import Fq_avx2 NTT_avx2_poly.
 require import MLKEM_Poly_avx2.
 require import Mlkem_bindings CircuitBindings.

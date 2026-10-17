@@ -475,7 +475,7 @@ from JazzEC require import WArray512 WArray32 WArray16.
 
 require import W16extra.
 require import AVX2_Ops NTT_avx2_poly Fq_avx2.
-require import Fq NTT_Fq MLKEMFCLib.
+require import Fq MLKEMFCLib.
 
 
 from JazzEC require import Jkem_avx2.
@@ -691,7 +691,6 @@ lemma poly_sub_corr _a _b ab bb :
               incoeff (to_sint res.[k]) = _a.[k] - _b.[k]] = 1%r
   by move => *; conseq poly_sub_ll (poly_sub_corr_h _a _b ab bb _ _).
 
-require import NTTAlgebra.
 lemma poly_reduce_corr_h (ap: coeff Array256.t):
      hoare[ Mprevec.poly_reduce :
           ap = lift_array256 rp ==>
@@ -1803,7 +1802,7 @@ equiv prevec_eq_shuffle1_sym:
                                     is16u16 res{2}.`2 res{1}.`2.
 symmetry. conseq prevec_eq_shuffle1 => />. qed.
 
-require import NTT_avx2_poly NTT_AVX_j.
+require import NTT_avx2_poly.
 
 lemma list_arr16 (x:'a Array16.t):
   [x.[0];x.[1];x.[2];x.[3];x.[4];x.[5];x.[6];x.[7];x.[8];x.[9];x.[10];x.[11];x.[12];x.[13];x.[14];x.[15]] = to_list x.

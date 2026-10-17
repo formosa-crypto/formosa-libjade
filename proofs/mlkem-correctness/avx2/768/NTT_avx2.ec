@@ -7,7 +7,6 @@ from JazzEC require import Array256 Array128 Array32 Array16 Array768 Array2304.
 require import MLKEMFCLib.
 require import MLKEM_W16_Rep.
 require import MLKEM768_prelude.
-require import NTT_Fq.
 require import AVX2_Ops.
 
 from Spec require import GFq Rq Serialization VecMat Correctness.
@@ -316,7 +315,6 @@ rewrite -/a initiE //=.
  smt(nttunpack_bnd Array256.allP).
 qed.
 
-require import NTT_AVX_Fq NTT_AVX_j.
 
 import KMatrix.
 import Vector.

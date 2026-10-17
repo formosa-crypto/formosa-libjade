@@ -8,7 +8,6 @@ require import MLKEMFCLib.
 import MLKEMFCLib1024.
 require import MLKEM_W16_Rep.
 require import MLKEM1024_prelude.
-require import NTT_Fq.
 require import AVX2_Ops.
 
 from Spec require import GFq Rq Serialization VecMat Correctness.
@@ -405,7 +404,6 @@ rewrite -/a initiE //=.
  smt(nttunpack_bnd Array256.allP).
 qed.
 
-require import NTT_AVX_Fq NTT_AVX_j.
 
 import KMatrix.
 import Vector.

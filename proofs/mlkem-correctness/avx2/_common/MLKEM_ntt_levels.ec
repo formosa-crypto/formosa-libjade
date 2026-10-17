@@ -212,6 +212,23 @@ move: (SignedReductions_W16.BREDCp_corr (W16.to_sint x) 26 _ _ _ _ _ _).
 by rewrite GFq.qE.
 qed.
 
+(* the Montgomery product against a table pair, lane-wise *)
+op [opaque] scl (b al ah : W256.t) : W256.t =
+  W16u16.pack16 (mkseq (fun l => mmr16 (b \bits16 l) (al \bits16 l, ah \bits16 l)) 16).
+
+hoare fqmulprecomp16x_h (b al ah : W256.t) :
+  M.__fqmulprecomp16x : arg = (b, al, ah, qx16v) ==> res = scl b al ah.
+proof.
+proc; auto => |>; apply W16u16.wordP => l rgl.
+rewrite /scl pack16bE // W16u16.Pack.get_of_list // nth_mkseq //=.
+rewrite /VPSUB_16u16 /VPMULH_16u16 /VPMULL_16u16 !map2bE //=.
+by rewrite bits16_qx16v.
+qed.
+
+lemma sclb (b al ah : W256.t) (l : int) : 0 <= l < 16 =>
+  scl b al ah \bits16 l = mmr16 (b \bits16 l) (al \bits16 l, ah \bits16 l).
+proof. by move=> rgl; rewrite /scl pack16bE // W16u16.Pack.get_of_list // nth_mkseq. qed.
+
 (* ==================================================================== *)
 (* The register file                                                    *)
 (* ==================================================================== *)

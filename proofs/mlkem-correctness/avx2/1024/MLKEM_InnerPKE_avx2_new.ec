@@ -12,7 +12,6 @@ require import NTT_avx2 NTT_avx2_poly.
 require import MLKEM_W16_Rep.
 require import MLKEM1024_prelude.
 require import Fq_avx2.
-require import NTT_Fq.
 require import AVX2_Ops MLKEMFCLib.
 require import MLKEM_Poly_avx2.
 require import MLKEM_PolyVec_avx2.
@@ -265,7 +264,7 @@ move => [#] Hva2 ? Hvb2 ? result2 [Hres2lift Hres2bnd]; split.
 + do split; 2..4: smt().
   rewrite tP => k kb; rewrite /lift_array256 mapiE 1:/#.
   have := Hres1k k kb.
-  pose a := NTT_AVX_j.incoeffW16 result1.[k].
+  pose a := incoeff (to_sint result1.[k]).
   rewrite -/a => ->.
   by rewrite /(&+) map2E /nttunpack !initiE //= initiE //=; 1:smt(nttunpack_inbounds).
 (* basemul₃ pre *)
@@ -280,14 +279,14 @@ move => [#] Hva3 ? Hvb3 ? result4 [Hres4lift Hres4bnd]; split.
   rewrite tP => k kb; rewrite /lift_array256 mapiE 1:/#.
   have Hibnd : 0 <= nttunpack_idx.[k] < 256 by smt(nttunpack_inbounds).
   have := Hres3k k kb.
-  pose a := NTT_AVX_j.incoeffW16 result3.[k].
+  pose a := incoeff (to_sint result3.[k]).
   rewrite -/a => ->.
   by rewrite /(&+) !map2E /nttunpack !initiE //=; smt(Array256.initiE).
 move => [#] ???? result5 [Hres5bnd Hres5k]; split; 2:smt().
 rewrite tP => k kb; rewrite /lift_array256 mapiE 1:/#.
 have Hibnd : 0 <= nttunpack_idx.[k] < 256 by smt(nttunpack_inbounds).
 have := Hres5k k kb.
-pose a := NTT_AVX_j.incoeffW16 result5.[k].
+pose a := incoeff (to_sint result5.[k]).
 rewrite -/a => ->.
 rewrite /(&+) !map2E /nttunpack !initiE //=.
 rewrite _r_def //=; smt(Array256.initiE).
@@ -468,7 +467,6 @@ proof.
 move => Hrr0v Hrr1k Hrr0b.
 rewrite /lift_array256 tP => k Hk.
 rewrite mapiE //=.
-have ->: NTT_AVX_j.incoeffW16 rr1.[k] = incoeff (to_sint rr1.[k]) by done.
 rewrite Hrr1k //.
 have [? Hredv] :=
   SignedReductions_W16.SREDCp_corr

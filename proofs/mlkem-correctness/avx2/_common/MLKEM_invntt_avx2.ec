@@ -54,22 +54,6 @@ op invres (rp : wpoly) : wpoly = ilast (iv6 (pk rp)).
 (* ==================================================================== *)
 (* Lane specifications                                                  *)
 (* ==================================================================== *)
-op [opaque] scl (b al ah : W256.t) : W256.t =
-  W16u16.pack16 (mkseq (fun l => mmr16 (b \bits16 l) (al \bits16 l, ah \bits16 l)) 16).
-
-hoare fqmulprecomp16x_h (b al ah : W256.t) :
-  M.__fqmulprecomp16x : arg = (b, al, ah, qx16v) ==> res = scl b al ah.
-proof.
-proc; auto => |>; apply W16u16.wordP => l rgl.
-rewrite /scl pack16bE // W16u16.Pack.get_of_list // nth_mkseq //=.
-rewrite /VPSUB_16u16 /VPMULH_16u16 /VPMULL_16u16 !map2bE //=.
-by rewrite bits16_qx16v.
-qed.
-
-lemma sclb (b al ah : W256.t) (l : int) : 0 <= l < 16 =>
-  scl b al ah \bits16 l = mmr16 (b \bits16 l) (al \bits16 l, ah \bits16 l).
-proof. by move=> rgl; rewrite /scl pack16bE // W16u16.Pack.get_of_list // nth_mkseq. qed.
-
 lemma iaddlb (a b : W256.t) (l : int) : 0 <= l < 16 =>
   iaddl a b \bits16 l = (a \bits16 l) + (b \bits16 l).
 proof. by move=> rgl; rewrite /iaddl pack16bE // W16u16.Pack.get_of_list // nth_mkseq. qed.

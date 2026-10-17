@@ -6,7 +6,7 @@ from JazzEC require import WArray2048 WArray1568 WArray1536 WArray1410 WArray115
 from JazzEC require import Jkem_avx2.
 
 require import AVX2_Ops W16extra.
-require import Fq NTT_Fq MLKEMFCLib MLKEM_W16_Rep MLKEM1024_prelude.
+require import Fq MLKEMFCLib MLKEM_W16_Rep MLKEM1024_prelude.
 require import Fq_avx2 NTT_avx2 NTT_avx2_poly AVX2_Ops MLKEMFCLib.
 require import MLKEM_Poly_avx2 MLKEM_PolyVec_avx2.
 require import MLKEM_Poly_avx2_circuit MLKEM_Poly_avx2_circuit_1024.

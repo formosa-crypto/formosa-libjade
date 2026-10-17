@@ -11,7 +11,7 @@ require import AVX2_Ops.
 import Zq.
 
 (* W16 Montgomery instantiation of SignedReductions, relocated here from
-   avx2/Fq.ec so eclib (NTT_Fq) can use R without depending on the avx2 layer.
+   avx2/Fq.ec so eclib can use R without depending on the avx2 layer.
    Cloned without `import` to keep SignedReductions.smod from colliding with the
    JModel word-level smod used in the rep proofs below.
    TODO: simplify SignedReductions to reuse crepr. *)
@@ -877,4 +877,25 @@ lemma lift_array256E (x : W16.t Array256.t) k :
   (lift_array256 x).[k] = incoeff (to_sint x.[k]).
 proof. 
 by move => ?; rewrite /lift_array256 mapiE //. 
+qed.
+
+(* the lanes of a register, and its store into block i of a polynomial *)
+op R2C (r : W256.t) : W16.t Array16.t = Array16.init (fun i => r \bits16 i).
+
+op PUR (p : W16.t Array256.t) (i : int) (x : W256.t) : W16.t Array256.t =
+  Array256.init (fun k => if k %/ 16 = i then (R2C x).[k %% 16] else p.[k]).
+
+lemma PUR_get (p : W16.t Array256.t) (i : int) (x : W256.t) (k : int) :
+  0 <= i < 16 => 0 <= k < 256 =>
+  (PUR p i x).[k] = if k %/ 16 = i then (R2C x).[k %% 16] else p.[k].
+proof. by move=> _ rgk; rewrite /PUR Array256.initiE. qed.
+
+lemma PURE (p : W16.t Array256.t) (i : int) (x : W256.t) : 0 <= i < 16 =>
+  PUR p i x =
+  Array256.init (WArray512.get16 (WArray512.set256_direct (WArray512.init16 (fun j => p.[j])) (32 * i) x)).
+proof.
+move=> rgi; apply Array256.ext_eq => j rgj; rewrite !Array256.initiE //= get16_set256E 1,2:/#.
+case: (j %/ 16 = i) => e.
+- by rewrite ifT 1:/# /R2C Array16.initiE 1:/# /=; congr; smt().
+by rewrite ifF 1:/# get16_init16 /#.
 qed.

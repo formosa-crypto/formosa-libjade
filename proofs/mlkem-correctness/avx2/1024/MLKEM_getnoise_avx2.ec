@@ -13,7 +13,7 @@ from JazzEC require import Array8 Array16 Array32 Array33 Array128 Array256.
 from JazzEC require import WArray128.
 from JazzEC require import Jkem_avx2.
 from Spec require import GFq Rq Sampling Symmetric InnerPKE_Op.
-require import MLKEMFCLib NTT_AVX_Fq AVX2_Ops Montgomery16.
+require import MLKEMFCLib AVX2_Ops Montgomery16.
 import MLKEMFCLib1024.
 require import MLKEM_keccak_avx2.
 
@@ -501,9 +501,9 @@ while (0 <= i <= 4 /\ #{~i}pre /\ List.all (fun k => rp.[k]=W16.of_int (noise_co
   by rewrite /VPMOVSX_16u8_16u16 /VPUNPCKL_32u8 /VPUNPCKL_16u8 /VPUNPCKH_32u8 /VPUNPCKH_16u8 /MOVSX_u16s8 /VEXTRACTI128 /interleave_gen /get_lo_2u64 /get_hi_2u64 /b2i /= /int_bit /= /#.
  auto => |> &m ? _ /List.allP IH ? /List.allP H.
  split; first smt().
- rewrite -!NTT_AVX_Fq.PURE 1..4:/#. 
+ rewrite -!PURE 1..4:/#. 
  apply/List.allP => k; rewrite mem_iota /= => |> *.
- rewrite !NTT_AVX_Fq.PUR_get 1..8:/#.
+ rewrite !PUR_get 1..8:/#.
  case: (k %/ 16 = 4 * i{m} + 3) => C1.
   move: (H (k %% 64) _) => /=; first smt(mem_iota).
   rewrite (modz_pow_div 2 6 4) 1,2:/# /= C1 (mulzC 4) modzMDl /=.

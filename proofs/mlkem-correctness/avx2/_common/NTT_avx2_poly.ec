@@ -5,12 +5,10 @@ from JazzEC require import Array256 Array128 Array32 Array16.
 from JazzEC require import Jkem_avx2.
 
 require import MLKEMFCLib.
-require import NTT_Fq.
-require import NTT_AVX_Fq.
-require import NTT_AVX_j.
 require import AVX2_Ops.
 require import Montgomery16 W16extra.
 require NttKem MLKEM_ntt_levels MLKEM_ntt_avx2 MLKEM_invntt_levels MLKEM_invntt_avx2.
+require MLKEM_basemul_avx2.
 
 from Spec require import GFq Rq Serialization Correctness.
 import Zq IntOrder BitReverse.
@@ -62,6 +60,27 @@ by rewrite -iotaredE /=.
 
 lemma nttunpack_idxK : all (fun i => nttunpack_idx.[nttpack_idx.[i]] = i) (iota_ 0 256)
 by rewrite -iotaredE /=.
+
+(* the permutation of nttunpack on one half *)
+op perm128 ['a] (p: int list) (a: 'a Array128.t): 'a Array128.t =
+ Array128.init (fun i=> a.[nth witness p i]).
+
+op perm_nttunpack128 : int list =
+  [0;8;16;24;32;40;48;56;64;72;80;88;96;104;112;120;
+  1;9;17;25;33;41;49;57;65;73;81;89;97;105;113;121;
+  2;10;18;26;34;42;50;58;66;74;82;90;98;106;114;122;
+  3;11;19;27;35;43;51;59;67;75;83;91;99;107;115;123;
+  4;12;20;28;36;44;52;60;68;76;84;92;100;108;116;124;
+  5;13;21;29;37;45;53;61;69;77;85;93;101;109;117;125;
+  6;14;22;30;38;46;54;62;70;78;86;94;102;110;118;126;
+  7;15;23;31;39;47;55;63;71;79;87;95;103;111;119;127]
+  axiomatized by perm_nttunpack128E.
+
+op nttunpack128 ['a] (rp : 'a Array128.t) : 'a Array128.t = perm128 perm_nttunpack128 rp.
+
+(* the scaling of a polynomial by a constant *)
+abbrev mul1x256 (y: coeff): coeff Array256.t -> coeff Array256.t =
+ Array256.map (( *) y).
 
 lemma nttpackK: cancel nttpack<:'a> nttunpack<:'a>.
 proof.
@@ -316,12 +335,29 @@ pose a:= nttunpack_idx.[k].
 rewrite initiE //= mapiE //=. smt(nttunpack_bnd Array256.allP).
 qed.
 
-from JazzEC require import Jkem_avx2.
-lemma perm_ntt_nttpackE ['a] (p: 'a Array256.t):
-  perm_ntt NTT_AVX_Fq.perm_nttpack128 p = nttpack p.
+(* -------------------------------------------------------------------- *)
+(* The base multiplication, from MLKEM_basemul_avx2                     *)
+lemma poly_basemul_ll : islossless Jkem_avx2.M._poly_basemul.
+proof. by proc; inline *; auto. qed.
+
+(* the pairs of the code, in the order of the specification *)
+lemma bmiE (i : int) : 0 <= i < 256 =>
+  nttunpack_idx.[i] = 2 * MLKEM_basemul_avx2.bmi (i %/ 32) (i %% 16) + i %% 32 %/ 16.
 proof.
-by apply Array256.all_eq_eq; rewrite /all_eq 
-   /perm_ntt /perm_nttpack128 /nttpack /=.
+move=> rgi; rewrite Array256.get_of_list //; move: i rgi.
+by apply/MLKEM_ntt_levels.allP_range; rewrite -iotaredE /MLKEM_basemul_avx2.bmi.
+qed.
+
+lemma nttunpack_get (p : 'a Array256.t) (i : int) :
+  0 <= i < 256 => (nttunpack p).[i] = p.[nttunpack_idx.[i]].
+proof. by move=> rgi; rewrite nttunpackE initiE. qed.
+
+lemma bmi_split (i : int) : 0 <= i < 256 => exists k l t,
+  0 <= k < 8 /\ 0 <= l < 16 /\ 0 <= t < 2 /\ i = 32 * k + l + 16 * t
+  /\ nttunpack_idx.[i] = 2 * MLKEM_basemul_avx2.bmi k l + t.
+proof.
+move=> rgi; exists (i %/ 32) (i %% 16) (i %% 32 %/ 16).
+by rewrite bmiE //; smt().
 qed.
 
 phoare poly_basemul_avx2_ph _a _b:
@@ -333,13 +369,26 @@ phoare poly_basemul_avx2_ph _a _b:
     = nttunpack (scale (basemul (_a) (_b)) (incoeff 169))
     /\ signed_bound_cxq res 0 256 1 ] = 1%r.
 proof.
-conseq poly_basemul_avx2_eq (__basemul_ph (nttunpack _a) (nttunpack _b)) => //.
- move => /> &1 *.
- by exists ((lift_array256 rp{1}), (lift_array256 ap{1}), (lift_array256 bp{1})) => //=.
-move=> /> &m <- Hb.
-move: (basemul_avx2E (nttunpack _a) (nttunpack _b)).
-rewrite !perm_ntt_nttpackE !nttunpackK => <-.
-by rewrite /scale -map_pack nttpackK.
+conseq poly_basemul_ll (_ : lift_array256 ap = nttunpack _a /\ signed_bound_cxq ap 0 256 2
+    /\ lift_array256 bp = nttunpack _b /\ signed_bound_cxq bp 0 256 2
+   ==> lift_array256 res = nttunpack (scale (basemul _a _b) (incoeff 169))
+    /\ signed_bound_cxq res 0 256 1) => //.
+exlim ap, bp => a0 b0; conseq (MLKEM_basemul_avx2.poly_basemul_h a0 b0) => //.
+move=> &m [#] -> -> hla hba hlb hbb r ->.
+have hv := MLKEM_basemul_avx2.bmres_val ap{m} bp{m} _a _b _ _.
+- move=> i rgi; have := hba i rgi; have := hbb i rgi; rewrite !b16E qE /#.
+- move=> k l t rgk rgl rgt; have rgi : 0 <= 32 * k + l + 16 * t < 256 by smt().
+  pose j := 32 * k + l + 16 * t.
+  have := bmiE _ rgi; have -> : j %/ 32 = k by smt().
+  have -> : j %% 16 = l by smt().
+  have -> : j %% 32 %/ 16 = t by smt().
+  by move=> <-; rewrite -!nttunpack_get // -hla -hlb /lift_array256 !mapiE.
+split.
+- apply Array256.ext_eq => i rgi; have [k l t [rgk [rgl [rgt [-> eu]]]]] := bmi_split _ rgi.
+  rewrite /lift_array256 mapiE 1:/# /= nttunpack_get 1:/# eu /scale mapiE 1:/# /=.
+  by have [-> _] := hv k l t _ _ _.
+move=> i rgi; rewrite b16E qE; have [k l t [rgk [rgl [rgt [-> _]]]]] := bmi_split _ rgi.
+by have [_ hr] := hv k l t _ _ _; smt().
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -356,7 +405,7 @@ lemma nttresE (r : W16.t Array256.t) :
 proof.
 rewrite nttunpackE; apply Array256.ext_eq => j rgj.
 rewrite /MLKEM_ntt_avx2.nttres !initiE //= mapiE; first by smt(nttunpack_inbounds).
-congr; congr; move: j rgj; apply/allP_range.
+congr; congr; move: j rgj; apply/MLKEM_ntt_levels.allP_range.
 by rewrite -iotaredE /MLKEM_ntt_avx2.fin /MLKEM_ntt_levels.pos2 /MLKEM_ntt_avx2.sigma.
 qed.
 
