@@ -15,6 +15,7 @@ rdirs = ../../../core
 
 rdirs = Spec:../../../mlkem/spec
 rdirs = ../../../mlkem/eclib
+rdirs = ../../generic
 
 rdirs = JazzEC:../../extraction/avx2/1024
 
