@@ -20,7 +20,10 @@
 //     "the polynomial violates the bound", so the leakage of a test is the
 //     index of its first failing polynomial. The tests on w0 - c*s2 and on
 //     the hint are only run once the test on z passed; the hint test is run
-//     whether or not the (public) test on c*t0 passed.
+//     whether or not the (public) test on c*t0 passed. The test on c*t0
+//     declassifies nothing: it is a function of c and t0 only. It is not
+//     even compiled when it cannot fail (ML-DSA-65 and ML-DSA-87, see
+//     CT0_NORM_BOUND).
 //   - on an exhausted iteration budget nothing of the rejected iteration is
 //     declassified: the signature buffer is left untouched.
 
@@ -150,15 +153,24 @@ inline fn __apply_cs2_and_check_norm(
     return w0_minus_cs2, infinity_norm_check_result;
 }
 
-// For each row i: compute ct0_i = c * t0_i, check infinity norm, and write
+// A coefficient of t0 lies in (-2^(d-1), 2^(d-1)] and a coefficient of c*t0 is
+// a signed sum of TAU coefficients of t0, hence ||c*t0||_inf <= TAU * 2^(d-1).
+// The test ||c*t0||_inf >= GAMMA2 of FIPS 204 can only fail when this bound
+// reaches GAMMA2: ML-DSA-44 (39 * 4096 = 159744 >= 95232). For ML-DSA-65
+// (49 * 4096 = 200704) and ML-DSA-87 (60 * 4096 = 245760) it is below
+// GAMMA2 = 261888 and the test is not compiled.
+param int CT0_NORM_BOUND =
+    ONES_IN_VERIFIER_CHALLENGE * (1 << (BITS_IN_LOWER_PART_OF_T - 1));
+
+// For each row i: compute ct0_i = c * t0_i, check infinity norm (when the test
+// can fail, see CT0_NORM_BOUND), and write
 // w0_minus_cs2_plus_ct0[i] = w0_minus_cs2[i] + ct0_i (whether or not the norm
 // test passes: the hint is computed from it in every case, as in the model).
 // Output and input are separate buffers (disjoint reg ptr args).
 // Skipped entirely after a prior norm failure; the returned flag is the result
-// of the c*t0 test alone (0 when the function is skipped).
+// of the c*t0 test alone (0 when the function is skipped or not compiled).
 // c and t0 are public (declassified by __sign_internal), so this function
-// computes on public data only: the declassification of its flag is a no-op
-// for the leakage model (see the comment in the loop).
+// computes on public data only and declassifies nothing.
 inline fn __apply_ct0_and_check_norm(
     reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] w0_minus_cs2_plus_ct0,
     reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] w0_minus_cs2,
@@ -173,6 +185,10 @@ inline fn __apply_ct0_and_check_norm(
     reg ui64 base;
 
     ct0_norm_check_result = 0;
+    // The scratch buffer only ever holds c*t0, a function of public data.
+    // Without this (no code is generated for it) the checker would type the
+    // uninitialised buffer, and everything derived from it, as secret.
+    ArrayInit(ct0);
     base = 0;
     _ = #init_msf();
     if (infinity_norm_check_result != 0) {
@@ -184,14 +200,15 @@ inline fn __apply_ct0_and_check_norm(
                     t0[base : COEFFICIENTS_IN_POLYNOMIAL],
                     verifier_challenge);
         ct0 = polynomial::invert_ntt_montgomery(ct0);
+        // The inverse NTT returns a representative in (-q, q); reduce32
+        // centres it, which __make_hint relies on even when the test is
+        // not compiled.
         ct0 = polynomial::reduce32(ct0);
-        ct0_norm_check_result_row =
-            polynomial::__check_infinity_norm(ct0, GAMMA2);
-        // A function of the public c and t0 only. The checker cannot see it:
-        // the level of a stack array only grows with the writes it receives,
-        // and ct0 starts uninitialised, hence secret.
-        () = #declassify(ct0_norm_check_result_row);
-        ct0_norm_check_result |= ct0_norm_check_result_row;
+        if (CT0_NORM_BOUND >= GAMMA2) {
+            ct0_norm_check_result_row =
+                polynomial::__check_infinity_norm(ct0, GAMMA2);
+            ct0_norm_check_result |= ct0_norm_check_result_row;
+        }
         w0_minus_cs2_plus_ct0[base : COEFFICIENTS_IN_POLYNOMIAL] =
             polynomial::add(
                 w0_minus_cs2_plus_ct0[base : COEFFICIENTS_IN_POLYNOMIAL],
@@ -361,7 +378,8 @@ fn __sign_internal(
     // The |#declassify|s in this loop body are the leakage of the model of
     // the security proof (MLDSATarget.sign): the challenge c, then the
     // outcome of each rejection test, polynomial by polynomial, in the order
-    // z, w0 - c*s2, hint (the test on c*t0 is a public computation). The
+    // z, w0 - c*s2, hint (the test on c*t0 is a public computation and
+    // declassifies nothing). The
     // constant-time checker validates that nothing else is leaked; that this
     // leakage is harmless is established by the EasyCrypt security proof.
     while (exit_rejection_sampling_loop == 0) {
@@ -408,9 +426,12 @@ fn __sign_internal(
             __apply_cs2_and_check_norm(w0_minus_cs2, w0, s2, verifier_challenge, infinity_norm_check_result);
 
         // b3: compute w0_minus_cs2_plus_ct0[i] = w0_minus_cs2[i] + c*t0[i] for each row,
-        // check norm. A public computation: c and t0 are declassified.
+        // check norm (ML-DSA-44 only, see CT0_NORM_BOUND). A public
+        // computation: c and t0 are declassified.
         w0_minus_cs2_plus_ct0, ct0_norm_check_result =
             __apply_ct0_and_check_norm(w0_minus_cs2_plus_ct0, w0_minus_cs2, t0, verifier_challenge, infinity_norm_check_result);
+        // (The spill is unconditional: the spill lowering does not look
+        // through the compile-time condition.)
         () = #spill(ct0_norm_check_result);
 
         // b4: compute hints using w0_minus_cs2_plus_ct0 and w1, check that the total
@@ -424,7 +445,9 @@ fn __sign_internal(
         // infinity_norm_check_result is always 0 or 1 (SETcc values ORed together).
         () = #declassify(infinity_norm_check_result);
         () = #unspill(ct0_norm_check_result);
-        infinity_norm_check_result |= ct0_norm_check_result;
+        if (CT0_NORM_BOUND >= GAMMA2) {
+            infinity_norm_check_result |= ct0_norm_check_result;
+        }
         () = #unspill(kappa_exceeded);
         _ = #init_msf();
         last_norm_check_result = infinity_norm_check_result;
