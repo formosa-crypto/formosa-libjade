@@ -281,6 +281,42 @@ by rewrite ifF 2:subarray384E //; smt().
 qed.
 
 (* -------------------------------------------------------------------- *)
+(* a matrix is the concatenation of its kvec * kvec entries, row major  *)
+op [a] blk (x : 'a Array_matn.t) (pos : int) : 'a Array256.t =
+  Array256.init (fun (k : int) => x.[256 * pos + k]).
+
+lemma matn_blk : matn = 256 * (kvec * kvec).
+proof. by rewrite matnE vecnE; ring. qed.
+
+lemma blkE (x : 'a Array_matn.t) pos k : 0 <= k < 256 => (blk x pos).[k] = x.[256 * pos + k].
+proof. by move=> kb; rewrite /blk Array256.initiE. qed.
+
+lemma matn_slice (pos k : int) : 0 <= pos < kvec * kvec => 0 <= k < 256 =>
+  0 <= 256 * pos + k < matn.
+proof. by rewrite matn_blk; smt(). qed.
+
+lemma matn_tP (v w : 'a Array_matn.t) :
+  v = w <=> forall pos, 0 <= pos < kvec * kvec => blk v pos = blk w pos.
+proof.
+split=> [-> //| h]; apply Array_matn.tP => n nb.
+have := h (n %/ 256) _; 1: by move: nb; rewrite matn_blk; smt().
+rewrite Array256.tP => /(_ (n %% 256) _); 1: smt().
+by rewrite !blkE 1,2:/# (mulzC 256) -divz_eq.
+qed.
+
+lemma blk_set (r : 'a Array_matn.t) (a : 'a Array256.t) p pos :
+  0 <= p < kvec * kvec => 0 <= pos < kvec * kvec =>
+  blk (Array_matn.init (fun k =>
+    if 256 * p <= k < 256 * p + 256 then a.[k - 256 * p] else r.[k])) pos =
+  if pos = p then a else blk r pos.
+proof.
+move=> pb posb; apply Array256.tP => k kb.
+rewrite blkE // Array_matn.initiE 1:matn_slice //=.
+case: (pos = p) => [-> /=|ne]; 1: by rewrite ifT /#.
+by rewrite ifF 2:blkE //; smt().
+qed.
+
+(* -------------------------------------------------------------------- *)
 op lift_polyvec(vec : W16.t Array_vecn.t) : polyvec =
   KVec.init (fun i => lift_array256 (subarray256 vec i)).
 
