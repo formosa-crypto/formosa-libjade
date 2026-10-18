@@ -179,7 +179,7 @@ sudo launchctl bootstrap system /Library/LaunchDaemons/io.lima.ci.plist
 Inside the VM (`limactl shell ci`), follow the Linux host setup: rootless
 Docker, multi-user nix (see below), then the systemd unit above with
 several `proofs` instances, each pinned to its own CPUs (`CPUSET`; the
-proofs job runs one EasyCrypt job per CPU it sees). On a 16-CPU VM, three
+proofs job runs one EasyCrypt job per two CPUs it sees). On a 16-CPU VM, three
 5-CPU instances leave one CPU for the docker and nix daemons:
 
 ```

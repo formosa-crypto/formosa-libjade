@@ -54,17 +54,22 @@ jobs:
       - name: EasyCrypt configuration
         run: $ECDEV easycrypt config
 
+      # One EasyCrypt job per two CPUs the runner's container is pinned to
+      # (CPUSET in its instance env): each smt call runs CVC5 and Z3 side by
+      # side, so one job per CPU oversubscribes the provers.
+      - name: Jobs
+        run: echo "JOBS=$(( ($(nproc) + 1) / 2 ))" >> "$GITHUB_ENV"
+
       # All scenarios (the Makefile's default target) in one runtest
-      # invocation, with a per-file timing report. One job per CPU the
-      # runner's container is pinned to (CPUSET in its instance env).
+      # invocation, with a per-file timing report.
       - name: Check proofs
-        run: $ECDEV make -C proofs JOBS=$(nproc) ECFLAGS='-report timing.yml'
+        run: $ECDEV make -C proofs JOBS=$JOBS ECFLAGS='-report timing.yml'
 
       # Timing pipeline: runtest report -> timing JSON -> sunburst page,
       # published as a run artifact.
       - name: Timing sunburst
         run: |
-          $ECDEV python3 scripts/timing-report-to-json.py --jobs "$(nproc)" proofs/timing.yml proofs-timing.json
+          $ECDEV python3 scripts/timing-report-to-json.py --jobs "$JOBS" proofs/timing.yml proofs-timing.json
           $ECDEV python3 scripts/timing-sunburst.py proofs-timing.json proofs-timing.html
 
       - name: Job summary
