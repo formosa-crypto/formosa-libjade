@@ -9,14 +9,108 @@ from CryptoSpecs require import FIPS202_SHA3_Spec Keccak1600_Spec Keccakf1600_Sp
 from Spec require import GFq Rq Sampling Serialization Symmetric Correctness.
 require import MLKEMFCLib.
 require import PreludeT.
-require BaseT MLKEM_InnerPKE_avx2T.
+require BaseT Fq_avx2T MLKEM_ntt_levelsT MLKEM_ntt_avx2T MLKEM_invntt_levelsT.
+require MLKEM_invntt_avx2T MLKEM_basemul_avx2T NTT_avx2_polyT MLKEM_Poly_avx2T.
+require MLKEM_Poly_avx2_circuitT NTT_avx2T MLKEM_PolyVec_avx2T MLKEM_PolyVec_avx2_circuitT.
+require MLKEM_keccak_avx2T Mlkem_filters_bridgeT MLKEM_sampler_avx2T MLKEM_genmatrix_avx2T.
+require MLKEM_getnoise_avx2T MLKEM_compress_avx2T.
+require Montgomery.
+require MLKEM_InnerPKE_avx2T.
 
 abstract theory MLKEM_KEM_avx2T.
 
 clone import BaseT.BaseT as B.
 import S R.
-clone import MLKEM_InnerPKE_avx2T.MLKEM_InnerPKE_avx2T as MLKEM_InnerPKE_avx2 with
+clone import PreludeT.PreludeT as PR with theory B <- B.
+clone import Fq_avx2T.Fq_avx2T as Fq_avx2 with theory B <- B.
+clone import MLKEM_ntt_levelsT.MLKEM_ntt_levelsT as MLKEM_ntt_levels with theory B <- B.
+clone import MLKEM_ntt_avx2T.MLKEM_ntt_avx2T as MLKEM_ntt_avx2 with
+  theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels.
+clone import MLKEM_invntt_levelsT.MLKEM_invntt_levelsT as MLKEM_invntt_levels with
+  theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels.
+clone import MLKEM_invntt_avx2T.MLKEM_invntt_avx2T as MLKEM_invntt_avx2 with
+  theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels,
+  theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2, theory MLKEM_invntt_levels <- MLKEM_invntt_levels.
+clone import MLKEM_basemul_avx2T.MLKEM_basemul_avx2T as MLKEM_basemul_avx2 with
+  theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels,
+  theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2.
+clone import NTT_avx2_polyT.NTT_avx2_polyT as NTT_avx2_poly with
+  theory B <- B, theory MLKEM_ntt_levels <- MLKEM_ntt_levels,
+  theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2, theory MLKEM_invntt_levels <- MLKEM_invntt_levels,
+  theory MLKEM_invntt_avx2 <- MLKEM_invntt_avx2, theory MLKEM_basemul_avx2 <- MLKEM_basemul_avx2.
+clone import MLKEM_Poly_avx2T.MLKEM_Poly_avx2T as MLKEM_Poly_avx2 with
+  theory B <- B, theory Fq_avx2 <- Fq_avx2, theory MLKEM_ntt_levels <- MLKEM_ntt_levels,
+  theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2, theory MLKEM_invntt_levels <- MLKEM_invntt_levels,
+  theory MLKEM_invntt_avx2 <- MLKEM_invntt_avx2, theory MLKEM_basemul_avx2 <- MLKEM_basemul_avx2,
+  theory NTT_avx2_poly <- NTT_avx2_poly.
+clone import MLKEM_Poly_avx2_circuitT.MLKEM_Poly_avx2_circuitT as MLKEM_Poly_avx2_circuit with
+  theory B <- B, theory Fq_avx2 <- Fq_avx2, theory MLKEM_ntt_levels <- MLKEM_ntt_levels,
+  theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2, theory MLKEM_invntt_levels <- MLKEM_invntt_levels,
+  theory MLKEM_invntt_avx2 <- MLKEM_invntt_avx2, theory MLKEM_basemul_avx2 <- MLKEM_basemul_avx2,
+  theory NTT_avx2_poly <- NTT_avx2_poly, theory MLKEM_Poly_avx2 <- MLKEM_Poly_avx2.
+clone import NTT_avx2T.NTT_avx2T as NTT_avx2 with
+  theory B <- B, theory PR <- PR, theory MLKEM_ntt_levels <- MLKEM_ntt_levels,
+  theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2, theory MLKEM_invntt_levels <- MLKEM_invntt_levels,
+  theory MLKEM_invntt_avx2 <- MLKEM_invntt_avx2, theory MLKEM_basemul_avx2 <- MLKEM_basemul_avx2,
+  theory NTT_avx2_poly <- NTT_avx2_poly.
+clone import MLKEM_PolyVec_avx2T.MLKEM_PolyVec_avx2T as MLKEM_PolyVec_avx2 with
+  theory B <- B, theory PR <- PR, theory Fq_avx2 <- Fq_avx2, theory MLKEM_ntt_levels <-
+    MLKEM_ntt_levels,
+  theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2, theory MLKEM_invntt_levels <- MLKEM_invntt_levels,
+  theory MLKEM_invntt_avx2 <- MLKEM_invntt_avx2, theory MLKEM_basemul_avx2 <- MLKEM_basemul_avx2,
+  theory NTT_avx2_poly <- NTT_avx2_poly,
+  theory MLKEM_Poly_avx2 <- MLKEM_Poly_avx2.
+clone import MLKEM_PolyVec_avx2_circuitT.MLKEM_PolyVec_avx2_circuitT as MLKEM_PolyVec_avx2_circuit
+  with
+  theory B <- B, theory PR <- PR, theory Fq_avx2 <- Fq_avx2, theory MLKEM_ntt_levels <-
+    MLKEM_ntt_levels,
+  theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2, theory MLKEM_invntt_levels <- MLKEM_invntt_levels,
+  theory MLKEM_invntt_avx2 <- MLKEM_invntt_avx2, theory MLKEM_basemul_avx2 <- MLKEM_basemul_avx2,
+  theory NTT_avx2_poly <- NTT_avx2_poly,
+  theory MLKEM_Poly_avx2 <- MLKEM_Poly_avx2, theory MLKEM_Poly_avx2_circuit <-
+    MLKEM_Poly_avx2_circuit,
+  theory NTT_avx2 <- NTT_avx2.
+clone import MLKEM_keccak_avx2T.MLKEM_keccak_avx2T as MLKEM_keccak_avx2 with theory B <- B.
+clone import Mlkem_filters_bridgeT.Mlkem_filters_bridgeT as Mlkem_filters_bridge with
   theory B <- B.
+clone import MLKEM_sampler_avx2T.MLKEM_sampler_avx2T as MLKEM_sampler_avx2 with
+  theory B <- B, theory MLKEM_keccak_avx2 <- MLKEM_keccak_avx2,
+  theory Mlkem_filters_bridge <- Mlkem_filters_bridge.
+clone import MLKEM_genmatrix_avx2T.MLKEM_genmatrix_avx2T as MLKEM_genmatrix_avx2 with
+  theory B <- B, theory PR <- PR, theory Fq_avx2 <- Fq_avx2, theory MLKEM_ntt_levels <-
+    MLKEM_ntt_levels,
+  theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2, theory MLKEM_invntt_levels <- MLKEM_invntt_levels,
+  theory MLKEM_invntt_avx2 <- MLKEM_invntt_avx2, theory MLKEM_basemul_avx2 <- MLKEM_basemul_avx2,
+  theory NTT_avx2_poly <- NTT_avx2_poly,
+  theory MLKEM_Poly_avx2 <- MLKEM_Poly_avx2, theory NTT_avx2 <- NTT_avx2,
+  theory MLKEM_keccak_avx2 <- MLKEM_keccak_avx2,
+  theory Mlkem_filters_bridge <- Mlkem_filters_bridge,
+  theory MLKEM_sampler_avx2 <- MLKEM_sampler_avx2.
+clone import MLKEM_getnoise_avx2T.MLKEM_getnoise_avx2T as MLKEM_getnoise_avx2 with
+  theory B <- B, theory MLKEM_keccak_avx2 <- MLKEM_keccak_avx2.
+clone import MLKEM_compress_avx2T.MLKEM_compress_avx2T as MLKEM_compress_avx2 with
+  theory B <- B, theory PR <- PR.
+clone import MLKEM_InnerPKE_avx2T.MLKEM_InnerPKE_avx2T as MLKEM_InnerPKE_avx2 with
+  theory B <- B,
+  theory PR <- PR,
+  theory Fq_avx2 <- Fq_avx2,
+  theory MLKEM_ntt_levels <- MLKEM_ntt_levels,
+  theory MLKEM_ntt_avx2 <- MLKEM_ntt_avx2,
+  theory MLKEM_invntt_levels <- MLKEM_invntt_levels,
+  theory MLKEM_invntt_avx2 <- MLKEM_invntt_avx2,
+  theory MLKEM_basemul_avx2 <- MLKEM_basemul_avx2,
+  theory NTT_avx2_poly <- NTT_avx2_poly,
+  theory MLKEM_Poly_avx2 <- MLKEM_Poly_avx2,
+  theory MLKEM_Poly_avx2_circuit <- MLKEM_Poly_avx2_circuit,
+  theory NTT_avx2 <- NTT_avx2,
+  theory MLKEM_PolyVec_avx2 <- MLKEM_PolyVec_avx2,
+  theory MLKEM_PolyVec_avx2_circuit <- MLKEM_PolyVec_avx2_circuit,
+  theory MLKEM_keccak_avx2 <- MLKEM_keccak_avx2,
+  theory Mlkem_filters_bridge <- Mlkem_filters_bridge,
+  theory MLKEM_sampler_avx2 <- MLKEM_sampler_avx2,
+  theory MLKEM_genmatrix_avx2 <- MLKEM_genmatrix_avx2,
+  theory MLKEM_getnoise_avx2 <- MLKEM_getnoise_avx2,
+  theory MLKEM_compress_avx2 <- MLKEM_compress_avx2.
 import PR MLKEM_keccak_avx2.
 
 import Serialization Symmetric IntOrder.
