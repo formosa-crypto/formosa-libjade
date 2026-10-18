@@ -121,8 +121,10 @@ namespace polynomial {
             offset += 32;
         }
 
-        // It is okay to leak which coefficient(s) violates the bound.
-        () = #declassify(exceeds_any);
+        // The result is a single secret boolean (0: every |coefficient| <
+        // threshold, 1: some coefficient violates the bound). The caller
+        // declassifies it where the leakage model allows: the model leaks the
+        // index of the first failing polynomial, not the failing lanes.
         msb_mask = #MOVEMASK_8u32(exceeds_any);
 
         _, _, _, _, zf = #TEST_32(msb_mask, msb_mask);

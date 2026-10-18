@@ -45,7 +45,9 @@ namespace polynomial {
             );
 
             // TODO: We could also handle serializing the hint here.
-            () = #declassify(hint_block);
+            // The hint bits stay secret: only the weight test of the caller is
+            // declassified (the hint itself is public only once it is part of
+            // an accepted signature).
             num_hints = (64u)#MOVEMASK_8u32(hint_block);
             _, _, _, _, _, num_hints = #POPCNT_64(num_hints);
 
