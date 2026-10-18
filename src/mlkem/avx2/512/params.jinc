@@ -1,0 +1,15 @@
+param int MLKEM_K = 2;
+param int MLKEM_DU = 10;
+param int MLKEM_DV = 4;
+param int MLKEM_ETA1 = 3;
+
+require "../common/params.jinc"
+
+/* the (i, j) byte pairs of the matrix entries sampled four at a time,
+   then of the transposed matrix */
+u8[16] gen_matrix_indexes =
+{
+  0x00, 0x00, 0x01, 0x00, 0x00, 0x01, 0x01, 0x01, // (0,0) (0,1) (1,0) (1,1)
+
+  0x00, 0x00, 0x00, 0x01, 0x01, 0x00, 0x01, 0x01  // (0,0) (0,1) (1,0) (1,1)
+};

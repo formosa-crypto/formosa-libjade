@@ -25,9 +25,10 @@ KAVX := third_party/kyber/avx2
 DAVX := third_party/dilithium/avx2
 
 # ---- backend library sets (<backend>_<scheme>.so) ------------------------
-# jasmin: only the parameter sets present in src/ (mlkem 768/1024; the ML-DSA
-# sets are discovered from src/mldsa/avx2/<set>/mldsa.jazz).
-JASMIN_KEM := $(BUILD)/jasmin_mlkem768.so $(BUILD)/jasmin_mlkem1024.so
+# jasmin: only the parameter sets present in src/, discovered from
+# src/mlkem/avx2/<set>/jmlkem.jazz and src/mldsa/avx2/<set>/mldsa.jazz.
+JASMIN_KEM := $(patsubst ../src/mlkem/avx2/%/jmlkem.jazz,$(BUILD)/jasmin_mlkem%.so,\
+                $(wildcard ../src/mlkem/avx2/*/jmlkem.jazz))
 JASMIN_SIG := $(patsubst ../src/mldsa/avx2/%/mldsa.jazz,$(BUILD)/jasmin_mldsa%.so,\
                 $(wildcard ../src/mldsa/avx2/*/mldsa.jazz))
 # native reference libraries: all parameter sets.

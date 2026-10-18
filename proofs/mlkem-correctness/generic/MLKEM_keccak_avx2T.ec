@@ -144,7 +144,7 @@ equiv a64__squeeze_eq:
 
 (****************************************************************************)
 
-clone KeccakArrayAvx2x4 as A128avx2x4
+clone KeccakArrayAvx2x4 as AETA1avx2x4
  with op _ASIZE <- 128,
       theory A <- Array128,
       theory WA <- WArray128
@@ -161,8 +161,8 @@ equiv a128__squeeze_eq:
  : ={arg} ==> ={res}
  by sim.
 
-equiv a128__squeeze_avx2x4_eq:
- M.a128____squeeze_avx2x4 ~ A128avx2x4.MM.__squeeze_avx2x4
+equiv aeta1__squeeze_avx2x4_eq:
+ M.aETA1____squeeze_avx2x4 ~ AETA1avx2x4.MM.__squeeze_avx2x4
  : ={arg} ==> ={res}
  by sim.
 
@@ -265,7 +265,7 @@ module K = {
     return out;
   }
 
-  proc _shake256x4_A128__A32_A1 (out0:W8.t Array128.t, out1:W8.t Array128.t,
+  proc _shake256x4_AETA1__A32_A1 (out0:W8.t Array128.t, out1:W8.t Array128.t,
                                  out2:W8.t Array128.t, out3:W8.t Array128.t,
                                  seed:W8.t Array32.t, nonces:W8.t Array4.t) :
   W8.t Array128.t * W8.t Array128.t * W8.t Array128.t * W8.t Array128.t = {
@@ -283,7 +283,7 @@ module K = {
     (Array1.init (fun i => nonces.[(1 + i)])),
     (Array1.init (fun i => nonces.[(2 + i)])),
     (Array1.init (fun i => nonces.[(3 + i)])), 31, 136);
-    (st, out0, out1, out2, out3) <@ A128avx2x4.MM.__squeeze_avx2x4 (st, out0,
+    (st, out0, out1, out2, out3) <@ AETA1avx2x4.MM.__squeeze_avx2x4 (st, out0,
     out1, out2, out3, 136);
     return (out0, out1, out2, out3);
   }
@@ -1010,13 +1010,13 @@ proof.
 by conseq shake256_128A_A33_eq (shake256_128A_A33_ph' _in0 _in1) => // /#.
 qed.
 
-equiv shake256x4_A128__A32_A1_eq:
-  M._shake256x4_A128__A32_A1 ~ K._shake256x4_A128__A32_A1
+equiv shake256x4_AETA1__A32_A1_eq:
+  M._shake256x4_AETA1__A32_A1 ~ K._shake256x4_AETA1__A32_A1
  : ={arg} ==> ={res}
 by sim.
 
-hoare shake256x4_A128__A32_A1_h' _seed _nonces :
- K._shake256x4_A128__A32_A1
+hoare shake256x4_AETA1__A32_A1_h' _seed _nonces :
+ K._shake256x4_AETA1__A32_A1
  : seed = _seed /\ nonces = _nonces
  ==>
     res.`1 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[0]]) 128)
@@ -1025,7 +1025,7 @@ hoare shake256x4_A128__A32_A1_h' _seed _nonces :
  /\ res.`4 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[3]]) 128).
 proof.
 proc.
-wp; ecall (A128avx2x4.squeeze_avx2x4_h out0 out1 out2 out3 st 136)=> /=.
+wp; ecall (AETA1avx2x4.squeeze_avx2x4_h out0 out1 out2 out3 st 136)=> /=.
 wp; ecall (A1avx2x4.absorb_avx2x4_h
  (to_list _seed) (to_list _seed) (to_list _seed) (to_list _seed) st
  (Array1.init (fun (i : int) => nonces.[0 + i]))
@@ -1071,18 +1071,18 @@ rewrite Keccak1600_avx2x4.st4x_get_pack2 /=; congr; rewrite /SHAKE256 /KECCAK160
 rewrite Keccak1600_avx2x4.st4x_get_pack3 /=; congr; rewrite /SHAKE256 /KECCAK1600 /SHAKE256_SQUEEZE /c512_r8 /=; congr; rewrite /st3; congr => //; by congr; rewrite /to_list /mkseq -iotaredE /=.
 qed.
 
-lemma shake256x4_A128__A32_A1_ll: islossless K._shake256x4_A128__A32_A1.
+lemma shake256x4_AETA1__A32_A1_ll: islossless K._shake256x4_AETA1__A32_A1.
 proof.
 proc => /=.
-wp; call A128avx2x4.squeeze_avx2x4_ll.
+wp; call AETA1avx2x4.squeeze_avx2x4_ll.
 wp; call A1avx2x4.absorb_avx2x4_ll.
 wp; call A32avx2x4.absorb_bcast_avx2x4_ll.
 wp; call state_init_avx2x4_ll.
 by auto => />.
 qed.
 
-phoare shake256x4_A128__A32_A1_ph' _seed _nonces :
- [ K._shake256x4_A128__A32_A1
+phoare shake256x4_AETA1__A32_A1_ph' _seed _nonces :
+ [ K._shake256x4_AETA1__A32_A1
  : seed = _seed /\ nonces = _nonces
  ==>
     res.`1 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[0]]) 128)
@@ -1091,12 +1091,12 @@ phoare shake256x4_A128__A32_A1_ph' _seed _nonces :
  /\ res.`4 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[3]]) 128)
  ] = 1%r.
 proof.
-by conseq shake256x4_A128__A32_A1_ll (shake256x4_A128__A32_A1_h' _seed _nonces).
+by conseq shake256x4_AETA1__A32_A1_ll (shake256x4_AETA1__A32_A1_h' _seed _nonces).
 qed.
 
-phoare shake256x4_A128__A32_A1_ph _seed _nonces :
+phoare shake256x4_AETA1__A32_A1_ph _seed _nonces :
  [
-   M._shake256x4_A128__A32_A1
+   M._shake256x4_AETA1__A32_A1
  : seed = _seed /\ nonces = _nonces
  ==>
     res.`1 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[0]]) 128)
@@ -1105,7 +1105,7 @@ phoare shake256x4_A128__A32_A1_ph _seed _nonces :
  /\ res.`4 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[3]]) 128)
  ] = 1%r.
 proof.
-by conseq shake256x4_A128__A32_A1_eq (shake256x4_A128__A32_A1_ph' _seed _nonces) => /> /#.
+by conseq shake256x4_AETA1__A32_A1_eq (shake256x4_AETA1__A32_A1_ph' _seed _nonces) => /> /#.
 qed.
 
 (*********************************************************************************)

@@ -1,6 +1,7 @@
 param int MLKEM_K = 4;
 param int MLKEM_DU = 11;
 param int MLKEM_DV = 5;
+param int MLKEM_ETA1 = 2;
 
 require "../common/params.jinc"
 

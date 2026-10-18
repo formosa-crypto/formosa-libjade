@@ -743,10 +743,20 @@ qed.
 equiv getnoise_1x_equiv_avx :
   M.__poly_cbd_eta1 ~ AuxMLKEMAvx2.cbd2_ref : ={arg} ==> ={res}.
 proof.
-proc*. inline M.__poly_cbd_eta1.  sp;wp.
+proc*. inline M.__poly_cbd_eta1. rcondt{1} ^if; 1: by auto. sp;wp.
+ecall{1} (cbd2_avx2_ph (Array128.init (fun i => buf0.[0 + i])){1}) => />.
+ecall{2} (cbd2_ref_ph buf{2}) => />.
+auto => /> &2.
+have -> // : Array128.init ("_.[_]" buf{2}) = buf{2}.
+by apply Array128.tP => j hj; rewrite Array128.initiE.
+qed.
+
+equiv cbd2_equiv_avx : M.__cbd2 ~ AuxMLKEMAvx2.cbd2_ref : ={arg} ==> ={res}.
+proof.
+proc*.
 ecall{1} (cbd2_avx2_ph buf{1}) => />.
 ecall{2} (cbd2_ref_ph buf{2}) => />.
-auto => /> &2. rewrite tP => i Hi. rewrite initiE /#.
+by auto.
 qed.
 
 (* ============================================================
@@ -770,7 +780,7 @@ seq 22 20 :
  /\ r0{1} = rp{2}     /\ r1{1} = rp0{2}
  /\ r2{1} = rp1{2}    /\ r3{1} = rp2{2} ).
 + sp => /=.
-  wp;ecall{1} (shake256x4_A128__A32_A1_ph seed{1} nonces{1}).
+  wp;ecall{1} (shake256x4_AETA1__A32_A1_ph seed{1} nonces{1}).
   by auto => /> &1 &2 rr H0 H1 H2 H3.
 wp;call getnoise_1x_equiv_avx.
 wp;call getnoise_1x_equiv_avx.
@@ -840,7 +850,7 @@ equiv getnoise_eta2_avx_aux :
     ={rp, seed, nonce} ==> ={res}.
 proof.
 proc.
-wp; call getnoise_1x_equiv_avx.
+wp; call cbd2_equiv_avx.
 sp; conseq />.
 wp; ecall {1} (shake256_128A_A33_ph seed{1} nonce_s{1}).
 auto => /> &2 r0; rewrite /SHAKE256_33_128 /=.

@@ -53,7 +53,10 @@ fn __indcpa_keypair
 
   // the K + K noise polynomials s, e, four at a time; with K = 3, the
   // last two lanes are discarded (into pkpv, overwritten below)
-  if (MLKEM_K == 3) {
+  if (MLKEM_K == 2) {
+    nonce = 0;
+    skpv[0:MLKEM_N], skpv[MLKEM_N:MLKEM_N], e[0:MLKEM_N], e[MLKEM_N:MLKEM_N] = _poly_getnoise_eta1_4x(skpv[0:MLKEM_N], skpv[MLKEM_N:MLKEM_N], e[0:MLKEM_N], e[MLKEM_N:MLKEM_N], noiseseed, nonce);
+  } else if (MLKEM_K == 3) {
     nonce = 0;
     skpv[0:MLKEM_N], skpv[MLKEM_N:MLKEM_N], skpv[2*MLKEM_N:MLKEM_N], e[0:MLKEM_N] = _poly_getnoise_eta1_4x(skpv[0:MLKEM_N], skpv[MLKEM_N:MLKEM_N], skpv[2*MLKEM_N:MLKEM_N], e[0:MLKEM_N], noiseseed, nonce);
 
@@ -133,8 +136,19 @@ fn __indcpa_enc(
   aat = _gen_matrix_avx2(aat, publicseed, transposed);
 
   // the K + K + 1 noise polynomials r, e1, e2, four at a time; with
-  // K = 3, the last lane is discarded (into bp, overwritten below)
-  if (MLKEM_K == 3) {
+  // K = 2, r takes eta1 and e1 eta2 in the same four lanes; with K = 3,
+  // the last lane is discarded (into bp, overwritten below)
+  if (MLKEM_K == 2) {
+    #unspill(noiseseed);
+    ms = #init_msf();
+    nonce = 0;
+    sp[0:MLKEM_N], sp[MLKEM_N:MLKEM_N], ep[0:MLKEM_N], ep[MLKEM_N:MLKEM_N] = _poly_getnoise_eta1122_4x(sp[0:MLKEM_N], sp[MLKEM_N:MLKEM_N], ep[0:MLKEM_N], ep[MLKEM_N:MLKEM_N], noiseseed, nonce);
+
+    #unspill(noiseseed);
+    ms = #init_msf();
+    nonce = 4;
+    epp = _poly_getnoise_eta2(epp, noiseseed, nonce);
+  } else if (MLKEM_K == 3) {
     #unspill(noiseseed);
     ms = #init_msf();
     nonce = 0;

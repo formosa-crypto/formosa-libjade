@@ -699,6 +699,17 @@ abbrev pc_mask_s_dv4 = (W16.of_int 15).
 
 abbrev pc_shift1_s_dv4 = (W16.of_int 512).
 
+abbrev cbd_jshufbidx =
+((Array32.of_list witness)
+[(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int (-1));
+(W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int (-1)); (W8.of_int 6);
+(W8.of_int 7); (W8.of_int 8); (W8.of_int (-1)); (W8.of_int 9);
+(W8.of_int 10); (W8.of_int 11); (W8.of_int (-1)); (W8.of_int 4);
+(W8.of_int 5); (W8.of_int 6); (W8.of_int (-1)); (W8.of_int 7); (W8.of_int 8);
+(W8.of_int 9); (W8.of_int (-1)); (W8.of_int 10); (W8.of_int 11);
+(W8.of_int 12); (W8.of_int (-1)); (W8.of_int 13); (W8.of_int 14);
+(W8.of_int 15); (W8.of_int (-1))]).
+
 abbrev pfm_idx_s =
 ((Array16.of_list witness)
 [(W8.of_int 0); (W8.of_int 1); (W8.of_int 4); (W8.of_int 5); (W8.of_int 8);

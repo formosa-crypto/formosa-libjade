@@ -5,8 +5,11 @@ param int MLKEM_VECN = MLKEM_K * MLKEM_N;
 param int MLKEM_SYMBYTES = 32;
 param int MLKEM_SSBYTES = 32;
 
-param int MLKEM_ETA1 = 2;
 param int MLKEM_ETA2 = 2;
+
+/* the bytes of SHAKE-256 output the eta1 noise sampler reads: the 3-bit
+   sampler loads 32 bytes at every 24, past the 192 it uses */
+param int MLKEM_ETA1_BUFBYTES = MLKEM_ETA1 * MLKEM_N / 4 + (MLKEM_ETA1 - 2) * 8;
 
 param int MLKEM_POLYBYTES = 384; /* 256*12/8 */
 param int MLKEM_POLYVECBYTES = (MLKEM_K * MLKEM_POLYBYTES);

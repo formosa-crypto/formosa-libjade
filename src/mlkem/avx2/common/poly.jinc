@@ -2,7 +2,7 @@ require "params.jinc"
 require "shuffle.jinc"
 require "consts.jinc"
 require "reduce.jinc"
-require "mlkem_keccak_avx2.jinc"
+require "mlkem_keccak_sized.jinc"
 
 /*
 _poly_add2: add arrays pointwise
@@ -560,16 +560,97 @@ fn __cbd2(reg ptr u16[MLKEM_N] rp, reg ptr u8[MLKEM_ETA2*MLKEM_N/4] buf) -> reg 
   return rp;
 }
 
-/* In MLKEM 768 and 1024 eta1 and eta2 is cbd2 */
+u8[32] cbd_jshufbidx = {0, 1, 2, -1, 3, 4, 5, -1, 6, 7, 8, -1, 9, 10, 11, -1,
+                        4, 5, 6, -1, 7, 8, 9, -1, 10, 11, 12, -1, 13, 14, 15, -1};
+
+/*
+__cbd3 generates a polynomial with binomial noise with eta=3, from the
+first 192 bytes of buf (it loads 32 bytes at every 24).
+*/
 #[ safety =
-   { requires = is_arr_init(buf,0,MLKEM_N/2)
+   { requires = is_arr_init(buf,0,MLKEM_ETA1_BUFBYTES)
    , ensures = is_arr_init(rp,0,MLKEM_N * 2)
    }
  ]
 inline
-fn __poly_cbd_eta1(reg ptr u16[MLKEM_N] rp, reg ptr u8[MLKEM_ETA1*MLKEM_N/4+(MLKEM_ETA1 - 2)*8] buf) -> reg ptr u16[MLKEM_N]
+fn __cbd3(reg ptr u16[MLKEM_N] rp, reg ptr u8[MLKEM_ETA1_BUFBYTES] buf) -> reg ptr u16[MLKEM_N]
 {
-  rp = __cbd2(rp, buf[0:MLKEM_ETA2*MLKEM_N/4]);
+  inline int i;
+  reg u256 f0 f1 f2 f3;
+  reg u256 mask249 mask6DB mask07 mask70 mask3 shufbidx;
+  stack u32 mask249_s mask6DB_s mask07_s mask70_s;
+  stack u16 mask3_s;
+
+  mask249_s = 0x249249;
+  mask6DB_s = 0x6DB6DB;
+  mask07_s = 7;
+  mask70_s = (7 << 16);
+  mask3_s = 3;
+
+  mask249 = #VPBROADCAST_8u32(mask249_s);
+  mask6DB = #VPBROADCAST_8u32(mask6DB_s);
+  mask07  = #VPBROADCAST_8u32(mask07_s);
+  mask70  = #VPBROADCAST_8u32(mask70_s);
+  mask3   = #VPBROADCAST_16u16(mask3_s);
+  shufbidx = cbd_jshufbidx[:u256 0];
+
+  for i = 0 to MLKEM_N/32
+  {
+    f0 = buf.[:u256 24*i];
+    f0 = #VPERMQ(f0, 0x94);
+    f0 = #VPSHUFB_256(f0, shufbidx);
+
+    f1 = #VPSRL_8u32(f0, 1);
+    f2 = #VPSRL_8u32(f0, 2);
+    f0 = #VPAND_256(mask249, f0);
+    f1 = #VPAND_256(mask249, f1);
+    f2 = #VPAND_256(mask249, f2);
+    f0 = #VPADD_8u32(f0, f1);
+    f0 = #VPADD_8u32(f0, f2);
+
+    f1 = #VPSRL_8u32(f0, 3);
+    f0 = #VPADD_8u32(f0, mask6DB);
+    f0 = #VPSUB_8u32(f0, f1);
+
+    f1 = #VPSLL_8u32(f0, 10);
+    f2 = #VPSRL_8u32(f0, 12);
+    f3 = #VPSRL_8u32(f0, 2);
+    f0 = #VPAND_256(f0, mask07);
+    f1 = #VPAND_256(f1, mask70);
+    f2 = #VPAND_256(f2, mask07);
+    f3 = #VPAND_256(f3, mask70);
+    f0 = #VPADD_16u16(f0, f1);
+    f1 = #VPADD_16u16(f2, f3);
+    f0 = #VPSUB_16u16(f0, mask3);
+    f1 = #VPSUB_16u16(f1, mask3);
+
+    f2 = #VPUNPCKL_8u32(f0, f1);
+    f3 = #VPUNPCKH_8u32(f0, f1);
+
+    f0 = #VPERM2I128(f2, f3, 0x20);
+    f1 = #VPERM2I128(f2, f3, 0x31);
+
+    rp[:u256 2*i] = f0;
+    rp[:u256 2*i + 1] = f1;
+  }
+
+  return rp;
+}
+
+/* the eta1 noise: eta1 = 2 (ML-KEM-768, ML-KEM-1024) or 3 (ML-KEM-512) */
+#[ safety =
+   { requires = is_arr_init(buf,0,MLKEM_ETA1_BUFBYTES)
+   , ensures = is_arr_init(rp,0,MLKEM_N * 2)
+   }
+ ]
+inline
+fn __poly_cbd_eta1(reg ptr u16[MLKEM_N] rp, reg ptr u8[MLKEM_ETA1_BUFBYTES] buf) -> reg ptr u16[MLKEM_N]
+{
+  if (MLKEM_ETA1 == 2) {
+    rp = __cbd2(rp, buf[0:MLKEM_ETA2*MLKEM_N/4]);
+  } else {
+    rp = __cbd3(rp, buf);
+  }
   return rp;
 }
 
@@ -590,12 +671,12 @@ fn _poly_getnoise_eta2(reg ptr u16[MLKEM_N] rp, reg ptr u8[MLKEM_SYMBYTES] seed,
 
   () = #unspill(rp);
   ms = #init_msf();
-  rp =__poly_cbd_eta1(rp, buf);
+  rp = __cbd2(rp, buf);
 
   return rp;
 }
 
-/* _poly_getnoise_eta1_4x: computes 4x the binomial noise,
+/* _poly_getnoise_eta1_4x: computes 4x the eta1 binomial noise,
    where only the shake computation is parallelized. */
 #[safety =
    { requires = is_arr_init(seed,0,MLKEM_SYMBYTES)
@@ -614,9 +695,9 @@ fn _poly_getnoise_eta1_4x
    , reg ptr u16[MLKEM_N]
    , reg ptr u16[MLKEM_N]
 {
-  stack u8[128] buf0_s buf1_s buf2_s buf3_s;
+  stack u8[MLKEM_ETA1_BUFBYTES] buf0_s buf1_s buf2_s buf3_s;
   stack u8[4] nonces;
-  reg ptr u8[128] buf0, buf1, buf2, buf3;
+  reg ptr u8[MLKEM_ETA1_BUFBYTES] buf0, buf1, buf2, buf3;
 
   buf0 = buf0_s; buf1 = buf1_s; buf2 = buf2_s; buf3 = buf3_s;
 
@@ -631,7 +712,7 @@ fn _poly_getnoise_eta1_4x
   nonces[3] = nonce;
 
 
-  buf0, buf1, buf2, buf3 = _shake256x4_A128__A32_A1(buf0, buf1, buf2, buf3, seed, nonces);
+  buf0, buf1, buf2, buf3 = _shake256x4_AETA1__A32_A1(buf0, buf1, buf2, buf3, seed, nonces);
 
   _ = #init_msf();
 
@@ -640,6 +721,56 @@ fn _poly_getnoise_eta1_4x
   r1 = __poly_cbd_eta1(r1, buf1);
   r2 = __poly_cbd_eta1(r2, buf2);
   r3 = __poly_cbd_eta1(r3, buf3);
+
+  return r0, r1, r2, r3;
+}
+
+/* _poly_getnoise_eta1122_4x: computes 4x the binomial noise, eta1 on the
+   first two lanes and eta2 on the last two, where only the shake
+   computation is parallelized. */
+#[safety =
+   { requires = is_arr_init(seed,0,MLKEM_SYMBYTES)
+   , ensures = is_arr_init(r0,0,MLKEM_N * 2) &&
+                is_arr_init(r1,0,MLKEM_N * 2) &&
+                is_arr_init(r2,0,MLKEM_N * 2) &&
+                is_arr_init(r3,0,MLKEM_N * 2)
+   }
+ ]
+fn _poly_getnoise_eta1122_4x
+( reg ptr u16[MLKEM_N] r0 r1 r2 r3
+, reg ptr u8[MLKEM_SYMBYTES] seed
+, reg u8 nonce
+) -> reg ptr u16[MLKEM_N]
+   , reg ptr u16[MLKEM_N]
+   , reg ptr u16[MLKEM_N]
+   , reg ptr u16[MLKEM_N]
+{
+  stack u8[MLKEM_ETA1_BUFBYTES] buf0_s buf1_s buf2_s buf3_s;
+  stack u8[4] nonces;
+  reg ptr u8[MLKEM_ETA1_BUFBYTES] buf0, buf1, buf2, buf3;
+
+  buf0 = buf0_s; buf1 = buf1_s; buf2 = buf2_s; buf3 = buf3_s;
+
+() = #spill(r0,r1,r2,r3);
+
+  nonces[0] = nonce;
+  nonce += 1;
+  nonces[1] = nonce;
+  nonce += 1;
+  nonces[2] = nonce;
+  nonce += 1;
+  nonces[3] = nonce;
+
+
+  buf0, buf1, buf2, buf3 = _shake256x4_AETA1__A32_A1(buf0, buf1, buf2, buf3, seed, nonces);
+
+  _ = #init_msf();
+
+() = #unspill(r0,r1,r2,r3);
+  r0 = __poly_cbd_eta1(r0, buf0);
+  r1 = __poly_cbd_eta1(r1, buf1);
+  r2 = __cbd2(r2, buf2[0:MLKEM_ETA2*MLKEM_N/4]);
+  r3 = __cbd2(r3, buf3[0:MLKEM_ETA2*MLKEM_N/4]);
 
   return r0, r1, r2, r3;
 }

@@ -596,7 +596,8 @@ seq 1 0 : (#pre /\
      lift_array256 (subarray256 e{1} j) =
      samplePolyCBD (PRF noiseseed{1} (W8.of_int (j + kvec)))) /\
   signed_boundvecn_cxq skpv{1} 0 vecn 1 /\ signed_boundvecn_cxq e{1} 0 vecn 1).
-+ if{1}.
++ rcondf{1} 1; 1: by auto => />; smt(param_sets).
+  if{1}.
   + wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 4)).
     wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 0)).
     auto => /> &1 &2 _ hk r1 h11 h12 h13 h14 b11 b12 b13 b14 r2 h21 h22 h23 h24 b21 b22 b23 b24.
@@ -931,7 +932,8 @@ seq 1 0 : (#pre /\
   lift_array256 epp{1} = samplePolyCBD (PRF noiseseed{1} (W8.of_int (2 * kvec))) /\
   signed_boundvecn_cxq sp_0{1} 0 vecn 1 /\ signed_boundvecn_cxq ep{1} 0 vecn 1 /\
   signed_bound_cxq epp{1} 0 256 1).
-+ if{1}.
++ rcondf{1} 1; 1: by auto => />; smt(param_sets).
+  if{1}.
   + wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 4)).
     wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 0)).
     auto => /> &1 &2 7? hk r1 h11 h12 h13 h14 b11 b12 b13 b14 r2 h21 h22 h23 h24 b21 b22 b23 b24.
