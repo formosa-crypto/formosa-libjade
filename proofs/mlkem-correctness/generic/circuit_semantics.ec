@@ -1,7 +1,7 @@
 require import AllCore List Int IntDiv CoreMap Real Number.
 
 from Jasmin require import JModel.
-from JazzEC require import Array256 Array128 Array64 Array32 Array16 Array8 Array4 Array2.
+from JazzEC require import Array384 Array256 Array128 Array64 Array32 Array16 Array8 Array4 Array2.
 from JazzEC require import Array768 Array960 Array1152 Array1024 Array1408 Array1536 Array160.
 
 require import AVX2_Ops W16extra.
@@ -94,6 +94,39 @@ qed.
 op frombytes_circuit(a : W12.t) : W16.t =
    BS_W16_W12_U.zeroextu16 a.
    
+
+lemma frombytes_circuit_sem384 (a : W8.t Array384.t) (i : int) :
+  0 <= i < 256 =>
+  incoeff (to_sint (frombytes_circuit
+    (W12.init (fun (j : int) => a.[(i * 12 + j) %/ 8].[(i * 12 + j) %% 8])))) =
+  incoeff (decode12 a).[i].
+proof.
+move=> ib; rewrite /decode12 Array256.get_of_list //.
+rewrite /ByteDecode (nth_map []);
+ 1: by rewrite size_chunk // size_BytesToBits size_to_list /#.
+rewrite /frombytes_circuit /to_sint /BS_W16_W12_U.zeroextu16 of_uintK /= modz_small /=;
+ 1: by have := W12.to_uint_cmp => /= /#.
+rewrite /BytesToBits JWordList.nth_chunk 1,2:/#.
+rewrite (EclibExtra.size_flatten' 8); 1,2: smt(mapP W8.size_w2bits Array384.size_to_list size_map).
+congr; rewrite /smod /= ifF; 1: by have := W12.to_uint_cmp => /= /#.
+rewrite /to_uint; congr; apply (eq_from_nth false).
++ rewrite W12.size_w2bits size_take 1:/# size_drop 1:/#.
+  rewrite (EclibExtra.size_flatten' 8); 1,2: smt(mapP W8.size_w2bits Array384.size_to_list size_map).
+move=> k; rewrite W12.size_w2bits => kb.
+rewrite W12.get_w2bits W12.initiE 1:/# /= nth_take 1,2:/# nth_drop 1,2:/#.
+rewrite (nth_flatten false 8); 1: by rewrite allP => x; rewrite mapP => Hx; elim Hx; smt(W8.size_w2bits).
+rewrite (nth_map witness); 1: by rewrite size_to_list /= /#.
+by rewrite get_to_list get_w2bits /#.
+qed.
+
+lemma frombytes_circuit_rng384 (a : W8.t Array384.t) (i : int) :
+  0 <= to_sint (frombytes_circuit
+    (W12.init (fun (j : int) => a.[(i * 12 + j) %/ 8].[(i * 12 + j) %% 8]))) < 4096.
+proof.
+rewrite /frombytes_circuit /to_sint /BS_W16_W12_U.zeroextu16 of_uintK /= modz_small /=;
+ 1: by have := W12.to_uint_cmp => /= /#.
+by rewrite /smod /=; have := W12.to_uint_cmp => /= /#.
+qed.
 
 op compress1_circuit(a : W16.t) : bool =
    if (a \ult W16.of_int 3329) then
