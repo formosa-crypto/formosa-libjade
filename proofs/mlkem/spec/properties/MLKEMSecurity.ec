@@ -6,7 +6,7 @@ from JazzEC require import Array768 Array960 Array1024 Array1152.
 
 from Spec require import GFq Rq Sampling Symmetric Serialization.
 from Spec require import Correctness MLKEMLib.
-from Spec require import EncDecCorrectness.
+from Spec require import EncDecCorrectness SamplingCBD.
 
 require import MLWE_PKE_Hash.
 require FLPRG PRF.
@@ -22,6 +22,8 @@ import PolyVec PolyMat.
    only variant facts the proof needs are the param_sets-derived bounds below. *)
 lemma kvec_le4 : kvec <= 4 by smt(param_sets).
 lemma dv_vals  : dv = 4 \/ dv = 5 by smt(param_sets).
+(* the noise is CBD_2 throughout: the PRF hop below samples it by CBD2_PRF *)
+lemma eta_vals : eta1 = 2 /\ eta2 = 2 by smt(param_sets).
 
 (* Rewriting the Spec in a way that allows applying computational
    assumptions on PRGs, as well as defining operators that
@@ -99,7 +101,7 @@ clone PRF as PRF_DEFS with
 clone import PRF_DEFS.PseudoRF as NPRF with
   type K <- W8.t Array32.t, 
   op dK <- srand,
-  op F <- Symmetric.PRF
+  op F <- SHAKE256_33_128
   proof dK_ll by apply srand_ll
   proof *.
 
@@ -157,9 +159,24 @@ module CBD2_PRF(PRF : PRF_DEFS.PRF_Oracles) = {
 }.
 
 equiv cbd_correct : 
-  CBD2_PRF(NPRF.PRF).sample ~ SamplePolyCBD.sample :
+  CBD2_PRF(NPRF.PRF).sample ~ SamplePolyCBD2.sample :
   arg{2} = SHAKE256_33_128 NPRF.PRF.k{1} (W8.of_int arg{1}) ==> ={res}
 by proc => /=;inline *;sim;auto.
+
+(* CBD2_PRF is the sampler of the specification at eta = 2 *)
+equiv cbd_spec_eq :
+  CBD2_PRF(NPRF.PRF).sample ~ SamplePolyCBD.sample :
+  arg{2} = (2, Symmetric.PRF 2 NPRF.PRF.k{1} (W8.of_int arg{1})) ==> ={res}.
+proof.
+transitivity SamplePolyCBD2.sample
+  (arg{2} = SHAKE256_33_128 NPRF.PRF.k{1} (W8.of_int arg{1}) ==> ={res})
+  (arg{2} = (2, to_list arg{1}) ==> ={res}).
++ move=> &1 &2 ->; exists (SHAKE256_33_128 NPRF.PRF.k{1} (W8.of_int arg{1})).
+  by rewrite PRF2E.
++ by [].
++ exact cbd_correct.
+exact samplePolyCBD2_eq.
+qed.
 
 equiv cbdspec_correct (PRF <: PRF_DEFS.PRF_Oracles): 
   CBD2_PRF(PRF).sample_spec ~ CBD2_PRF(PRF).sample :  ={arg,glob PRF} ==> ={res}.
@@ -182,10 +199,11 @@ qed.
 
 lemma cbd2prfsem _k _N :
    phoare [ CBD2_PRF(NPRF.PRF).sample : NPRF.PRF.k = _k /\ arg = _N ==>
-        res = samplePolyCBD (SHAKE256_33_128 _k (W8.of_int _N)) ] = 1%r.
+        res = samplePolyCBD 2 (Symmetric.PRF 2 _k (W8.of_int _N)) ] = 1%r.
 bypr => &m0; split => //; move=> [#] kv ->.
-have /=  <- := samplePolyCBD_opsem &m0 (samplePolyCBD (SHAKE256_33_128 _k (W8.of_int _N))) (SHAKE256_33_128 _k (W8.of_int _N)).
-by  byequiv (cbd_correct) => /#.
+pose b := Symmetric.PRF 2 _k (W8.of_int _N).
+have /= <- := samplePolyCBD_opsem &m0 (samplePolyCBD 2 b) 2 b.
+by byequiv cbd_spec_eq => /#.
 qed.
 
 import PolyVec PolyMat.
@@ -273,13 +291,15 @@ qed.
 
 op prg_kg_inner(coins :  W8.t Array32.t) : W8.t Array32.t * polyvec * polyvec =
    ((G_coins768 coins).`1, 
-    KVec.init (fun i => samplePolyCBD (Symmetric.PRF (G_coins768 coins).`2 (W8.of_int i))),
-    KVec.init (fun i => samplePolyCBD (Symmetric.PRF (G_coins768 coins).`2 (W8.of_int (i + kvec))))).
+    KVec.init (fun i =>
+      samplePolyCBD eta1 (Symmetric.PRF eta1 (G_coins768 coins).`2 (W8.of_int i))),
+    KVec.init (fun i =>
+      samplePolyCBD eta1 (Symmetric.PRF eta1 (G_coins768 coins).`2 (W8.of_int (i + kvec))))).
 
 op prg_enc_inner(coins :  W8.t Array32.t) : polyvec * polyvec * poly =
-   (KVec.init (fun i => samplePolyCBD (Symmetric.PRF coins (W8.of_int i))),
-    KVec.init (fun i => samplePolyCBD (Symmetric.PRF coins (W8.of_int (i + kvec)))),
-    samplePolyCBD (Symmetric.PRF coins (W8.of_int (2 * kvec)))).
+   (KVec.init (fun i => samplePolyCBD eta1 (Symmetric.PRF eta1 coins (W8.of_int i))),
+    KVec.init (fun i => samplePolyCBD eta2 (Symmetric.PRF eta2 coins (W8.of_int (i + kvec)))),
+    samplePolyCBD eta2 (Symmetric.PRF eta2 coins (W8.of_int (2 * kvec)))).
 
 lemma prg_kg_sem _coins : 
    phoare [ MLKEM_PRGs.prg_kg : coins = _coins ==> res = prg_kg_inner _coins ] = 1%r.
@@ -287,7 +307,8 @@ proc; sp.
 while (0 <= i <= kvec /\ _N = i + kvec /\ rho = (G_coins768 _coins).`1 /\
        NPRF.PRF.k = (G_coins768 _coins).`2 /\ noise1 = (prg_kg_inner _coins).`2 /\
        (forall ii, 0 <= ii < i =>
-          noise2.[ii] = samplePolyCBD (SHAKE256_33_128 ((G_coins768 _coins).`2) (W8.of_int (ii + kvec)))))
+          noise2.[ii] =
+          samplePolyCBD 2 (Symmetric.PRF 2 ((G_coins768 _coins).`2) (W8.of_int (ii + kvec)))))
       (kvec - i).
 + move => z; wp; ecall (cbd2prfsem NPRF.PRF.k _N).
   auto => />; smt(KVec.get_setE gt0_k).
@@ -295,25 +316,26 @@ wp.
 while (0 <= i <= kvec /\ _N = i /\ rho = (G_coins768 _coins).`1 /\
        NPRF.PRF.k = (G_coins768 _coins).`2 /\ noise2 = witness /\
        (forall ii, 0 <= ii < i =>
-          noise1.[ii] = samplePolyCBD (SHAKE256_33_128 ((G_coins768 _coins).`2) (W8.of_int ii))))
+          noise1.[ii] = samplePolyCBD 2 (Symmetric.PRF 2 ((G_coins768 _coins).`2) (W8.of_int ii))))
       (kvec - i).
 + move => z; wp; ecall (cbd2prfsem NPRF.PRF.k _N).
   auto => />; smt(KVec.get_setE gt0_k).
 auto => />.
+have [he1 _] := eta_vals.
 split; first by smt(gt0_k).
 move => i0 n10.
 split; first by smt(gt0_k).
 move => hex h0 h0l hrho hsig Hn10.
 have Hn10v : n10 = (prg_kg_inner _coins).`2.
 + rewrite /prg_kg_inner /=; apply KVec.ext_eq => k hk.
-  by rewrite KVec.initiE 1:hk /= /PRF; smt().
+  by rewrite KVec.initiE 1:hk /= he1; smt().
 split; first by smt(gt0_k).
 move => i1 n20.
 split; first by smt(gt0_k).
 move => hex2 h1 h1l hn10eq Hn20.
 have Hn20v : n20 = (prg_kg_inner _coins).`3.
 + rewrite /prg_kg_inner /=; apply KVec.ext_eq => k hk.
-  by rewrite KVec.initiE 1:hk /= /PRF; smt(kvec_le4).
+  by rewrite KVec.initiE 1:hk /= he1; smt(kvec_le4).
 by rewrite Hn20v /prg_kg_inner /=; smt().
 qed.
 
@@ -324,33 +346,34 @@ ecall (cbd2prfsem NPRF.PRF.k _N).
 while (0 <= i <= kvec /\ _N = i + kvec /\ NPRF.PRF.k = _coins /\
        noise1 = (prg_enc_inner _coins).`1 /\
        (forall ii, 0 <= ii < i =>
-          noise2.[ii] = samplePolyCBD (SHAKE256_33_128 _coins (W8.of_int (ii + kvec)))))
+          noise2.[ii] = samplePolyCBD 2 (Symmetric.PRF 2 _coins (W8.of_int (ii + kvec)))))
       (kvec - i).
 + move => z; wp; ecall (cbd2prfsem NPRF.PRF.k _N).
   auto => />; smt(KVec.get_setE gt0_k).
 wp.
 while (0 <= i <= kvec /\ _N = i /\ NPRF.PRF.k = _coins /\ noise2 = witness /\
        (forall ii, 0 <= ii < i =>
-          noise1.[ii] = samplePolyCBD (SHAKE256_33_128 _coins (W8.of_int ii))))
+          noise1.[ii] = samplePolyCBD 2 (Symmetric.PRF 2 _coins (W8.of_int ii))))
       (kvec - i).
 + move => z; wp; ecall (cbd2prfsem NPRF.PRF.k _N).
   auto => />; smt(KVec.get_setE gt0_k).
 auto => />.
+have [he1 he2] := eta_vals.
 split; first by smt(gt0_k).
 move => i0 n10.
 split; first by smt(gt0_k).
 move => hex h0 h0l Hn10.
 have Hn10v : n10 = (prg_enc_inner _coins).`1.
 + rewrite /prg_enc_inner /=; apply KVec.ext_eq => k hk.
-  by rewrite KVec.initiE 1:hk /= /PRF; smt().
+  by rewrite KVec.initiE 1:hk /= he1; smt().
 split; first by smt(gt0_k).
 move => i1 n20.
 split; first by smt(gt0_k).
 move => hex2 h1 h1l hn10eq Hn20.
 have Hn20v : n20 = (prg_enc_inner _coins).`2.
 + rewrite /prg_enc_inner /=; apply KVec.ext_eq => k hk.
-  by rewrite KVec.initiE 1:hk /= /PRF; smt(kvec_le4).
-by rewrite Hn20v /prg_enc_inner /= /PRF; smt(kvec_le4).
+  by rewrite KVec.initiE 1:hk /= he2; smt(kvec_le4).
+by rewrite Hn20v /prg_enc_inner /= he2; smt(kvec_le4).
 (* losslessness of the two noise whiles (prefix of the trailing e2 call) *)
 while (0 <= i <= kvec) (kvec - i).
 + move => z; wp; ecall (cbd2prfsem NPRF.PRF.k _N); auto => /> /#.
@@ -458,15 +481,12 @@ transitivity{1} { a<-witness;(rho,s,e) <@ MLKEM_PRGs.prg_kg(coins);
 inline {1} 2. 
 case <- {1} 12. 
 swap {1} 12 -7. swap {1} 15 -9. wp.
-inline CBD2_PRF(NPRF.PRF).sample.
-inline SamplePolyCBD.sample.
-inline PseudoRF.f.
 while (noise1{1} = s{2} /\ rho{1} = rho{2} /\ noiseseed{1} = sig{2} /\
        ={i,_N,a} /\ NPRF.PRF.k{1} = sig{2} /\
        0<=i{1}<=kvec /\ 
        forall k, 0 <=k < i{1} => (noise2{1}.[k]) = (e{2}.[k])).
-+ wp; conseq(_: ={rr0}); 1: by smt(KVec.get_setE).  
-  by inline*; sim; auto => />. 
++ wp; call cbd_spec_eq; auto => /> &1 &2 *.
+  by have [-> _] := eta_vals; smt(KVec.get_setE).
 wp;conseq (: noise1{1} = s{2} /\
              rho{1} = rho{2} /\
              NPRF.PRF.k{1} = sig{2} /\
@@ -479,16 +499,16 @@ while (rho{1} = rho{2} /\ noiseseed{1} = sig{2} /\
        ={i,_N,a} /\ NPRF.PRF.k{1} = sig{2} /\
        0<=i{1}<=kvec /\ 
        forall k, 0 <=k < i{1} => (noise1{1}.[k]) = (s{2}.[k])).
-+ wp; conseq(_: ={rr}); 1: by smt(KVec.get_setE).  
-  by inline*; sim; auto => />. 
++ wp; call cbd_spec_eq; auto => /> &1 &2 *.
+  by have [-> _] := eta_vals; smt(KVec.get_setE).
 inline {1} 6.
 sp;wp;conseq  (: rho{1} = rho{2} /\ 
              noiseseed{1} = sig{2} /\
-             a2{1} = a{2}).
+             a0{1} = a{2}).
 + move => &1 &2 /> *; split; first by smt(gt0_k).
   by move => *; apply KVec.ext_eq => k hk; smt().
-while (#post /\ sd{1} = rho{1} /\ i2{1} = i{2} /\ 0<=i2{1}<=kvec); last by auto => />.
-wp;while (#post /\ j1{1} = j{2} /\ 0<=j1{1}<=kvec); 
+while (#post /\ sd{1} = rho{1} /\ i0{1} = i{2} /\ 0<=i0{1}<=kvec); last by auto => />.
+wp;while (#post /\ j{1} = j{2} /\ 0<=j{1}<=kvec); 
      last by auto => /> /#. 
 inline {2} 1;sp 0 4.
 exists * rho{2}, (W8.of_int i{2}), (W8.of_int j{2}).
@@ -516,16 +536,18 @@ transitivity{1} {  aT <@ Hmodule.sampleAT(rho);
 + ecall{2} (prg_enc_sem r{2}).
   by ecall{2} (H_T_sem rho{2}); auto.
 
-inline {1} 2. inline {1} 11. inline {2} 9. inline {1} 13. swap {2} 1 2.
-wp;sim;wp;
+inline {1} 2. swap {2} 1 2.
+wp; call cbd_spec_eq; wp.
 conseq (: ={that,_N,m,aT} /\
   noise2{1} = e1{2} /\
   noise1{1} = rv{2} /\ NPRF.PRF.k{1} = coins{2} /\
-  noiseseed{1} = coins{2});1: by smt().
+  noiseseed{1} = coins{2}).
++ by move=> &1 &2 /> *; have [_ ->] := eta_vals.
 while (={i, that, _N, m, aT} /\ noise1{1} = rv{2} /\ noiseseed{1} = coins{2} /\
        0<=i{1}<=kvec /\ NPRF.PRF.k{1} = coins{2} /\
        forall k, 0 <=k < i{1} => (noise2{1}.[k]) = (e1{2}.[k])).
-+ inline *;wp;conseq(_: ={rr0}); 1: by smt(KVec.get_setE).  by inline*; sim; auto => />. 
++ wp; call cbd_spec_eq; auto => /> &1 &2 *.
+  by have [_ ->] := eta_vals; smt(KVec.get_setE).
 wp;conseq (: ={that,_N,m,aT} /\
   noise1{1} = rv{2} /\ NPRF.PRF.k{1} = coins{2} /\
   noiseseed{1} = coins{2}).
@@ -534,22 +556,22 @@ wp;conseq (: ={that,_N,m,aT} /\
 while (={i, that, _N, m, aT} /\ noiseseed{1} = coins{2} /\
        0<=i{1}<=kvec /\ NPRF.PRF.k{1} = coins{2} /\
        forall k, 0 <=k < i{1} => (noise1{1}.[k]) = (rv{2}.[k])).
-+ inline *;wp; conseq(_: ={rr0}); 1: by smt(KVec.get_setE).  
-  by inline*; sim; auto => />. 
++ wp; call cbd_spec_eq; auto => /> &1 &2 *.
+  by have [-> _] := eta_vals; smt(KVec.get_setE).
 inline {1} 1.
-sp;wp;conseq (: ={that, m} /\ a0{1} = aT{2} /\ r{1} = coins{2}).
+sp;wp;conseq (: ={that, m} /\ a{1} = aT{2} /\ r{1} = coins{2}).
 + move => &1 &2 /> *; split; first by smt(gt0_k).
   by move => *; apply KVec.ext_eq => k hk; smt().
-while (#post /\ sd{1} = rho{2} /\  i1{1} = i{2} /\ r{1} = coins{2} /\ 0<=i1{1}<=kvec); last by auto => />. 
-
-wp;while (#post /\ i1{1} = i{2} /\ j0{1} = j{2} /\ 0<=j0{1}<=kvec); 
+while (#post /\ sd{1} = rho{2} /\ i0{1} = i{2} /\ r{1} = coins{2} /\ 0<=i0{1}<=kvec);
+  last by auto => />.
+wp;while (#post /\ i0{1} = i{2} /\ j{1} = j{2} /\ 0<=j{1}<=kvec);
      last by auto => /> /#.
 inline {2} 1;sp 0 4.
 exists * rho{2}, (W8.of_int i{2}), (W8.of_int j{2}).
          elim * => _rho _i _j.
   pose _st := (SHAKE128_ABSORB_34 _rho _i _j).
 have parsesem := parse_sem _st _rho _i _j _;1: smt().
-wp;call{2} parsesem. 
+wp;call{2} parsesem.
 by inline *; auto => /> /#.
 qed.
 

@@ -11,7 +11,8 @@ require import GFq.
 import Zq.
 require import Rq.
 
-require import Symmetric. 
+require import Symmetric.
+require import Serialization.
 
 module SampleNTT(XOF : XOF_t) = {
   proc sample() : poly = {
@@ -38,21 +39,26 @@ module SampleNTT(XOF : XOF_t) = {
 }.
 
 
+(* FIPS 203, Algorithm 8 (SamplePolyCBD_eta): the coefficient i is the
+   difference of the sums of the bits 2 i eta .. 2 i eta + eta - 1 and
+   2 i eta + eta .. 2 i eta + 2 eta - 1 of the 64 eta input bytes *)
 module SamplePolyCBD = {
-  proc sample(bytes : W8.t Array128.t) : poly = {
-    var i,j,a,b;
+  proc sample(eta_ : int, bytes : W8.t list) : poly = {
+    var i, j, x, y, bits;
     var rr : poly;
     rr <- witness;
-    j <- 0; i <- 0; 
-    while (i < 128) {
-      a <- b2i bytes.[i].[j %% 2 * 4 + 0] + b2i bytes.[i].[j %% 2 * 4 + 1];
-      b <- b2i bytes.[i].[j %% 2 * 4 + 2] + b2i bytes.[i].[j %% 2 * 4 + 3];
-      rr.[j] <- incoeff  (a - b);
-      j <- j + 1;
-      a <- b2i bytes.[i].[j %% 2 * 4 + 0] + b2i bytes.[i].[j %% 2 * 4 + 1];
-      b <- b2i bytes.[i].[j %% 2 * 4 + 2] + b2i bytes.[i].[j %% 2 * 4 + 3];
-      rr.[j] <- incoeff  (a - b);
-      j <- j + 1;
+    bits <- BytesToBits bytes;
+    i <- 0;
+    while (i < 256) {
+      x <- 0;
+      y <- 0;
+      j <- 0;
+      while (j < eta_) {
+        x <- x + b2i (nth false bits (2 * i * eta_ + j));
+        y <- y + b2i (nth false bits (2 * i * eta_ + eta_ + j));
+        j <- j + 1;
+      }
+      rr.[i] <- incoeff (x - y);
       i <- i + 1;
     }
     return rr;

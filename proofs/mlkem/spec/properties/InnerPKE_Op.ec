@@ -5,7 +5,7 @@ from JazzEC require import Array25 Array32 Array33 Array64 Array128 Array168
 
 from Spec require import GFq Rq Sampling Symmetric Serialization.
 from Spec require import Correctness MLKEMLib.
-from Spec require import EncDecCorrectness.
+from Spec require import EncDecCorrectness SamplingCBD.
 
 import Zq Serialization Symmetric.
 
@@ -18,27 +18,20 @@ import PolyVec PolyMat KMatrix Vector.
    nttm (H rho) = sampleA rho via nttmK. *)
 op H(rho : W8.t Array32.t) : polymat = invnttm (sampleA rho).
 
-(* Operator-form PRG composing G_coins_ds with CBD2 sampling.  s, e are
+(* Operator-form PRG composing G_coins_ds with CBD sampling.  s, e are
    the two noise polyvecs. *)
 op prg_kg_inner(coins : W8.t Array32.t) : W8.t Array32.t * polyvec * polyvec =
   ((G_coins_ds coins).`1,
-   KVec.init (fun i => samplePolyCBD (Symmetric.PRF (G_coins_ds coins).`2 (W8.of_int i))),
-   KVec.init (fun i => samplePolyCBD (Symmetric.PRF (G_coins_ds coins).`2 (W8.of_int (i + kvec))))).
+   KVec.init (fun i =>
+     samplePolyCBD eta1 (Symmetric.PRF eta1 (G_coins_ds coins).`2 (W8.of_int i))),
+   KVec.init (fun i =>
+     samplePolyCBD eta1 (Symmetric.PRF eta1 (G_coins_ds coins).`2 (W8.of_int (i + kvec))))).
 
 op prg_enc_inner(coins : W8.t Array32.t) : polyvec * polyvec * poly =
-  (KVec.init (fun i => samplePolyCBD (Symmetric.PRF coins (W8.of_int i))),
-   KVec.init (fun i => samplePolyCBD (Symmetric.PRF coins (W8.of_int (i + kvec)))),
-   samplePolyCBD (Symmetric.PRF coins (W8.of_int (2 * kvec)))).
-
-(* CBD2.sample's proc-op bridge.  Belongs in Correctness768.ec alongside
-   sampleA_sem; co-located here pending that relocation. *)
-lemma cbd2sample_ph b :
-  phoare [SamplePolyCBD.sample : arg = b ==> res = samplePolyCBD b] = 1%r.
-proof.
-bypr => &m0 ->.
-have /= <- := samplePolyCBD_opsem &m0 (samplePolyCBD b) b.
-done.
-qed.
+  (KVec.init (fun i => samplePolyCBD eta1 (Symmetric.PRF eta1 coins (W8.of_int i))),
+   KVec.init (fun i =>
+     samplePolyCBD eta2 (Symmetric.PRF eta2 coins (W8.of_int (i + kvec)))),
+   samplePolyCBD eta2 (Symmetric.PRF eta2 coins (W8.of_int (2 * kvec)))).
 
 (* get-after-set on the concrete polyvec is KVec.get_setE; the sampleA
    accessor is now Correctness768.sampleAE — both used directly below. *)
@@ -174,11 +167,11 @@ seq 0 2 : (rho{1} = rho{2} /\
              e{1} = (prg_kg_inner coins{1}).`3 /\
              (forall ii, 0 <= ii < i{2} =>
                 (s{2}.[ii])
-                  = samplePolyCBD (Symmetric.PRF sig{2} (W8.of_int ii))))
+                  = samplePolyCBD eta1 (Symmetric.PRF eta1 sig{2} (W8.of_int ii))))
             (kvec - i{2}).
   + move => &m z; wp.
     exists * sig, _N; elim * => _sig _N.
-    call (cbd2sample_ph (Symmetric.PRF _sig (W8.of_int _N))).
+    call (samplePolyCBD_opph eta1 (Symmetric.PRF eta1 _sig (W8.of_int _N))).
     auto => /> &hr [#] ? Hbnd Hgi Hvar; do split;1..2,4..:smt().
     + move => k Hk0 Hk1; case (k < _N) => ?.
       + by rewrite KVec.get_setE /=; smt().
@@ -201,11 +194,11 @@ seq 0 2 : (rho{1} = rho{2} /\
              e{1} = (prg_kg_inner coins{1}).`3 /\
              (forall ii, 0 <= ii < i{2} =>
                 (e{2}.[ii])
-                  = samplePolyCBD (Symmetric.PRF sig{2} (W8.of_int (ii + kvec)))))
+                  = samplePolyCBD eta1 (Symmetric.PRF eta1 sig{2} (W8.of_int (ii + kvec)))))
             (kvec - i{2}).
   + move => &m z; wp.
     exists * sig, _N; elim * => _sig _N.
-    call (cbd2sample_ph (Symmetric.PRF _sig (W8.of_int _N))).
+    call (samplePolyCBD_opph eta1 (Symmetric.PRF eta1 _sig (W8.of_int _N))).
     auto => /> &hr [#] ? Hbnd Hgi Hvar; do split; smt(KVec.get_setE gt0_k).
 
   auto => /> &1 &2; split; 1: smt(gt0_k).
@@ -290,11 +283,11 @@ seq 0 2 : (r{1} = coins{2} /\ m{1} = m{2} /\
              aT{2} = trmx (sampleA rho{2}) /\
              (forall ii, 0 <= ii < i{2} =>
                 (rv{2}.[ii])
-                  = samplePolyCBD (Symmetric.PRF coins{2} (W8.of_int ii))))
+                  = samplePolyCBD eta1 (Symmetric.PRF eta1 coins{2} (W8.of_int ii))))
             (kvec - i{2}).
   + move => &m z; wp.
     exists * coins, _N; elim * => _coins _N.
-    call (cbd2sample_ph (Symmetric.PRF _coins (W8.of_int _N))).
+    call (samplePolyCBD_opph eta1 (Symmetric.PRF eta1 _coins (W8.of_int _N))).
     auto => /> &hr [#] ? Hbnd Hgi Hvar; do split; smt(KVec.get_setE gt0_k).
   auto => /> &1; split; 1: smt(gt0_k).
   move => ir rr; split; 1: smt(gt0_k).
@@ -324,18 +317,18 @@ seq 0 2 : (r{1} = coins{2} /\ m{1} = m{2} /\
              aT{2} = trmx (sampleA rho{2}) /\
              (forall ii, 0 <= ii < i{2} =>
                 (e1{2}.[ii])
-                  = samplePolyCBD (Symmetric.PRF coins{2} (W8.of_int (ii + kvec)))))
+                  = samplePolyCBD eta2 (Symmetric.PRF eta2 coins{2} (W8.of_int (ii + kvec)))))
             (kvec - i{2}).
   + move => &m z; wp.
     exists * coins, _N; elim * => _coins _N.
-    call (cbd2sample_ph (Symmetric.PRF _coins (W8.of_int _N))).
+    call (samplePolyCBD_opph eta2 (Symmetric.PRF eta2 _coins (W8.of_int _N))).
     auto => /> &hr [#] ? Hbnd Hgi Hvar; do split; smt(KVec.get_setE gt0_k).
   auto => /> &1; split; 1: smt(gt0_k).
   move => ir er; split; 1: smt(gt0_k).
   move => Hreq ?Hbnd Hv; rewrite /prg_enc_inner /=; split; 2: smt().
   apply KVec.tP => i Hi.
   by rewrite KVec.initiE //=; smt().
-wp;ecall {2} (cbd2sample_ph (Symmetric.PRF coins{2} (W8.of_int (2*kvec)))).
+wp;ecall {2} (samplePolyCBD_opph eta2 (Symmetric.PRF eta2 coins{2} (W8.of_int (2*kvec)))).
 auto => /> &1.
 do congr.
 + (* aT{1} = aT{2}: nttm (trmx (H rho{1})) = trmx (sampleA rho{2}).

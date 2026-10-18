@@ -41,7 +41,10 @@ from CryptoSpecs require import Keccak1600_Spec.
 op SHAKE256_33_128 (x: W8.t Array32.t, tag: W8.t): W8.t Array128.t =
  Array128.of_list W8.zero (SHAKE256 (to_list x ++ [tag]) 128).
 
-op PRF = SHAKE256_33_128.
+(* FIPS 203 PRF_eta: SHAKE256 of the seed and a byte, to the 64 eta bytes of
+   input of SamplePolyCBD_eta *)
+op PRF (eta_ : int) (s : W8.t Array32.t) (b : W8.t) : W8.t list =
+  SHAKE256 (to_list s ++ [b]) (64 * eta_).
 
 
 module type XOF_t = {

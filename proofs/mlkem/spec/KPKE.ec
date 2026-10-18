@@ -53,14 +53,14 @@ module KPKE = {
     }
     i <- 0;
     while (i < kvec) {
-      c <@ SamplePolyCBD.sample(PRF sig (W8.of_int _N));
+      c <@ SamplePolyCBD.sample(eta1, PRF eta1 sig (W8.of_int _N));
       s <- s.[i <- c];
       _N <- _N + 1;
       i <- i + 1;
     }
     i <- 0;
     while (i < kvec) {
-      c <@ SamplePolyCBD.sample(PRF sig (W8.of_int _N));
+      c <@ SamplePolyCBD.sample(eta1, PRF eta1 sig (W8.of_int _N));
       e <- e.[i <- c];
       _N <- _N + 1;
       i <- i + 1;
@@ -101,19 +101,19 @@ module KPKE = {
     }
     i <- 0;
     while (i < kvec) {
-      c <@ SamplePolyCBD.sample(PRF coins (W8.of_int _N));
+      c <@ SamplePolyCBD.sample(eta1, PRF eta1 coins (W8.of_int _N));
       rv <- rv.[i <- c];
       _N <- _N + 1;
       i <- i + 1;
     }
     i <- 0;
     while (i < kvec) {
-      c <@ SamplePolyCBD.sample(PRF coins (W8.of_int _N));
+      c <@ SamplePolyCBD.sample(eta2, PRF eta2 coins (W8.of_int _N));
       e1 <- e1.[i <- c];
       _N <- _N + 1;
       i <- i + 1;
     }
-    e2 <@ SamplePolyCBD.sample(PRF coins (W8.of_int _N));
+    e2 <@ SamplePolyCBD.sample(eta2, PRF eta2 coins (W8.of_int _N));
     rhat <- nttv rv;
     u <- invnttv (ntt_mmul aT rhat) + e1;
     mp <- decode1(m);
