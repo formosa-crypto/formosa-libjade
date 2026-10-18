@@ -597,11 +597,25 @@ seq 1 0 : (#pre /\
      lift_array256 (subarray256 e{1} j) =
      samplePolyCBD eta1 (PRF eta1 noiseseed{1} (W8.of_int (j + kvec)))) /\
   signed_boundvecn_cxq skpv{1} 0 vecn 1 /\ signed_boundvecn_cxq e{1} 0 vecn 1).
-+ rcondf{1} 1; 1: by auto => />; smt(param_sets).
++ if{1}.
+  + wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 0)).
+    auto => /> &1 &2 _ hk r1 h11 h12 h13 h14 b11 b12 b13 b14.
+    have hv : vecn = 512 by rewrite vecnE hk.
+    do split.
+    + move=> j j0 jk; have : j = 0 \/ j = 1 by smt().
+      case=> [->|->]; rewrite !subarray256_upd /=; try smt().
+    + move=> j j0 jk; have : j = 0 \/ j = 1 by smt().
+      case=> [->|->]; rewrite !subarray256_upd /=; try smt().
+    + apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 by smt().
+      case=> [->|->]; rewrite !subarray256_upd /=; try smt();
+        by move=> k kb; rewrite /b16 qE; smt().
+    apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 by smt().
+    case=> [->|->]; rewrite !subarray256_upd /=; try smt();
+      by move=> k kb; rewrite /b16 qE; smt().
   if{1}.
   + wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 4)).
     wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 0)).
-    auto => /> &1 &2 _ hk r1 h11 h12 h13 h14 b11 b12 b13 b14 r2 h21 h22 h23 h24 b21 b22 b23 b24.
+    auto => /> &1 &2 _ _ hk r1 h11 h12 h13 h14 b11 b12 b13 b14 r2 h21 h22 h23 h24 b21 b22 b23 b24.
     have hv : vecn = 768 by rewrite vecnE hk.
     do split.
     + move=> j j0 jk; have : j = 0 \/ j = 1 \/ j = 2 by smt().
@@ -616,7 +630,8 @@ seq 1 0 : (#pre /\
       by move=> k kb; rewrite /b16 qE; smt().
   wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 4)).
   wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 0)).
-  auto => /> &1 &2 _ hk3 r1 h11 h12 h13 h14 b11 b12 b13 b14 r2 h21 h22 h23 h24 b21 b22 b23 b24.
+  auto => /> &1 &2 _ hk2 hk3 r1 h11 h12 h13 h14 b11 b12 b13 b14 r2 h21 h22 h23 h24
+    b21 b22 b23 b24.
   have hk : kvec = 4 by smt(param_sets).
   have hv : vecn = 1024 by rewrite vecnE hk.
   do split.
@@ -934,11 +949,28 @@ seq 1 0 : (#pre /\
   lift_array256 epp{1} = samplePolyCBD eta2 (PRF eta2 noiseseed{1} (W8.of_int (2 * kvec))) /\
   signed_boundvecn_cxq sp_0{1} 0 vecn 1 /\ signed_boundvecn_cxq ep{1} 0 vecn 1 /\
   signed_bound_cxq epp{1} 0 256 1).
-+ rcondf{1} 1; 1: by auto => />; smt(param_sets).
++ if{1}.
+  + wp; ecall {1} (jkem_getnoise_eta2_ph noiseseed{1} (W8.of_int 4)).
+    wp; ecall {1} (jkem_getnoise_eta1122_ph noiseseed{1} (W8.of_int 0)).
+    auto => /> &1 &2 7? hk r1 h11 h12 h13 h14 b11 b12 b13 b14 r3 h3 b3.
+    have hv : vecn = 512 by rewrite vecnE hk.
+    do split.
+    + move=> j j0 jk; have : j = 0 \/ j = 1 by smt().
+      case=> [->|->]; rewrite !subarray256_upd /=; try smt().
+    + move=> j j0 jk; have : j = 0 \/ j = 1 by smt().
+      rewrite hk; case=> [->|->]; rewrite !subarray256_upd /=; try smt().
+    + by rewrite hk h3.
+    + apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 by smt().
+      case=> [->|->]; rewrite !subarray256_upd /=; try smt();
+        by move=> k kb; rewrite /b16 qE; smt().
+    + apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 by smt().
+      case=> [->|->]; rewrite !subarray256_upd /=; try smt();
+        by move=> k kb; rewrite /b16 qE; smt().
+    by move=> k kb; rewrite /b16 qE; smt().
   if{1}.
   + wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 4)).
     wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 0)).
-    auto => /> &1 &2 7? hk r1 h11 h12 h13 h14 b11 b12 b13 b14 r2 h21 h22 h23 h24 b21 b22 b23 b24.
+    auto => /> &1 &2 8? hk r1 h11 h12 h13 h14 b11 b12 b13 b14 r2 h21 h22 h23 h24 b21 b22 b23 b24.
     rewrite (: eta2 = eta1) 1:#smt:(param_sets).
     have hv : vecn = 768 by rewrite vecnE hk.
     do split.
@@ -957,7 +989,7 @@ seq 1 0 : (#pre /\
   wp; ecall {1} (jkem_getnoise_eta2_ph noiseseed{1} (W8.of_int 8)).
   wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 4)).
   wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 0)).
-  auto => /> &1 &2 7? hk3 r1 h11 h12 h13 h14 b11 b12 b13 b14 r2 h21 h22 h23 h24 b21 b22 b23 b24
+  auto => /> &1 &2 8? hk3 r1 h11 h12 h13 h14 b11 b12 b13 b14 r2 h21 h22 h23 h24 b21 b22 b23 b24
     r3 h3 b3.
   rewrite (: eta2 = eta1) 1:#smt:(param_sets).
   have hk : kvec = 4 by smt(param_sets).

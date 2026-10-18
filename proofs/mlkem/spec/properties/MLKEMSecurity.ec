@@ -18,12 +18,13 @@ clone include EncDecCorrectness.EncDecCorrectnessT.
 import PolyVec PolyMat.
 
 (* ML-KEM security/correctness proof, parametric over the variant: it holds for
-   every (kvec,du,dv,eta1,eta2) admitted by param_sets (both 768 and 1024).  The
-   only variant facts the proof needs are the param_sets-derived bounds below. *)
+   every (kvec,du,dv,eta1,eta2) admitted by param_sets with eta1 = eta2 = 2
+   (ML-KEM-768 and ML-KEM-1024).  The only variant facts the proof needs are the
+   bounds and the hypothesis on the noise below. *)
 lemma kvec_le4 : kvec <= 4 by smt(param_sets).
 lemma dv_vals  : dv = 4 \/ dv = 5 by smt(param_sets).
 (* the noise is CBD_2 throughout: the PRF hop below samples it by CBD2_PRF *)
-lemma eta_vals : eta1 = 2 /\ eta2 = 2 by smt(param_sets).
+axiom eta_vals : eta1 = 2 /\ eta2 = 2.
 
 (* Rewriting the Spec in a way that allows applying computational
    assumptions on PRGs, as well as defining operators that
@@ -852,13 +853,13 @@ apply Array256.tP => k kb.
 rewrite /decompress_polyvec /compress_polyvec /= /= /Rq.(&+)  /= initiE 1:/# /= mapiE 1:/# mapiE 1:/# map2E initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= !initiE 1,2:/# /= mapiE 1:/# /=.
 case (i = 2).
 + rewrite decompress_errE //; 1,3: smt(param_sets).
-  by rewrite qE /=;have /= H := param_sets; elim H => /> ? -> /=.
+  by rewrite qE; have [] -> : du = 10 \/ du = 11 by smt(param_sets).
 
 case (i = 1).
 + rewrite decompress_errE //; 1,3: smt(param_sets).
-  by rewrite qE /=;have /= H := param_sets; elim H => /> ? -> /=.
+  by rewrite qE; have [] -> : du = 10 \/ du = 11 by smt(param_sets).
 rewrite decompress_errE //; 1,3: smt(param_sets).
-by rewrite qE /=;have /= H := param_sets; elim H => /> ? -> /=.
+by rewrite qE; have [] -> : du = 10 \/ du = 11 by smt(param_sets).
 qed.
 
 realize good_decode.

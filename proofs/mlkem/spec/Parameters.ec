@@ -3,7 +3,7 @@ require import AllCore IntDiv List.
 (* The ML-KEM parameters of a set: the module rank k, the compression
    widths d_u, d_v and the noise parameters eta1, eta2.  The rest of the
    specification is built on the abstract theory ParamsT, which each
-   parameter-set instance realizes (Spec768, Spec1024). *)
+   parameter-set instance realizes (Spec512, Spec768, Spec1024). *)
 abstract theory ParamsT.
 
 op kvec : int.
@@ -13,7 +13,8 @@ op eta1 : int.
 op eta2 : int.
 
 axiom param_sets :
-  (kvec, du, dv, eta1, eta2) \in [ (3, 10, 4, 2, 2);   (* ML-KEM-768  *)
+  (kvec, du, dv, eta1, eta2) \in [ (2, 10, 4, 3, 2);   (* ML-KEM-512  *)
+                                 (3, 10, 4, 2, 2);   (* ML-KEM-768  *)
                                  (4, 11, 5, 2, 2) ]. (* ML-KEM-1024 *)
 
 lemma gt0_k    : 0 < kvec by smt(param_sets).

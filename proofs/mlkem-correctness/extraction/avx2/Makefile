@@ -19,12 +19,16 @@ extract = env JASMINPATH="Keccak=$(KECCAK)" $(JASMIN2EC) $(1) --array-model=old 
             -f __crypto_kem_dec_jazz
 
 .PHONY: all generic clean
-all: 768/Jkem_avx2.ec 1024/Jkem_avx2.ec
+all: 512/Jkem_avx2.ec 768/Jkem_avx2.ec 1024/Jkem_avx2.ec
 
 # the generic model ../../generic/{LayoutT,JkemConstants,JkemT}.ec and the
 # instances ../../avx2/<set>/Jkem<set>I.ec
 generic: all
 	python3 generalize.py
+
+512/Jkem_avx2.ec: $(SRC)/512/jmlkem.jazz $(wildcard $(SRC)/512/*.jinc) $(COMMON_DEPS)
+	@mkdir -p 512
+	$(call extract,$<) > $@
 
 768/Jkem_avx2.ec: $(SRC)/768/jmlkem.jazz $(wildcard $(SRC)/768/*.jinc) $(COMMON_DEPS)
 	@mkdir -p 768
@@ -35,4 +39,4 @@ generic: all
 	$(call extract,$<) > $@
 
 clean:
-	rm -f 768/Jkem_avx2.ec 1024/Jkem_avx2.ec
+	rm -f 512/Jkem_avx2.ec 768/Jkem_avx2.ec 1024/Jkem_avx2.ec

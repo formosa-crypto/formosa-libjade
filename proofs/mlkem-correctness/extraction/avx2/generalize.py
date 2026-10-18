@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turn the jasmin2ec models {768,1024}/Jkem_avx2.ec into one generic
+"""Turn the jasmin2ec models {512,768,1024}/Jkem_avx2.ec into one generic
 abstract theory JkemT, plus one instance file per parameter set that
 realizes the generic module M by that set's extracted module.
 
@@ -30,7 +30,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC  = os.path.abspath(os.path.join(HERE, "..", "..", "..", "..", "src", "mlkem", "avx2"))
 GEN_DIR  = os.path.abspath(os.path.join(HERE, "..", "..", "generic"))
 INST_DIR = os.path.abspath(os.path.join(HERE, "..", "..", "avx2"))
-SETS = [768, 1024]
+SETS = [512, 768, 1024]
 
 TOKRE = re.compile(r"[A-Za-z_][A-Za-z_0-9']*|\d+|\S")
 ARRRE = re.compile(r"^(W?Array)(\d+)$")
@@ -59,6 +59,7 @@ ROLES = [
  ("kvec",  "P.kvec", "MLKEM_K",  lambda p: p["MLKEM_K"]),
  ("du",    "P.du",   "MLKEM_DU", lambda p: p["MLKEM_DU"]),
  ("dv",    "P.dv",   "MLKEM_DV", lambda p: p["MLKEM_DV"]),
+ ("eta1",  "P.eta1", "MLKEM_ETA1", lambda p: p["MLKEM_ETA1"]),
  # the operators of LayoutT
  ("vecn",          "256 * P.kvec",            "MLKEM_VECN",
                    lambda p: p["MLKEM_VECN"]),
@@ -85,8 +86,10 @@ ROLES = [
                    lambda p: p["MLKEM_CIPHERTEXTBYTES"]),
  ("zct_bytes",     "32 + ct_bytes",           "MLKEM_SYMBYTES + MLKEM_CIPHERTEXTBYTES",
                    lambda p: p["MLKEM_SYMBYTES"] + p["MLKEM_CIPHERTEXTBYTES"]),
- ("idx_table",     "32 * (P.kvec - 2)",       "IDX_TABLE_SIZE",
-                   lambda p: 32 * (p["MLKEM_K"] - 2)),
+ ("idx_table",     "if P.kvec = 2 then 16 else 32 * (P.kvec - 2)", "IDX_TABLE_SIZE",
+                   lambda p: 2 ** (p["MLKEM_K"] + 2)),
+ ("eta1_bytes",    "64 * P.eta1 + 8 * (P.eta1 - 2)", "MLKEM_ETA1_BUFBYTES",
+                   lambda p: p["MLKEM_ETA1_BUFBYTES"]),
 ]
 ROLE = {r[0]: r for r in ROLES}
 

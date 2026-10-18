@@ -35,6 +35,10 @@ bind circuit
     VPSUB_16u16 <- "VPSUB_16u16",
     VPADD_16u16 <- "VPADD_16u16",
     VPADD_32u8     <-   "VPADD_32u8",
+    VPADD_8u32 <- "VPADD_8u32",
+    VPSUB_8u32 <- "VPSUB_8u32",
+    VPUNPCKL_8u32 <- "VPUNPCKL_8u32",
+    VPUNPCKH_8u32 <- "VPUNPCKH_8u32",
 
     VPSHUFD_256 <- "VPSHUFD_256",
     VPERMQ <- "VPERMQ",

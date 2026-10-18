@@ -338,8 +338,8 @@ axiom gen_matrix_indexesP (t : bool) pos : 0 <= pos < 4 * (kvec * kvec %/ 4) =>
 lemma idx_table_bnd p (t : bool) : 0 <= p < kvec * kvec %/ 4 =>
   0 <= 8 * p + 2 ^ (kvec + 1) * b2i t /\ 8 * p + 2 ^ (kvec + 1) * b2i t + 8 <= idx_table.
 proof.
-move=> rgp; have : kvec = 3 \/ kvec = 4 by smt(param_sets).
-rewrite /idx_table; case=> hk; move: rgp; rewrite hk /=; case: t; smt().
+move=> rgp; have : kvec = 2 \/ kvec = 3 \/ kvec = 4 by smt(param_sets).
+rewrite /idx_table; case=> [|[|]] hk; move: rgp; rewrite hk /=; case: t; smt().
 qed.
 
 hoare gen_matrix_get_indexes_h p (t : bool) :
@@ -351,9 +351,9 @@ proc => /=.
 seq 5 : (idxs = gen_matrix_indexes /\ to_uint b = 8 * p + 2 ^ (kvec + 1) * b2i t /\
          0 <= p < kvec * kvec %/ 4) => //=.
 + auto => /> &m hb ht hp0 hp1.
-  have hk : kvec = 3 \/ kvec = 4 by smt(param_sets).
+  have hk : kvec = 2 \/ kvec = 3 \/ kvec = 4 by smt(param_sets).
   rewrite to_uintD_small to_uint_shl !of_uintK;
-    by move: hp1; rewrite ?hb ?ht; case: hk => -> /=; case: t => /=; smt().
+    by move: hp1; rewrite ?hb ?ht; case: hk => [|[|]] -> /=; case: t => /=; smt().
 auto => /> &m hb hp0 hp1.
 have [h0 h1] := idx_table_bnd p t _; 1: done.
 rewrite WArray_idx_table.get64E; congr; apply W8u8.Pack.ext_eq => i Hi.
@@ -393,8 +393,8 @@ conseq (sample_four_ph _sd (W64.of_int (8 * p)) (W64.of_int (b2i b)) w _) => //.
   by rewrite !hw.
 conseq (gen_matrix_get_indexes_ph p b) => &hr /= -> /=.
 rewrite !of_uintK; split; 2: by case: b.
-have hk : kvec = 3 \/ kvec = 4 by smt(param_sets).
-by move: rgp; case: hk => -> /=; smt().
+have hk : kvec = 2 \/ kvec = 3 \/ kvec = 4 by smt(param_sets).
+by move: rgp; case: hk => [|[|]] -> /=; smt().
 qed.
 
 (* the last entry alone, when kvec is odd: the diagonal entry, the same *)
@@ -418,8 +418,8 @@ auto => &hr |> /=.
 have hc : Array2.init (WArray2.get8 (WArray2.set16_direct
     (WArray2.init8 ("_.[_]" witness<:W8.t Array2.t>)) 0 (W16.of_int ((kvec - 1) * 257))))
   = Array2.of_list witness [c; c].
-+ have hk : kvec = 3 \/ kvec = 4 by smt(param_sets).
-  by rewrite /c; case: hk => -> /=; apply Array2.all_eq_eq; rewrite /all_eq /=.
++ have hk : kvec = 2 \/ kvec = 3 \/ kvec = 4 by smt(param_sets).
+  by rewrite /c; case: hk => [|[|]] -> /=; apply Array2.all_eq_eq; rewrite /all_eq /=.
 split; 1: exact hc.
 move=> _; split; 1: by rewrite Array2.of_listK.
 move=> _ _ r h0 h1 h2 _.

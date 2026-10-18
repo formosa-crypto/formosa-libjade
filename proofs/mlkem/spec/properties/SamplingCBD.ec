@@ -145,3 +145,7 @@ qed.
 
 lemma PRF2E s b : PRF 2 s b = to_list (SHAKE256_33_128 s b).
 proof. by rewrite /PRF /SHAKE256_33_128 Array128.of_listK // size_SHAKE256. qed.
+
+(* a shorter SHAKE256 output is a prefix of a longer one *)
+lemma SHAKE256_take m n1 n2 : 0 <= n1 <= n2 => take n1 (SHAKE256 m n2) = SHAKE256 m n1.
+proof. by move=> h; rewrite /SHAKE256 /KECCAK1600 -(SQUEEZE1600_ext _ _ n1 n2). qed.

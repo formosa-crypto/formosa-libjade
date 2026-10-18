@@ -16,6 +16,8 @@ clone JkemT.JkemT as Jkem768I with
   theory P <= Spec768.Params768,
   theory Array_ct_bytes <= Array1088,
   theory WArray_ct_bytes <= WArray1088,
+  theory Array_eta1_bytes <= Array128,
+  theory WArray_eta1_bytes <= WArray128,
   theory Array_idx_table <= Array32,
   theory WArray_idx_table <= WArray32,
   theory Array_matn <= Array2304,

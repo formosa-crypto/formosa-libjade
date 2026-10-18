@@ -6,9 +6,9 @@
 require import AllCore IntDiv CoreMap List Distr.
 from Jasmin require import JModel_x86.
 from JazzEC require import Jkem_avx2.
-from JazzEC require import Array64 Array160 Array1024 Array1410 Array1536 Array1568
- Array1600 Array3168 Array4096 WArray64 WArray160 WArray1410 WArray1568
- WArray1600 WArray2048 WArray3168.
+from JazzEC require import Array64 Array128 Array160 Array1024 Array1410 Array1536
+ Array1568 Array1600 Array3168 Array4096 WArray64 WArray128 WArray160
+ WArray1410 WArray1568 WArray1600 WArray2048 WArray3168.
 from Spec require Spec1024.
 require JkemT.
 
@@ -16,6 +16,8 @@ clone JkemT.JkemT as Jkem1024I with
   theory P <= Spec1024.Params1024,
   theory Array_ct_bytes <= Array1568,
   theory WArray_ct_bytes <= WArray1568,
+  theory Array_eta1_bytes <= Array128,
+  theory WArray_eta1_bytes <= WArray128,
   theory Array_idx_table <= Array64,
   theory WArray_idx_table <= WArray64,
   theory Array_matn <= Array4096,

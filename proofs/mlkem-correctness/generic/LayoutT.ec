@@ -6,21 +6,23 @@ from Spec require Parameters.
 (* Vocabulary: every leaf of the models that varies with the
    parameter set is one of these. Values for ML-KEM-768/1024, and
    the Jasmin parameter each one stands for:
-     kvec            (3, 4)         MLKEM_K
-     du              (10, 11)       MLKEM_DU
-     dv              (4, 5)         MLKEM_DV
-     vecn            (768, 1024)    MLKEM_VECN
-     vecn_bytes      (1536, 2048)   bytes of a vector of u16 polynomials
-     matn            (2304, 4096)   MLKEM_K * MLKEM_VECN
-     polyvec_bytes   (1152, 1536)   MLKEM_POLYVECBYTES
-     pk_bytes        (1184, 1568)   MLKEM_PUBLICKEYBYTES
-     sk_bytes        (2400, 3168)   MLKEM_SECRETKEYBYTES
-     polyc_bytes     (128, 160)     MLKEM_POLYCOMPRESSEDBYTES
-     polyvecc_bytes  (960, 1408)    MLKEM_POLYVECCOMPRESSEDBYTES
-     polyvecc_pad    (960, 1410)    MLKEM_POLYVECCOMPRESSEDBYTES + MLKEM_POLYVECCOMPRESSEDPAD
-     ct_bytes        (1088, 1568)   MLKEM_CIPHERTEXTBYTES
-     zct_bytes       (1120, 1600)   MLKEM_SYMBYTES + MLKEM_CIPHERTEXTBYTES
-     idx_table       (32, 64)       IDX_TABLE_SIZE
+     kvec            (2, 3, 4)      MLKEM_K
+     du              (10, 10, 11)   MLKEM_DU
+     dv              (4, 4, 5)      MLKEM_DV
+     eta1            (3, 2, 2)      MLKEM_ETA1
+     vecn            (512, 768, 1024) MLKEM_VECN
+     vecn_bytes      (1024, 1536, 2048) bytes of a vector of u16 polynomials
+     matn            (1024, 2304, 4096) MLKEM_K * MLKEM_VECN
+     polyvec_bytes   (768, 1152, 1536) MLKEM_POLYVECBYTES
+     pk_bytes        (800, 1184, 1568) MLKEM_PUBLICKEYBYTES
+     sk_bytes        (1632, 2400, 3168) MLKEM_SECRETKEYBYTES
+     polyc_bytes     (128, 128, 160) MLKEM_POLYCOMPRESSEDBYTES
+     polyvecc_bytes  (640, 960, 1408) MLKEM_POLYVECCOMPRESSEDBYTES
+     polyvecc_pad    (640, 960, 1410) MLKEM_POLYVECCOMPRESSEDBYTES + MLKEM_POLYVECCOMPRESSEDPAD
+     ct_bytes        (768, 1088, 1568) MLKEM_CIPHERTEXTBYTES
+     zct_bytes       (800, 1120, 1600) MLKEM_SYMBYTES + MLKEM_CIPHERTEXTBYTES
+     idx_table       (16, 32, 64)   IDX_TABLE_SIZE
+     eta1_bytes      (200, 128, 128) MLKEM_ETA1_BUFBYTES
 *)
 
 abstract theory LayoutT.
@@ -40,11 +42,13 @@ op polyvecc_bytes : int = P.kvec * (32 * P.du).
 op polyvecc_pad : int = polyvecc_bytes + 2 * (P.du - 10).
 op ct_bytes : int = polyvecc_bytes + polyc_bytes.
 op zct_bytes : int = 32 + ct_bytes.
-op idx_table : int = 32 * (P.kvec - 2).
+op idx_table : int = if P.kvec = 2 then 16 else 32 * (P.kvec - 2).
+op eta1_bytes : int = 64 * P.eta1 + 8 * (P.eta1 - 2).
 
 lemma ge0_kvec : 0 <= P.kvec by smt(P.param_sets).
 lemma ge0_du : 0 <= P.du by smt(P.param_sets).
 lemma ge0_dv : 0 <= P.dv by smt(P.param_sets).
+lemma ge0_eta1 : 0 <= P.eta1 by smt(P.param_sets).
 lemma ge0_vecn : 0 <= vecn.
 proof. by rewrite /vecn; smt(P.param_sets). qed.
 lemma ge0_vecn_bytes : 0 <= vecn_bytes.
@@ -69,12 +73,18 @@ lemma ge0_zct_bytes : 0 <= zct_bytes.
 proof. by rewrite /zct_bytes; smt(P.param_sets ge0_ct_bytes). qed.
 lemma ge0_idx_table : 0 <= idx_table.
 proof. by rewrite /idx_table; smt(P.param_sets). qed.
+lemma ge0_eta1_bytes : 0 <= eta1_bytes.
+proof. by rewrite /eta1_bytes; smt(P.param_sets). qed.
 
 (* the array theories whose size varies with the parameter set *)
 clone PolyArray as Array_ct_bytes with op size <- ct_bytes
   proof ge0_size by exact ge0_ct_bytes.
 clone WArray as WArray_ct_bytes with op size <- ct_bytes
   proof ge0_size by exact ge0_ct_bytes.
+clone PolyArray as Array_eta1_bytes with op size <- eta1_bytes
+  proof ge0_size by exact ge0_eta1_bytes.
+clone WArray as WArray_eta1_bytes with op size <- eta1_bytes
+  proof ge0_size by exact ge0_eta1_bytes.
 clone PolyArray as Array_idx_table with op size <- idx_table
   proof ge0_size by exact ge0_idx_table.
 clone WArray as WArray_idx_table with op size <- idx_table

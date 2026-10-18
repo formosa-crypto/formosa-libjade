@@ -47,6 +47,15 @@ clone BSWAS as BSWAS_640u8_128 with
 
   proof le_size by done.
 
+(* -------------------------------------------------------------------- *)
+clone BSWAS as BSWAS_640u8_32 with
+      op asize <- 640, op bsize <- 8, op ssize <- 32,
+  theory A    <- Array640.Array640, theory BSA <- BSA640,
+  theory WB   <- W8  { rename "_XX" as "_8" }, theory WEB <- WE8, theory BSWB <- BSW8,
+  theory WS   <- W32 { rename "_XX" as "_32" }, theory WES <- WE32, theory BSWS <- BSW32,
+  theory BSWA <- BSWA_640u8
+  proof le_size by done.
+
 from JazzEC require import WArray640.
 require import BitEncoding.
 import Array640 BitChunking.
@@ -84,3 +93,23 @@ lemma BSWAS_640u8_128_slicegetE o (p : W8.t Array640.t):
   rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
   by rewrite get_to_list get_w2bits /#.
  qed.
+
+lemma BSWAS_640u8_32_slicesetE (t : W8.t Array640.t) o (s : W32.t) :
+  0 <= (o*8) <= 8 * 640 - 32 =>
+   BSWAS_640u8_32.sliceset t (o*8) s =
+      Array640.init (get8 (set32_direct (WArray640.init8 (fun (i_0 : int) => t.[i_0])) o s)).
+proof.
+move => Ho.
+rewrite tP => k kb.
+rewrite wordP => i ib;rewrite initiE 1:/# /=.
+have //= := BSWAS_640u8_32.BVA_asliceset_Top_CircuitBindings_BSWAS_WB_t_Top_CircuitBindings_BSWAS_WS_t_Top_CircuitBindings_BSWAS_A_t.bvaslicesetP t (o*8) s _ (k*8+i) _;1,2:by smt().
+rewrite (nth_flatten false 8).
++ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W8.size_w2bits).
+rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
+rewrite get_to_list get_w2bits (: (k * 8 + i) %/ 8 = k) 1:/# (: (k * 8 + i) %% 8 = i) 1:/# => -> .
+rewrite (nth_flatten false 8).
++ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W8.size_w2bits).
+rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
+rewrite get_w2bits get_to_list /get8 /set32_direct initiE 1:/# /= /(\bits8) initiE 1:/# /=.
+by smt(W8.initiE).
+qed.

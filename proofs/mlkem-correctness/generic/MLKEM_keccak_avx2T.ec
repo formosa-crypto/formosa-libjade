@@ -145,10 +145,10 @@ equiv a64__squeeze_eq:
 (****************************************************************************)
 
 clone KeccakArrayAvx2x4 as AETA1avx2x4
- with op _ASIZE <- 128,
-      theory A <- Array128,
-      theory WA <- WArray128
-      proof _ASIZE_ge0 by done.
+ with op _ASIZE <- eta1_bytes,
+      theory A <- Array_eta1_bytes,
+      theory WA <- WArray_eta1_bytes
+      proof _ASIZE_ge0 by exact ge0_eta1_bytes.
 
 clone KeccakArrayRef as A128ref
  with op _ASIZE <- 128,
@@ -161,10 +161,15 @@ equiv a128__squeeze_eq:
  : ={arg} ==> ={res}
  by sim.
 
+(* the model computes the output size as in the Jasmin parameter *)
 equiv aeta1__squeeze_avx2x4_eq:
  M.aETA1____squeeze_avx2x4 ~ AETA1avx2x4.MM.__squeeze_avx2x4
- : ={arg} ==> ={res}
- by sim.
+ : ={arg} ==> ={res}.
+proof.
+proc; seq 2 2 : (={st, buf0, buf1, buf2, buf3, _RATE8, offset, _LEN}).
++ by auto => />; rewrite /eta1_bytes /#.
+by sim.
+qed.
 
 (****************************************************************************)
 
@@ -265,10 +270,10 @@ module K = {
     return out;
   }
 
-  proc _shake256x4_AETA1__A32_A1 (out0:W8.t Array128.t, out1:W8.t Array128.t,
-                                 out2:W8.t Array128.t, out3:W8.t Array128.t,
+  proc _shake256x4_AETA1__A32_A1 (out0:W8.t Array_eta1_bytes.t, out1:W8.t Array_eta1_bytes.t,
+                                 out2:W8.t Array_eta1_bytes.t, out3:W8.t Array_eta1_bytes.t,
                                  seed:W8.t Array32.t, nonces:W8.t Array4.t) :
-  W8.t Array128.t * W8.t Array128.t * W8.t Array128.t * W8.t Array128.t = {
+  W8.t Array_eta1_bytes.t * W8.t Array_eta1_bytes.t * W8.t Array_eta1_bytes.t * W8.t Array_eta1_bytes.t = {
     var st_s:W256.t Array25.t;
     var st:W256.t Array25.t;
     var  _0:int;
@@ -1012,17 +1017,20 @@ qed.
 
 equiv shake256x4_AETA1__A32_A1_eq:
   M._shake256x4_AETA1__A32_A1 ~ K._shake256x4_AETA1__A32_A1
- : ={arg} ==> ={res}
-by sim.
+ : ={arg} ==> ={res}.
+proof.
+proc; wp; call aeta1__squeeze_avx2x4_eq.
+by conseq (: ={st, out0, out1, out2, out3}); [auto | sim].
+qed.
 
 hoare shake256x4_AETA1__A32_A1_h' _seed _nonces :
  K._shake256x4_AETA1__A32_A1
  : seed = _seed /\ nonces = _nonces
  ==>
-    res.`1 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[0]]) 128)
- /\ res.`2 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[1]]) 128)
- /\ res.`3 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[2]]) 128)
- /\ res.`4 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[3]]) 128).
+    res.`1 = Array_eta1_bytes.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[0]]) eta1_bytes)
+ /\ res.`2 = Array_eta1_bytes.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[1]]) eta1_bytes)
+ /\ res.`3 = Array_eta1_bytes.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[2]]) eta1_bytes)
+ /\ res.`4 = Array_eta1_bytes.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[3]]) eta1_bytes).
 proof.
 proc.
 wp; ecall (AETA1avx2x4.squeeze_avx2x4_h out0 out1 out2 out3 st 136)=> /=.
@@ -1085,10 +1093,10 @@ phoare shake256x4_AETA1__A32_A1_ph' _seed _nonces :
  [ K._shake256x4_AETA1__A32_A1
  : seed = _seed /\ nonces = _nonces
  ==>
-    res.`1 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[0]]) 128)
- /\ res.`2 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[1]]) 128)
- /\ res.`3 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[2]]) 128)
- /\ res.`4 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[3]]) 128)
+    res.`1 = Array_eta1_bytes.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[0]]) eta1_bytes)
+ /\ res.`2 = Array_eta1_bytes.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[1]]) eta1_bytes)
+ /\ res.`3 = Array_eta1_bytes.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[2]]) eta1_bytes)
+ /\ res.`4 = Array_eta1_bytes.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[3]]) eta1_bytes)
  ] = 1%r.
 proof.
 by conseq shake256x4_AETA1__A32_A1_ll (shake256x4_AETA1__A32_A1_h' _seed _nonces).
@@ -1099,10 +1107,10 @@ phoare shake256x4_AETA1__A32_A1_ph _seed _nonces :
    M._shake256x4_AETA1__A32_A1
  : seed = _seed /\ nonces = _nonces
  ==>
-    res.`1 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[0]]) 128)
- /\ res.`2 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[1]]) 128)
- /\ res.`3 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[2]]) 128)
- /\ res.`4 = Array128.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[3]]) 128)
+    res.`1 = Array_eta1_bytes.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[0]]) eta1_bytes)
+ /\ res.`2 = Array_eta1_bytes.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[1]]) eta1_bytes)
+ /\ res.`3 = Array_eta1_bytes.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[2]]) eta1_bytes)
+ /\ res.`4 = Array_eta1_bytes.of_list W8.zero (SHAKE256 (to_list _seed ++ [_nonces.[3]]) eta1_bytes)
  ] = 1%r.
 proof.
 by conseq shake256x4_AETA1__A32_A1_eq (shake256x4_AETA1__A32_A1_ph' _seed _nonces) => /> /#.

@@ -156,5 +156,9 @@ qed.
 
 clone export MLKEM_getnoise_avx2T.MLKEM_getnoise_avx2T as MLKEM_getnoise_avx2I with
   theory B <- Base768.Base768,
-  theory MLKEM_keccak_avx2 <- MLKEM_keccak_avx2I.
+  theory MLKEM_keccak_avx2 <- MLKEM_keccak_avx2I
+  proof cbd3_corr.
+(* eta1 = 2: the eta = 3 sampler is not used *)
+realize cbd3_corr.
+proof. by move=> _b; rewrite (: Spec768.MLKEM768.eta1 = 2) 1://. qed.
 

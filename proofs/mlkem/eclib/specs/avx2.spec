@@ -47,6 +47,10 @@ VPADD_4u64(w1@256, w2@256) -> @256 =
 VPADD_8u32(w1@256, w2@256) -> @256 =
   map<32, 8>(add<32>, w1, w2)
 
+# Intel intrinsic: _mm256_sub_epi32
+VPSUB_8u32(w1@256, w2@256) -> @256 =
+  map<32, 8>(sub<32>, w1, w2)
+
 # Intel intrinsic: _mm256_add_epi16
 VPADD_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(add<16>, w1, w2)
@@ -430,6 +434,20 @@ VPUNPCKL_4u64(a@256, b@256) -> @256 =
 VPUNPCKH_4u64(a@256, b@256) -> @256 =
   let interleave (w1@128, w2@128) =
           concat<64>(w1[@64|1], w2[@64|1]) in
+    concat<128>(interleave(a[@128|0],b[@128|0]),
+                    interleave(a[@128|1],b[@128|1]))
+
+# Intel intrinsic: _mm256_unpacklo_epi32 (per 128-bit lane: a0 b0 a1 b1)
+VPUNPCKL_8u32(a@256, b@256) -> @256 =
+  let interleave (w1@128, w2@128) =
+          concat<32>(w1[@32|0], w2[@32|0], w1[@32|1], w2[@32|1]) in
+    concat<128>(interleave(a[@128|0],b[@128|0]),
+                    interleave(a[@128|1],b[@128|1]))
+
+# Intel intrinsic: _mm256_unpackhi_epi32 (per 128-bit lane: a2 b2 a3 b3)
+VPUNPCKH_8u32(a@256, b@256) -> @256 =
+  let interleave (w1@128, w2@128) =
+          concat<32>(w1[@32|2], w2[@32|2], w1[@32|3], w2[@32|3]) in
     concat<128>(interleave(a[@128|0],b[@128|0]),
                     interleave(a[@128|1],b[@128|1]))
 
