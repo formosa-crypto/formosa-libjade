@@ -1,10 +1,11 @@
 require import AllCore List IntDiv RealExp.
 from Jasmin require import JModel_x86.
-require import CircuitBindings Bindings XArray48.
+require import CircuitBindings Bindings XArray48 MldsaConstants Nttspec.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
-require import Array2 Array32 Array48 Array64 Array256 WArray48.
+require import Array2 Array32 Array48 Array64 Array256 WArray48 WArray1024.
 require import BitEncoding.
-require import JWordList.
+require import JWordList StdBigop.
+(*---*) import Bigint.
 require BaseT PreludeT PolynomialT CommonNttT CommonModularT.
 
 abstract theory RowVectorT.
@@ -180,25 +181,190 @@ move => ?; move : HH.
 by smt(or64_ne0).
 qed.
 
+(* the coefficient c of a polynomial after a 256-bit store at the byte
+   offset o of its byte view *)
+lemma wpoly_set256_lane (p : W32.t Array256.t) (o : int) (w : W256.t) (c : int) :
+  0 <= o => o + 32 <= 1024 => o %% 4 = 0 => 0 <= c < 256 =>
+  (Array256.init (fun i => WArray1024.get32
+     (WArray1024.set256_direct (WArray1024.init32 (fun j => p.[j])) o w) i)).[c]
+  = if o %/ 4 <= c < o %/ 4 + 8 then w \bits32 (c - o %/ 4) else p.[c].
+proof.
+move => Ho0 Ho1 Hom Hc; rewrite Array256.initiE 1:// /=.
+rewrite /WArray1024.get32_direct /=.
+apply W32.wordP => k kb.
+rewrite /W4u8.pack4_t W32.initiE 1:/# /= W4u8.Pack.initiE 1:/# /=.
+rewrite /WArray1024.set256_direct WArray1024.initiE 1:/# /=.
+case (o %/ 4 <= c < o %/ 4 + 8) => Hi_region.
++ rewrite (_: o <= 4 * c + k %/ 8 < o + 32) 1:/# /=.
+  rewrite /W8u32.(\bits32) /W32u8.(\bits8) W32.initiE 1:/# /= W8.initiE 1:/# /=.
+  congr; smt().
+rewrite (_: !(o <= 4 * c + k %/ 8 < o + 32)) 1:/# /=.
+rewrite /WArray1024.init32 WArray1024.initiE 1:/# /=.
+rewrite (_: (4 * c + k %/ 8) %/ 4 = c) 1:/# (_: (4 * c + k %/ 8) %% 4 = k %/ 8) 1:/#.
+by rewrite W4u8.get_bits8 1:/# /#.
+qed.
+
 (* ================================================================== *)
 (* row_vector____dot_product                                            *)
-(* Computes dot product of two row vectors (lvec polynomials each):    *)
-(*   output = sum_{i=0}^{4} pmmar(lhs[i], rhs[i])                    *)
-(* Calls polynomial____zero, polynomial__pointwise_montgomery_multiply *)
-(* _and_reduce, polynomial____pointwise_add_to_total in a loop.     *)
+(* output = sum_i lhs_i * rhs_i, pointwise in the Montgomery domain:    *)
+(* the lvec products of each coefficient are summed on 64 bits and the  *)
+(* sum is Montgomery-reduced once (mred).                               *)
 (* Spec: ntt_dotp from VecMat.ec                                       *)
 (* ================================================================== *)
 
+(* the final Montgomery reduction of the two accumulators: even lanes in
+   al, odd lanes in ah *)
+lemma dot_reduceE (al ah : W256.t) :
+    VPBLENDD_256
+      (VMOVSHDUP_256 (VPSUB_4u64 al
+         (VPMUL_256 (VPMUL_256 al iNVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR) mODULUS_VECTOR)))
+      (VPSUB_4u64 ah
+         (VPMUL_256 (VPMUL_256 ah iNVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR) mODULUS_VECTOR))
+      (W8.of_int 170)
+  = W8u32.pack8 [mred (al \bits64 0); mred (ah \bits64 0); mred (al \bits64 1);
+                 mred (ah \bits64 1); mred (al \bits64 2); mred (ah \bits64 2);
+                 mred (al \bits64 3); mred (ah \bits64 3)].
+proof.
+rewrite /mred /=; congr; congr.
+by do 8! (congr; 1: by rewrite -shr_shrw 1://; circuit).
+qed.
+
+(* the integer sum of the products of the coefficient c of the first m
+   polynomials of two L-vectors *)
+op dot_lane (lhs rhs : W32.t Array_lpolys.t) (m c : int) : int =
+  BIA.bigi predT (fun i => to_sint lhs.[256 * i + c] * to_sint rhs.[256 * i + c]) 0 m.
+
+(* an accumulator of the loop: the 64-bit sums of the coefficients
+   c0, c0 + 2, c0 + 4, c0 + 6 *)
+op dot_acc (lhs rhs : W32.t Array_lpolys.t) (m c0 : int) : W256.t =
+  W4u64.pack4 [W64.of_int (dot_lane lhs rhs m c0); W64.of_int (dot_lane lhs rhs m (c0 + 2));
+               W64.of_int (dot_lane lhs rhs m (c0 + 4)); W64.of_int (dot_lane lhs rhs m (c0 + 6))].
+
+lemma dot_lane0 (lhs rhs : W32.t Array_lpolys.t) (c : int) : dot_lane lhs rhs 0 c = 0.
+proof. by rewrite /dot_lane BIA.big_geq. qed.
+
+lemma dot_laneS (lhs rhs : W32.t Array_lpolys.t) (m c : int) : 0 <= m =>
+  dot_lane lhs rhs (m + 1) c
+  = dot_lane lhs rhs m c + to_sint lhs.[256 * m + c] * to_sint rhs.[256 * m + c].
+proof. by move=> hm; rewrite /dot_lane BIA.big_int_recr. qed.
+
+lemma sxE (x y : W32.t) : x \sx y = W64.of_int (to_sint x * to_sint y).
+proof. by rewrite /(\sx) /sigextu64 W64.of_intM. qed.
+
+(* one step of the inner loop: the products of the polynomial i, even
+   lanes from VPMUL_256, odd lanes after VMOVSHDUP_256, added to the
+   accumulators (the first step sets them) *)
+lemma dot_acc_step (lhs rhs : W32.t Array_lpolys.t) (i c0 : int) (lc rc : W256.t) :
+  0 <= i =>
+  (forall l, 0 <= l < 8 => lc \bits32 l = lhs.[256 * i + c0 + l]) =>
+  (forall l, 0 <= l < 8 => rc \bits32 l = rhs.[256 * i + c0 + l]) =>
+  (if i = 0 then VPMUL_256 lc rc else VPADD_4u64 (dot_acc lhs rhs i c0) (VPMUL_256 lc rc))
+    = dot_acc lhs rhs (i + 1) c0 /\
+  (if i = 0 then VPMUL_256 (VMOVSHDUP_256 lc) (VMOVSHDUP_256 rc)
+   else VPADD_4u64 (dot_acc lhs rhs i (c0 + 1))
+          (VPMUL_256 (VMOVSHDUP_256 lc) (VMOVSHDUP_256 rc)))
+    = dot_acc lhs rhs (i + 1) (c0 + 1).
+proof.
+move=> hi hl hr.
+rewrite /dot_acc !dot_laneS // /= !sxE.
+rewrite (hl 0) // (hl 1) // (hl 2) // (hl 3) // (hl 4) // (hl 5) // (hl 6) // (hl 7) //.
+rewrite (hr 0) // (hr 1) // (hr 2) // (hr 3) // (hr 4) // (hr 5) // (hr 6) // (hr 7) //.
+rewrite !addzA /=; case: (i = 0) => [->|_] /=.
++ by rewrite !dot_lane0.
+done.
+qed.
+
+(* the coefficients of an L-vector in the base-multiplication range *)
+lemma dot_coeff_bnd (v : W32.t Array_lpolys.t) (i c : int) :
+  wpolylvec_bmul_irng (lvec_unflatten256 v) => 0 <= i < lvec => 0 <= c < 256 =>
+  `|to_sint v.[256 * i + c]| <= 9 * q - 1.
+proof.
+rewrite /wpolylvec_bmul_irng LArray.allP => H hi hc.
+have := H i hi; have -> : (lvec_unflatten256 v).[i] = Array256.init (fun j => v.[256 * i + j]).
++ by have := lvec_slice_eq v (256 * i) _ _; [smt() | smt() | rewrite (_ : 256 * i %/ 256 = i) 1:/#].
+rewrite /wpoly_bmul_irng /wpoly_srng Array256.allP => Hs.
+by have /= := Hs c hc; rewrite Array256.initiE //=; smt().
+qed.
+
+lemma dot_lane_bnd (lhs rhs : W32.t Array_lpolys.t) (m c : int) :
+  wpolylvec_bmul_irng (lvec_unflatten256 lhs) =>
+  wpolylvec_bmul_irng (lvec_unflatten256 rhs) =>
+  0 <= m <= lvec => 0 <= c < 256 =>
+  `|dot_lane lhs rhs m c| <= m * ((9 * q - 1) * (9 * q - 1)).
+proof.
+move=> hl hr; elim/natind: m => [m hm0 hm1 hc|m hm0 ih hm1 hc].
++ have -> : m = 0 by smt().
+  by rewrite dot_lane0.
+rewrite dot_laneS //.
+have hx := dot_coeff_bnd lhs m c hl _ hc; 1: smt().
+have hy := dot_coeff_bnd rhs m c hr _ hc; 1: smt().
+have hd := ih _ hc; 1: smt().
+have hxy : `|to_sint lhs.[256 * m + c] * to_sint rhs.[256 * m + c]|
+           <= (9 * q - 1) * (9 * q - 1).
++ by rewrite StdOrder.IntOrder.normrM; apply StdOrder.IntOrder.ler_pmul; smt().
+smt().
+qed.
+
+(* the abstract partial dot product, coefficient by coefficient *)
+lemma dotp_partial_lane (lhs rhs : W32.t Array_lpolys.t) (m c : int) :
+  0 <= m <= lvec => 0 <= c < 256 =>
+  (dotp_partial (lifts_wpolylvec (lvec_unflatten256 lhs))
+                (lifts_wpolylvec (lvec_unflatten256 rhs)) m).[c]
+  = incoeff (dot_lane lhs rhs m c).
+proof.
+elim/natind: m => [m hm0 hm1 hc|m hm0 ih hm1 hc].
++ have -> : m = 0 by smt().
+  by rewrite dot_lane0 /dotp_partial iota0 //= poly_zeroE.
+rewrite dotp_partialS // poly_addE // ih 1,2:/# dot_laneS // incoeffD.
+rewrite /basemul Array256.initiE //= /lifts_wpolylvec !LArray.mapiE 1,2:/# /=.
+rewrite /lifts_wpoly !Array256.mapiE 1,2:/# /=.
+have Hs : forall (v : W32.t Array_lpolys.t),
+  (lvec_unflatten256 v).[m].[c] = v.[256 * m + c].
++ move=> v; have := lvec_slice_eq v (256 * m) _ _; 1,2: smt().
+  by rewrite (_ : 256 * m %/ 256 = m) 1:/# => ->; rewrite Array256.initiE.
+by rewrite !Hs incoeffM; ring.
+qed.
+
+(* the stored coefficients mred (sum) are the abstract dot product, in
+   the base-multiplication output range *)
+lemma dot_spec (lhs rhs : W32.t Array_lpolys.t) (out : W32.t Array256.t) :
+  wpolylvec_bmul_irng (lvec_unflatten256 lhs) =>
+  wpolylvec_bmul_irng (lvec_unflatten256 rhs) =>
+  (forall c, 0 <= c < 256 => out.[c] = mred (W64.of_int (dot_lane lhs rhs lvec c))) =>
+  liftm_wpoly out = ntt_dotp (lifts_wpolylvec (lvec_unflatten256 lhs))
+                             (lifts_wpolylvec (lvec_unflatten256 rhs)) /\
+  wpoly_srng (lvec * (q - 1)) (lvec * (q - 1)) out.
+proof.
+move=> hl hr Hout.
+have hlv : lvec = 4 \/ lvec = 5 \/ lvec = 7 by smt(param_sets).
+have HS : forall c, 0 <= c < 256 =>
+  `|dot_lane lhs rhs lvec c| <= lvec * ((9 * q - 1) * (9 * q - 1)) /\
+  to_sint (W64.of_int (dot_lane lhs rhs lvec c)) = dot_lane lhs rhs lvec c.
++ move=> c hc; have Hb := dot_lane_bnd lhs rhs lvec c hl hr _ hc; 1: smt(gt0_l).
+  split; 1: exact Hb.
+  by apply W64.to_sintK_small; move: Hb; rewrite /q; smt().
+split.
++ apply Array256.tP => c hc.
+  rewrite /liftm_wpoly scaleE // /lifts_wpoly mapiE //= Hout //.
+  rewrite -dotp_partial_ntt_dotp dotp_partial_lane //; 1: smt(gt0_l).
+  have [Hb hS] := HS c hc.
+  have := mred_mont (W64.of_int (dot_lane lhs rhs lvec c)) _.
+  + by rewrite hS; move: Hb; rewrite /q; smt().
+  rewrite hS => hm.
+  by rewrite /mont -incoeffM; apply incoeffP; rewrite incoeffK hm.
+rewrite /wpoly_srng Array256.allP => c hc /=; rewrite Hout //.
+have [Hb hS] := HS c hc.
+have := mred_bnd (W64.of_int (dot_lane lhs rhs lvec c)) (lvec * ((9 * q - 1) * (9 * q - 1))) _ _.
++ by rewrite hS.
++ by move: hlv; rewrite /q; smt().
+by move: hlv; rewrite /q; smt().
+qed.
+
 lemma row_vector____dot_product_ll : islossless M.row_vector____dot_product.
 proof.
-proc.
-while (0 <= i <= lvec) (lvec - i); last first.
-+ wp; call polynomial____zero_ll.
-  by auto; smt(gt0_l).
-move => *.
-wp; call polynomial____pointwise_add_to_total_ll.
-wp; call polynomial__pointwise_montgomery_multiply_and_reduce_ll.
-by auto => /#.
+proc; while (0 <= offset <= 1024 /\ offset %% 32 = 0) (1024 - offset); last by auto => /#.
+move=> z; wp; while (0 <= i <= lvec) (lvec - i); last by auto; smt(gt0_l).
+by move=> z'; auto => /#.
 qed.
 
 lemma row_vector____dot_product_correct
@@ -214,70 +380,60 @@ lemma row_vector____dot_product_correct
         wpoly_srng (lvec * (q-1)) (lvec * (q-1)) res
     ].
 proof.
-have lvec_val := gt0_l.
 proc.
-while (0 <= i <= lvec /\ lhs = _lhs /\ rhs = _rhs /\
-       wpolylvec_bmul_irng (lvec_unflatten256 _lhs) /\
-       wpolylvec_bmul_irng (lvec_unflatten256 _rhs) /\
-       liftm_wpoly output =
-         dotp_partial (lifts_wpolylvec (lvec_unflatten256 _lhs))
-                      (lifts_wpolylvec (lvec_unflatten256 _rhs)) i /\
-       wpoly_srng (i * (q-1)) (i * (q-1)) output
-      ); last first.
-+ (* Exit + pre-loop: zero then initial invariant *)
-  wp; ecall (polynomial____zero_correct output). wp.
-  auto => /> Hbmul_lhs Hbmul_rhs result Hzero Hsrng; split.
-  + (* Initial invariant at i=0: lifts of zero = dotp_partial 0 *)
-    rewrite /liftm_wpoly; have -> : lifts_wpoly result = poly_zero.
-    + rewrite /lifts_wpoly /poly_zero.
-      apply Array256.tP => j jb.
-      rewrite mapiE; 1: smt().
-      rewrite /= Hzero; 1: smt().
-      by rewrite /create initiE 1:/# /= /to_sint /= /smod /= /zero.
-    by split; [smt(gt0_l) | rewrite /dotp_partial (iota0 0 0) //= scale0].
-  + (* Exit: i = lvec, dotp_partial lvec = ntt_dotp *)
-    move => i0 out0 Hng Hi1 Hi2 Hlifts Hsrng0.
-    have Hi0 : i0 = lvec by smt(gt0_l).
-    split.
-    + by rewrite Hlifts Hi0 dotp_partial_ntt_dotp.
-    by subst i0; exact Hsrng0.
-(* Loop body: pmmar then add_to_total *)
-wp; ecall (polynomial____pointwise_add_to_total_correct output product (i * (q-1)) (q-1)).
-ecall (polynomial__pointwise_montgomery_multiply_and_reduce_correct
-         product
-         (Array256.init (fun j => lhs.[(256 * i) + j]))
-         (Array256.init (fun j => rhs.[(256 * i) + j]))).
-auto => /> &hr Hi1 Hi2 Hbmul_lhs Hbmul_rhs Hlifts Hsrng Hguard.
-split.
-+ (* bmul preconditions *)
-  split.
-  - have /= Heq_lhs := lvec_slice_eq _lhs (256 * i{hr}) _ _; 1,2: smt().
-    rewrite -Heq_lhs.
-    by move: Hbmul_lhs; rewrite /wpolylvec_bmul_irng LArray.allP => H; apply H; smt().
-  - have /= Heq_rhs := lvec_slice_eq _rhs (256 * i{hr}) _ _; 1,2: smt().
-    rewrite -Heq_rhs.
-    by move: Hbmul_rhs; rewrite /wpolylvec_bmul_irng LArray.allP => H; apply H; smt().
-+ (* continuation after pmmar *)
-  move => _ _ product Hbmul_eq Hbmul_rng; split; 1: smt(param_sets).
-  move => Hoverflow result0 Hadd_eq Hadd_rng.
-  do split; 1,2: smt().
-  + (* lifts: dotp_partial at i+1 *)
-    have Hlhs_slice : lifts_wpoly (init (fun j => _lhs.[n * i{hr} + j])) =
-        (lifts_wpolylvec (lvec_unflatten256 _lhs)).[i{hr}].
-    + rewrite /lifts_wpolylvec mapiE; 1: smt(gt0_l).
-      by rewrite -lvec_slice_eq; smt().
-    have Hrhs_slice : lifts_wpoly (init (fun j => _rhs.[n * i{hr} + j])) =
-        (lifts_wpolylvec (lvec_unflatten256 _rhs)).[i{hr}].
-    + rewrite /lifts_wpolylvec mapiE; 1: smt(gt0_l).
-      by rewrite -lvec_slice_eq; smt().
-    have -> : liftm_wpoly result0 = liftm_wpoly output{hr} &+ liftm_wpoly product.
-    + by rewrite /liftm_wpoly Hadd_eq scaleD.
-    rewrite Hlifts Hbmul_eq Hlhs_slice Hrhs_slice dotp_partialS; 1: smt().
-    pose a := dotp_partial _ _.
-    pose b := basemul _ _.
-    by rewrite Rq_addC.
-  + (* range: (i+1)*(q-1) *)
-    by have -> : (i{hr} + 1) * (q - 1) = i{hr} * (q - 1) + (q - 1) by ring.
+while (lhs = _lhs /\ rhs = _rhs /\ 0 <= offset <= 1024 /\ offset %% 32 = 0 /\
+       qinv = iNVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR /\ modulus = mODULUS_VECTOR /\
+       forall c, 0 <= c < offset %/ 4 =>
+         output.[c] = mred (W64.of_int (dot_lane _lhs _rhs lvec c))).
++ wp.
+  while (lhs = _lhs /\ rhs = _rhs /\ 0 <= offset < 1024 /\ offset %% 32 = 0 /\
+         qinv = iNVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR /\ modulus = mODULUS_VECTOR /\
+         (forall c, 0 <= c < offset %/ 4 =>
+            output.[c] = mred (W64.of_int (dot_lane _lhs _rhs lvec c))) /\
+         0 <= i <= lvec /\
+         (0 < i => acc_low = dot_acc _lhs _rhs i (offset %/ 4) /\
+                   acc_high = dot_acc _lhs _rhs i (offset %/ 4 + 1))).
+  + (* one product per polynomial, added to the accumulators *)
+    wp; skip => &hr [#] -> -> ho0 ho1 hom -> -> Hout hi0 hi1 Hacc hil.
+    have hlb : lpolys_bytes = 1024 * lvec by rewrite /lpolys_bytes /lpolys; ring.
+    have Hl : forall l, 0 <= l < 8 =>
+      (WArray_lpolys_bytes.get256_direct (WArray_lpolys_bytes.init32 (fun i0 => _lhs.[i0]))
+         (offset{hr} + i{hr} * 1024)) \bits32 l = _lhs.[256 * i{hr} + offset{hr} %/ 4 + l].
+    + move=> l hl; rewrite WAE_lpolys_bytes.get256_direct_init32_bits32 // 1..3:/#.
+      have -> : (offset{hr} + i{hr} * 1024) %/ 4 = offset{hr} %/ 4 + n * i{hr}.
+      + by rewrite addzC (_ : i{hr} * 1024 = n * i{hr} * 4) 1:/# divzMDl //; ring.
+      by rewrite /=; congr; ring.
+    have Hr : forall l, 0 <= l < 8 =>
+      (WArray_lpolys_bytes.get256_direct (WArray_lpolys_bytes.init32 (fun i0 => _rhs.[i0]))
+         (offset{hr} + i{hr} * 1024)) \bits32 l = _rhs.[256 * i{hr} + offset{hr} %/ 4 + l].
+    + move=> l hl; rewrite WAE_lpolys_bytes.get256_direct_init32_bits32 // 1..3:/#.
+      have -> : (offset{hr} + i{hr} * 1024) %/ 4 = offset{hr} %/ 4 + n * i{hr}.
+      + by rewrite addzC (_ : i{hr} * 1024 = n * i{hr} * 4) 1:/# divzMDl //; ring.
+      by rewrite /=; congr; ring.
+    have [H1 H2] := dot_acc_step _lhs _rhs i{hr} (offset{hr} %/ 4) _ _ hi0 Hl Hr.
+    move: H1 H2; case: (i{hr} = 0) => hiz /= H1 H2.
+    + by rewrite hiz /=; rewrite hiz /= in H1; rewrite hiz /= in H2; rewrite H1 H2 /=; smt().
+    have [Hal Hah] := Hacc _; 1: smt().
+    by rewrite Hal Hah H1 H2 /=; smt().
+  (* the reduction of the accumulators and the store of 8 coefficients *)
+  wp; skip => &hr [#] -> -> ho0 ho1 hom -> -> Hout hol.
+  split; 1: by rewrite /= ho0 hom /=; smt(gt0_l).
+  move=> ah al i0 hi0 [#] _ _ _ _ _ _ _ _ hi1 hi2 Hacc.
+  have hil : i0 = lvec by smt().
+  have [Hal Hah] := Hacc _; 1: smt(gt0_l).
+  rewrite hil in Hal; rewrite hil in Hah.
+  rewrite dot_reduceE Hal Hah /dot_acc /=.
+  split; 1: smt().
+  split; 1: smt().
+  move=> c [hc0 hc1]; rewrite wpoly_set256_lane // 1..3:/#.
+  case: (offset{hr} %/ 4 <= c < offset{hr} %/ 4 + 8) => hc; last by apply Hout; smt().
+  have : c - offset{hr} %/ 4 = 0 \/ c - offset{hr} %/ 4 = 1 \/ c - offset{hr} %/ 4 = 2 \/
+         c - offset{hr} %/ 4 = 3 \/ c - offset{hr} %/ 4 = 4 \/ c - offset{hr} %/ 4 = 5 \/
+         c - offset{hr} %/ 4 = 6 \/ c - offset{hr} %/ 4 = 7 by smt().
+  by case=> [|[|[|[|[|[|[|]]]]]]] hk; rewrite hk /=; do 3! congr; smt().
+auto => /> hl hr; split; 1: smt().
+move=> off out hoff _ hoff1 hom Hout.
+by apply dot_spec => // c hc; apply Hout; smt().
 qed.
 
 lemma row_vector____dot_product_ph
@@ -421,5 +577,26 @@ lemma row_vector____multiply_with_matrix_A_ph
     ] = 1%r
   by conseq row_vector____multiply_with_matrix_A_ll
             (row_vector____multiply_with_matrix_A_correct _mat _vec).
+
+(* The accumulators of the dot product are written at the first
+   iteration of its inner loop, before being read: [sim] cannot see it,
+   hence these equivalences for the callers. *)
+lemma row_vector____dot_product_eq : equiv[
+  M.row_vector____dot_product ~ M.row_vector____dot_product : ={arg} ==> ={res}].
+proof.
+proc; while (={offset, output, lhs, rhs, qinv, modulus}); last by auto.
+wp; while (={offset, lhs, rhs, i} /\ 0 <= i{1} /\ (0 < i{1} => ={acc_low, acc_high})).
++ by auto => /> /#.
+auto => /> &2 _ 4? i hi _ _ /(_ _); 1: smt(gt0_l).
+by case=> -> ->.
+qed.
+
+lemma row_vector____multiply_with_matrix_A_eq : equiv[
+  M.row_vector____multiply_with_matrix_A ~ M.row_vector____multiply_with_matrix_A :
+  ={arg} ==> ={res}].
+proof.
+proc; while (={i, out, matrix_A, vector}); last by auto.
+by wp; call row_vector____dot_product_eq; auto.
+qed.
 
 end RowVectorT.

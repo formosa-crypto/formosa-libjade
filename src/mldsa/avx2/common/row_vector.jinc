@@ -16,29 +16,59 @@ namespace row_vector {
         return vector;
     }
 
+    // output = sum_i lhs_i * rhs_i (pointwise, Montgomery domain), with the
+    // COLUMNS_IN_MATRIX_A products of each coefficient accumulated on 64 bits
+    // and reduced once, in a single pass over the polynomial: one Montgomery
+    // reduction per coefficient instead of one per product, and no store or
+    // addition pass per product. The sum of at most 7 products |a b| < q 2^31
+    // stays below 2^63, and the reduction of a 64-bit T with |T| < 7 q 2^31
+    // returns a value in (-4q, 4q), which the reduce32 that follows centres.
     inline
     fn __dot_product(
-        #[spill_to_mmx] reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] output,
-        #[spill_to_mmx] reg ptr u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] lhs rhs
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] output,
+        reg ptr u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] lhs rhs
     ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
     {
-        stack u32[COEFFICIENTS_IN_POLYNOMIAL] product;
-
-        output = polynomial::__zero(output);
-        () = #spill(output, lhs, rhs);
-
+        reg u256 lhs_coeffs rhs_coeffs lhs_high rhs_high;
+        reg u256 product_low product_high acc_low acc_high;
+        reg u256 t_low t_high qinv modulus;
+        reg ui64 offset;
         inline int i;
-        for i = 0 to COLUMNS_IN_MATRIX_A {
-            () = #unspill(lhs, rhs);
-            product = polynomial::pointwise_montgomery_multiply_and_reduce(
-                product,
-                lhs[COEFFICIENTS_IN_POLYNOMIAL * i : COEFFICIENTS_IN_POLYNOMIAL],
-                rhs[COEFFICIENTS_IN_POLYNOMIAL * i : COEFFICIENTS_IN_POLYNOMIAL]
-            );
 
-            () = #unspill(output);
-            output = polynomial::__pointwise_add_to_total(output, product);
-            () = #spill(output);
+        qinv = INVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR;
+        modulus = MODULUS_VECTOR;
+
+        offset = 0;
+        while (offset < BYTES_PER_UNCOMPRESSED_POLYNOMIAL) {
+            for i = 0 to COLUMNS_IN_MATRIX_A {
+                lhs_coeffs = lhs.[:u256 offset + i * BYTES_PER_UNCOMPRESSED_POLYNOMIAL];
+                rhs_coeffs = rhs.[:u256 offset + i * BYTES_PER_UNCOMPRESSED_POLYNOMIAL];
+                lhs_high = #VMOVSHDUP_256(lhs_coeffs);
+                rhs_high = #VMOVSHDUP_256(rhs_coeffs);
+                product_low = #VPMUL_256(lhs_coeffs, rhs_coeffs);
+                product_high = #VPMUL_256(lhs_high, rhs_high);
+                if (i == 0) {
+                    acc_low = product_low;
+                    acc_high = product_high;
+                } else {
+                    acc_low = #VPADD_4u64(acc_low, product_low);
+                    acc_high = #VPADD_4u64(acc_high, product_high);
+                }
+            }
+
+            // One Montgomery reduction of the 64-bit sums (as in
+            // montgomery_multiply_and_reduce, on the accumulated products).
+            t_low = #VPMUL_256(acc_low, qinv);
+            t_high = #VPMUL_256(acc_high, qinv);
+            t_low = #VPMUL_256(t_low, modulus);
+            t_high = #VPMUL_256(t_high, modulus);
+            acc_low = #VPSUB_4u64(acc_low, t_low);
+            acc_high = #VPSUB_4u64(acc_high, t_high);
+            acc_low = #VMOVSHDUP_256(acc_low);
+            acc_low = #VPBLEND_8u32(acc_low, acc_high, 0b1_0_1_0_1_0_1_0);
+            output.[:u256 offset] = acc_low;
+
+            offset += 32;
         }
 
         return output;

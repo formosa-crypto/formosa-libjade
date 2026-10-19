@@ -14497,43 +14497,6 @@ module M = {
     }
     return difference_pointer;
   }
-  proc polynomial____pointwise_add_to_total (total:W32.t Array256.t,
-                                             polynomial:W32.t Array256.t) : 
-  W32.t Array256.t = {
-    var lhs:W256.t;
-    var rhs:W256.t;
-    var sum:W256.t;
-    var offset:int;
-    offset <- 0;
-    while ((offset < ((256 * 32) %/ 8))) {
-      lhs <-
-      (get256_direct (WArray1024.init32 (fun i => polynomial.[i])) offset);
-      rhs <- (get256_direct (WArray1024.init32 (fun i => total.[i])) offset);
-      sum <- (VPADD_8u32 lhs rhs);
-      total <-
-      (Array256.init
-      (WArray1024.get32
-      (WArray1024.set256_direct (WArray1024.init32 (fun i => total.[i]))
-      offset sum)));
-      offset <- (offset + 32);
-    }
-    return total;
-  }
-  proc polynomial____zero (polynomial:W32.t Array256.t) : W32.t Array256.t = {
-    var zero_u256:W256.t;
-    var offset:int;
-    zero_u256 <- (set0_256);
-    offset <- 0;
-    while ((offset < ((256 * 32) %/ 8))) {
-      polynomial <-
-      (Array256.init
-      (WArray1024.get32
-      (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      offset zero_u256)));
-      offset <- (offset + 32);
-    }
-    return polynomial;
-  }
   proc polynomial____check_infinity_norm (polynomial:W32.t Array256.t,
                                           threshold:int) : W64.t = {
     var result:W64.t;
@@ -14787,21 +14750,59 @@ module M = {
   proc row_vector____dot_product (output:W32.t Array256.t,
                                   lhs:W32.t Array1280.t,
                                   rhs:W32.t Array1280.t) : W32.t Array256.t = {
-    var product:W32.t Array256.t;
+    var qinv:W256.t;
+    var modulus:W256.t;
     var i:int;
-    product <- witness;
-    output <@ polynomial____zero (output);
-    (* Erased call to spill *)
-    i <- 0;
-    while ((i < 5)) {
-      (* Erased call to unspill *)
-      product <@ polynomial__pointwise_montgomery_multiply_and_reduce (
-      product, (Array256.init (fun i_0 => lhs.[((256 * i) + i_0)])),
-      (Array256.init (fun i_0 => rhs.[((256 * i) + i_0)])));
-      (* Erased call to unspill *)
-      output <@ polynomial____pointwise_add_to_total (output, product);
-      (* Erased call to spill *)
-      i <- (i + 1);
+    var lhs_coeffs:W256.t;
+    var rhs_coeffs:W256.t;
+    var lhs_high:W256.t;
+    var rhs_high:W256.t;
+    var product_low:W256.t;
+    var product_high:W256.t;
+    var acc_low:W256.t;
+    var acc_high:W256.t;
+    var t_low:W256.t;
+    var t_high:W256.t;
+    var offset:int;
+    qinv <- iNVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR;
+    modulus <- mODULUS_VECTOR;
+    offset <- 0;
+    while ((offset < ((256 * 32) %/ 8))) {
+      i <- 0;
+      while ((i < 5)) {
+        lhs_coeffs <-
+        (get256_direct (WArray5120.init32 (fun i_0 => lhs.[i_0]))
+        (offset + (i * ((256 * 32) %/ 8))));
+        rhs_coeffs <-
+        (get256_direct (WArray5120.init32 (fun i_0 => rhs.[i_0]))
+        (offset + (i * ((256 * 32) %/ 8))));
+        lhs_high <- (VMOVSHDUP_256 lhs_coeffs);
+        rhs_high <- (VMOVSHDUP_256 rhs_coeffs);
+        product_low <- (VPMUL_256 lhs_coeffs rhs_coeffs);
+        product_high <- (VPMUL_256 lhs_high rhs_high);
+        if ((i = 0)) {
+          acc_low <- product_low;
+          acc_high <- product_high;
+        } else {
+          acc_low <- (VPADD_4u64 acc_low product_low);
+          acc_high <- (VPADD_4u64 acc_high product_high);
+        }
+        i <- (i + 1);
+      }
+      t_low <- (VPMUL_256 acc_low qinv);
+      t_high <- (VPMUL_256 acc_high qinv);
+      t_low <- (VPMUL_256 t_low modulus);
+      t_high <- (VPMUL_256 t_high modulus);
+      acc_low <- (VPSUB_4u64 acc_low t_low);
+      acc_high <- (VPSUB_4u64 acc_high t_high);
+      acc_low <- (VMOVSHDUP_256 acc_low);
+      acc_low <- (VPBLEND_8u32 acc_low acc_high (W8.of_int 170));
+      output <-
+      (Array256.init
+      (WArray1024.get32
+      (WArray1024.set256_direct (WArray1024.init32 (fun i_0 => output.[i_0]))
+      offset acc_low)));
+      offset <- (offset + 32);
     }
     return output;
   }

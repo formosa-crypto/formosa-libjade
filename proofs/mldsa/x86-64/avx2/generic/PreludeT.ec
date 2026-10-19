@@ -1,7 +1,7 @@
 require import AllCore List IntDiv BitEncoding JWordList.
 from Jasmin require import JWord.
 require import Array256 Array320 Array416.
-require BaseT.
+require BaseT JArrayExtra.
 
 (* The views of the implementation's flat arrays as vectors and matrices of
    polynomials or of polynomial encodings, their slice and writeback laws,
@@ -249,5 +249,13 @@ have -> /= : 0 <= 8 + j < 16 by smt().
 rewrite /int2bs nth_mkseq //= (pmod_small k 65536) // -divz_mul //.
 by have -> // : 256 * 2 ^ j = 2 ^ (8 + j) by rewrite exprD_nneg /#.
 qed.
+
+(* -------------------------------------------------------------------- *)
+(* Word packing in the byte view of an L-vector of u32 polynomials:      *)
+(* init32, get32, set256_direct and get256_direct.                       *)
+(* -------------------------------------------------------------------- *)
+
+clone JArrayExtra.WAE as WAE_lpolys_bytes with
+  op size <- lpolys_bytes, theory A <- WArray_lpolys_bytes.
 
 end PreludeT.
