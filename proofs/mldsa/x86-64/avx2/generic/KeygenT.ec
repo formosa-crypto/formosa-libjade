@@ -284,7 +284,10 @@ seq 1 1 : (#pre
 proc change {2} [19..20] : [s1p : W32.t Array_lpolys.t] {
    s1p <@ M.row_vector__ntt(s1);
    (t1, t0) <@ M.__compute_t0_t1(matrix_A, s1p, s2);
-}; 1:  by sim.
+}.
++ call (: ={arg} ==> ={res}); last by call (: ={arg} ==> ={res}); [sim | auto].
+  proc; seq 4 4 : (={t, s2}); last by sim.
+  by call row_vector____multiply_with_matrix_A_eq; auto.
 
 swap {2} [19..20] -18.
 

@@ -376,6 +376,93 @@ have -> : 2^32 * `|sval (mmr u z)| = `|sval u * sval z - t * q| by rewrite -E no
 by move: hP rgt; rewrite /q /=; smt().
 qed.
 
+(* Montgomery reduction of a 64-bit value: mmr is its instance on a
+   product, mmr u w = mred (u \sx w). The dot product reduces a sum of
+   products with it. *)
+op mred (a : W64.t) : W32.t =
+  let t = W2u32.truncateu32 (a * W64.of_int 58728449) in
+  let t = t \sx W32.of_int 8380417 in
+  W2u32.truncateu32 ((a - t) `>>>` 32).
+
+lemma mmr_mred (u w : W32.t) : mmr u w = mred (u \sx w).
+proof. by []. qed.
+
+(* the exact reading of mred: with |a| <= 2^62, the low-word multiplier t
+   makes a - t*q divisible by 2^32, and mred a is the exact quotient *)
+lemma mred_exact (a : W64.t) : `|W64.to_sint a| <= 2^62 => exists t,
+  -2^31 <= t < 2^31 /\ 2^32 * sval (mred a) = W64.to_sint a - t * q.
+proof.
+move=> ha.
+pose t := sval (W2u32.truncateu32 (a * W64.of_int 58728449)).
+exists t; split.
+- by have := W32.to_sint_cmp (W2u32.truncateu32 (a * W64.of_int 58728449)) => /#.
+have hA : W64.to_uint a = W64.to_sint a %% W64.modulus.
+- rewrite W64.to_sintE /W64.smod /=.
+  have := W64.to_uint_cmp a; case (9223372036854775808 <= to_uint a) => _ /= h.
+  + by rewrite -modzDr modz_small /#.
+  by rewrite modz_small /#.
+have hu : W32.to_uint (W2u32.truncateu32 (a * W64.of_int 58728449))
+    = (W64.to_sint a * 58728449) %% 2^32.
+- rewrite W2u32.to_uint_truncateu32 W64.to_uintM hA W64.of_uintK.
+  rewrite modzMml modzMmr (: JModel_x86.ptr_modulus = 2^64) 1:// (: W32.modulus = 2^32) 1://.
+  by rewrite modz_dvd_pow 1://.
+have hT : t %% 2^32 = (W64.to_sint a * 58728449) %% 2^32.
+- rewrite /t W32.to_sintE /W32.smod /=.
+  by case (2147483648 <= W32.to_uint (W2u32.truncateu32 (a * W64.of_int 58728449))) => _;
+       rewrite hu; smt().
+have hdvd : 2^32 %| (W64.to_sint a - t * q).
+- rewrite dvdzE -modzBm -(modzMml t q) hT (modzMml (W64.to_sint a * 58728449) q) modzBm.
+  have -> : W64.to_sint a - W64.to_sint a * 58728449 * q
+          = W64.to_sint a * (1 - 58728449 * q) by ring.
+  by rewrite -modzMmr (: (1 - 58728449 * q) %% W32.modulus = 0) 1:/q.
+have hT64 : W64.to_uint (W2u32.truncateu32 (a * W64.of_int 58728449) \sx W32.of_int 8380417)
+          = (t * q) %% W64.modulus.
+- rewrite /(\sx) W64.to_uintM /sigextu64 !W64.of_uintK modzMml modzMmr.
+  have -> // : sval (W32.of_int 8380417) = q.
+  by rewrite W32.to_sintK_small /q.
+have hct : `|t| <= 2^31.
+- by have := W32.to_sint_cmp (W2u32.truncateu32 (a * W64.of_int 58728449)) => /#.
+have hD : `|W64.to_sint a - t * q| < 2^63.
+- by move: ha hct; rewrite /q /=; smt().
+rewrite /mred /= -/t W32.to_sintE W2u32.to_uint_truncateu32 W64.to_uint_shr //.
+rewrite W64.to_uintD W64.to_uintN hA hT64.
+rewrite (: JModel_x86.ptr_modulus = 2^64) 1:// (: W32.modulus = 2^32) 1://.
+have -> : (W64.to_sint a %% 2^64 + (- t * q %% 2^64) %% 2^64) %% 2^64
+        = (W64.to_sint a - t * q) %% 2^64.
+- by smt(modzBm modz_mod modzNm modzDml modzDmr).
+rewrite modz_pow2_div 1:// (: 64 - 32 = 32) 1:// modz_mod.
+have [k hk] : exists k, W64.to_sint a - t * q = k * 2^32.
+- by exists ((W64.to_sint a - t * q) %/ 2^32); rewrite divzK.
+rewrite hk mulzK 1://.
+have hkb : -2^31 <= k < 2^31.
+- by move: hD; rewrite hk (: W32.modulus = 2^32) 1:// /=; smt().
+move: hkb => /= hkb.
+have -> : W32.smod (k %% 4294967296) = k.
+- rewrite /W32.smod /=; case (0 <= k) => hk0.
+  + by rewrite modz_small /=; smt().
+  have -> : k %% 4294967296 = k + 4294967296.
+  + by rewrite -(modzDr k 4294967296) modz_small; smt().
+  smt().
+by ring.
+qed.
+
+(* bound and congruence of mred, from its exact reading *)
+lemma mred_bnd (a : W64.t) (P : int) :
+  `|W64.to_sint a| <= P => P <= 2^62 =>
+  2^32 * `|sval (mred a)| <= P + 2^31 * q.
+proof.
+move=> hP hP62; have [t [rgt E]] := mred_exact a (IntOrder.ler_trans _ _ _ hP hP62).
+have -> : 2^32 * `|sval (mred a)| = `|W64.to_sint a - t * q| by rewrite -E normrM.
+by move: hP hP62 rgt; rewrite /q /=; smt().
+qed.
+
+lemma mred_mont (a : W64.t) : `|W64.to_sint a| <= 2^62 =>
+  (2^32 * sval (mred a)) %% q = W64.to_sint a %% q.
+proof.
+move=> ha; have [t [_ ->]] := mred_exact a ha.
+by rewrite -modzBm modzMl /= modz_mod.
+qed.
+
 (* 2^32 is invertible mod q (q odd): cancellation *)
 lemma cgr_pow2_cancel (a b : int) :
   (2^32 * a) %% q = (2^32 * b) %% q => a %% q = b %% q.
