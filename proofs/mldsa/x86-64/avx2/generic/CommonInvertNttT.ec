@@ -26,23 +26,10 @@ import Round ZModQ Zq.
 (*           (the final scaling step is an mmr by 41978)               *)
 (* ================================================================== *)
 
-lemma polynomial__invert_ntt_round_ll : islossless M.polynomial__invert_ntt_round.
-proof.
-proc; while true (offset - i); last by auto=> /#.
-by move=> z; wp; call montgomery_multiply_and_reduce_ll; auto=> /#.
-qed.
-
 lemma polynomial__invert_ntt_montgomery_ll : islossless M.polynomial__invert_ntt_montgomery.
 proof.
-proc; while true (1024 - i).
-- by move=> z; wp; call montgomery_multiply_and_reduce_ll; auto=> /#.
-wp; do 5!(call (: true); 1: by while true (1024 - i); [
-  by move=> z; wp; call polynomial__invert_ntt_round_ll; auto=> /# |
-  by auto=> /#]).
-do 3!(call (: true); 1: by while true (1024 - i); [
-  by move=> z; wp; call (: true); [islossless | auto=> /#] |
-  by auto=> /#]).
-by auto=> /#.
+proc; while true (4 - i); first by move=> z; wp; call (: true); [islossless | auto=> /#].
+by wp; while true (4 - i); [move=> z; wp; call (: true); [islossless | auto=> /#] | auto=> /#].
 qed.
 
 lemma polynomial__invert_ntt_montgomery_correct (_a : W32.t Array256.t) :

@@ -30,27 +30,7 @@ op topair ['a] (s : 'a list) =
   (nth witness s 0, nth witness s 1).
 
 (* -------------------------------------------------------------------- *)
-op [opaque] LAYER_0_ZETAS = lAYER_0_ZETAS.
-op [opaque] LAYER_1_ZETAS = lAYER_1_ZETAS.
-op [opaque] LAYER_2_ZETAS = lAYER_2_ZETAS.
-op [opaque] LAYER_3_ZETAS = lAYER_3_ZETAS.
-op [opaque] LAYER_4_ZETAS = lAYER_4_ZETAS.
 op [opaque] LAYER_5_ZETAS = lAYER_5_ZETAS.
-
-lemma LAYER_0_ZETASE : lAYER_0_ZETAS = LAYER_0_ZETAS.
-proof. by rewrite /LAYER_0_ZETAS. qed.
-
-lemma LAYER_1_ZETASE : lAYER_1_ZETAS = LAYER_1_ZETAS.
-proof. by rewrite /LAYER_1_ZETAS. qed.
-
-lemma LAYER_2_ZETASE : lAYER_2_ZETAS = LAYER_2_ZETAS.
-proof. by rewrite /LAYER_2_ZETAS. qed.
-
-lemma LAYER_3_ZETASE : lAYER_3_ZETAS = LAYER_3_ZETAS.
-proof. by rewrite /LAYER_3_ZETAS. qed.
-
-lemma LAYER_4_ZETASE : lAYER_4_ZETAS = LAYER_4_ZETAS.
-proof. by rewrite /LAYER_4_ZETAS. qed.
 
 lemma LAYER_5_ZETASE : lAYER_5_ZETAS = LAYER_5_ZETAS.
 proof. by rewrite /LAYER_5_ZETAS. qed.
@@ -389,22 +369,3 @@ move=> @/range; rewrite -iotaredE /= => [#|] -> /=;
   by rewrite ?of_int_bits32_div /=.
 qed.
 
-(* -------------------------------------------------------------------- *)
-lemma size_flatten_bl0 (s : W256.t list) :
-  size (flatten (map (fun (w : W256.t) => map ((\bits32) w) perm0L) s))
-  = 8 * size s.
-proof. hint +listred. by elim: s => [|x s ih] //=; rewrite size_cat ih /perm0L /= /#. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma size_flatten_bl1 (s : W256.t list) :
-  size (flatten (map
-    (fun (w : W256.t) => map (fun m => w \bits32 (2 * m)) perm1L) s))
-  = 4 * size s.
-proof. hint +listred. by elim: s => [|x s ih] //=; rewrite size_cat ih /perm1L /= /#. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma size_flatten_bl2 (s : W256.t list) :
-  size (flatten (map
-    (fun (w : W256.t) => [w \bits32 0; w \bits32 4]) s))
-  = 2 * size s.
-proof. hint +listred. by elim: s => [|x s ih] //=; rewrite ih /#. qed.
