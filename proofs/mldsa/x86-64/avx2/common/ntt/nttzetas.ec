@@ -30,32 +30,6 @@ op topair ['a] (s : 'a list) =
   (nth witness s 0, nth witness s 1).
 
 (* -------------------------------------------------------------------- *)
-op [opaque] LAYER_0_ZETAS = lAYER_0_ZETAS.
-op [opaque] LAYER_1_ZETAS = lAYER_1_ZETAS.
-op [opaque] LAYER_2_ZETAS = lAYER_2_ZETAS.
-op [opaque] LAYER_3_ZETAS = lAYER_3_ZETAS.
-op [opaque] LAYER_4_ZETAS = lAYER_4_ZETAS.
-op [opaque] LAYER_5_ZETAS = lAYER_5_ZETAS.
-
-lemma LAYER_0_ZETASE : lAYER_0_ZETAS = LAYER_0_ZETAS.
-proof. by rewrite /LAYER_0_ZETAS. qed.
-
-lemma LAYER_1_ZETASE : lAYER_1_ZETAS = LAYER_1_ZETAS.
-proof. by rewrite /LAYER_1_ZETAS. qed.
-
-lemma LAYER_2_ZETASE : lAYER_2_ZETAS = LAYER_2_ZETAS.
-proof. by rewrite /LAYER_2_ZETAS. qed.
-
-lemma LAYER_3_ZETASE : lAYER_3_ZETAS = LAYER_3_ZETAS.
-proof. by rewrite /LAYER_3_ZETAS. qed.
-
-lemma LAYER_4_ZETASE : lAYER_4_ZETAS = LAYER_4_ZETAS.
-proof. by rewrite /LAYER_4_ZETAS. qed.
-
-lemma LAYER_5_ZETASE : lAYER_5_ZETAS = LAYER_5_ZETAS.
-proof. by rewrite /LAYER_5_ZETAS. qed.
-
-(* -------------------------------------------------------------------- *)
 section.
 hint simplify bs2int_nil, bs2int_cons.
 
@@ -271,22 +245,6 @@ op [opaque] izetasL (k : int) : W32.t list =
   else [].
 
 (* -------------------------------------------------------------------- *)
-lemma size_izetasL3 : size (izetasL 3) = 16.
-proof. hint +listred. by rewrite /izetasL /= Array16.size_to_list. qed.
-
-lemma size_izetasL4 : size (izetasL 4) = 8.
-proof. hint +listred. by rewrite /izetasL /= Array8.size_to_list. qed.
-
-lemma size_izetasL5 : size (izetasL 5) = 4.
-proof. hint +listred. by rewrite /izetasL /= Array4.size_to_list. qed.
-
-lemma size_izetasL6 : size (izetasL 6) = 2.
-proof. hint +listred. by rewrite /izetasL /= Array2.size_to_list. qed.
-
-lemma size_izetasL7 : size (izetasL 7) = 1.
-proof. hint +listred. by rewrite /izetasL. qed.
-
-(* -------------------------------------------------------------------- *)
 (* The implementation tables are the inverse twiddles of the tree, by   *)
 (* computation.                                                         *)
 section.
@@ -330,10 +288,6 @@ rewrite /range -iotaredE /= => [#|] ->.
 - by apply izetasL7E.
 qed.
 end section.
-
-lemma ireduce_levelE (p : wpoly) (k : int) : 0 <= k < 8 =>
-  ireduce_level p k = ireduce_n p 0 (2^k) (izetasL k).
-proof. by move=> rgk; rewrite /ireduce_level izetasLE. qed.
 
 (* Levels applied in program order: layer 0 first, then 1, ..., up to   *)
 (* (excluding) i. The full inverse butterfly network is [invtree p 8].  *)
@@ -389,22 +343,3 @@ move=> @/range; rewrite -iotaredE /= => [#|] -> /=;
   by rewrite ?of_int_bits32_div /=.
 qed.
 
-(* -------------------------------------------------------------------- *)
-lemma size_flatten_bl0 (s : W256.t list) :
-  size (flatten (map (fun (w : W256.t) => map ((\bits32) w) perm0L) s))
-  = 8 * size s.
-proof. hint +listred. by elim: s => [|x s ih] //=; rewrite size_cat ih /perm0L /= /#. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma size_flatten_bl1 (s : W256.t list) :
-  size (flatten (map
-    (fun (w : W256.t) => map (fun m => w \bits32 (2 * m)) perm1L) s))
-  = 4 * size s.
-proof. hint +listred. by elim: s => [|x s ih] //=; rewrite size_cat ih /perm1L /= /#. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma size_flatten_bl2 (s : W256.t list) :
-  size (flatten (map
-    (fun (w : W256.t) => [w \bits32 0; w \bits32 4]) s))
-  = 2 * size s.
-proof. hint +listred. by elim: s => [|x s ih] //=; rewrite ih /#. qed.

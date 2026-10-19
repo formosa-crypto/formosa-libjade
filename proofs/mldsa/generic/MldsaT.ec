@@ -1206,737 +1206,588 @@ module M = {
     }
     return polynomial;
   }
-  proc polynomial__butterfly_2 (polynomial:W32.t Array256.t, start:W64.t,
-                                zetas:W256.t) : W32.t Array256.t = {
-    var lhs_start:W64.t;
-    var lhs:W256.t;
-    var rhs_start:W64.t;
-    var rhs:W256.t;
-    var summands:W256.t;
-    var zeta_products:W256.t;
-    var add_terms:W256.t;
-    var sub_terms:W256.t;
-    lhs_start <- start;
-    lhs_start <- (lhs_start * (W64.of_int 32));
-    lhs <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint lhs_start));
-    lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
-    rhs_start <- lhs_start;
-    rhs_start <- (rhs_start + (W64.of_int 32));
-    rhs <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint rhs_start));
-    rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
-    summands <- (VPUNPCKL_4u64 lhs rhs);
-    zeta_products <- (VPUNPCKH_4u64 lhs rhs);
-    zeta_products <@ montgomery_multiply_and_reduce (zeta_products, zetas);
-    add_terms <- (VPADD_8u32 summands zeta_products);
-    sub_terms <- (VPSUB_8u32 summands zeta_products);
-    lhs <- (VPUNPCKL_4u64 add_terms sub_terms);
-    lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
-    rhs <- (VPUNPCKH_4u64 add_terms sub_terms);
-    rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint lhs_start) lhs)));
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint rhs_start) rhs)));
-    return polynomial;
-  }
-  proc polynomial__ntt_at_layer_0 (polynomial:W32.t Array256.t) : W32.t Array256.t = {
-    var i:int;
-    var start:W64.t;
-    var zetas:W256.t;
-    i <- 0;
-    while ((i < 16)) {
-      start <- (W64.of_int (i * 2));
-      zetas <- lAYER_0_ZETAS.[i];
-      polynomial <@ polynomial__butterfly_2 (polynomial, start, zetas);
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__butterfly_4 (polynomial:W32.t Array256.t, start:W64.t,
-                                zetas:W256.t) : W32.t Array256.t = {
-    var lhs_start:W64.t;
-    var lhs:W256.t;
-    var rhs_start:W64.t;
-    var rhs:W256.t;
-    var summands:W256.t;
-    var zeta_products:W256.t;
-    var add_terms:W256.t;
-    var sub_terms:W256.t;
-    lhs_start <- start;
-    lhs_start <- (lhs_start * (W64.of_int 32));
-    lhs <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint lhs_start));
-    rhs_start <- lhs_start;
-    rhs_start <- (rhs_start + (W64.of_int 32));
-    rhs <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint rhs_start));
-    summands <- (VPUNPCKL_4u64 lhs rhs);
-    zeta_products <- (VPUNPCKH_4u64 lhs rhs);
-    zeta_products <@ montgomery_multiply_and_reduce (zeta_products, zetas);
-    add_terms <- (VPADD_8u32 summands zeta_products);
-    sub_terms <- (VPSUB_8u32 summands zeta_products);
-    lhs <- (VPUNPCKL_4u64 add_terms sub_terms);
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint lhs_start) lhs)));
-    rhs <- (VPUNPCKH_4u64 add_terms sub_terms);
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint rhs_start) rhs)));
-    return polynomial;
-  }
-  proc polynomial__ntt_at_layer_1 (polynomial:W32.t Array256.t) : W32.t Array256.t = {
-    var i:int;
-    var start:W64.t;
-    var zetas:W256.t;
-    i <- 0;
-    while ((i < 16)) {
-      start <- (W64.of_int (i * 2));
-      zetas <- lAYER_1_ZETAS.[i];
-      polynomial <@ polynomial__butterfly_4 (polynomial, start, zetas);
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__butterfly_8 (polynomial:W32.t Array256.t, start:W64.t,
-                                zetas:W256.t) : W32.t Array256.t = {
-    var lhs_start:W64.t;
-    var lhs:W256.t;
-    var lhs_truncated:W128.t;
-    var rhs_start:W64.t;
-    var rhs:W256.t;
-    var rhs_truncated:W128.t;
-    var summands:W256.t;
-    var zeta_products:W256.t;
-    var add_terms:W256.t;
-    var sub_terms:W256.t;
-    lhs_start <- start;
-    lhs_start <- (lhs_start * (W64.of_int 32));
-    lhs <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint lhs_start));
-    lhs_truncated <- (truncateu128 lhs);
-    rhs_start <- lhs_start;
-    rhs_start <- (rhs_start + (W64.of_int 32));
-    rhs <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint rhs_start));
-    rhs_truncated <- (truncateu128 rhs);
-    summands <- (set0_256);
-    summands <- (VINSERTI128 summands lhs_truncated (W8.of_int 0));
-    summands <- (VINSERTI128 summands rhs_truncated (W8.of_int 1));
-    zeta_products <- (VPERM2I128 rhs lhs (W8.of_int 19));
-    zeta_products <@ montgomery_multiply_and_reduce (zeta_products, zetas);
-    add_terms <- (VPADD_8u32 summands zeta_products);
-    sub_terms <- (VPSUB_8u32 summands zeta_products);
-    lhs_truncated <- (truncateu128 add_terms);
-    rhs_truncated <- (truncateu128 sub_terms);
-    lhs <- (VINSERTI128 lhs lhs_truncated (W8.of_int 0));
-    lhs <- (VINSERTI128 lhs rhs_truncated (W8.of_int 1));
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint lhs_start) lhs)));
-    rhs <- (VPERM2I128 sub_terms add_terms (W8.of_int 19));
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint rhs_start) rhs)));
-    return polynomial;
-  }
-  proc polynomial__ntt_at_layer_2 (polynomial:W32.t Array256.t) : W32.t Array256.t = {
-    var i:int;
-    var start:W64.t;
-    var zetas:W256.t;
-    i <- 0;
-    while ((i < 16)) {
-      start <- (W64.of_int (i * 2));
-      zetas <- lAYER_2_ZETAS.[i];
-      polynomial <@ polynomial__butterfly_8 (polynomial, start, zetas);
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__ntt_round (polynomial:W32.t Array256.t, step:int,
-                              step_by:int, start:int, zetas:W256.t) : 
-  W32.t Array256.t = {
-    var coeffs_i:W256.t;
-    var coeffs_i_plus_step:W256.t;
-    var product:W256.t;
-    var offset:int;
-    var i:int;
-    var bound:int;
-    var index:int;
-    var index_plus_step:int;
-    offset <- start;
-    offset <- (offset * step);
-    offset <- (offset * 2);
-    offset <- (offset `|>>` 3);
-    i <- offset;
-    bound <- offset;
-    bound <- (bound + step_by);
-    while ((i < bound)) {
-      index <- i;
-      index <- (index * 32);
-      coeffs_i <-
-      (get256_direct (WArray1024.init32 (fun i_0 => polynomial.[i_0])) index);
-      index_plus_step <- i;
-      index_plus_step <- (index_plus_step + step_by);
-      index_plus_step <- (index_plus_step * 32);
-      coeffs_i_plus_step <-
-      (get256_direct (WArray1024.init32 (fun i_0 => polynomial.[i_0]))
-      index_plus_step);
-      product <@ montgomery_multiply_and_reduce (coeffs_i_plus_step, zetas);
-      coeffs_i_plus_step <- (VPSUB_8u32 coeffs_i product);
-      polynomial <-
-      (Array256.init
-      (WArray1024.get32
-      (WArray1024.set256_direct
-      (WArray1024.init32 (fun i_0 => polynomial.[i_0])) index_plus_step
-      coeffs_i_plus_step)));
-      coeffs_i <- (VPADD_8u32 coeffs_i product);
-      polynomial <-
-      (Array256.init
-      (WArray1024.get32
-      (WArray1024.set256_direct
-      (WArray1024.init32 (fun i_0 => polynomial.[i_0])) index coeffs_i)));
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__ntt_at_layer_3 (polynomial:W32.t Array256.t) : W32.t Array256.t = {
-    var i:int;
-    var zetas:W256.t;
-    var step:int;
-    var step_by:int;
-    var start:int;
-    step <- (1 `<<` 3);
-    step_by <- ((1 `<<` 3) %/ 8);
-    i <- 0;
-    while ((i < 16)) {
-      start <- i;
-      zetas <- lAYER_3_ZETAS.[i];
-      polynomial <@ polynomial__ntt_round (polynomial, step, step_by, 
-      start, zetas);
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__ntt_at_layer_4 (polynomial:W32.t Array256.t) : W32.t Array256.t = {
-    var i:int;
-    var zetas:W256.t;
-    var step:int;
-    var step_by:int;
-    var start:int;
-    step <- (1 `<<` 4);
-    step_by <- ((1 `<<` 4) %/ 8);
-    i <- 0;
-    while ((i < 8)) {
-      start <- i;
-      zetas <- lAYER_4_ZETAS.[i];
-      polynomial <@ polynomial__ntt_round (polynomial, step, step_by, 
-      start, zetas);
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__ntt_at_layer_5 (polynomial:W32.t Array256.t) : W32.t Array256.t = {
-    var i:int;
-    var zetas:W256.t;
-    var step:int;
-    var step_by:int;
-    var start:int;
-    step <- (1 `<<` 5);
-    step_by <- ((1 `<<` 5) %/ 8);
-    i <- 0;
-    while ((i < 4)) {
-      start <- i;
-      zetas <- lAYER_5_ZETAS.[i];
-      polynomial <@ polynomial__ntt_round (polynomial, step, step_by, 
-      start, zetas);
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__multiply (polynomial:W32.t Array256.t, start:W64.t,
-                             step_by:W64.t, zeta_0:W32.t) : W32.t Array256.t = {
-    var index_i_plus_step_by:W64.t;
-    var coeffs_i_plus_step_by:W256.t;
-    var constants:W256.t;
-    var prod02:W256.t;
-    var prod13:W256.t;
-    var c02:W256.t;
-    var c13:W256.t;
-    var res02:W256.t;
-    var res13:W256.t;
+  proc polynomial____ct_butterfly (a:W256.t, b:W256.t, zetas:W256.t) : 
+  W256.t * W256.t = {
     var t:W256.t;
-    var index_i:W64.t;
-    var coeffs_i:W256.t;
-    index_i_plus_step_by <- start;
-    index_i_plus_step_by <- (index_i_plus_step_by + step_by);
-    index_i_plus_step_by <- (index_i_plus_step_by * (W64.of_int 32));
-    coeffs_i_plus_step_by <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint index_i_plus_step_by));
-    constants <- (zeroextu256 (VMOV_32 zeta_0));
-    constants <- (VPBROADCAST_8u32 (truncateu32 constants));
-    prod02 <- (VPMUL_256 coeffs_i_plus_step_by constants);
-    coeffs_i_plus_step_by <-
-    (VPSHUFD_256 coeffs_i_plus_step_by (W8.of_int 245));
-    constants <- (VPSHUFD_256 constants (W8.of_int 245));
-    prod13 <- (VPMUL_256 coeffs_i_plus_step_by constants);
-    constants <- iNVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR;
-    c02 <- (VPMUL_256 prod02 constants);
-    c13 <- (VPMUL_256 prod13 constants);
-    constants <- mODULUS_VECTOR;
-    c02 <- (VPMUL_256 c02 constants);
-    c13 <- (VPMUL_256 c13 constants);
-    res02 <- (VPSUB_8u32 prod02 c02);
-    res13 <- (VPSUB_8u32 prod13 c13);
-    res02 <- (VPSHUFD_256 res02 (W8.of_int 245));
-    t <-
-    (VPBLEND_8u32 res02 res13
-    (W8.of_int
-    ((0 %% (2 ^ 1)) +
-    ((2 ^ 1) *
-    ((1 %% (2 ^ 1)) +
-    ((2 ^ 1) *
-    ((0 %% (2 ^ 1)) +
-    ((2 ^ 1) *
-    ((1 %% (2 ^ 1)) +
-    ((2 ^ 1) *
-    ((0 %% (2 ^ 1)) +
-    ((2 ^ 1) *
-    ((1 %% (2 ^ 1)) + ((2 ^ 1) * ((0 %% (2 ^ 1)) + ((2 ^ 1) * 1))))))))))))))
-    ));
-    index_i <- start;
-    index_i <- (index_i * (W64.of_int 32));
-    coeffs_i <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint index_i));
-    coeffs_i_plus_step_by <- (VPSUB_8u32 coeffs_i t);
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint index_i_plus_step_by) coeffs_i_plus_step_by)));
-    coeffs_i <- (VPADD_8u32 coeffs_i t);
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    (W64.to_uint index_i) coeffs_i)));
-    return polynomial;
+    t <@ montgomery_multiply_and_reduce (b, zetas);
+    b <- (VPSUB_8u32 a t);
+    a <- (VPADD_8u32 a t);
+    return (a, b);
   }
-  proc polynomial____layer (polynomial:W32.t Array256.t, _start:int,
-                            _step_by:int, _zeta:int) : W32.t Array256.t = {
-    var step_by:W64.t;
-    var zeta_0:W64.t;
-    var i:int;
-    var start:W64.t;
-    step_by <- (W64.of_int _step_by);
-    zeta_0 <- (W64.of_int _zeta);
-    i <- 0;
-    while ((i < 4)) {
-      start <- (W64.of_int (_start + i));
-      polynomial <@ polynomial__multiply (polynomial, start, step_by,
-      (truncateu32 zeta_0));
-      i <- (i + 1);
-    }
-    return polynomial;
+  proc polynomial____ct_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
+  W256.t * W256.t = {
+    var summands:W256.t;
+    var zeta_products:W256.t;
+    var add_terms:W256.t;
+    var sub_terms:W256.t;
+    summands <- (VPERM2I128 lhs rhs (W8.of_int 32));
+    zeta_products <- (VPERM2I128 lhs rhs (W8.of_int 49));
+    zeta_products <@ montgomery_multiply_and_reduce (zeta_products, zetas);
+    add_terms <- (VPADD_8u32 summands zeta_products);
+    sub_terms <- (VPSUB_8u32 summands zeta_products);
+    lhs <- (VPERM2I128 add_terms sub_terms (W8.of_int 32));
+    rhs <- (VPERM2I128 add_terms sub_terms (W8.of_int 49));
+    return (lhs, rhs);
   }
-  proc polynomial__ntt_at_layer_7_and_6 (polynomial:W32.t Array256.t) : 
+  proc polynomial____ct_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
+  W256.t * W256.t = {
+    var summands:W256.t;
+    var zeta_products:W256.t;
+    var add_terms:W256.t;
+    var sub_terms:W256.t;
+    summands <- (VPUNPCKL_4u64 lhs rhs);
+    zeta_products <- (VPUNPCKH_4u64 lhs rhs);
+    zeta_products <@ montgomery_multiply_and_reduce (zeta_products, zetas);
+    add_terms <- (VPADD_8u32 summands zeta_products);
+    sub_terms <- (VPSUB_8u32 summands zeta_products);
+    lhs <- (VPUNPCKL_4u64 add_terms sub_terms);
+    rhs <- (VPUNPCKH_4u64 add_terms sub_terms);
+    return (lhs, rhs);
+  }
+  proc polynomial____ct_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
+  W256.t * W256.t = {
+    
+    lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
+    rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
+    (lhs, rhs) <@ polynomial____ct_butterfly_4 (lhs, rhs, zetas);
+    lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
+    rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
+    return (lhs, rhs);
+  }
+  proc polynomial____ntt_layers_7_6_5 (polynomial:W32.t Array256.t, j:int) : 
   W32.t Array256.t = {
-    var sTEP_BY_7:int;
-    var sTEP_BY_6:int;
-    var zETA_7:int;
-    var zETA_60:int;
-    var zETA_61:int;
-    sTEP_BY_7 <- (2 * 8);
-    sTEP_BY_6 <- ((1 `<<` 6) %/ 8);
-    zETA_7 <- 25847;
-    zETA_60 <- (- 2608894);
-    zETA_61 <- (- 518909);
-    polynomial <@ polynomial____layer (polynomial, 0, sTEP_BY_7, zETA_7);
-    polynomial <@ polynomial____layer (polynomial, 8, sTEP_BY_7, zETA_7);
-    polynomial <@ polynomial____layer (polynomial, 0, sTEP_BY_6, zETA_60);
-    polynomial <@ polynomial____layer (polynomial, 16, sTEP_BY_6, zETA_61);
-    polynomial <@ polynomial____layer (polynomial, 4, sTEP_BY_7, zETA_7);
-    polynomial <@ polynomial____layer (polynomial, 12, sTEP_BY_7, zETA_7);
-    polynomial <@ polynomial____layer (polynomial, 4, sTEP_BY_6, zETA_60);
-    polynomial <@ polynomial____layer (polynomial, 20, sTEP_BY_6, zETA_61);
+    var r0:W256.t;
+    var r1:W256.t;
+    var r2:W256.t;
+    var r3:W256.t;
+    var r4:W256.t;
+    var r5:W256.t;
+    var r6:W256.t;
+    var r7:W256.t;
+    var zeta_0:W64.t;
+    var zetas:W256.t;
+    r0 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 0)));
+    r1 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 4)));
+    r2 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 8)));
+    r3 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 12)));
+    r4 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 16)));
+    r5 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 20)));
+    r6 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 24)));
+    r7 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 28)));
+    zeta_0 <- (W64.of_int 25847);
+    zetas <- (zeroextu256 (VMOV_64 zeta_0));
+    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
+    (r0, r4) <@ polynomial____ct_butterfly (r0, r4, zetas);
+    (r1, r5) <@ polynomial____ct_butterfly (r1, r5, zetas);
+    (r2, r6) <@ polynomial____ct_butterfly (r2, r6, zetas);
+    (r3, r7) <@ polynomial____ct_butterfly (r3, r7, zetas);
+    zeta_0 <- (W64.of_int (- 2608894));
+    zetas <- (zeroextu256 (VMOV_64 zeta_0));
+    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
+    (r0, r2) <@ polynomial____ct_butterfly (r0, r2, zetas);
+    (r1, r3) <@ polynomial____ct_butterfly (r1, r3, zetas);
+    zeta_0 <- (W64.of_int (- 518909));
+    zetas <- (zeroextu256 (VMOV_64 zeta_0));
+    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
+    (r4, r6) <@ polynomial____ct_butterfly (r4, r6, zetas);
+    (r5, r7) <@ polynomial____ct_butterfly (r5, r7, zetas);
+    zetas <- lAYER_5_ZETAS.[0];
+    (r0, r1) <@ polynomial____ct_butterfly (r0, r1, zetas);
+    zetas <- lAYER_5_ZETAS.[1];
+    (r2, r3) <@ polynomial____ct_butterfly (r2, r3, zetas);
+    zetas <- lAYER_5_ZETAS.[2];
+    (r4, r5) <@ polynomial____ct_butterfly (r4, r5, zetas);
+    zetas <- lAYER_5_ZETAS.[3];
+    (r6, r7) <@ polynomial____ct_butterfly (r6, r7, zetas);
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 0)) r0)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 4)) r1)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 8)) r2)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 12)) r3)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 16)) r4)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 20)) r5)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 24)) r6)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 28)) r7)));
+    return polynomial;
+  }
+  proc polynomial____ntt_layers_4_to_0 (polynomial:W32.t Array256.t, g:int) : 
+  W32.t Array256.t = {
+    var r0:W256.t;
+    var r1:W256.t;
+    var r2:W256.t;
+    var r3:W256.t;
+    var r4:W256.t;
+    var r5:W256.t;
+    var r6:W256.t;
+    var r7:W256.t;
+    var zetas:W256.t;
+    r0 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 0)));
+    r1 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 1)));
+    r2 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 2)));
+    r3 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 3)));
+    r4 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 4)));
+    r5 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 5)));
+    r6 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 6)));
+    r7 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 7)));
+    zetas <- lAYER_4_ZETAS.[(2 * g)];
+    (r0, r2) <@ polynomial____ct_butterfly (r0, r2, zetas);
+    (r1, r3) <@ polynomial____ct_butterfly (r1, r3, zetas);
+    zetas <- lAYER_4_ZETAS.[((2 * g) + 1)];
+    (r4, r6) <@ polynomial____ct_butterfly (r4, r6, zetas);
+    (r5, r7) <@ polynomial____ct_butterfly (r5, r7, zetas);
+    zetas <- lAYER_3_ZETAS.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____ct_butterfly (r0, r1, zetas);
+    zetas <- lAYER_3_ZETAS.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____ct_butterfly (r2, r3, zetas);
+    zetas <- lAYER_3_ZETAS.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____ct_butterfly (r4, r5, zetas);
+    zetas <- lAYER_3_ZETAS.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____ct_butterfly (r6, r7, zetas);
+    zetas <- lAYER_2_ZETAS.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____ct_butterfly_8 (r0, r1, zetas);
+    zetas <- lAYER_2_ZETAS.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____ct_butterfly_8 (r2, r3, zetas);
+    zetas <- lAYER_2_ZETAS.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____ct_butterfly_8 (r4, r5, zetas);
+    zetas <- lAYER_2_ZETAS.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____ct_butterfly_8 (r6, r7, zetas);
+    zetas <- lAYER_1_ZETAS.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____ct_butterfly_4 (r0, r1, zetas);
+    zetas <- lAYER_1_ZETAS.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____ct_butterfly_4 (r2, r3, zetas);
+    zetas <- lAYER_1_ZETAS.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____ct_butterfly_4 (r4, r5, zetas);
+    zetas <- lAYER_1_ZETAS.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____ct_butterfly_4 (r6, r7, zetas);
+    zetas <- lAYER_0_ZETAS.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____ct_butterfly_2 (r0, r1, zetas);
+    zetas <- lAYER_0_ZETAS.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____ct_butterfly_2 (r2, r3, zetas);
+    zetas <- lAYER_0_ZETAS.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____ct_butterfly_2 (r4, r5, zetas);
+    zetas <- lAYER_0_ZETAS.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____ct_butterfly_2 (r6, r7, zetas);
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 0)) r0)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 1)) r1)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 2)) r2)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 3)) r3)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 4)) r4)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 5)) r5)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 6)) r6)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 7)) r7)));
     return polynomial;
   }
   proc polynomial__ntt (polynomial:W32.t Array256.t) : W32.t Array256.t = {
-    
-    polynomial <@ polynomial__ntt_at_layer_7_and_6 (polynomial);
-    polynomial <@ polynomial__ntt_at_layer_5 (polynomial);
-    polynomial <@ polynomial__ntt_at_layer_4 (polynomial);
-    polynomial <@ polynomial__ntt_at_layer_3 (polynomial);
-    polynomial <@ polynomial__ntt_at_layer_2 (polynomial);
-    polynomial <@ polynomial__ntt_at_layer_1 (polynomial);
-    polynomial <@ polynomial__ntt_at_layer_0 (polynomial);
-    return polynomial;
-  }
-  proc polynomial__invert_at_layer_0 (polynomial:W32.t Array256.t, start:int,
-                                      zetas:W256.t) : W32.t Array256.t = {
-    var coeffs_i:W256.t;
-    var coeffs_i_plus_1:W256.t;
-    var low_values:W256.t;
-    var high_values:W256.t;
-    var differences:W256.t;
-    var sums:W256.t;
-    var coeffs_i_start:int;
-    var coeffs_i_plus_1_start:int;
-    coeffs_i_start <- start;
-    coeffs_i_start <- (coeffs_i_start * 32);
-    coeffs_i <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    coeffs_i_start);
-    coeffs_i <- (VPSHUFD_256 coeffs_i (W8.of_int 216));
-    coeffs_i_plus_1_start <- coeffs_i_start;
-    coeffs_i_plus_1_start <- (coeffs_i_plus_1_start + 32);
-    coeffs_i_plus_1 <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    coeffs_i_plus_1_start);
-    coeffs_i_plus_1 <- (VPSHUFD_256 coeffs_i_plus_1 (W8.of_int 216));
-    low_values <- (VPUNPCKL_4u64 coeffs_i coeffs_i_plus_1);
-    high_values <- (VPUNPCKH_4u64 coeffs_i coeffs_i_plus_1);
-    differences <- (VPSUB_8u32 high_values low_values);
-    sums <- (VPADD_8u32 high_values low_values);
-    differences <@ montgomery_multiply_and_reduce (differences, zetas);
-    coeffs_i <- (VPUNPCKL_4u64 sums differences);
-    coeffs_i_plus_1 <- (VPUNPCKH_4u64 sums differences);
-    coeffs_i <- (VPSHUFD_256 coeffs_i (W8.of_int 216));
-    coeffs_i_plus_1 <- (VPSHUFD_256 coeffs_i_plus_1 (W8.of_int 216));
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    coeffs_i_start coeffs_i)));
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    coeffs_i_plus_1_start coeffs_i_plus_1)));
-    return polynomial;
-  }
-  proc polynomial__invert_ntt_at_layer_0 (polynomial:W32.t Array256.t) : 
-  W32.t Array256.t = {
     var i:int;
-    var zetas:W256.t;
-    var start:int;
-    i <- 0;
-    while ((i < 16)) {
-      start <- (i * 2);
-      zetas <- zETAS_TO_INVERT_LAYER_0.[i];
-      polynomial <@ polynomial__invert_at_layer_0 (polynomial, start, zetas);
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__invert_at_layer_1 (polynomial:W32.t Array256.t, start:int,
-                                      zetas:W256.t) : W32.t Array256.t = {
-    var coeffs_i:W256.t;
-    var coeffs_i_plus_1:W256.t;
-    var low_values:W256.t;
-    var high_values:W256.t;
-    var differences:W256.t;
-    var sums:W256.t;
-    var coeffs_i_start:int;
-    var coeffs_i_plus_1_start:int;
-    coeffs_i_start <- start;
-    coeffs_i_start <- (coeffs_i_start * 32);
-    coeffs_i <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    coeffs_i_start);
-    coeffs_i_plus_1_start <- coeffs_i_start;
-    coeffs_i_plus_1_start <- (coeffs_i_plus_1_start + 32);
-    coeffs_i_plus_1 <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    coeffs_i_plus_1_start);
-    low_values <- (VPUNPCKL_4u64 coeffs_i coeffs_i_plus_1);
-    high_values <- (VPUNPCKH_4u64 coeffs_i coeffs_i_plus_1);
-    differences <- (VPSUB_8u32 high_values low_values);
-    sums <- (VPADD_8u32 high_values low_values);
-    differences <@ montgomery_multiply_and_reduce (differences, zetas);
-    coeffs_i <- (VPUNPCKL_4u64 sums differences);
-    coeffs_i_plus_1 <- (VPUNPCKH_4u64 sums differences);
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    coeffs_i_start coeffs_i)));
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    coeffs_i_plus_1_start coeffs_i_plus_1)));
-    return polynomial;
-  }
-  proc polynomial__invert_ntt_at_layer_1 (polynomial:W32.t Array256.t) : 
-  W32.t Array256.t = {
-    var i:int;
-    var zetas:W256.t;
-    var start:int;
-    i <- 0;
-    while ((i < 16)) {
-      start <- (i * 2);
-      zetas <- zETAS_TO_INVERT_LAYER_1.[i];
-      polynomial <@ polynomial__invert_at_layer_1 (polynomial, start, zetas);
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__invert_at_layer_2 (polynomial:W32.t Array256.t, start:int,
-                                      zetas:W256.t) : W32.t Array256.t = {
-    var coeffs_i:W256.t;
-    var coeffs_i_plus_1:W256.t;
-    var low_values:W256.t;
-    var high_values:W256.t;
-    var differences:W256.t;
-    var sums:W256.t;
-    var coeffs_i_start:int;
-    var coeffs_i_plus_1_start:int;
-    coeffs_i_start <- start;
-    coeffs_i_start <- (coeffs_i_start * 32);
-    coeffs_i <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    coeffs_i_start);
-    coeffs_i_plus_1_start <- coeffs_i_start;
-    coeffs_i_plus_1_start <- (coeffs_i_plus_1_start + 32);
-    coeffs_i_plus_1 <-
-    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    coeffs_i_plus_1_start);
-    low_values <- (VPERM2I128 coeffs_i coeffs_i_plus_1 (W8.of_int 32));
-    high_values <- (VPERM2I128 coeffs_i coeffs_i_plus_1 (W8.of_int 49));
-    differences <- (VPSUB_8u32 high_values low_values);
-    sums <- (VPADD_8u32 high_values low_values);
-    differences <@ montgomery_multiply_and_reduce (differences, zetas);
-    coeffs_i <- (VPERM2I128 sums differences (W8.of_int 32));
-    coeffs_i_plus_1 <- (VPERM2I128 sums differences (W8.of_int 49));
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    coeffs_i_start coeffs_i)));
-    polynomial <-
-    (Array256.init
-    (WArray1024.get32
-    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-    coeffs_i_plus_1_start coeffs_i_plus_1)));
-    return polynomial;
-  }
-  proc polynomial__invert_ntt_at_layer_2 (polynomial:W32.t Array256.t) : 
-  W32.t Array256.t = {
-    var i:int;
-    var zetas:W256.t;
-    var start:int;
-    i <- 0;
-    while ((i < 16)) {
-      start <- (i * 2);
-      zetas <- zETAS_TO_INVERT_LAYER_2.[i];
-      polynomial <@ polynomial__invert_at_layer_2 (polynomial, start, zetas);
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__invert_ntt_round (polynomial:W32.t Array256.t, offset:int,
-                                     step_by:int, zeta_0:W32.t) : W32.t Array256.t = {
-    var zetas:W256.t;
-    var coeffs_i:W256.t;
-    var coeffs_i_plus_step_by:W256.t;
-    var a_minus_b:W256.t;
-    var i:int;
-    var index_i:int;
-    var index_i_plus_step_by:int;
-    zetas <- (zeroextu256 (VMOV_32 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    i <- offset;
-    offset <- (offset + step_by);
-    while ((i < offset)) {
-      index_i <- i;
-      index_i <- (index_i * 32);
-      coeffs_i <-
-      (get256_direct (WArray1024.init32 (fun i_0 => polynomial.[i_0]))
-      index_i);
-      index_i_plus_step_by <- i;
-      index_i_plus_step_by <- (index_i_plus_step_by + step_by);
-      index_i_plus_step_by <- (index_i_plus_step_by * 32);
-      coeffs_i_plus_step_by <-
-      (get256_direct (WArray1024.init32 (fun i_0 => polynomial.[i_0]))
-      index_i_plus_step_by);
-      a_minus_b <- (VPSUB_8u32 coeffs_i_plus_step_by coeffs_i);
-      coeffs_i <- (VPADD_8u32 coeffs_i coeffs_i_plus_step_by);
-      coeffs_i_plus_step_by <@ montgomery_multiply_and_reduce (a_minus_b,
-      zetas);
-      polynomial <-
-      (Array256.init
-      (WArray1024.get32
-      (WArray1024.set256_direct
-      (WArray1024.init32 (fun i_0 => polynomial.[i_0])) index_i coeffs_i)));
-      polynomial <-
-      (Array256.init
-      (WArray1024.get32
-      (WArray1024.set256_direct
-      (WArray1024.init32 (fun i_0 => polynomial.[i_0])) index_i_plus_step_by
-      coeffs_i_plus_step_by)));
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__invert_ntt_at_layer_3 (polynomial:W32.t Array256.t) : 
-  W32.t Array256.t = {
-    var sTEP:int;
-    var sTEP_BY:int;
-    var i:int;
-    var zeta_0:W32.t;
-    var offset:int;
-    var step_by:int;
-    sTEP <- 8;
-    sTEP_BY <- (sTEP %/ 8);
-    i <- 0;
-    while ((i < 16)) {
-      offset <- (((i * sTEP) * 2) %/ 8);
-      step_by <- sTEP_BY;
-      zeta_0 <- zETAS_TO_INVERT_LAYER_3.[i];
-      polynomial <@ polynomial__invert_ntt_round (polynomial, offset,
-      step_by, zeta_0);
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__invert_ntt_at_layer_4 (polynomial:W32.t Array256.t) : 
-  W32.t Array256.t = {
-    var sTEP:int;
-    var sTEP_BY:int;
-    var i:int;
-    var zeta_0:W32.t;
-    var offset:int;
-    var step_by:int;
-    sTEP <- 16;
-    sTEP_BY <- (sTEP %/ 8);
-    i <- 0;
-    while ((i < 8)) {
-      offset <- (((i * sTEP) * 2) %/ 8);
-      step_by <- sTEP_BY;
-      zeta_0 <- zETAS_TO_INVERT_LAYER_4.[i];
-      polynomial <@ polynomial__invert_ntt_round (polynomial, offset,
-      step_by, zeta_0);
-      i <- (i + 1);
-    }
-    return polynomial;
-  }
-  proc polynomial__invert_ntt_at_layer_5 (polynomial:W32.t Array256.t) : 
-  W32.t Array256.t = {
-    var sTEP:int;
-    var sTEP_BY:int;
-    var i:int;
-    var zeta_0:W32.t;
-    var offset:int;
-    var step_by:int;
-    sTEP <- 32;
-    sTEP_BY <- (sTEP %/ 8);
     i <- 0;
     while ((i < 4)) {
-      offset <- (((i * sTEP) * 2) %/ 8);
-      step_by <- sTEP_BY;
-      zeta_0 <- zETAS_TO_INVERT_LAYER_5.[i];
-      polynomial <@ polynomial__invert_ntt_round (polynomial, offset,
-      step_by, zeta_0);
+      polynomial <@ polynomial____ntt_layers_7_6_5 (polynomial, i);
+      i <- (i + 1);
+    }
+    i <- 0;
+    while ((i < 4)) {
+      polynomial <@ polynomial____ntt_layers_4_to_0 (polynomial, i);
       i <- (i + 1);
     }
     return polynomial;
   }
-  proc polynomial__invert_ntt_at_layer_6 (polynomial:W32.t Array256.t) : 
-  W32.t Array256.t = {
-    var sTEP:int;
-    var sTEP_BY:int;
-    var i:int;
+  proc polynomial____gs_butterfly (a:W256.t, b:W256.t, zetas:W256.t) : 
+  W256.t * W256.t = {
+    var b_minus_a:W256.t;
+    b_minus_a <- (VPSUB_8u32 b a);
+    a <- (VPADD_8u32 a b);
+    b <@ montgomery_multiply_and_reduce (b_minus_a, zetas);
+    return (a, b);
+  }
+  proc polynomial____gs_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
+  W256.t * W256.t = {
+    var low_values:W256.t;
+    var high_values:W256.t;
+    var differences:W256.t;
+    var sums:W256.t;
+    low_values <- (VPUNPCKL_4u64 lhs rhs);
+    high_values <- (VPUNPCKH_4u64 lhs rhs);
+    differences <- (VPSUB_8u32 high_values low_values);
+    sums <- (VPADD_8u32 high_values low_values);
+    differences <@ montgomery_multiply_and_reduce (differences, zetas);
+    lhs <- (VPUNPCKL_4u64 sums differences);
+    rhs <- (VPUNPCKH_4u64 sums differences);
+    return (lhs, rhs);
+  }
+  proc polynomial____gs_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
+  W256.t * W256.t = {
+    
+    lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
+    rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
+    (lhs, rhs) <@ polynomial____gs_butterfly_4 (lhs, rhs, zetas);
+    lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
+    rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
+    return (lhs, rhs);
+  }
+  proc polynomial____gs_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
+  W256.t * W256.t = {
+    var low_values:W256.t;
+    var high_values:W256.t;
+    var differences:W256.t;
+    var sums:W256.t;
+    low_values <- (VPERM2I128 lhs rhs (W8.of_int 32));
+    high_values <- (VPERM2I128 lhs rhs (W8.of_int 49));
+    differences <- (VPSUB_8u32 high_values low_values);
+    sums <- (VPADD_8u32 high_values low_values);
+    differences <@ montgomery_multiply_and_reduce (differences, zetas);
+    lhs <- (VPERM2I128 sums differences (W8.of_int 32));
+    rhs <- (VPERM2I128 sums differences (W8.of_int 49));
+    return (lhs, rhs);
+  }
+  proc polynomial____broadcast_zeta (zeta_0:W32.t) : W256.t = {
+    var zetas:W256.t;
+    zetas <- (zeroextu256 (VMOV_32 zeta_0));
+    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
+    return zetas;
+  }
+  proc polynomial____invert_ntt_layers_0_to_4 (polynomial:W32.t Array256.t,
+                                               g:int) : W32.t Array256.t = {
+    var r0:W256.t;
+    var r1:W256.t;
+    var r2:W256.t;
+    var r3:W256.t;
+    var r4:W256.t;
+    var r5:W256.t;
+    var r6:W256.t;
+    var r7:W256.t;
+    var zetas:W256.t;
     var zeta_0:W32.t;
-    var offset:int;
-    var step_by:int;
-    sTEP <- 64;
-    sTEP_BY <- (sTEP %/ 8);
-    i <- 0;
-    while ((i < 2)) {
-      offset <- (((i * sTEP) * 2) %/ 8);
-      step_by <- sTEP_BY;
-      zeta_0 <- zETAS_TO_INVERT_LAYER_6.[i];
-      polynomial <@ polynomial__invert_ntt_round (polynomial, offset,
-      step_by, zeta_0);
-      i <- (i + 1);
-    }
+    r0 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 0)));
+    r1 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 1)));
+    r2 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 2)));
+    r3 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 3)));
+    r4 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 4)));
+    r5 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 5)));
+    r6 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 6)));
+    r7 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 7)));
+    zetas <- zETAS_TO_INVERT_LAYER_0.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____gs_butterfly_2 (r0, r1, zetas);
+    zetas <- zETAS_TO_INVERT_LAYER_0.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____gs_butterfly_2 (r2, r3, zetas);
+    zetas <- zETAS_TO_INVERT_LAYER_0.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____gs_butterfly_2 (r4, r5, zetas);
+    zetas <- zETAS_TO_INVERT_LAYER_0.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____gs_butterfly_2 (r6, r7, zetas);
+    zetas <- zETAS_TO_INVERT_LAYER_1.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____gs_butterfly_4 (r0, r1, zetas);
+    zetas <- zETAS_TO_INVERT_LAYER_1.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____gs_butterfly_4 (r2, r3, zetas);
+    zetas <- zETAS_TO_INVERT_LAYER_1.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____gs_butterfly_4 (r4, r5, zetas);
+    zetas <- zETAS_TO_INVERT_LAYER_1.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____gs_butterfly_4 (r6, r7, zetas);
+    zetas <- zETAS_TO_INVERT_LAYER_2.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____gs_butterfly_8 (r0, r1, zetas);
+    zetas <- zETAS_TO_INVERT_LAYER_2.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____gs_butterfly_8 (r2, r3, zetas);
+    zetas <- zETAS_TO_INVERT_LAYER_2.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____gs_butterfly_8 (r4, r5, zetas);
+    zetas <- zETAS_TO_INVERT_LAYER_2.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____gs_butterfly_8 (r6, r7, zetas);
+    zeta_0 <- zETAS_TO_INVERT_LAYER_3.[((4 * g) + 0)];
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r0, r1) <@ polynomial____gs_butterfly (r0, r1, zetas);
+    zeta_0 <- zETAS_TO_INVERT_LAYER_3.[((4 * g) + 1)];
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r2, r3) <@ polynomial____gs_butterfly (r2, r3, zetas);
+    zeta_0 <- zETAS_TO_INVERT_LAYER_3.[((4 * g) + 2)];
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r4, r5) <@ polynomial____gs_butterfly (r4, r5, zetas);
+    zeta_0 <- zETAS_TO_INVERT_LAYER_3.[((4 * g) + 3)];
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r6, r7) <@ polynomial____gs_butterfly (r6, r7, zetas);
+    zeta_0 <- zETAS_TO_INVERT_LAYER_4.[(2 * g)];
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r0, r2) <@ polynomial____gs_butterfly (r0, r2, zetas);
+    (r1, r3) <@ polynomial____gs_butterfly (r1, r3, zetas);
+    zeta_0 <- zETAS_TO_INVERT_LAYER_4.[((2 * g) + 1)];
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r4, r6) <@ polynomial____gs_butterfly (r4, r6, zetas);
+    (r5, r7) <@ polynomial____gs_butterfly (r5, r7, zetas);
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 0)) r0)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 1)) r1)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 2)) r2)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 3)) r3)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 4)) r4)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 5)) r5)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 6)) r6)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * ((8 * g) + 7)) r7)));
     return polynomial;
   }
-  proc polynomial__invert_ntt_at_layer_7 (polynomial:W32.t Array256.t) : 
-  W32.t Array256.t = {
-    var sTEP:int;
-    var sTEP_BY:int;
-    var i:int;
+  proc polynomial____invert_ntt_layers_5_6_7 (polynomial:W32.t Array256.t,
+                                              j:int) : W32.t Array256.t = {
+    var r0:W256.t;
+    var r1:W256.t;
+    var r2:W256.t;
+    var r3:W256.t;
+    var r4:W256.t;
+    var r5:W256.t;
+    var r6:W256.t;
+    var r7:W256.t;
     var zeta_0:W32.t;
-    var offset:int;
-    var step_by:int;
-    sTEP <- 128;
-    sTEP_BY <- (sTEP %/ 8);
-    i <- 0;
-    while ((i < 1)) {
-      offset <- (((i * sTEP) * 2) %/ 8);
-      step_by <- sTEP_BY;
-      zeta_0 <- (W32.of_int 25847);
-      polynomial <@ polynomial__invert_ntt_round (polynomial, offset,
-      step_by, zeta_0);
-      i <- (i + 1);
-    }
+    var zetas:W256.t;
+    r0 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 0)));
+    r1 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 4)));
+    r2 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 8)));
+    r3 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 12)));
+    r4 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 16)));
+    r5 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 20)));
+    r6 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 24)));
+    r7 <-
+    (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 28)));
+    zeta_0 <- zETAS_TO_INVERT_LAYER_5.[0];
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r0, r1) <@ polynomial____gs_butterfly (r0, r1, zetas);
+    zeta_0 <- zETAS_TO_INVERT_LAYER_5.[1];
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r2, r3) <@ polynomial____gs_butterfly (r2, r3, zetas);
+    zeta_0 <- zETAS_TO_INVERT_LAYER_5.[2];
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r4, r5) <@ polynomial____gs_butterfly (r4, r5, zetas);
+    zeta_0 <- zETAS_TO_INVERT_LAYER_5.[3];
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r6, r7) <@ polynomial____gs_butterfly (r6, r7, zetas);
+    zeta_0 <- zETAS_TO_INVERT_LAYER_6.[0];
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r0, r2) <@ polynomial____gs_butterfly (r0, r2, zetas);
+    (r1, r3) <@ polynomial____gs_butterfly (r1, r3, zetas);
+    zeta_0 <- zETAS_TO_INVERT_LAYER_6.[1];
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r4, r6) <@ polynomial____gs_butterfly (r4, r6, zetas);
+    (r5, r7) <@ polynomial____gs_butterfly (r5, r7, zetas);
+    zeta_0 <- (W32.of_int 25847);
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    (r0, r4) <@ polynomial____gs_butterfly (r0, r4, zetas);
+    (r1, r5) <@ polynomial____gs_butterfly (r1, r5, zetas);
+    (r2, r6) <@ polynomial____gs_butterfly (r2, r6, zetas);
+    (r3, r7) <@ polynomial____gs_butterfly (r3, r7, zetas);
+    zeta_0 <- (W32.of_int 41978);
+    zetas <@ polynomial____broadcast_zeta (zeta_0);
+    r0 <@ montgomery_multiply_and_reduce (r0, zetas);
+    r1 <@ montgomery_multiply_and_reduce (r1, zetas);
+    r2 <@ montgomery_multiply_and_reduce (r2, zetas);
+    r3 <@ montgomery_multiply_and_reduce (r3, zetas);
+    r4 <@ montgomery_multiply_and_reduce (r4, zetas);
+    r5 <@ montgomery_multiply_and_reduce (r5, zetas);
+    r6 <@ montgomery_multiply_and_reduce (r6, zetas);
+    r7 <@ montgomery_multiply_and_reduce (r7, zetas);
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 0)) r0)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 4)) r1)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 8)) r2)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 12)) r3)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 16)) r4)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 20)) r5)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 24)) r6)));
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+    (32 * (j + 28)) r7)));
     return polynomial;
   }
   proc polynomial__invert_ntt_montgomery (polynomial:W32.t Array256.t) : 
   W32.t Array256.t = {
-    var temp:W64.t;
-    var twiddle_factors:W256.t;
-    var coefficients:W256.t;
     var i:int;
-    polynomial <@ polynomial__invert_ntt_at_layer_0 (polynomial);
-    polynomial <@ polynomial__invert_ntt_at_layer_1 (polynomial);
-    polynomial <@ polynomial__invert_ntt_at_layer_2 (polynomial);
-    polynomial <@ polynomial__invert_ntt_at_layer_3 (polynomial);
-    polynomial <@ polynomial__invert_ntt_at_layer_4 (polynomial);
-    polynomial <@ polynomial__invert_ntt_at_layer_5 (polynomial);
-    polynomial <@ polynomial__invert_ntt_at_layer_6 (polynomial);
-    polynomial <@ polynomial__invert_ntt_at_layer_7 (polynomial);
-    temp <- (W64.of_int 41978);
-    twiddle_factors <- (zeroextu256 (VMOV_32 (truncateu32 temp)));
-    twiddle_factors <- (VPBROADCAST_8u32 (truncateu32 twiddle_factors));
     i <- 0;
-    while ((i < ((256 * 32) %/ 8))) {
-      coefficients <-
-      (get256_direct (WArray1024.init32 (fun i_0 => polynomial.[i_0])) i);
-      coefficients <@ montgomery_multiply_and_reduce (coefficients,
-      twiddle_factors);
-      polynomial <-
-      (Array256.init
-      (WArray1024.get32
-      (WArray1024.set256_direct
-      (WArray1024.init32 (fun i_0 => polynomial.[i_0])) i coefficients)));
-      i <- (i + 32);
+    while ((i < 4)) {
+      polynomial <@ polynomial____invert_ntt_layers_0_to_4 (polynomial, i);
+      i <- (i + 1);
+    }
+    i <- 0;
+    while ((i < 4)) {
+      polynomial <@ polynomial____invert_ntt_layers_5_6_7 (polynomial, i);
+      i <- (i + 1);
     }
     return polynomial;
   }

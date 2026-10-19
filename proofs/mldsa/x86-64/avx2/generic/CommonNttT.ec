@@ -22,17 +22,10 @@ import Round ZModQ Zq.
 (*         wpoly_ntt_orng res (|x| < 9q: each of the 8 layers adds q)  *)
 (* ================================================================== *)
 
-lemma polynomial__ntt_round_ll : islossless M.polynomial__ntt_round.
-proof.
-proc; while true (bound - i); last by auto=> /#.
-by move=> z; wp; call (: true); [islossless | auto=> /#].
-qed.
-
 lemma polynomial__ntt_ll : islossless M.polynomial__ntt.
 proof.
-proc; islossless; (while true (16 - i); [
-  by move=> z; wp; (call polynomial__ntt_round_ll || (call (: true); 1: by islossless)); auto=> /# |
-  by auto=> /#]).
+proc; while true (4 - i); first by move=> z; wp; call (: true); [islossless | auto=> /#].
+by wp; while true (4 - i); [move=> z; wp; call (: true); [islossless | auto=> /#] | auto=> /#].
 qed.
 
 lemma polynomial__ntt_correct (_a : W32.t Array256.t) :

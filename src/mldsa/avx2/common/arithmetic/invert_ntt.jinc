@@ -1,326 +1,252 @@
 namespace polynomial {
-    // ----------- Layer 0 -------------
-    fn invert_at_layer_0(
-        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
-        reg ui64 start,
-        reg u256 zetas
-    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
+    // The inverse NTT in two passes over the polynomial, the coefficients
+    // staying in eight ymm registers through several layers (see ntt.jinc
+    // for the register numbering):
+    //   - pass A, layers 0, 1, 2, 3, 4: the registers 8g..8g+7 of a block
+    //     g = 0..3 (64 consecutive coefficients) form a complete network;
+    //   - pass B, layers 5, 6, 7: the registers {j, j+4, ..., j+28} of a
+    //     column j = 0..3 form a complete network, and the final scaling by
+    //     the Montgomery form of 1/256 is applied before the store.
+    // The butterflies themselves are those of the layer-by-layer version;
+    // only their order and the residency of the data change.
+
+    // Gentleman-Sande butterfly on two registers: (a, b) -> (a + b, z (b - a))
+    inline
+    fn __gs_butterfly(reg u256 a b zetas) -> reg u256, reg u256
     {
-        reg u256 coeffs_i coeffs_i_plus_1;
-        reg u256 low_values high_values;
-        reg u256 differences sums;
+        reg u256 b_minus_a;
 
-        reg ui64 coeffs_i_start coeffs_i_plus_1_start;
+        b_minus_a = #VPSUB_8u32(b, a);
+        a = #VPADD_8u32(a, b);
+        b = montgomery_multiply_and_reduce(b_minus_a, zetas);
 
-        coeffs_i_start = start;
-        coeffs_i_start *= 32;
-        coeffs_i = polynomial.[:u256 coeffs_i_start];
-        coeffs_i = #VPSHUFD_256(coeffs_i, 0b11_01_10_00);
-
-        coeffs_i_plus_1_start = coeffs_i_start;
-        coeffs_i_plus_1_start += 32;
-        coeffs_i_plus_1 = polynomial.[:u256 coeffs_i_plus_1_start];
-        coeffs_i_plus_1 = #VPSHUFD_256(coeffs_i_plus_1, 0b11_01_10_00);
-
-        low_values = #VPUNPCKL_4u64(coeffs_i, coeffs_i_plus_1);
-        high_values = #VPUNPCKH_4u64(coeffs_i, coeffs_i_plus_1);
-
-        differences = #VPSUB_8u32(high_values, low_values);
-        sums = #VPADD_8u32(high_values, low_values);
-
-        differences = montgomery_multiply_and_reduce(differences, zetas);
-
-        coeffs_i = #VPUNPCKL_4u64(sums, differences);
-        coeffs_i_plus_1 = #VPUNPCKH_4u64(sums, differences);
-
-        coeffs_i = #VPSHUFD_256(coeffs_i, 0b11_01_10_00);
-        coeffs_i_plus_1 = #VPSHUFD_256(coeffs_i_plus_1, 0b11_01_10_00);
-
-        polynomial.[:u256 coeffs_i_start] = coeffs_i;
-        polynomial.[:u256 coeffs_i_plus_1_start] = coeffs_i_plus_1;
-
-        return polynomial;
-    }
-    fn invert_ntt_at_layer_0(
-         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
-    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
-    {
-        reg ui64 start;
-        reg u256 zetas;
-
-        inline int i;
-
-        for i = 0 to 16 {
-            start = i * 2;
-            zetas = ZETAS_TO_INVERT_LAYER_0[i];
-            polynomial = invert_at_layer_0(polynomial, start, zetas);
-        }
-
-        return polynomial;
+        return a, b;
     }
 
-    // ----------- Layer 1 -------------
-    fn invert_at_layer_1(
-        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
-        reg ui64 start,
-        reg u256 zetas
-    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
+    // Layer 1: the butterflies pair the 64-bit quarters of two registers.
+    inline
+    fn __gs_butterfly_4(reg u256 lhs rhs zetas) -> reg u256, reg u256
     {
-        reg u256 coeffs_i coeffs_i_plus_1;
         reg u256 low_values high_values;
         reg u256 sums differences;
 
-        reg ui64 coeffs_i_start coeffs_i_plus_1_start;
-
-        coeffs_i_start = start;
-        coeffs_i_start *= 32;
-        coeffs_i = polynomial.[:u256 coeffs_i_start];
-
-        coeffs_i_plus_1_start = coeffs_i_start;
-        coeffs_i_plus_1_start += 32;
-        coeffs_i_plus_1 = polynomial.[:u256 coeffs_i_plus_1_start];
-
-        low_values = #VPUNPCKL_4u64(coeffs_i, coeffs_i_plus_1);
-        high_values = #VPUNPCKH_4u64(coeffs_i, coeffs_i_plus_1);
+        low_values = #VPUNPCKL_4u64(lhs, rhs);
+        high_values = #VPUNPCKH_4u64(lhs, rhs);
 
         differences = #VPSUB_8u32(high_values, low_values);
         sums = #VPADD_8u32(high_values, low_values);
-
         differences = montgomery_multiply_and_reduce(differences, zetas);
 
-        coeffs_i = #VPUNPCKL_4u64(sums, differences);
-        coeffs_i_plus_1 = #VPUNPCKH_4u64(sums, differences);
+        lhs = #VPUNPCKL_4u64(sums, differences);
+        rhs = #VPUNPCKH_4u64(sums, differences);
 
-        polynomial.[:u256 coeffs_i_start] = coeffs_i;
-        polynomial.[:u256 coeffs_i_plus_1_start] = coeffs_i_plus_1;
-
-        return polynomial;
-    }
-    fn invert_ntt_at_layer_1(
-         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
-    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
-    {
-        reg ui64 start;
-        reg u256 zetas;
-
-        inline int i;
-
-        for i = 0 to 16 {
-            start = i * 2;
-            zetas = ZETAS_TO_INVERT_LAYER_1[i];
-            polynomial = invert_at_layer_1(polynomial, start, zetas);
-        }
-
-        return polynomial;
+        return lhs, rhs;
     }
 
-    // ----------- Layer 2 -------------
-    fn invert_at_layer_2(
-        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
-        reg ui64 start,
-        reg u256 zetas
-    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
+    // Layer 0: the butterflies pair adjacent coefficients; a shuffle brings
+    // them into the layout of layer 1 and back.
+    inline
+    fn __gs_butterfly_2(reg u256 lhs rhs zetas) -> reg u256, reg u256
     {
-        reg u256 coeffs_i coeffs_i_plus_1;
+        lhs = #VPSHUFD_256(lhs, 0b11_01_10_00);
+        rhs = #VPSHUFD_256(rhs, 0b11_01_10_00);
+
+        lhs, rhs = __gs_butterfly_4(lhs, rhs, zetas);
+
+        lhs = #VPSHUFD_256(lhs, 0b11_01_10_00);
+        rhs = #VPSHUFD_256(rhs, 0b11_01_10_00);
+
+        return lhs, rhs;
+    }
+
+    // Layer 2: the butterflies pair the 128-bit halves of two registers.
+    inline
+    fn __gs_butterfly_8(reg u256 lhs rhs zetas) -> reg u256, reg u256
+    {
         reg u256 low_values high_values;
         reg u256 sums differences;
 
-        reg ui64 coeffs_i_start coeffs_i_plus_1_start;
-
-        coeffs_i_start = start;
-        coeffs_i_start *= 32;
-        coeffs_i = polynomial.[:u256 coeffs_i_start];
-
-        coeffs_i_plus_1_start = coeffs_i_start;
-        coeffs_i_plus_1_start += 32;
-        coeffs_i_plus_1 = polynomial.[:u256 coeffs_i_plus_1_start];
-
-        low_values = #VPERM2I128(coeffs_i, coeffs_i_plus_1, 0x20);
-        high_values = #VPERM2I128(coeffs_i, coeffs_i_plus_1, 0x31);
+        low_values = #VPERM2I128(lhs, rhs, 0x20);
+        high_values = #VPERM2I128(lhs, rhs, 0x31);
 
         differences = #VPSUB_8u32(high_values, low_values);
         sums = #VPADD_8u32(high_values, low_values);
-
         differences = montgomery_multiply_and_reduce(differences, zetas);
 
-        coeffs_i = #VPERM2I128(sums, differences, 0x20);
-        coeffs_i_plus_1 = #VPERM2I128(sums, differences, 0x31);
+        lhs = #VPERM2I128(sums, differences, 0x20);
+        rhs = #VPERM2I128(sums, differences, 0x31);
 
-        polynomial.[:u256 coeffs_i_start] = coeffs_i;
-        polynomial.[:u256 coeffs_i_plus_1_start] = coeffs_i_plus_1;
-
-        return polynomial;
-    }
-    fn invert_ntt_at_layer_2(
-         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
-    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
-    {
-        reg ui64 start;
-        reg u256 zetas;
-
-        inline int i;
-
-        for i = 0 to 16 {
-            start = i * 2;
-            zetas = ZETAS_TO_INVERT_LAYER_2[i];
-            polynomial = invert_at_layer_2(polynomial, start, zetas);
-        }
-
-        return polynomial;
+        return lhs, rhs;
     }
 
-    // ----------- Helper for layers 3 and beyond -------------
-    fn invert_ntt_round(
-        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
-        reg ui64 offset,
-        reg ui64 step_by,
-        reg u32 zeta
-    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
+    inline
+    fn __broadcast_zeta(reg u32 zeta) -> reg u256
     {
-        reg u256 a_minus_b;
-
-        reg ui64 index_i index_i_plus_step_by;
-        reg u256 coeffs_i coeffs_i_plus_step_by;
         reg u256 zetas;
 
         zetas = (256u)#VMOV_32(zeta);
         zetas = #VPBROADCAST_8u32(zetas);
 
-        reg ui64 i;
+        return zetas;
+    }
 
-        i = offset;
-        offset += step_by;
-        while (i < offset) {
-            index_i = i;
-            index_i *= 32;
-            coeffs_i = polynomial.[:u256 index_i];
+    // Pass A: layers 0 to 4 on the block g (registers 8g .. 8g+7).
+    inline
+    fn __invert_ntt_layers_0_to_4(
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
+        inline int g
+    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
+    {
+        reg u256 r0 r1 r2 r3 r4 r5 r6 r7;
+        reg u256 zetas;
+        reg u32 zeta;
 
-            index_i_plus_step_by = i;
-            index_i_plus_step_by += step_by;
-            index_i_plus_step_by *= 32;
-            coeffs_i_plus_step_by = polynomial.[:u256 index_i_plus_step_by];
+        r0 = polynomial.[:u256 32 * (8 * g + 0)];
+        r1 = polynomial.[:u256 32 * (8 * g + 1)];
+        r2 = polynomial.[:u256 32 * (8 * g + 2)];
+        r3 = polynomial.[:u256 32 * (8 * g + 3)];
+        r4 = polynomial.[:u256 32 * (8 * g + 4)];
+        r5 = polynomial.[:u256 32 * (8 * g + 5)];
+        r6 = polynomial.[:u256 32 * (8 * g + 6)];
+        r7 = polynomial.[:u256 32 * (8 * g + 7)];
 
-            a_minus_b = #VPSUB_8u32(coeffs_i_plus_step_by, coeffs_i);
+        // layers 0, 1, 2: inside the register pairs (v, v + 1)
+        zetas = ZETAS_TO_INVERT_LAYER_0[4 * g + 0];
+        r0, r1 = __gs_butterfly_2(r0, r1, zetas);
+        zetas = ZETAS_TO_INVERT_LAYER_0[4 * g + 1];
+        r2, r3 = __gs_butterfly_2(r2, r3, zetas);
+        zetas = ZETAS_TO_INVERT_LAYER_0[4 * g + 2];
+        r4, r5 = __gs_butterfly_2(r4, r5, zetas);
+        zetas = ZETAS_TO_INVERT_LAYER_0[4 * g + 3];
+        r6, r7 = __gs_butterfly_2(r6, r7, zetas);
 
-            coeffs_i = #VPADD_8u32(coeffs_i, coeffs_i_plus_step_by);
-            coeffs_i_plus_step_by = montgomery_multiply_and_reduce(a_minus_b, zetas);
+        zetas = ZETAS_TO_INVERT_LAYER_1[4 * g + 0];
+        r0, r1 = __gs_butterfly_4(r0, r1, zetas);
+        zetas = ZETAS_TO_INVERT_LAYER_1[4 * g + 1];
+        r2, r3 = __gs_butterfly_4(r2, r3, zetas);
+        zetas = ZETAS_TO_INVERT_LAYER_1[4 * g + 2];
+        r4, r5 = __gs_butterfly_4(r4, r5, zetas);
+        zetas = ZETAS_TO_INVERT_LAYER_1[4 * g + 3];
+        r6, r7 = __gs_butterfly_4(r6, r7, zetas);
 
-            polynomial.[:u256 index_i] = coeffs_i;
-            polynomial.[:u256 index_i_plus_step_by] = coeffs_i_plus_step_by;
+        zetas = ZETAS_TO_INVERT_LAYER_2[4 * g + 0];
+        r0, r1 = __gs_butterfly_8(r0, r1, zetas);
+        zetas = ZETAS_TO_INVERT_LAYER_2[4 * g + 1];
+        r2, r3 = __gs_butterfly_8(r2, r3, zetas);
+        zetas = ZETAS_TO_INVERT_LAYER_2[4 * g + 2];
+        r4, r5 = __gs_butterfly_8(r4, r5, zetas);
+        zetas = ZETAS_TO_INVERT_LAYER_2[4 * g + 3];
+        r6, r7 = __gs_butterfly_8(r6, r7, zetas);
 
-            i += 1;
-        }
+        // layer 3: pairs (v, v + 1)
+        zeta = ZETAS_TO_INVERT_LAYER_3[4 * g + 0];
+        zetas = __broadcast_zeta(zeta);
+        r0, r1 = __gs_butterfly(r0, r1, zetas);
+        zeta = ZETAS_TO_INVERT_LAYER_3[4 * g + 1];
+        zetas = __broadcast_zeta(zeta);
+        r2, r3 = __gs_butterfly(r2, r3, zetas);
+        zeta = ZETAS_TO_INVERT_LAYER_3[4 * g + 2];
+        zetas = __broadcast_zeta(zeta);
+        r4, r5 = __gs_butterfly(r4, r5, zetas);
+        zeta = ZETAS_TO_INVERT_LAYER_3[4 * g + 3];
+        zetas = __broadcast_zeta(zeta);
+        r6, r7 = __gs_butterfly(r6, r7, zetas);
+
+        // layer 4: pairs (v, v + 2)
+        zeta = ZETAS_TO_INVERT_LAYER_4[2 * g];
+        zetas = __broadcast_zeta(zeta);
+        r0, r2 = __gs_butterfly(r0, r2, zetas);
+        r1, r3 = __gs_butterfly(r1, r3, zetas);
+        zeta = ZETAS_TO_INVERT_LAYER_4[2 * g + 1];
+        zetas = __broadcast_zeta(zeta);
+        r4, r6 = __gs_butterfly(r4, r6, zetas);
+        r5, r7 = __gs_butterfly(r5, r7, zetas);
+
+        polynomial.[:u256 32 * (8 * g + 0)] = r0;
+        polynomial.[:u256 32 * (8 * g + 1)] = r1;
+        polynomial.[:u256 32 * (8 * g + 2)] = r2;
+        polynomial.[:u256 32 * (8 * g + 3)] = r3;
+        polynomial.[:u256 32 * (8 * g + 4)] = r4;
+        polynomial.[:u256 32 * (8 * g + 5)] = r5;
+        polynomial.[:u256 32 * (8 * g + 6)] = r6;
+        polynomial.[:u256 32 * (8 * g + 7)] = r7;
 
         return polynomial;
     }
 
-    // ----------- Layer 3 -------------
-    fn invert_ntt_at_layer_3(
-         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
+    // Pass B: layers 5, 6, 7 and the scaling on the column j
+    // (registers j, j+4, ..., j+28).
+    inline
+    fn __invert_ntt_layers_5_6_7(
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
+        inline int j
     ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
     {
-        inline int STEP = 8; // 1 << layer
-        inline int STEP_BY = STEP / COEFFICIENTS_PER_YMM_REGISTER;
-
-        reg ui64 offset step_by;
+        reg u256 r0 r1 r2 r3 r4 r5 r6 r7;
+        reg u256 zetas;
         reg u32 zeta;
 
-        inline int i;
-        for i = 0 to 16 {
-            offset = i * STEP * 2 / COEFFICIENTS_PER_YMM_REGISTER;
-            step_by = STEP_BY;
-            zeta = ZETAS_TO_INVERT_LAYER_3[i];
-            polynomial = invert_ntt_round(polynomial, offset, step_by, zeta);
-        }
+        r0 = polynomial.[:u256 32 * (j +  0)];
+        r1 = polynomial.[:u256 32 * (j +  4)];
+        r2 = polynomial.[:u256 32 * (j +  8)];
+        r3 = polynomial.[:u256 32 * (j + 12)];
+        r4 = polynomial.[:u256 32 * (j + 16)];
+        r5 = polynomial.[:u256 32 * (j + 20)];
+        r6 = polynomial.[:u256 32 * (j + 24)];
+        r7 = polynomial.[:u256 32 * (j + 28)];
 
-        return polynomial;
-    }
+        // layer 5: pairs (v, v + 4), one root per quarter
+        zeta = ZETAS_TO_INVERT_LAYER_5[0];
+        zetas = __broadcast_zeta(zeta);
+        r0, r1 = __gs_butterfly(r0, r1, zetas);
+        zeta = ZETAS_TO_INVERT_LAYER_5[1];
+        zetas = __broadcast_zeta(zeta);
+        r2, r3 = __gs_butterfly(r2, r3, zetas);
+        zeta = ZETAS_TO_INVERT_LAYER_5[2];
+        zetas = __broadcast_zeta(zeta);
+        r4, r5 = __gs_butterfly(r4, r5, zetas);
+        zeta = ZETAS_TO_INVERT_LAYER_5[3];
+        zetas = __broadcast_zeta(zeta);
+        r6, r7 = __gs_butterfly(r6, r7, zetas);
 
-    // ----------- Layer 4 -------------
-    fn invert_ntt_at_layer_4(
-         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
-    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
-    {
-        inline int STEP = 16; // 1 << layer
-        inline int STEP_BY = STEP / COEFFICIENTS_PER_YMM_REGISTER;
+        // layer 6: pairs (v, v + 8), one root per half
+        zeta = ZETAS_TO_INVERT_LAYER_6[0];
+        zetas = __broadcast_zeta(zeta);
+        r0, r2 = __gs_butterfly(r0, r2, zetas);
+        r1, r3 = __gs_butterfly(r1, r3, zetas);
+        zeta = ZETAS_TO_INVERT_LAYER_6[1];
+        zetas = __broadcast_zeta(zeta);
+        r4, r6 = __gs_butterfly(r4, r6, zetas);
+        r5, r7 = __gs_butterfly(r5, r7, zetas);
 
-        reg ui64 offset step_by;
-        reg u32 zeta;
+        // layer 7: pairs (v, v + 16), one root
+        zeta = 25_847;
+        zetas = __broadcast_zeta(zeta);
+        r0, r4 = __gs_butterfly(r0, r4, zetas);
+        r1, r5 = __gs_butterfly(r1, r5, zetas);
+        r2, r6 = __gs_butterfly(r2, r6, zetas);
+        r3, r7 = __gs_butterfly(r3, r7, zetas);
 
-        inline int i;
-        for i = 0 to 8 {
-            offset = i * STEP * 2 / COEFFICIENTS_PER_YMM_REGISTER;
-            step_by = STEP_BY;
-            zeta = ZETAS_TO_INVERT_LAYER_4[i];
-            polynomial = invert_ntt_round(polynomial, offset, step_by, zeta);
-        }
+        // scaling by the Montgomery form of 1/256
+        zeta = 41_978;
+        zetas = __broadcast_zeta(zeta);
+        r0 = montgomery_multiply_and_reduce(r0, zetas);
+        r1 = montgomery_multiply_and_reduce(r1, zetas);
+        r2 = montgomery_multiply_and_reduce(r2, zetas);
+        r3 = montgomery_multiply_and_reduce(r3, zetas);
+        r4 = montgomery_multiply_and_reduce(r4, zetas);
+        r5 = montgomery_multiply_and_reduce(r5, zetas);
+        r6 = montgomery_multiply_and_reduce(r6, zetas);
+        r7 = montgomery_multiply_and_reduce(r7, zetas);
 
-        return polynomial;
-    }
-
-    // ----------- Layer 5 -------------
-    fn invert_ntt_at_layer_5(
-         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
-    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
-    {
-        inline int STEP = 32; // 1 << layer
-        inline int STEP_BY = STEP / COEFFICIENTS_PER_YMM_REGISTER;
-
-        reg ui64 offset step_by;
-        reg u32 zeta;
-
-        inline int i;
-        for i = 0 to 4 {
-            offset = i * STEP * 2 / COEFFICIENTS_PER_YMM_REGISTER;
-            step_by = STEP_BY;
-            zeta = ZETAS_TO_INVERT_LAYER_5[i];
-            polynomial = invert_ntt_round(polynomial, offset, step_by, zeta);
-        }
-
-        return polynomial;
-    }
-
-    // ----------- Layer 6 -------------
-    fn invert_ntt_at_layer_6(
-         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
-    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
-    {
-        inline int STEP = 64; // 1 << layer
-        inline int STEP_BY = STEP / COEFFICIENTS_PER_YMM_REGISTER;
-
-        reg ui64 offset step_by;
-        reg u32 zeta;
-
-        inline int i;
-        for i = 0 to 2 {
-            offset = i * STEP * 2 / COEFFICIENTS_PER_YMM_REGISTER;
-            step_by = STEP_BY;
-            zeta = ZETAS_TO_INVERT_LAYER_6[i];
-            polynomial = invert_ntt_round(polynomial, offset, step_by, zeta);
-        }
-
-        return polynomial;
-    }
-
-    // ----------- Layer 7 -------------
-    fn invert_ntt_at_layer_7(
-         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
-    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
-    {
-        inline int STEP = 128; // 1 << layer
-        inline int STEP_BY = STEP / COEFFICIENTS_PER_YMM_REGISTER;
-
-        reg ui64 offset step_by;
-        reg u32 zeta;
-
-        inline int i;
-
-        for i = 0 to 1 {
-            offset = i * STEP * 2 / COEFFICIENTS_PER_YMM_REGISTER;
-            step_by = STEP_BY;
-            zeta = 25_847;
-            polynomial = invert_ntt_round(polynomial, offset, step_by, zeta);
-        }
+        polynomial.[:u256 32 * (j +  0)] = r0;
+        polynomial.[:u256 32 * (j +  4)] = r1;
+        polynomial.[:u256 32 * (j +  8)] = r2;
+        polynomial.[:u256 32 * (j + 12)] = r3;
+        polynomial.[:u256 32 * (j + 16)] = r4;
+        polynomial.[:u256 32 * (j + 20)] = r5;
+        polynomial.[:u256 32 * (j + 24)] = r6;
+        polynomial.[:u256 32 * (j + 28)] = r7;
 
         return polynomial;
     }
@@ -329,31 +255,13 @@ namespace polynomial {
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
     ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
     {
-        reg u256 coefficients twiddle_factors;
-        reg ui64 i;
-        reg u64 temp;
+        inline int i;
 
-        polynomial = invert_ntt_at_layer_0(polynomial);
-        polynomial = invert_ntt_at_layer_1(polynomial);
-        polynomial = invert_ntt_at_layer_2(polynomial);
-        polynomial = invert_ntt_at_layer_3(polynomial);
-        polynomial = invert_ntt_at_layer_4(polynomial);
-        polynomial = invert_ntt_at_layer_5(polynomial);
-        polynomial = invert_ntt_at_layer_6(polynomial);
-        polynomial = invert_ntt_at_layer_7(polynomial);
-
-        temp = 41_978;
-        twiddle_factors = (256u)#VMOV_32(temp);
-        twiddle_factors = #VPBROADCAST_8u32(twiddle_factors);
-
-        i = 0;
-        while(i < BYTES_PER_UNCOMPRESSED_POLYNOMIAL) {
-            coefficients = polynomial.[:u256 i];
-
-            coefficients = montgomery_multiply_and_reduce(coefficients, twiddle_factors);
-            polynomial.[:u256 i] = coefficients;
-
-            i += 32;
+        for i = 0 to 4 {
+            polynomial = __invert_ntt_layers_0_to_4(polynomial, i);
+        }
+        for i = 0 to 4 {
+            polynomial = __invert_ntt_layers_5_6_7(polynomial, i);
         }
 
         return polynomial;
