@@ -2,7 +2,7 @@
   Algebraic correctness of the AVX2 inverse NTT procedure.
 
   Combines the code-level functional correctness (`Inttcorrect`: the
-  procedure computes `iscale (invtree polynomial 8)`) with the
+  procedure computes `ifinal (invtree polynomial 7)`) with the
   algebraic content of those operators (`Inttalg`), yielding the
   end-to-end statement: on a reduced input congruent to the forward
   NTT of p, the procedure returns 2^32 * p coefficient-wise mod q
@@ -41,7 +41,7 @@ lemma polynomial__invert_ntt_montgomery_algP (p_ v_ : wpoly) (B : int) :
              sval res.[i] %% q = (2^32 * sval p_.[i]) %% q].
 proof.
 move=> leqB hB hbnd hv.
-have [hb hs] := intt_ntt_alg p_ v_ B leqB hB hbnd hv.
+have [hb hs] := intt_ntt_alg_final p_ v_ B leqB hB hbnd hv.
 conseq (polynomial__invert_ntt_montgomeryP v_) => //.
 move=> &hr _ r ->.
 split.

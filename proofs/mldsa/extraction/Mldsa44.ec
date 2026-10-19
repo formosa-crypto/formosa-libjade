@@ -2553,6 +2553,15 @@ module M = {
     rhs <- (VPERM2I128 sums differences (W8.of_int 49));
     return (lhs, rhs);
   }
+  proc polynomial____gs_butterfly_scaled (a:W256.t, b:W256.t, zetas_f:W256.t,
+                                          f:W256.t) : W256.t * W256.t = {
+    var b_minus_a:W256.t;
+    b_minus_a <- (VPSUB_8u32 b a);
+    a <- (VPADD_8u32 a b);
+    b <@ montgomery_multiply_and_reduce (b_minus_a, zetas_f);
+    a <@ montgomery_multiply_and_reduce (a, f);
+    return (a, b);
+  }
   proc polynomial____broadcast_zeta (zeta_0:W32.t) : W256.t = {
     var zetas:W256.t;
     zetas <- (zeroextu256 (VMOV_32 zeta_0));
@@ -2693,6 +2702,7 @@ module M = {
     var r7:W256.t;
     var zeta_0:W32.t;
     var zetas:W256.t;
+    var scaling:W256.t;
     r0 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * (j + 0)));
@@ -2737,22 +2747,14 @@ module M = {
     zetas <@ polynomial____broadcast_zeta (zeta_0);
     (r4, r6) <@ polynomial____gs_butterfly (r4, r6, zetas);
     (r5, r7) <@ polynomial____gs_butterfly (r5, r7, zetas);
-    zeta_0 <- (W32.of_int 25847);
+    zeta_0 <- (W32.of_int (- 3975713));
     zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r0, r4) <@ polynomial____gs_butterfly (r0, r4, zetas);
-    (r1, r5) <@ polynomial____gs_butterfly (r1, r5, zetas);
-    (r2, r6) <@ polynomial____gs_butterfly (r2, r6, zetas);
-    (r3, r7) <@ polynomial____gs_butterfly (r3, r7, zetas);
     zeta_0 <- (W32.of_int 41978);
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    r0 <@ montgomery_multiply_and_reduce (r0, zetas);
-    r1 <@ montgomery_multiply_and_reduce (r1, zetas);
-    r2 <@ montgomery_multiply_and_reduce (r2, zetas);
-    r3 <@ montgomery_multiply_and_reduce (r3, zetas);
-    r4 <@ montgomery_multiply_and_reduce (r4, zetas);
-    r5 <@ montgomery_multiply_and_reduce (r5, zetas);
-    r6 <@ montgomery_multiply_and_reduce (r6, zetas);
-    r7 <@ montgomery_multiply_and_reduce (r7, zetas);
+    scaling <@ polynomial____broadcast_zeta (zeta_0);
+    (r0, r4) <@ polynomial____gs_butterfly_scaled (r0, r4, zetas, scaling);
+    (r1, r5) <@ polynomial____gs_butterfly_scaled (r1, r5, zetas, scaling);
+    (r2, r6) <@ polynomial____gs_butterfly_scaled (r2, r6, zetas, scaling);
+    (r3, r7) <@ polynomial____gs_butterfly_scaled (r3, r7, zetas, scaling);
     polynomial <-
     (Array256.init
     (WArray1024.get32
