@@ -88,6 +88,21 @@ ecall (mmrP differences zetas0); auto => &hr [#] -> -> -> /= ? ->.
 by rewrite (ivec_small p 0 jb o) 1..4:/# (ivec_small p 0 jb2 o2) 1..4:/# /vec /=.
 qed.
 
+(* level 7 with the scaling folded in *)
+lemma gs_butterfly_scaledP (p : wpoly) (o o2 : int) :
+  0 <= o => o + 8 <= 128 => o2 = o + 128 =>
+  hoare[M.polynomial____gs_butterfly_scaled :
+       a = vec p o /\ b = vec p o2
+    /\ zetas_f = W8u32.pack8 (nseq 8 (W32.of_int (-3975713)))
+    /\ f = W8u32.pack8 (nseq 8 (W32.of_int 41978))
+    ==> res = (vec (ifinal p) o, vec (ifinal p) o2)].
+proof.
+hint +listred.
+move=> 2? o2E; proc; ecall (mmrP a f); ecall (mmrP b_minus_a zetas_f).
+auto => &hr [#] -> -> -> -> /= ? -> ? ->.
+by rewrite o2E vec_ifinal_lo // vec_ifinal_hi // /vec /=.
+qed.
+
 (* the broadcast of a scalar twiddle *)
 lemma broadcast_zetaP (z : W32.t) :
   hoare[M.polynomial____broadcast_zeta : zeta_0 = z ==> res = W8u32.pack8 (nseq 8 z)].
@@ -177,7 +192,7 @@ qed.
 (* ==================================================================== *)
 lemma intt_layers_5_6_7P (p : wpoly) (j_ : int) : 0 <= j_ < 4 =>
   hoare[M.polynomial____invert_ntt_layers_5_6_7 :
-    arg = (p, j_) ==> res = merge (fun t => t %/ 8 %% 4 = j_) p (iscale (ilevels p 5 8))].
+    arg = (p, j_) ==> res = merge (fun t => t %/ 8 %% 4 = j_) p (ifinal (ilevels p 5 7))].
 proof.
 hint +listred.
 move=> rgj; proc.
@@ -205,21 +220,15 @@ seq 8 : (polynomial = p /\ j = j_ /\ col p6 j_ r0 r1 r2 r3 r4 r5 r6 r7).
   ecall (gs_butterflyP p5 6 0 (8 * j_) (8 * j_) (8 * j_ + 64) _ _ _ _ _ _); 2..7: smt().
   ecall (broadcast_zetaP zeta_0); wp; skip.
   by rewrite !izetas6E.
-pose p7 := ireduce_level p6 7.
-seq 6 : (polynomial = p /\ j = j_ /\ col p7 j_ r0 r1 r2 r3 r4 r5 r6 r7).
-- ecall (gs_butterflyP p6 7 0 (8 * j_ + 96) (8 * j_ + 96) (8 * j_ + 224) _ _ _ _ _ _); 2..7: smt().
-  ecall (gs_butterflyP p6 7 0 (8 * j_ + 64) (8 * j_ + 64) (8 * j_ + 192) _ _ _ _ _ _); 2..7: smt().
-  ecall (gs_butterflyP p6 7 0 (8 * j_ + 32) (8 * j_ + 32) (8 * j_ + 160) _ _ _ _ _ _); 2..7: smt().
-  ecall (gs_butterflyP p6 7 0 (8 * j_) (8 * j_) (8 * j_ + 128) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0).
-  by auto => />; rewrite izj7E.
-pose s7 := iscale p7.
-seq 10 : (polynomial = p /\ j = j_ /\ col s7 j_ r0 r1 r2 r3 r4 r5 r6 r7).
-- ecall (mmrP r7 zetas); ecall (mmrP r6 zetas); ecall (mmrP r5 zetas); ecall (mmrP r4 zetas).
-  ecall (mmrP r3 zetas); ecall (mmrP r2 zetas); ecall (mmrP r1 zetas); ecall (mmrP r0 zetas).
-  ecall (broadcast_zetaP zeta_0); auto => />.
-  by rewrite /s7 !vec_iscale 1..16:/# /vec /=.
-by auto => />; rewrite store_colE // ilevels5_8E.
+pose s7 := ifinal p6.
+seq 8 : (polynomial = p /\ j = j_ /\ col s7 j_ r0 r1 r2 r3 r4 r5 r6 r7).
+- ecall (gs_butterfly_scaledP p6 (8 * j_ + 96) (8 * j_ + 224) _ _ _); 2..4: smt().
+  ecall (gs_butterfly_scaledP p6 (8 * j_ + 64) (8 * j_ + 192) _ _ _); 2..4: smt().
+  ecall (gs_butterfly_scaledP p6 (8 * j_ + 32) (8 * j_ + 160) _ _ _); 2..4: smt().
+  ecall (gs_butterfly_scaledP p6 (8 * j_) (8 * j_ + 128) _ _ _); 2..4: smt().
+  ecall (broadcast_zetaP zeta_0); wp.
+  by ecall (broadcast_zetaP zeta_0); auto.
+by auto => />; rewrite store_colE // ilevels5_7E.
 qed.
 
 (* ==================================================================== *)
@@ -227,7 +236,7 @@ qed.
 (* ==================================================================== *)
 lemma polynomial__invert_ntt_montgomeryP (p_ : wpoly) :
   hoare[M.polynomial__invert_ntt_montgomery :
-    polynomial = p_ ==> res = iscale (invtree p_ 8)].
+    polynomial = p_ ==> res = ifinal (invtree p_ 7)].
 proof.
 proc.
 pose R := ilevels p_ 0 5.
@@ -244,16 +253,16 @@ seq 2 : (polynomial = R).
   by apply (ilevels_frame _ _ 0 5) => // k rgk; apply closed_blk.
 (* levels 5 to 7 and the scaling, column by column *)
 while (0 <= i <= 4 /\
-  polynomial = merge (fun t => t %/ 8 %% 4 < i) R (iscale (ilevels R 5 8))); last first.
+  polynomial = merge (fun t => t %/ 8 %% 4 < i) R (ifinal (ilevels R 5 7))); last first.
 - auto => />; split; first by rewrite merge_none 1:/#.
-  by move=> i ? 2?; rewrite merge_all 1:/# /R invtree8E.
+  by move=> i ? 2?; rewrite merge_all 1:/# /R invtree7E.
 exlim polynomial, i => p i_.
 case@[ambient]: (0 <= i_ < 4) => rgi; last first.
 - by conseq (_ : false ==> _); [smt() | exfalso].
 wp; call (intt_layers_5_6_7P p i_ rgi); auto => /> 3?; split; 1: smt().
-apply (merge_step (fun t => t %/ 8 %% 4) (fun p => iscale (ilevels p 5 8))) => p' /= hag.
-apply iscale_frame; apply (ilevels_frame _ _ 5 8) => // k rgk.
-by apply closed_col.
+apply (merge_step (fun t => t %/ 8 %% 4) (fun p => ifinal (ilevels p 5 7))) => p' /= hag.
+apply ifinal_frame; 1: by apply closed_col.
+by apply (ilevels_frame _ _ 5 7) => // k rgk; apply closed_col => /#.
 qed.
 
 end InttcorrectT.

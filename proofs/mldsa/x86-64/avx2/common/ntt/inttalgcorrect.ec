@@ -2,7 +2,7 @@
   Algebraic correctness of the AVX2 inverse NTT procedure.
 
   Combines the code-level functional correctness (`Inttcorrect`: the
-  procedure computes `iscale (invtree polynomial 8)`) with the
+  procedure computes `ifinal (invtree polynomial 7)`) with the
   algebraic content of those operators (`Inttalg`), yielding the
   end-to-end statement: on a reduced input congruent to the forward
   NTT of p, the procedure returns 2^32 * p coefficient-wise mod q

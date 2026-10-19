@@ -396,6 +396,14 @@ op [opaque] zetaL (i : int) =
 op iscale (p : wpoly) : wpoly =
   Array256.map (fun (c : W32.t) => mmr c (W32.of_int 41978)) p.
 
+(* The last level of the inverse NTT with the scaling folded in: the     *)
+(* sums are multiplied by 41978 and the differences by the root of the  *)
+(* level (25847) times 41978, reduced once more (-3975713).             *)
+op ifinal (p : wpoly) : wpoly =
+  Array256.init (fun t =>
+    if t < 128 then mmr (p.[t] + p.[t + 128]) (W32.of_int 41978)
+    else mmr (p.[t] - p.[t - 128]) (W32.of_int (-3975713))).
+
 (* ==================================================================== *)
 (* Pointwise (NTT-domain) multiplication: every coefficient of the      *)
 (* product is the montgomery-multiplication of the matching             *)

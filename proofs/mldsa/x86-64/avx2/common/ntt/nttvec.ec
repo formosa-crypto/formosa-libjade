@@ -425,14 +425,6 @@ move=> _; rewrite -(IntOrder.ltr_pmul2r (2^(k+1))) // e256 mulzDl -oE.
 smt(lez_floor).
 qed.
 
-(* the final scaling *)
-lemma vec_iscale (p : wpoly) (o : int) : 0 <= o => o + 8 <= 256 =>
-  vec (iscale p) o = W8u32.pack8 (mkseq (fun l => mmr p.[o + l] (W32.of_int 41978)) 8).
-proof.
-move=> 2?; rewrite /vec &(congr1 W8u32.pack8) &(eq_in_mkseq) => l rgl /=.
-by rewrite /iscale mapiE 1:/#.
-qed.
-
 (* ==================================================================== *)
 (* Inverse twiddle tables                                               *)
 (* ==================================================================== *)
@@ -459,9 +451,6 @@ proof.
 move=> rgi; rewrite -izjE // /izetasL.
 by do 6! rewrite ifF //; rewrite ifT // Array2.get_to_list.
 qed.
-
-lemma izj7E : izj 7 0 = W32.of_int 25847.
-proof. by rewrite -izjE // /izetasL. qed.
 
 lemma nth_flatten_map ['a 'b] (x0 : 'b) (f : 'a -> 'b list) (s : 'a list) (n i m : int) :
      (forall x, size (f x) = n) => 0 <= i < size s => 0 <= m < n
@@ -577,13 +566,6 @@ lemma ilevels0_5E (p : wpoly) : ilevels p 0 5 =
   ireduce_level (ireduce_level (ireduce_level (ireduce_level (ireduce_level p 0) 1) 2) 3) 4.
 proof. by rewrite /ilevels /range /= -iotaredE. qed.
 
-lemma ilevels5_8E (p : wpoly) : ilevels p 5 8 =
-  ireduce_level (ireduce_level (ireduce_level p 5) 6) 7.
-proof. by rewrite /ilevels /range /= -iotaredE. qed.
-
-lemma invtree8E (p : wpoly) : invtree p 8 = ilevels (ilevels p 0 5) 5 8.
-proof. by rewrite ilevels0_5E ilevels5_8E /invtree /range /= -iotaredE. qed.
-
 lemma ireduce_level_frame (p p' : wpoly) (k : int) (P : int -> bool) :
   0 <= k < 8 => closed k P => agree P p p' =>
   agree P (ireduce_level p k) (ireduce_level p' k).
@@ -621,6 +603,37 @@ apply ih; 1: by move=> k' hk'; apply hks; right.
 by have [? ?] := hks k _ => //; apply ireduce_level_frame.
 qed.
 
-lemma iscale_frame (p p' : wpoly) (P : int -> bool) :
-  agree P p p' => agree P (iscale p) (iscale p').
-proof. by move=> hag t rgt Pt; rewrite /iscale !mapiE // hag. qed.
+(* ==================================================================== *)
+(* The last inverse level, with the scaling folded in                   *)
+(* ==================================================================== *)
+lemma ilevels5_7E (p : wpoly) : ilevels p 5 7 = ireduce_level (ireduce_level p 5) 6.
+proof. by rewrite /ilevels /range /= -iotaredE. qed.
+
+lemma invtree7E (p : wpoly) : invtree p 7 = ilevels (ilevels p 0 5) 5 7.
+proof. by rewrite ilevels0_5E ilevels5_7E /invtree /range /= -iotaredE. qed.
+
+lemma vec_ifinal_lo (p : wpoly) (o : int) : 0 <= o => o + 8 <= 128 =>
+  vec (ifinal p) o =
+    W8u32.pack8 (mkseq (fun l => mmr (p.[o + l] + p.[o + 128 + l]) (W32.of_int 41978)) 8).
+proof.
+move=> 2?; rewrite /vec &(congr1 W8u32.pack8) &(eq_in_mkseq) => l rgl /=.
+by rewrite /ifinal initiE 1:/# /= ifT 1:/#; do 3! congr; ring.
+qed.
+
+lemma vec_ifinal_hi (p : wpoly) (o : int) : 0 <= o => o + 8 <= 128 =>
+  vec (ifinal p) (o + 128) =
+    W8u32.pack8 (mkseq (fun l =>
+      mmr (p.[o + 128 + l] - p.[o + l]) (W32.of_int (-3975713))) 8).
+proof.
+move=> 2?; rewrite /vec &(congr1 W8u32.pack8) &(eq_in_mkseq) => l rgl /=.
+by rewrite /ifinal initiE 1:/# /= ifF 1:/#; do 4! congr; ring.
+qed.
+
+lemma ifinal_frame (p p' : wpoly) (P : int -> bool) :
+  closed 7 P => agree P p p' => agree P (ifinal p) (ifinal p').
+proof.
+move=> [hlo hhi] hag t rgt Pt; rewrite /ifinal !initiE //=.
+case: (t < 128) => ht.
+- by rewrite (hag t) // (hag (t + 128)) 1:/#; [apply hlo => /# | done].
+by rewrite (hag t) // (hag (t - 128)) 1:/#; [apply hhi => /# | done].
+qed.

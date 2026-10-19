@@ -9,8 +9,9 @@
   - the forward transform *is* the specification's `ntt`, with no
     Montgomery factor (the zeta tables carry 2^32, `mmr` removes it);
   - the inverse transform is `invntt` up to exactly one Montgomery
-    factor: `iscale` multiplies by 41978 = 2^64 / 256 mod q, i.e. by
-    2^32 / 256 after `mmr`, and the tree contributes 256.
+    factor: the last level (`ifinal`) multiplies by 41978 = 2^64 / 256
+    mod q, i.e. by 2^32 / 256 after `mmr`, and the tree contributes
+    256.
 
   The inverse link needs no NTT pre-image from its caller: since
   `ntt (invntt v) = v` (`Rq.nttK`), the pre-image of any reduced input
@@ -99,8 +100,8 @@ qed.
 
 lemma intt_link (v : W32.t Array256.t) (B : int) :
   q <= B => 2^8 * B < 2^31 => cbnd v B =>
-     cbnd (iscale (invtree v 8)) q
-  /\ lifts_wpoly (iscale (invtree v 8)) = invntt (liftm_wpoly v).
+     cbnd (ifinal (invtree v 7)) q
+  /\ lifts_wpoly (ifinal (invtree v 7)) = invntt (liftm_wpoly v).
 proof.
 move=> leqB hB hbnd.
 pose u := invntt (lifts_wpoly v).
@@ -125,12 +126,17 @@ rewrite /wpoly_srng /cbnd allP; split=> h i rgi; have := h i rgi; smt().
 qed.
 
 (* the last operation of the inverse NTT, on every coefficient *)
-lemma iscale_rng (p : W32.t Array256.t) :
-  wpoly_srng invntt_obound invntt_obound (iscale p).
+lemma ifinal_rng (p : W32.t Array256.t) :
+  wpoly_srng invntt_obound invntt_obound (ifinal p).
 proof.
-rewrite /wpoly_srng allP => i rgi /=; rewrite iscaleiE //.
-have := mmr_bnd_prod p.[i] (W32.of_int 41978) (2^31 * 41978) _.
-- rewrite sval41978 normrM /=; have := W32.to_sint_cmp p.[i]; smt().
+rewrite /wpoly_srng allP => i rgi /=; rewrite /ifinal initiE //=.
+case: (i < 128) => _.
+- have := mmr_bnd_prod (p.[i] + p.[i + 128]) (W32.of_int 41978) (2^31 * 41978) _.
+  - rewrite sval41978 normrM /=; have := W32.to_sint_cmp (p.[i] + p.[i + 128]); smt().
+  by rewrite /invntt_obound /Nttlogspec.q /=; smt().
+have := mmr_bnd_prod (p.[i] - p.[i - 128]) (W32.of_int (-3975713)) (2^31 * 3975713) _.
+- have -> : sval (W32.of_int (-3975713)) = -3975713 by rewrite W32.to_sintE /smod /=.
+  by rewrite normrM /=; have := W32.to_sint_cmp (p.[i] - p.[i - 128]); smt().
 by rewrite /invntt_obound /Nttlogspec.q /=; smt().
 qed.
 

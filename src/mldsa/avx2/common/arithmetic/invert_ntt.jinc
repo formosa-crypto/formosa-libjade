@@ -1,3 +1,8 @@
+// The root of the last inverse layer times f = 41978, the Montgomery form of
+// 1/256, reduced once more by Montgomery: 25847 * 41978 * 2^-32 mod q, as a
+// centred representative.
+param int INVERSE_NTT_LAYER_7_ZETA_TIMES_F = -3_975_713;
+
 namespace polynomial {
     // The inverse NTT in two passes over the polynomial, the coefficients
     // staying in eight ymm registers through several layers (see ntt.jinc
@@ -77,6 +82,21 @@ namespace polynomial {
         rhs = #VPERM2I128(sums, differences, 0x31);
 
         return lhs, rhs;
+    }
+
+    // The last butterfly with the scaling folded in:
+    // (a, b) -> (f (a + b), (zeta f) (b - a)), zeta f given in Montgomery form.
+    inline
+    fn __gs_butterfly_scaled(reg u256 a b zetas_f f) -> reg u256, reg u256
+    {
+        reg u256 b_minus_a;
+
+        b_minus_a = #VPSUB_8u32(b, a);
+        a = #VPADD_8u32(a, b);
+        b = montgomery_multiply_and_reduce(b_minus_a, zetas_f);
+        a = montgomery_multiply_and_reduce(a, f);
+
+        return a, b;
     }
 
     inline
@@ -183,7 +203,7 @@ namespace polynomial {
     ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
     {
         reg u256 r0 r1 r2 r3 r4 r5 r6 r7;
-        reg u256 zetas;
+        reg u256 zetas scaling;
         reg u32 zeta;
 
         r0 = polynomial.[:u256 32 * (j +  0)];
@@ -219,25 +239,18 @@ namespace polynomial {
         r4, r6 = __gs_butterfly(r4, r6, zetas);
         r5, r7 = __gs_butterfly(r5, r7, zetas);
 
-        // layer 7: pairs (v, v + 16), one root
-        zeta = 25_847;
+        // layer 7: pairs (v, v + 16), one root, with the scaling by f, the
+        // Montgomery form of 1/256, folded in: the sums are multiplied by f
+        // and the differences by zeta f (one Montgomery multiplication each
+        // instead of two for the differences).
+        zeta = INVERSE_NTT_LAYER_7_ZETA_TIMES_F;
         zetas = __broadcast_zeta(zeta);
-        r0, r4 = __gs_butterfly(r0, r4, zetas);
-        r1, r5 = __gs_butterfly(r1, r5, zetas);
-        r2, r6 = __gs_butterfly(r2, r6, zetas);
-        r3, r7 = __gs_butterfly(r3, r7, zetas);
-
-        // scaling by the Montgomery form of 1/256
         zeta = 41_978;
-        zetas = __broadcast_zeta(zeta);
-        r0 = montgomery_multiply_and_reduce(r0, zetas);
-        r1 = montgomery_multiply_and_reduce(r1, zetas);
-        r2 = montgomery_multiply_and_reduce(r2, zetas);
-        r3 = montgomery_multiply_and_reduce(r3, zetas);
-        r4 = montgomery_multiply_and_reduce(r4, zetas);
-        r5 = montgomery_multiply_and_reduce(r5, zetas);
-        r6 = montgomery_multiply_and_reduce(r6, zetas);
-        r7 = montgomery_multiply_and_reduce(r7, zetas);
+        scaling = __broadcast_zeta(zeta);
+        r0, r4 = __gs_butterfly_scaled(r0, r4, zetas, scaling);
+        r1, r5 = __gs_butterfly_scaled(r1, r5, zetas, scaling);
+        r2, r6 = __gs_butterfly_scaled(r2, r6, zetas, scaling);
+        r3, r7 = __gs_butterfly_scaled(r3, r7, zetas, scaling);
 
         polynomial.[:u256 32 * (j +  0)] = r0;
         polynomial.[:u256 32 * (j +  4)] = r1;

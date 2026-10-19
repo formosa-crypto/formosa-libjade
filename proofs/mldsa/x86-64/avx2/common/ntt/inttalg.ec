@@ -2,9 +2,10 @@
   Algebraic content of the machine-level inverse NTT.
 
   The code-level proof (`Inttcorrect`) shows that the AVX2 procedure
-  computes `iscale (invtree p 8)`: the eight Gentleman-Sande levels of
-  the generic tree (`ireduce_level`, instantiated in `Nttspec`), then a
-  final scaling.
+  computes `ifinal (invtree p 7)`: seven Gentleman-Sande levels of the
+  generic tree (`ireduce_level`, instantiated in `Nttspec`), then the
+  last level with a final scaling folded in, congruent to the eighth
+  level followed by the scaling `iscale` (`ifinal_cgr`).
 
   Each level contributes a factor 2, so after the 8 levels block j of
   `invtree v 8` is 256 times the input of the forward transform
@@ -96,11 +97,40 @@ have e64 : 10746368 %% q = (2^32 * 2^32) %% q by rewrite /q /=.
 by rewrite -(modzMmr x 10746368 q) e64 modzMmr.
 qed.
 
-lemma iscale_bnd (c : W32.t) : `|sval (mmr c (W32.of_int 41978))| < q.
+(* ==================================================================== *)
+(* The last level with the scaling folded in                            *)
+(* ==================================================================== *)
+(* two Montgomery multiplications, by z1 then by z2, are one by z when
+   2^32 * z = z1 * z2 mod q *)
+lemma mmr_mmr (u z z1 z2 : W32.t) :
+  (2^32 * sval z) %% q = (sval z1 * sval z2) %% q =>
+  sval (mmr u z) %% q = sval (mmr (mmr u z1) z2) %% q.
 proof.
-apply mmr_small.
-rewrite sval41978.
-by rewrite /q.
+move=> hz; do 2! apply cgr_pow2_cancel.
+rewrite -modzMmr mmr_mont modzMmr -(modzMmr _ (_ * sval (mmr _ z2))) mmr_mont modzMmr.
+rewrite mulrCA -modzMmr hz modzMmr (IntID.mulrA (2^32)) -(modzMml (2^32 * _)) mmr_mont.
+by rewrite modzMml IntID.mulrA.
+qed.
+
+lemma ifinal_cgr (p : wpoly) (i : int) : 0 <= i < 256 =>
+  sval (ifinal p).[i] %% q = sval (iscale (ireduce_level p 7)).[i] %% q.
+proof.
+move=> rgi; rewrite /ifinal initiE //= iscaleiE //.
+case: (i < 128) => hi.
+- have [-> _] /= := ireduce_leveliE p 7 0 i _ _ _ => //; 1: smt().
+  by rewrite addzC.
+have [_ /=] := ireduce_leveliE p 7 0 (i - 128) _ _ _ => //; 1: smt().
+move=> ->; apply mmr_mmr.
+(* 2^32 * -3975713 = 25847 * 41978 mod q, 25847 being the root of level 7 *)
+have := izetasLE 7 _ => //; rewrite /izetasL /izetaW /= mkseq1 /= => <-.
+by rewrite !W32.to_sintE /smod /= /q.
+qed.
+
+lemma ifinal_bnd (p : wpoly) (i : int) : 0 <= i < 256 => `|sval (ifinal p).[i]| < q.
+proof.
+move=> rgi; rewrite /ifinal initiE //=.
+case: (i < 128) => _; apply mmr_small; first by rewrite sval41978.
+by rewrite W32.to_sintE /smod /= /q.
 qed.
 
 (* ==================================================================== *)
@@ -109,11 +139,12 @@ qed.
 lemma intt_ntt_alg (p v : wpoly) (B : int) :
   q <= B => 2^8 * B < 2^31 => cbnd v B =>
   (forall i, 0 <= i < 256 => sval v.[i] %% q = nttsum p 0 i 0 %% q) =>
-     cbnd (iscale (invtree v 8)) q
+     cbnd (ifinal (invtree v 7)) q
   /\ forall i, 0 <= i < 256 =>
-       sval (iscale (invtree v 8)).[i] %% q = (2^32 * sval p.[i]) %% q.
+       sval (ifinal (invtree v 7)).[i] %% q = (2^32 * sval p.[i]) %% q.
 proof.
 move=> leqB hB hbnd hv; have [_ hc] := invtree_cgr p v B 8 _ leqB hB hbnd hv => //.
-split=> i rgi; rewrite iscaleiE //; first by smt(iscale_bnd).
+split=> i rgi; first by have := ifinal_bnd (invtree v 7) i rgi; smt().
+rewrite ifinal_cgr // -(invtree_step v 7) // iscaleiE //.
 by apply/iscale_cgr; have /= := icgr_top p _ i hc rgi.
 qed.
