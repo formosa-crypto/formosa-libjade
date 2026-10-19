@@ -190,7 +190,6 @@ inline fn __apply_ct0_and_check_norm(
     // uninitialised buffer, and everything derived from it, as secret.
     ArrayInit(ct0);
     base = 0;
-    _ = #init_msf();
     if (infinity_norm_check_result != 0) {
         base = ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL;
     }
