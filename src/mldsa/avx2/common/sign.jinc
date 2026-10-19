@@ -24,8 +24,10 @@
 //     declassifies nothing: it is a function of c and t0 only. It is not
 //     even compiled when it cannot fail (ML-DSA-65 and ML-DSA-87, see
 //     CT0_NORM_BOUND).
-//   - on an exhausted iteration budget nothing of the rejected iteration is
-//     declassified: the signature buffer is left untouched.
+//   - the exiting iteration is encoded whether or not the budget is
+//     exhausted, as on main (the encoded bytes of a rejected iteration are
+//     then returned to the caller alongside the failure code; the model
+//     returns None, so this is more than it leaks).
 
 fn derive_seed_for_mask(
     reg ptr u8[32] k,
@@ -319,7 +321,6 @@ fn __sign_internal(
     reg u64 kappa_exceeded;
 
     reg u64 infinity_norm_check_result ct0_norm_check_result result;
-    reg bool success;
     stack u64 last_norm_check_result;
     reg u32 kappa_diff;
     reg bool kappa_zf;
@@ -468,25 +469,19 @@ fn __sign_internal(
     () = #unspill(signature);
     ms = #init_msf();
     signature = #protect_ptr(signature, ms);
+    // The exiting iteration is encoded whether or not it passed the tests:
+    // the result code tells the caller. (The model returns None on an
+    // exhausted budget; see the header.)
+    () = #declassify(hint);
+    () = #declassify(commitment_hash);
+    () = #declassify(signer_response);
+    signature = signature::__encode(signature, commitment_hash, signer_response, hint);
 
     // last_norm_check_result is 0 iff the exiting iteration produced a valid
     // signature (reset to 0 each iteration); it is 1 only when the iteration
     // budget is exhausted. It is public (the outcome of every test is leaked).
+    _ = #init_msf();
     result = last_norm_check_result;
-    result = #protect(result, ms);
-    success = result == 0;
-    if (success) {
-        ms = #update_msf(success, ms);
-        // The accepted iteration is the signature: it is public.
-        () = #declassify(hint);
-        () = #declassify(commitment_hash);
-        () = #declassify(signer_response);
-        signature = signature::__encode(signature, commitment_hash, signer_response, hint);
-    } else {
-        // Budget exhausted: nothing of the rejected iteration is leaked and the
-        // signature buffer is left untouched (the model returns None).
-        ms = #update_msf(!success, ms);
-    }
 
     // result = 0 on success, -1 on failure. Broadcast bit 0 to all 64 bits.
     result <<= 63;
