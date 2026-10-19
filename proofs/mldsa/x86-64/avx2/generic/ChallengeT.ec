@@ -471,4 +471,20 @@ ecall{2} (sample____challengeP s); ecall{1} (SampleInBall_correct ct).
 by auto=> />.
 qed.
 
+(* The same equivalence with the l1 bound of the spec challenge (tau nonzero
+   coefficients, each +-1): what bounds ||c t0||_inf in the signing proof. *)
+lemma sample_challenge_correct_l1 :
+    equiv [ SampleInBall(MLDSA_XOF_SIB).sample ~ M.sample____challenge :
+       arg{1} = BytesCT.of_list (to_list arg{2}.`2)
+       ==>
+       lifts_wpoly res{2} = res{1}.`1 /\
+       wpoly_srng 1 1 res{2} /\
+       l1 res{1}.`1 <= tau
+    ].
+proof.
+proc*; exlim rho{1}, seed{2} => ct s.
+ecall{2} (sample____challengeP s); ecall{1} (SampleInBall_correct ct).
+by auto=> />; smt(sampleInBall_norm).
+qed.
+
 end ChallengeT.

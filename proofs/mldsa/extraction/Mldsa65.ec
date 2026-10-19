@@ -2055,7 +2055,6 @@ module M = {
       hint_block <-
       (VPOR_256 low_out_of_bounds low_equals_minus_gamma2_and_high_is_nonzero
       );
-      (* Erased call to declassify *)
       num_hints <- (zeroextu64 (MOVEMASK_8u32 hint_block));
       ( _0,  _1,  _2,  _3,  _4, num_hints) <- (POPCNT_64 num_hints);
       hint_block <- (VPSRL_8u32 hint_block (W128.of_int 31));
@@ -14556,7 +14555,6 @@ module M = {
       exceeds_any <- (VPOR_256 exceeds_any exceeds);
       offset <- (offset + 32);
     }
-    (* Erased call to declassify *)
     msb_mask <- (MOVEMASK_8u32 exceeds_any);
     ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
     res8 <- (SETcc (! zf));
@@ -16970,14 +16968,14 @@ module M = {
                                    infinity_norm_check_result:W64.t) : 
   W32.t Array1536.t * W64.t = {
     var aux:W32.t Array256.t;
+    var ct0_norm_check_result_row:W64.t;
+    var ct0_norm_check_result:W64.t;
     var ct0:W32.t Array256.t;
     var base:int;
-    var  _0:W64.t;
-    var  _1:W64.t;
+    ct0 <- witness;
+    ct0_norm_check_result <- (W64.of_int 0);
     ct0 <- witness;
     base <- 0;
-    (* Erased call to declassify *)
-     _1 <- (init_msf);
     if ((infinity_norm_check_result <> (W64.of_int 0))) {
       base <- (6 * 256);
     } else {
@@ -16988,33 +16986,26 @@ module M = {
       (Array256.init (fun i => t0.[(base + i)])), verifier_challenge);
       ct0 <@ polynomial__invert_ntt_montgomery (ct0);
       ct0 <@ polynomial__reduce32 (ct0);
-      infinity_norm_check_result <@ polynomial____check_infinity_norm (
-      ct0, ((8380417 - 1) %/ 32));
-      (* Erased call to declassify *)
-       _0 <- (init_msf);
-      if ((infinity_norm_check_result = (W64.of_int 0))) {
-        aux <@ polynomial__add ((Array256.init
-                                (fun i => w0_minus_cs2_plus_ct0.[(base + i)])
-                                ),
-        (Array256.init (fun i => w0_minus_cs2.[(base + i)])), ct0);
-        w0_minus_cs2_plus_ct0 <-
-        (Array1536.init
-        (fun i => (if (base <= i < (base + 256)) then aux.[(i - base)] else 
-                  w0_minus_cs2_plus_ct0.[i]))
-        );
+      if ((((8380417 - 1) %/ 32) <= (49 * (1 `<<` (13 - 1))))) {
+        ct0_norm_check_result_row <@ polynomial____check_infinity_norm (
+        ct0, ((8380417 - 1) %/ 32));
+        ct0_norm_check_result <-
+        (ct0_norm_check_result `|` ct0_norm_check_result_row);
       } else {
         
       }
+      aux <@ polynomial__add ((Array256.init
+                              (fun i => w0_minus_cs2_plus_ct0.[(base + i)])),
+      (Array256.init (fun i => w0_minus_cs2.[(base + i)])), ct0);
+      w0_minus_cs2_plus_ct0 <-
+      (Array1536.init
+      (fun i => (if (base <= i < (base + 256)) then aux.[(i - base)] else 
+                w0_minus_cs2_plus_ct0.[i]))
+      );
       base <- (base + 256);
-      (* Erased call to declassify *)
-       _1 <- (init_msf);
-      if ((infinity_norm_check_result <> (W64.of_int 0))) {
-        base <- (6 * 256);
-      } else {
-        
-      }
     }
-    return (w0_minus_cs2_plus_ct0, infinity_norm_check_result);
+    ct0_norm_check_result_row <- ct0_norm_check_result;
+    return (w0_minus_cs2_plus_ct0, ct0_norm_check_result_row);
   }
   proc __make_hint_vector (w0_minus_cs2_plus_ct0:W32.t Array1536.t,
                            w1:W32.t Array1536.t, hint_0:W32.t Array1536.t,
@@ -17093,9 +17084,10 @@ module M = {
     var commitment_hash:W8.t Array48.t;
     var verifier_challenge:W32.t Array256.t;
     var infinity_norm_check_result:W64.t;
+    var signer_response:W32.t Array1280.t;
     var w0_minus_cs2:W32.t Array1536.t;
     var w0_minus_cs2_plus_ct0:W32.t Array1536.t;
-    var signer_response:W32.t Array1280.t;
+    var ct0_norm_check_result:W64.t;
     var hint_0:W32.t Array1536.t;
     var kappa_diff:W32.t;
     var kappa_zf:bool;
@@ -17159,6 +17151,7 @@ module M = {
     (Array2496.init
     (fun i => signing_key.[(((((32 + 32) + 64) + (5 * 128)) + (6 * 128)) + i)])
     ));
+    (* Erased call to declassify *)
     s1 <@ row_vector__ntt (s1);
     s2 <@ column_vector__ntt (s2);
     t0 <@ column_vector__ntt (t0);
@@ -17194,20 +17187,29 @@ module M = {
       verifier_challenge <@ sample____challenge (verifier_challenge,
       commitment_hash);
       (* Erased call to unspill *)
+      (* Erased call to declassify *)
       verifier_challenge <@ polynomial__ntt (verifier_challenge);
       infinity_norm_check_result <- (W64.of_int 0);
-      (w0_minus_cs2, infinity_norm_check_result) <@ __apply_cs2_and_check_norm (
-      w0_minus_cs2, w0, s2, verifier_challenge, infinity_norm_check_result);
-      (w0_minus_cs2_plus_ct0, infinity_norm_check_result) <@ __apply_ct0_and_check_norm (
-      w0_minus_cs2_plus_ct0, w0_minus_cs2, t0, verifier_challenge,
-      infinity_norm_check_result);
       (signer_response, infinity_norm_check_result) <@ __compute_z_and_check_norm (
       s1, verifier_challenge, mask, signer_response,
       infinity_norm_check_result);
+      (w0_minus_cs2, infinity_norm_check_result) <@ __apply_cs2_and_check_norm (
+      w0_minus_cs2, w0, s2, verifier_challenge, infinity_norm_check_result);
+      (w0_minus_cs2_plus_ct0, ct0_norm_check_result) <@ __apply_ct0_and_check_norm (
+      w0_minus_cs2_plus_ct0, w0_minus_cs2, t0, verifier_challenge,
+      infinity_norm_check_result);
+      (* Erased call to spill *)
       w0_minus_cs2_plus_ct0 <- w0_minus_cs2_plus_ct0;
       (hint_0, infinity_norm_check_result) <@ __make_hint_vector (w0_minus_cs2_plus_ct0,
       w1, hint_0, infinity_norm_check_result);
       (* Erased call to declassify *)
+      (* Erased call to unspill *)
+      if ((((8380417 - 1) %/ 32) <= (49 * (1 `<<` (13 - 1))))) {
+        infinity_norm_check_result <-
+        (infinity_norm_check_result `|` ct0_norm_check_result);
+      } else {
+        
+      }
       (* Erased call to unspill *)
        _0 <- (init_msf);
       last_norm_check_result <- infinity_norm_check_result;
@@ -17362,6 +17364,7 @@ module M = {
     hints, signature_encoded);
     result2 <@ row_vector____check_infinity_norm (signer_response,
     ((1 `<<` 19) - (49 * 4)));
+    (* Erased call to declassify *)
     result <- (result1 `|` result2);
      _0 <- (init_msf);
     if ((result = (W64.of_int 0))) {

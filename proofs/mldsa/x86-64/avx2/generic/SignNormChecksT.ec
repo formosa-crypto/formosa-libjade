@@ -449,13 +449,40 @@ by conseq __apply_cs2_and_check_norm_ll
           (__apply_cs2_and_check_norm_correct _w0mc _w0 _s2 _c _incr).
 qed.
 
+(* The compile-time guard of the c t0 test: the test is only compiled when
+   tau 2^(d-1) can reach gamma2 (ML-DSA-44); the model keeps it as a test on
+   the parameters. *)
+lemma guardE :
+    ((Avx2red.MODULUS - 1) %/ gamma2_div <= tau * (1 `<<` (d - 1))) = (gamma2 <= tau * 4096).
+proof. by rewrite /gamma2 /(`<<`) /=. qed.
+
+(* |c * v|_inf <= ||c||_1 * ||v||_inf (convolution theorem + conv_coeff_bnd),
+   the generalisation of VecMat.cs2_norm_bound used for c t0: with
+   |t0|_inf <= 2^(d-1) the product is below tau 2^(d-1), which is below gamma2
+   for ML-DSA-65 and ML-DSA-87 (the test on c t0 is not compiled there). *)
+lemma smul_norm_bound (c : poly) (v : polykvec) (B : int) :
+    0 <= B => l1 c <= tau =>
+    PolyKVec.infnorm_lt v (B + 1) =>
+    PolyKVec.infnorm_lt (PolyKVec.invnttv (PolyKVec.ntt_smul (ntt c) (PolyKVec.nttv v))) (tau * B + 1).
+proof.
+move=> hB hc hv; rewrite /PolyKVec.infnorm_lt allP => k /mem_iota rgk /=.
+rewrite allP => j /mem_iota rgj /=.
+rewrite PolyKVec.invnttv_ntt_smul_k 1:/# /PolyKVec.nttv mapiE 1:/# /= conv Rq_mulC.
+have hvk : forall i, 0 <= i < 256 => `|v.[k].[i]| <= B.
+- move=> i rgi; move: hv; rewrite /PolyKVec.infnorm_lt allP => /(_ k _); 1: by rewrite mem_iota /#.
+  by rewrite /= allP => /(_ i _) /=; [rewrite mem_iota /# | smt()].
+have := conv_coeff_bnd c v.[k] B j _ hvk; 1: smt().
+have : l1 c * B <= tau * B by apply StdOrder.IntOrder.ler_wpmul2r.
+smt().
+qed.
+
 (* ================================================================== *)
 (* __apply_ct0_and_check_norm                                          *)
-(* Called second; incr = result of cs2 check (0 or 1).               *)
-(* Computes ct0 per row (kvec rows); checks infnorm < gamma2.              *)
-(* If check passes: conditionally adds ct0 to w0_minus_cs2.           *)
+(* Called third; incr = result of the z and cs2 checks (0 or 1).     *)
+(* Computes ct0 per row (kvec rows), adds it to w0_minus_cs2 in every *)
+(* case, and checks infnorm < gamma2 only when the test is compiled    *)
+(* (gamma2 <= tau 2^(d-1), ML-DSA-44). Returns the ct0 flag alone.     *)
 (* Spec: ct0 = invnttv (ntt_smul ch t0h); output = w0mc + ct0        *)
-(* Threshold: gamma2                                                  *)
 (* ================================================================== *)
 
 lemma __apply_ct0_and_check_norm_ll : islossless M.__apply_ct0_and_check_norm.
@@ -464,17 +491,18 @@ proc.
 wp; while (0 <= base <= kvec * n /\ base %% n = 0) (kvec * n - base); last by auto; smt(gt0_k).
 move => ?.
 wp; conseq (: true==>true); 1: by smt().
-seq 5 : true.
+seq 3 : true.
 + by auto.
-+ wp; call polynomial____check_infinity_norm_ll.
-  wp; call polynomial__reduce32_ll.
++ wp; call polynomial__reduce32_ll.
   wp; call polynomial__invert_ntt_montgomery_ll.
   wp; call polynomial__pointwise_montgomery_multiply_and_reduce_ll.
   by auto.
-+ if; last by auto.
-  wp; call polynomial__add_ll.
-  by auto.
-
++ if.
+  + wp; call polynomial__add_ll.
+    wp; call polynomial____check_infinity_norm_ll.
+    by auto.
+  + wp; call polynomial__add_ll.
+    by auto.
 + hoare; by auto.
 + by auto.
 qed.
@@ -496,20 +524,26 @@ lemma __apply_ct0_and_check_norm_correct
           wpolykvec_infnorm_lt (gamma2 - Beta) (kvec_unflatten256 _w0mc))
         ==>
         (res.`2 = W64.zero \/ res.`2 = W64.one) /\
-        (res.`2 = W64.zero <=>
-           _incr = W64.zero /\
-           PolyKVec.infnorm_lt
-             (PolyKVec.invnttv (PolyKVec.ntt_smul
-                (lifts_wpoly _c)
-                (lifts_wpolykvec (kvec_unflatten256 _t0))))
-             gamma2) /\
-        (res.`2 = W64.zero =>
+        (* skipped after a prior failure: nothing computed, flag 0 *)
+        (_incr <> W64.zero => res.`2 = W64.zero /\ res.`1 = _r) /\
+        (_incr = W64.zero =>
            let ct0 = PolyKVec.invnttv (PolyKVec.ntt_smul
                        (lifts_wpoly _c)
                        (lifts_wpolykvec (kvec_unflatten256 _t0))) in
-           wpolykvec_srng (kvec_unflatten256 res.`1) (2*gamma2 - Beta - 2) (2*gamma2 - Beta - 2) /\
+           (* The flag is the abstract ct0-norm check when the test is
+              compiled (gamma2 <= tau 2^(d-1)), and 0 otherwise. *)
+           (res.`2 = W64.zero <=>
+              (tau * 4096 < gamma2 \/ PolyKVec.infnorm_lt ct0 gamma2)) /\
+           (* c t0 is always added to w0 - c s2 (the hint needs it) *)
            lifts_wpolykvec (kvec_unflatten256 res.`1) =
-             (lifts_wpolykvec (kvec_unflatten256 _w0mc)) + ct0)
+             (lifts_wpolykvec (kvec_unflatten256 _w0mc)) + ct0 /\
+           (* word-level range: reduce32 output plus the cs2 range... *)
+           wpolykvec_srng (kvec_unflatten256 res.`1)
+             (gamma2 - Beta - 1 + 6283009) (gamma2 - Beta - 1 + 6283009) /\
+           (* ... and the tight range when ||c t0||_inf < gamma2 *)
+           (PolyKVec.infnorm_lt ct0 gamma2 =>
+              wpolykvec_srng (kvec_unflatten256 res.`1)
+                (2*gamma2 - Beta - 2) (2*gamma2 - Beta - 2)))
     ].
 proof.
 have kvec_val := gt0_k.
@@ -521,71 +555,55 @@ case (infinity_norm_check_result <> zero).
 + rcondt ^if; 1: by auto.
   rcondf ^while; 1: by auto.
   by auto => /#.
-conseq (: _ ==>
-  (infinity_norm_check_result = zero \/ infinity_norm_check_result = one) /\
-  (infinity_norm_check_result = zero <=>
-   PolyKVec.infnorm_lt
-     (PolyKVec.invnttv (PolyKVec.ntt_smul
-        (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0))))
-     gamma2) /\
-  (infinity_norm_check_result = zero =>
-   wpolykvec_srng (kvec_unflatten256 w0_minus_cs2_plus_ct0) (2*gamma2 - Beta - 2) (2*gamma2 - Beta - 2) /\
-   lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2_plus_ct0) =
-     lifts_wpolykvec (kvec_unflatten256 _w0mc) +
-     PolyKVec.invnttv (PolyKVec.ntt_smul
-       (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))));
- 1: by move => |> &hr ?? infncr rr *; rewrite H_incr /=;
-       smt(W64.to_uint_eq pow2_64 W64.to_uintK W64.of_uintK).
 rcondf ^if; 1: by auto.
-while (#{/~_incr}{~infinity_norm_check_result}{~w0_minus_cs2_plus_ct0}pre /\
-       _incr = W64.zero /\
-       (infinity_norm_check_result = zero \/ infinity_norm_check_result = one) /\
-       0 <= base <= kvec * n /\ base %% n = 0 /\
-       (infinity_norm_check_result <> zero => base = kvec * n) /\
-       wpolykvec_infnorm_lt (gamma2 - Beta) (kvec_unflatten256 _w0mc) /\
-       (infinity_norm_check_result <> zero =>
-          ! PolyKVec.infnorm_lt
-              (PolyKVec.invnttv (PolyKVec.ntt_smul
-                 (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0))))
-              gamma2) /\
-       (infinity_norm_check_result = zero =>
-         let ct0 = PolyKVec.invnttv (PolyKVec.ntt_smul
-                     (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0))) in
-         (forall k, 0 <= k < base %/ n =>
-           wpoly_srng (gamma2 - Beta - 1 + gamma2 - 1)
-                      (gamma2 - Beta - 1 + gamma2 - 1)
-                      (kvec_unflatten256 w0_minus_cs2_plus_ct0).[k]) /\
-         (forall k, 0 <= k < base %/ n =>
-           infnorm_lt ct0.[k] gamma2) /\
-         (forall k, 0 <= k < base %/ n =>
-           (lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2_plus_ct0)).[k] =
-           (lifts_wpolykvec (kvec_unflatten256 _w0mc)).[k] &+ ct0.[k]))
-      ); last first.
-+ auto => /> ???; split; 1: smt().
-  move => bs r ????????? H_cond; do split.
-  (* biconditional ⇒: r = zero => infnorm_lt ct0_spec gamma2 *)
-  + move => Hzero.
-    have [# H1 H2 H3] := H_cond Hzero.
-    rewrite /infnorm_lt allP => k Hk.
-    have := H2 k _; 1: smt(mem_iota gt0_k).
+wp.
+while (
+  _incr = zero /\ w0_minus_cs2 = _w0mc /\ t0 = _t0 /\ verifier_challenge = _c /\
+  wpoly_ntt_orng _c /\ wpolykvec_ntt_orng (kvec_unflatten256 _t0) /\
+  wpolykvec_infnorm_lt (gamma2 - Beta) (kvec_unflatten256 _w0mc) /\
+  (ct0_norm_check_result = zero \/ ct0_norm_check_result = one) /\
+  0 <= base <= kvec * n /\ base %% n = 0 /\
+  (let ct0 = PolyKVec.invnttv (PolyKVec.ntt_smul
+               (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0))) in
+   (ct0_norm_check_result = zero <=>
+      (tau * 4096 < gamma2 \/ forall k, 0 <= k < base %/ n => infnorm_lt ct0.[k] gamma2)) /\
+   (forall k, 0 <= k < base %/ n =>
+      wpoly_srng (gamma2 - Beta + 6283008) (gamma2 - Beta + 6283008)
+                 (kvec_unflatten256 w0_minus_cs2_plus_ct0).[k]) /\
+   (forall k, 0 <= k < base %/ n => infnorm_lt ct0.[k] gamma2 =>
+      wpoly_srng (2*gamma2 - Beta - 2) (2*gamma2 - Beta - 2)
+                 (kvec_unflatten256 w0_minus_cs2_plus_ct0).[k]) /\
+   (forall k, 0 <= k < base %/ n =>
+      (lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2_plus_ct0)).[k] =
+      (lifts_wpolykvec (kvec_unflatten256 _w0mc)).[k] &+ ct0.[k]))
+); last first.
+(* ── Initialisation and loop exit ──────────────────────────────── *)
++ auto => /> *; split; 1: smt().
+  move => bs r w0 Hexit Hw0mc Hbit Hb0 Hb1 Hbmod Hiff Hwide Htight Heq.
+  have Hbs : bs %/ n = kvec by smt().
+  do split.
+  + move => Hz; case (tau * 4096 < gamma2) => //= Hg.
+    have := Hiff; rewrite Hz /= Hg /= => Hall.
+    rewrite /infnorm_lt allP => k Hk; have := Hall k _; 1: smt(mem_iota gt0_k).
     by rewrite /infnorm_lt.
-  (* biconditional ⇐: infnorm_lt ... gamma2 => r = zero *)
-  + by smt().
-  (* r = zero => wpolykvec_srng ... /\ lifts = ... *)
-  + move => Hinflt.
-    have [# H1 H2 H3] := H_cond Hinflt.
-    split.
-    + rewrite /wpolykvec_srng allP => k kb.
-      have := H1 k _; 1: smt(gt0_k).
-      by smt(gamma2_cases beta_gamma2_lt gt0_beta).
-    + apply KArray.tP => ii iib.
-      have -> := H3 ii _; 1: smt().
-      by rewrite polykvec_add_iE 1:/#.
-    
+  + move => [Hg | Hall]; 1: smt().
+    rewrite Hiff; right => k Hk.
+    move: Hall; rewrite /infnorm_lt allP => H; have := H k _; 1: smt(mem_iota gt0_k).
+    by rewrite /infnorm_lt.
+  + apply KArray.tP => ii iib.
+    have -> := Heq ii _; 1: smt().
+    by rewrite polykvec_add_iE 1:/#.
+  + rewrite /wpolykvec_srng allP => k kb.
+    by apply Hwide; smt().
+  + move => Hinf; rewrite /wpolykvec_srng allP => k kb.
+    apply Htight; 1: smt().
+    move: Hinf; rewrite /infnorm_lt allP => H; have := H k _; 1: smt(mem_iota gt0_k).
+    by rewrite /infnorm_lt.
+
 (* ── Loop body: one column at index base %/ n ──────────────────────── *)
-(* Jasmin: basemul(t0_slice,c) → invNTT → reduce32 → check_infnorm(ct0,gamma2)
-           → if(pass){ add(w0mc_slice, w0mc_slice, ct0); writeback }
-           → base += 256 → if(fail){ base = kvec * n }                           *)
+(* Jasmin: basemul(t0_slice,c) → invNTT → reduce32
+           → if (compiled) { check_infnorm(ct0,gamma2); flag |= row }
+           → add(w0mc_slice, ct0); writeback → base += 256                      *)
 
 (* ══ Phase 1: compute ct0 via ecall chain ══ *)
 seq 3 : (#pre /\
@@ -602,8 +620,7 @@ seq 3 : (#pre /\
            verifier_challenge).
   auto => |> &hr *.
   do split => /=.
-  - (* t0 slice bmul_irng — kvec_slice_eq replaces inline Array256.tP proof *)
-    have Ht0_ntt : wpolykvec_ntt_orng (kvec_unflatten256 _t0) by smt().
+  - have Ht0_ntt : wpolykvec_ntt_orng (kvec_unflatten256 _t0) by smt().
     have Heq_t0 : (kvec_unflatten256 _t0).[base{hr} %/ n] = Array256.init (fun i => _t0.[base{hr} + i]).
     + by apply kvec_slice_eq; smt(gt0_k).
     rewrite -Heq_t0.
@@ -617,160 +634,179 @@ seq 3 : (#pre /\
   rewrite invnttv_ntt_smul_k 1:/#.
   by rewrite (lifts_wpolykvec_slice _t0 base{hr}) 1:/# 1:/#.
 
-(* ══ Phase 2+3: check_infnorm + conditional add + base update ══ *)
-(* wp absorbs: base += n; if(infnorm!=0) base = kvec * n *)
-wp.
-(* Remaining: (1) check_infnorm(ct0, gamma2)
-              (2) infnorm_result <- infnorm_result  [no-op]
-              (3) if (infnorm_result = 0) { add(w0mc_slice, ct0); writeback }
-   if. fails here because (1) is a call, not an if.
-   seq 2 splits off (1)+(2), leaving (3) alone so if. can work. *)
-seq 2 : (
-  _incr = zero /\
-  (w0_minus_cs2 = _w0mc /\
-   t0 = _t0 /\
-   verifier_challenge = _c /\
-   wpoly_ntt_orng _c /\
-   wpolykvec_ntt_orng (kvec_unflatten256 _t0)) /\
-  0 <= base /\ base < kvec * n /\
-  base %% n = 0 /\
-  lifts_wpoly ct0 =
-    (PolyKVec.invnttv (PolyKVec.ntt_smul
-      (lifts_wpoly _c)
-      (lifts_wpolykvec (kvec_unflatten256 _t0)))).[base %/ n] /\
-  wpoly_srng 6283009 6283008 ct0 /\
-  (* check_infnorm result: zero iff infnorm_lt holds *)
-  (wpoly_infnorm_lt gamma2 ct0 => infinity_norm_check_result = W64.zero) /\
-  (!wpoly_infnorm_lt gamma2 ct0 => infinity_norm_check_result = W64.one) /\
-  (* w0mc range: needed for add precondition in then-branch *)
+(* ══ Phase 2: the guarded norm check (only compiled for ML-DSA-44) ══ *)
+seq 1 : (
+  _incr = zero /\ w0_minus_cs2 = _w0mc /\ t0 = _t0 /\ verifier_challenge = _c /\
+  wpoly_ntt_orng _c /\ wpolykvec_ntt_orng (kvec_unflatten256 _t0) /\
   wpolykvec_infnorm_lt (gamma2 - Beta) (kvec_unflatten256 _w0mc) /\
-  (* previous columns: infnorm_lt and algebraic equality hold for k < base/n *)
-  (let ct0_spec = PolyKVec.invnttv (PolyKVec.ntt_smul
-                    (lifts_wpoly _c)
-                    (lifts_wpolykvec (kvec_unflatten256 _t0))) in
-   (forall k, 0 <= k < base %/ n =>
-     wpoly_srng (gamma2 - Beta - 1 + gamma2 - 1)
-                (gamma2 - Beta - 1 + gamma2 - 1)
-                (kvec_unflatten256 w0_minus_cs2_plus_ct0).[k]) /\
-   (forall k, 0 <= k < base %/ n => infnorm_lt ct0_spec.[k] gamma2) /\
-   (forall k, 0 <= k < base %/ n =>
+  (ct0_norm_check_result = zero \/ ct0_norm_check_result = one) /\
+  0 <= base < kvec * n /\ base %% n = 0 /\
+  lifts_wpoly ct0 = (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[base %/ n] /\
+  wpoly_srng 6283009 6283008 ct0 /\
+  (ct0_norm_check_result = zero <=>
+     (tau * 4096 < gamma2 \/ forall k, 0 <= k < base %/ n + 1 => infnorm_lt (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[k] gamma2)) /\
+  (forall k, 0 <= k < base %/ n =>
+     wpoly_srng (gamma2 - Beta + 6283008) (gamma2 - Beta + 6283008) (kvec_unflatten256 w0_minus_cs2_plus_ct0).[k]) /\
+  (forall k, 0 <= k < base %/ n => infnorm_lt (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[k] gamma2 =>
+     wpoly_srng (2*gamma2 - Beta - 2) (2*gamma2 - Beta - 2) (kvec_unflatten256 w0_minus_cs2_plus_ct0).[k]) /\
+  (forall k, 0 <= k < base %/ n =>
      (lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2_plus_ct0)).[k] =
-     (lifts_wpolykvec (kvec_unflatten256 _w0mc)).[k] &+ ct0_spec.[k]))
-).
-- (* ── Goal 1: { pre } check_infnorm(ct0, gamma2); no-op { intermediate_cond } ── *)
-  wp. (* absorb no-op backward *)
-  ecall (polynomial____check_infinity_norm_correct ct0 gamma2).
-  auto => |> &hr *.
-  (* wpolykvec_infnorm_lt is now a direct invariant conjunct, absorbed by |> into context.
-     do split produces 3 forall goals (wpoly_srng, infnorm_lt, algebra for k < base/n).
-     All closed by smt() from the unnamed (infnorm=zero => ...) invariant hypothesis:
-     infnorm=zero follows from base < kpolys + (infnorm≠zero => base=kpolys). *)
-  do split; 1..3: smt().
-
-- (* ── Goal 2: { intermediate_cond } if(infnorm=0){ add; writeback } { post_wp } ── *)
-  (* if. now works: first instruction is the if-block *)
-  if.
-  + (* Then-branch: infnorm_result = zero → add + writeback *)
-    wp. (* absorb writeback: w0mc_plus_ct0 <- Array_kpolys.init(...) *)
-    ecall (polynomial__add_correct
-             (Array256.init (fun i => w0_minus_cs2_plus_ct0.[base + i]))
-             (Array256.init (fun i => w0_minus_cs2.[base + i]))
-             ct0
-             (gamma2 - Beta - 1) (gamma2 - 1)).
+     (lifts_wpolykvec (kvec_unflatten256 _w0mc)).[k] &+ (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[k])).
++ if.
+  + (* the test is compiled: gamma2 <= tau 2^(d-1) *)
+    wp; ecall (polynomial____check_infinity_norm_correct ct0 gamma2).
     auto => |> &hr *.
-    (* From intermediate_cond + infnorm_result = zero:
-       derive wpoly_infnorm_lt gamma2 ct0 via contrapositive of Hfail *)
-    have Hct0_infnorm : wpoly_infnorm_lt gamma2 ct0{hr} by smt(W64.to_uint_eq W64.of_uintK W64.to_uintK pow2_64).
-    have Hct0_eq : lifts_wpoly ct0{hr} =
-        (PolyKVec.invnttv (PolyKVec.ntt_smul
-          (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[base{hr} %/ n] by smt().
+    split; 1: smt(gamma2_cases).
+    move => Hg1 Hg2 _ result Hpass Hfail.
+    have Hguard : gamma2 <= tau * 4096 by smt(guardE).
+    have Hct0eq : lifts_wpoly ct0{hr} = (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[base{hr} %/ n] by assumption.
+    have Hct0rng : wpoly_srng 6283009 6283008 ct0{hr} by assumption.
+    have Hiff : (ct0_norm_check_result{hr} = zero <=>
+       (tau * 4096 < gamma2 \/ forall k, 0 <= k < base{hr} %/ n => infnorm_lt (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[k] gamma2)) by assumption.
+    have Hbit : ct0_norm_check_result{hr} = zero \/ ct0_norm_check_result{hr} = one by assumption.
+    have Hres : result = zero \/ result = one by smt().
+    (* the row flag is the abstract norm check of the column *)
+    have Hrow : (result = zero) <=> infnorm_lt (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[base{hr} %/ n] gamma2.
+    + split.
+      + move => Hr0; have Hw : wpoly_infnorm_lt gamma2 ct0{hr} by smt(W64.to_uint_eq W64.of_uintK W64.to_uintK pow2_64).
+        by rewrite -Hct0eq; apply (wpoly_infnorm_liftE gamma2 ct0{hr}); [smt(gamma2_cases) | exact Hw].
+      + move => Hinf; apply Hpass.
+        by apply (wpoly_infnorm_unliftE gamma2 6283009 6283008 ct0{hr}); [smt(gamma2_cases) | smt(gamma2_cases) | smt(gamma2_cases) | exact Hct0rng | rewrite Hct0eq].
+    have Hor0 : (ct0_norm_check_result{hr} `|` result = zero) <=> (ct0_norm_check_result{hr} = zero /\ result = zero) by smt(or64_ne0).
     do split.
-    - (* add lhs range: wpoly_srng (gamma2-Beta-1) ... w0mc_slice *)
-      have Hw0mc_inflt : wpolykvec_infnorm_lt (gamma2 - Beta) (kvec_unflatten256 _w0mc) by smt().
-      have Heq_slice : (kvec_unflatten256 _w0mc).[base{hr} %/ n] =
-          Array256.init (fun i => _w0mc.[base{hr} + i]).
-      + by apply kvec_slice_eq; smt(gt0_k).
-      rewrite /wpoly_srng allP => j jb.
-      move: Hw0mc_inflt; rewrite /wpolykvec_infnorm_lt /wpolykvec_srng allP => H.
-      move: (H (base{hr} %/ n) _); 1: smt(gt0_k).
-      rewrite Heq_slice /wpoly_srng allP => Hk.
-      have := Hk j _; 1: smt().
-      by rewrite initiE 1:/# /=; smt().
-    - (* add rhs range: wpoly_srng (gamma2-1) ... ct0 from infnorm_lt *)
-      rewrite /wpoly_srng allP => j jb.
-      move: Hct0_infnorm; rewrite /wpoly_infnorm_lt /wpoly_srng allP => H.
-      by have := H j _; 1: smt(); smt().
-    - smt(gamma2_cases beta_gamma2_lt gt0_beta).
-    move => 3? add_result Hadd_eq Hadd_rng.
-    do split; 1..3: by smt().
-    + (* range of w0mc_plus_ct0 for all k < (base+n)/n *)
-      move => k kb ?.
-      case (k < base{hr} %/ n) => Hlt.
-      - (* k < base/n: writeback does not touch column k, use old invariant *)
-        have Hmod : base{hr} %% 256 = 0 by smt().
-        have Hkvec : 0 <= k < kvec by smt(gt0_k).
-        have Hwb := kvec_unflatten256_writeback_iE w0_minus_cs2_plus_ct0{hr} add_result base{hr} k Hmod Hkvec.
-        by rewrite Hwb ifF; smt().
-      - (* k = base/n: range comes from Hadd_rng + writeback_iE *)
-        have -> : k = base{hr} %/ n by smt().
-        rewrite /n.
-        have Hmod2 : base{hr} %% 256 = 0 by smt().
-        have Hkvec2 : 0 <= base{hr} %/ 256 < kvec by smt(gt0_k).
-        have Hwb := kvec_unflatten256_writeback_iE w0_minus_cs2_plus_ct0{hr} add_result base{hr} (base{hr} %/ 256) Hmod2 Hkvec2.
-        by rewrite Hwb /=; smt().
-    + (* infnorm_lt for new column k = base/n *)
-      move => k ??.
-      case (k < base{hr} %/ n) => ?; 1: by smt().
-      have -> : k = base{hr} %/ n by smt().
-      rewrite -Hct0_eq.
-      apply (wpoly_infnorm_liftE gamma2 ct0{hr} _ Hct0_infnorm).
-      smt(gamma2_cases beta_gamma2_lt gt0_beta).
-    + (* algebra for all k < (base+n)/n *)
-      move => k kb ?.
-      case (k < base{hr} %/ n) => Hlt.
-      - (* k < base/n: writeback does not touch column k *)
-        have Hmod : base{hr} %% 256 = 0 by smt().
-        have Hkvec : 0 <= k < kvec by smt(gt0_k).
-        have Hwb := kvec_unflatten256_writeback_iE w0_minus_cs2_plus_ct0{hr} add_result base{hr} k Hmod Hkvec.
-        have Hk_eq : (kvec_unflatten256 (Array_kpolys.init (fun i =>
-              if base{hr} <= i < base{hr} + n then add_result.[i - base{hr}]
-              else w0_minus_cs2_plus_ct0{hr}.[i]))).[k] =
-            (kvec_unflatten256 w0_minus_cs2_plus_ct0{hr}).[k]
-          by rewrite Hwb ifF; smt().
-        have /= HH2k : (lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2_plus_ct0{hr})).[k] =
-            (lifts_wpolykvec (kvec_unflatten256 _w0mc)).[k] &+
-            (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c)
-              (lifts_wpolykvec (kvec_unflatten256 _t0)))).[k]
-          by smt().
-        by rewrite -HH2k /lifts_wpolykvec mapiE 1:/# mapiE 1:/# /= Hk_eq.
-         
-      - (* k = base/n: writeback_iE + Hadd_eq + lifts_wpolykvec_slice + Hct0_eq *)
-        have -> : k = base{hr} %/ n by smt().
-        rewrite /lifts_wpolykvec mapiE 1:/# /=.
-        rewrite (kvec_unflatten256_writeback_iE _ add_result base{hr} (base{hr} %/ 256)) 1:/#;
-                1:smt(gt0_k).
-        rewrite Hadd_eq (lifts_wpolykvec_slice _w0mc base{hr}) 1:/#; 1:smt(gt0_k).
-        by rewrite Hct0_eq.
-  + (* Else-branch: infnorm_result != zero → no add, base becomes kvec * n in post *)
-    auto => |> &hr  Hbin0 Hbin1 Hbase0 Hbase1 Hbasemod Hct0_eq Hct0_rng Hpass Hfail
-            Hw0mc_inflt Hprev_srng Hprev_inf Hprev_eq Hne0.
-    do split; 1: smt(W64.to_uint_eq W64.of_uintK W64.to_uintK pow2_64).
-    + smt(gt0_k).
-    + by rewrite modzMl.
-    have Hnwpoly : !wpoly_infnorm_lt gamma2 ct0{hr}
-      by apply /negP => Hwpoly; smt().
-    have Hninfnorm : !infnorm_lt (lifts_wpoly ct0{hr}) gamma2.
-    + apply /negP => Hcontra; apply Hnwpoly.
-      apply (wpoly_infnorm_unliftE gamma2 6283009 6283008 ct0{hr}).
-      + smt(gamma2_cases beta_gamma2_lt gt0_beta).
-      + smt().
-      + smt().
-      + smt().
-      + exact Hcontra.
-    apply /negP => Hkvec; apply Hninfnorm; rewrite Hct0_eq.
-    move: Hkvec; rewrite /infnorm_lt allP => Hk.
-    apply (Hk (base{hr} %/ n)).
-    by rewrite mem_iota /=; smt(gt0_k).
+    + smt(W64.or0w W64.orw0 W64.orwK).
+    + rewrite Hor0 => -[H0 Hr0]; right => k Hk.
+      case (k = base{hr} %/ n) => Hkb; 1: by rewrite Hkb -Hrow.
+      have := Hiff; rewrite H0 /= => -[|Hall]; 1: smt().
+      by apply Hall; smt().
+    + move => Hall; rewrite Hor0; split.
+      + rewrite Hiff; right => k Hk; case Hall => [|H]; 1: smt(); by apply H; smt().
+      + rewrite Hrow; case Hall => [|H]; 1: smt(); by apply H; smt().
+  + (* the test is not compiled: tau 2^(d-1) < gamma2, the flag stays 0 *)
+    by auto => |> &hr *; smt(guardE).
+
+(* ══ Phase 3: add ct0 to the column, whatever its norm ══ *)
+case (wpoly_infnorm_lt gamma2 ct0).
++ (* ||ct0||_inf < gamma2: the tight range of the sum holds *)
+  wp; ecall (polynomial__add_correct
+           (Array256.init (fun i => w0_minus_cs2_plus_ct0.[base + i]))
+           (Array256.init (fun i => w0_minus_cs2.[base + i]))
+           ct0 (gamma2 - Beta - 1) (gamma2 - 1)).
+  auto => |> &hr *.
+  have Hct0eq : lifts_wpoly ct0{hr} = (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[base{hr} %/ n] by assumption.
+  have Hw0mc_inflt : wpolykvec_infnorm_lt (gamma2 - Beta) (kvec_unflatten256 _w0mc) by assumption.
+  have Hct0_infnorm : wpoly_infnorm_lt gamma2 ct0{hr} by assumption.
+  have Hbn : (base{hr} + n) %/ n = base{hr} %/ n + 1 by smt().
+  have Hmod : base{hr} %% 256 = 0 by smt().
+  have Hkb : 0 <= base{hr} %/ 256 < kvec by smt(gt0_k).
+  split.
+  + split; last by smt(gamma2_cases beta_gamma2_lt gt0_beta).
+  have Heq_slice : (kvec_unflatten256 _w0mc).[base{hr} %/ n] = Array256.init (fun i => _w0mc.[base{hr} + i]).
+  + by apply kvec_slice_eq; smt(gt0_k).
+  rewrite /wpoly_srng allP => j jb.
+  move: Hw0mc_inflt; rewrite /wpolykvec_infnorm_lt /wpolykvec_srng allP => H.
+  move: (H (base{hr} %/ n) _); 1: smt(gt0_k).
+  rewrite Heq_slice /wpoly_srng allP => Hk.
+  have := Hk j _; 1: smt().
+  by rewrite initiE 1:/# /=; smt().
+  move => _ _ _ add_result Hadd_eq Hadd_rng.
+  have Hwb := kvec_unflatten256_writeback_iE w0_minus_cs2_plus_ct0{hr} add_result base{hr}.
+  do split; 1,2,3: smt().
+  + by rewrite Hbn; smt().
+  + by rewrite Hbn; smt().
+  + move => k kb Hk.
+    case (k < base{hr} %/ n) => Hlt.
+    - have Hkvec : 0 <= k < kvec by smt(gt0_k).
+      by rewrite (Hwb k Hmod Hkvec) ifF 1:/#; smt().
+    - have -> : k = base{hr} %/ n by smt().
+      rewrite (Hwb (base{hr} %/ 256) Hmod Hkb) /=.
+      by apply (wpoly_srng_widen add_result (gamma2 - Beta - 1 + (gamma2 - 1)) (gamma2 - Beta - 1 + (gamma2 - 1)) (gamma2 - Beta + 6283008) (gamma2 - Beta + 6283008)); [smt(gamma2_cases) | smt(gamma2_cases) | exact Hadd_rng].
+  + move => k kb Hk Hinf.
+    case (k < base{hr} %/ n) => Hlt.
+    - have Hkvec : 0 <= k < kvec by smt(gt0_k).
+      by rewrite (Hwb k Hmod Hkvec) ifF 1:/#; smt().
+    - have -> : k = base{hr} %/ n by smt().
+      rewrite (Hwb (base{hr} %/ 256) Hmod Hkb) /=.
+      by apply (wpoly_srng_widen add_result (gamma2 - Beta - 1 + (gamma2 - 1)) (gamma2 - Beta - 1 + (gamma2 - 1)) (2*gamma2 - Beta - 2) (2*gamma2 - Beta - 2)); [smt() | smt() | exact Hadd_rng].
+  + move => k kb Hk.
+    case (k < base{hr} %/ n) => Hlt.
+    - have Hkvec : 0 <= k < kvec by smt(gt0_k).
+      have Hk_eq : (kvec_unflatten256 (Array_kpolys.init (fun i =>
+            if base{hr} <= i < base{hr} + n then add_result.[i - base{hr}]
+            else w0_minus_cs2_plus_ct0{hr}.[i]))).[k] =
+          (kvec_unflatten256 w0_minus_cs2_plus_ct0{hr}).[k]
+        by rewrite (Hwb k Hmod Hkvec) ifF 1:/#.
+      have /= HH2k : (lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2_plus_ct0{hr})).[k] =
+          (lifts_wpolykvec (kvec_unflatten256 _w0mc)).[k] &+ (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[k]
+        by smt().
+      by rewrite -HH2k /lifts_wpolykvec mapiE 1:/# mapiE 1:/# /= Hk_eq.
+    - have -> : k = base{hr} %/ n by smt().
+      rewrite /lifts_wpolykvec mapiE 1:/# /=.
+      rewrite (Hwb (base{hr} %/ 256) Hmod Hkb) /=.
+      rewrite Hadd_eq (lifts_wpolykvec_slice _w0mc base{hr}) 1:/# 1:/#.
+      by rewrite Hct0eq.
+
++ (* ||ct0||_inf >= gamma2 (ML-DSA-44, iteration rejected): only the
+     wide range of the sum; the tight range is vacuous for this column *)
+  wp; ecall (polynomial__add_correct
+           (Array256.init (fun i => w0_minus_cs2_plus_ct0.[base + i]))
+           (Array256.init (fun i => w0_minus_cs2.[base + i]))
+           ct0 (gamma2 - Beta - 1) 6283009).
+  auto => |> &hr *.
+  have Hct0eq : lifts_wpoly ct0{hr} = (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[base{hr} %/ n] by assumption.
+  have Hw0mc_inflt : wpolykvec_infnorm_lt (gamma2 - Beta) (kvec_unflatten256 _w0mc) by assumption.
+  have Hct0rng : wpoly_srng 6283009 6283008 ct0{hr} by assumption.
+  have Hnot : !wpoly_infnorm_lt gamma2 ct0{hr} by assumption.
+  have Hbn : (base{hr} + n) %/ n = base{hr} %/ n + 1 by smt().
+  have Hmod : base{hr} %% 256 = 0 by smt().
+  have Hkb : 0 <= base{hr} %/ 256 < kvec by smt(gt0_k).
+  have Hninf : !infnorm_lt (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[base{hr} %/ n] gamma2.
+  + rewrite -Hct0eq; apply /negP => Hcontra; apply Hnot.
+    by apply (wpoly_infnorm_unliftE gamma2 6283009 6283008 ct0{hr}); [smt(gamma2_cases) | smt(gamma2_cases) | smt(gamma2_cases) | exact Hct0rng | exact Hcontra].
+  split.
+  + split; last split; last by smt(gamma2_cases beta_gamma2_lt gt0_beta).
+    + have Heq_slice : (kvec_unflatten256 _w0mc).[base{hr} %/ n] = Array256.init (fun i => _w0mc.[base{hr} + i]).
+    + by apply kvec_slice_eq; smt(gt0_k).
+    rewrite /wpoly_srng allP => j jb.
+    move: Hw0mc_inflt; rewrite /wpolykvec_infnorm_lt /wpolykvec_srng allP => H.
+    move: (H (base{hr} %/ n) _); 1: smt(gt0_k).
+    rewrite Heq_slice /wpoly_srng allP => Hk.
+    have := Hk j _; 1: smt().
+    by rewrite initiE 1:/# /=; smt().
+    + by apply (wpoly_srng_widen ct0{hr} 6283009 6283008 6283009 6283009); [smt() | smt() | exact Hct0rng].
+  move => _ _ _ add_result Hadd_eq Hadd_rng.
+  have Hwb := kvec_unflatten256_writeback_iE w0_minus_cs2_plus_ct0{hr} add_result base{hr}.
+  do split; 1,2,3: smt().
+  + by rewrite Hbn; smt().
+  + by rewrite Hbn; smt().
+  + move => k kb Hk.
+    case (k < base{hr} %/ n) => Hlt.
+    - have Hkvec : 0 <= k < kvec by smt(gt0_k).
+      by rewrite (Hwb k Hmod Hkvec) ifF 1:/#; smt().
+    - have -> : k = base{hr} %/ n by smt().
+      by rewrite (Hwb (base{hr} %/ 256) Hmod Hkb) /=.
+  + move => k kb Hk Hinf.
+    case (k < base{hr} %/ n) => Hlt.
+    - have Hkvec : 0 <= k < kvec by smt(gt0_k).
+      by rewrite (Hwb k Hmod Hkvec) ifF 1:/#; smt().
+    - by smt().
+  + move => k kb Hk.
+    case (k < base{hr} %/ n) => Hlt.
+    - have Hkvec : 0 <= k < kvec by smt(gt0_k).
+      have Hk_eq : (kvec_unflatten256 (Array_kpolys.init (fun i =>
+            if base{hr} <= i < base{hr} + n then add_result.[i - base{hr}]
+            else w0_minus_cs2_plus_ct0{hr}.[i]))).[k] =
+          (kvec_unflatten256 w0_minus_cs2_plus_ct0{hr}).[k]
+        by rewrite (Hwb k Hmod Hkvec) ifF 1:/#.
+      have /= HH2k : (lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2_plus_ct0{hr})).[k] =
+          (lifts_wpolykvec (kvec_unflatten256 _w0mc)).[k] &+ (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly _c) (lifts_wpolykvec (kvec_unflatten256 _t0)))).[k]
+        by smt().
+      by rewrite -HH2k /lifts_wpolykvec mapiE 1:/# mapiE 1:/# /= Hk_eq.
+    - have -> : k = base{hr} %/ n by smt().
+      rewrite /lifts_wpolykvec mapiE 1:/# /=.
+      rewrite (Hwb (base{hr} %/ 256) Hmod Hkb) /=.
+      rewrite Hadd_eq (lifts_wpolykvec_slice _w0mc base{hr}) 1:/# 1:/#.
+      by rewrite Hct0eq.
 qed.
 
 lemma __apply_ct0_and_check_norm_ph
@@ -785,33 +821,35 @@ lemma __apply_ct0_and_check_norm_ph
         (_incr = W64.zero \/ _incr = W64.one) /\
         wpoly_ntt_orng _c /\
         wpolykvec_ntt_orng (kvec_unflatten256 _t0) /\
+        (* only needed when _incr = 0 (loop runs): w0mc passed cs2 norm check *)
         (_incr = W64.zero =>
           wpolykvec_infnorm_lt (gamma2 - Beta) (kvec_unflatten256 _w0mc))
         ==>
         (res.`2 = W64.zero \/ res.`2 = W64.one) /\
-        (* Biconditional: failure bit is zero iff no prior failure AND
-           the abstract ct0-norm check holds. *)
-        (res.`2 = W64.zero <=>
-           _incr = W64.zero /\
-           PolyKVec.infnorm_lt
-             (PolyKVec.invnttv (PolyKVec.ntt_smul
-                (lifts_wpoly _c)
-                (lifts_wpolykvec (kvec_unflatten256 _t0))))
-             gamma2) /\
-        (res.`2 = W64.zero =>
+        (* skipped after a prior failure: nothing computed, flag 0 *)
+        (_incr <> W64.zero => res.`2 = W64.zero /\ res.`1 = _r) /\
+        (_incr = W64.zero =>
            let ct0 = PolyKVec.invnttv (PolyKVec.ntt_smul
                        (lifts_wpoly _c)
                        (lifts_wpolykvec (kvec_unflatten256 _t0))) in
-           (* Tightest word-level range from add: wpolykvec_infnorm_lt (gamma2-Beta)
-              on w0mc plus wpoly_infnorm_lt gamma2 on ct0. *)
-           wpolykvec_srng (kvec_unflatten256 res.`1) (2*gamma2 - Beta - 2) (2*gamma2 - Beta - 2) /\
+           (* The flag is the abstract ct0-norm check when the test is
+              compiled (gamma2 <= tau 2^(d-1)), and 0 otherwise. *)
+           (res.`2 = W64.zero <=>
+              (tau * 4096 < gamma2 \/ PolyKVec.infnorm_lt ct0 gamma2)) /\
+           (* c t0 is always added to w0 - c s2 (the hint needs it) *)
            lifts_wpolykvec (kvec_unflatten256 res.`1) =
-             (lifts_wpolykvec (kvec_unflatten256 _w0mc)) + ct0)
+             (lifts_wpolykvec (kvec_unflatten256 _w0mc)) + ct0 /\
+           (* word-level range: reduce32 output plus the cs2 range... *)
+           wpolykvec_srng (kvec_unflatten256 res.`1)
+             (gamma2 - Beta - 1 + 6283009) (gamma2 - Beta - 1 + 6283009) /\
+           (* ... and the tight range when ||c t0||_inf < gamma2 *)
+           (PolyKVec.infnorm_lt ct0 gamma2 =>
+              wpolykvec_srng (kvec_unflatten256 res.`1)
+                (2*gamma2 - Beta - 2) (2*gamma2 - Beta - 2)))
     ] = 1%r.
 proof.
 by conseq __apply_ct0_and_check_norm_ll (__apply_ct0_and_check_norm_correct _r _w0mc _t0 _c _incr).
 qed.
-
 
 lemma __compute_z_and_check_norm_ll : islossless M.__compute_z_and_check_norm.
 proof.
@@ -1112,7 +1150,8 @@ qed.
 
 (* ================================================================== *)
 (* __make_hint_vector                                                  *)
-(* Called fourth; incr = combined result of all three norm checks.    *)
+(* Called fourth; incr = result of the z and cs2 checks (0 or 1); the  *)
+(* flag of the (public) c t0 test joins the result in __sign_internal.  *)
 (* Computes h = MakeHintImpl(-ct0, w-cs2+ct0) per row (kvec rows).            *)
 (* Checks total hint count <= omega = w_hint.                         *)
 (* Note: ct0 at spec level is passed as parameter by the caller.      *)
@@ -1129,6 +1168,27 @@ wp. (* hint_0 writeback *)
 call polynomial____make_hint_ll.
 wp. (* hint_element <- Array256.init *)
 by auto => /#.
+qed.
+
+(* The flag of the hint test is a bit whatever the ranges of the inputs:
+   __sign_internal runs the hint test even when the (public) test on c t0
+   failed, and then nothing else is known about w0 - c s2 + c t0. *)
+lemma __make_hint_vector_bit (_incr : W64.t) :
+    hoare [ M.__make_hint_vector :
+        infinity_norm_check_result = _incr /\ (_incr = W64.zero \/ _incr = W64.one)
+        ==> (res.`2 = W64.zero \/ res.`2 = W64.one) /\
+            (_incr <> W64.zero => res.`2 = _incr) ].
+proof.
+proc => /=.
+case (infinity_norm_check_result <> zero).
++ rcondt ^if; 1: by auto.
+  rcondf ^while; 1: by auto.
+  by auto.
+rcondf ^if; 1: by auto.
+while ((infinity_norm_check_result = W64.zero \/ infinity_norm_check_result = W64.one) /\ _incr = W64.zero); last by auto => /#.
+wp; call (: true ==> true); 1: by conseq (: _ ==> true) => //; proc; inline *; wp; while (true); auto.
+auto => /> &hr H result r; rewrite /SETcc; case (w_hint < total_ones_in_hint{hr} + r.`2) => _ /=; case H => ->;
+  by smt(W64.or0w W64.orw0 W64.orwK W64.to_uint_eq to_uint_zeroextu64 W8.to_uint1 W8.to_uint0 W64.to_uint1 W64.to_uint0).
 qed.
 
 (* When all coefficients of the hint vector are 0 or 1 (wpolykvec_urng v 2),
@@ -1444,5 +1504,66 @@ lemma __make_hint_vector_ph
     ] = 1%r.
 proof. by conseq __make_hint_vector_ll (__make_hint_vector_correct _r _w1 _h _incr). 
 qed.
+
+(* The hint test with the range of w0 - c s2 + c t0 as a hypothesis of the
+   conclusions rather than of the call: in __sign_internal the range is only
+   known when the test on c t0 passed. *)
+lemma __make_hint_vector_correct_anyrange
+      (_r : W32.t Array_kpolys.t) (_w1 : W32.t Array_kpolys.t)
+      (_h : W32.t Array_kpolys.t) (_incr : W64.t)
+      :
+    hoare [ M.__make_hint_vector :
+        w0_minus_cs2_plus_ct0 = _r /\ w1 = _w1 /\ hint_0 = _h /\
+        infinity_norm_check_result = _incr /\
+        (_incr = W64.zero \/ _incr = W64.one) /\
+        wpolykvec_urng (kvec_unflatten256 _w1) ((q - 1) %/ (2 * gamma2))
+        ==>
+        (res.`2 = W64.zero \/ res.`2 = W64.one) /\
+        (_incr <> W64.zero => res.`2 = _incr) /\
+        (wpolykvec_srng (kvec_unflatten256 _r) (2*gamma2 - Beta - 2) (2*gamma2 - Beta - 2) =>
+           (res.`2 = W64.zero =>
+              liftu_wpolykvec (kvec_unflatten256 res.`1) =
+                MakeHintImpl (lifts_wpolykvec (kvec_unflatten256 _w1))
+                             (lifts_wpolykvec (kvec_unflatten256 _r))) /\
+           (res.`2 = W64.zero <=>
+              _incr = W64.zero /\
+              PolyKVec.hammw
+                (MakeHintImpl (lifts_wpolykvec (kvec_unflatten256 _w1))
+                             (lifts_wpolykvec (kvec_unflatten256 _r))) w_hint) /\
+           (res.`2 = W64.zero =>
+              wpolykvec_urng (kvec_unflatten256 res.`1) 2))
+    ].
+proof.
+case (wpolykvec_srng (kvec_unflatten256 _r) (2*gamma2 - Beta - 2) (2*gamma2 - Beta - 2)) => Hr.
++ by conseq (__make_hint_vector_correct _r _w1 _h _incr) => /> /#.
++ by conseq (__make_hint_vector_bit _incr) => /> /#.
+qed.
+
+lemma __make_hint_vector_ph_anyrange
+      (_r : W32.t Array_kpolys.t) (_w1 : W32.t Array_kpolys.t)
+      (_h : W32.t Array_kpolys.t) (_incr : W64.t)
+      :
+    phoare [ M.__make_hint_vector :
+        w0_minus_cs2_plus_ct0 = _r /\ w1 = _w1 /\ hint_0 = _h /\
+        infinity_norm_check_result = _incr /\
+        (_incr = W64.zero \/ _incr = W64.one) /\
+        wpolykvec_urng (kvec_unflatten256 _w1) ((q - 1) %/ (2 * gamma2))
+        ==>
+        (res.`2 = W64.zero \/ res.`2 = W64.one) /\
+        (_incr <> W64.zero => res.`2 = _incr) /\
+        (wpolykvec_srng (kvec_unflatten256 _r) (2*gamma2 - Beta - 2) (2*gamma2 - Beta - 2) =>
+           (res.`2 = W64.zero =>
+              liftu_wpolykvec (kvec_unflatten256 res.`1) =
+                MakeHintImpl (lifts_wpolykvec (kvec_unflatten256 _w1))
+                             (lifts_wpolykvec (kvec_unflatten256 _r))) /\
+           (res.`2 = W64.zero <=>
+              _incr = W64.zero /\
+              PolyKVec.hammw
+                (MakeHintImpl (lifts_wpolykvec (kvec_unflatten256 _w1))
+                             (lifts_wpolykvec (kvec_unflatten256 _r))) w_hint) /\
+           (res.`2 = W64.zero =>
+              wpolykvec_urng (kvec_unflatten256 res.`1) 2))
+    ] = 1%r.
+proof. by conseq __make_hint_vector_ll (__make_hint_vector_correct_anyrange _r _w1 _h _incr). qed.
 
 end SignNormChecksT.
