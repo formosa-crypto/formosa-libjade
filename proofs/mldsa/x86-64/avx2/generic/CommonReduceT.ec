@@ -43,6 +43,45 @@ wp; while (0 <= offset <= (256 * 32) %/ 8 /\ offset %% 32 = 0)
 by move => *; auto => /#.
 qed.
 
+(* reduce32 on one coefficient: a - round(a / 2^23) * q. *)
+op reduce32_w (a : W32.t) : W32.t =
+  a - ((a + W32.of_int 4194304) `|>>>` 23) * W32.of_int 8380417.
+
+lemma reduce32_wE (a : W32.t) :
+    -(2^31 - 2^22 - 1) <= to_sint a <= 2^31 - 2^22 - 1 =>
+    incoeff (to_sint (reduce32_w a)) = incoeff (to_sint a) /\
+    -6283009 <= to_sint (reduce32_w a) <= 6283008.
+proof.
+move => /= Hs.
+have H22 : to_sint (W32.of_int 4194304) = 4194304 by rewrite W32.to_sintE W32.of_uintK /smod /=.
+have Hadd : to_sint (a + W32.of_int 4194304) = to_sint a + 4194304.
++ by rewrite W32.to_sintD_small H22 //=; smt().
+have Hsar : to_sint ((a + W32.of_int 4194304) `|>>>` 23) = (to_sint a + 4194304) %/ 8388608.
++ by rewrite JWordExtra.WE32.to_sint_sar 1:/# Hadd.
+have Hk : -255 <= (to_sint a + 4194304) %/ 8388608 <= 255 by smt().
+have Hush : to_uint ((a + W32.of_int 4194304) `|>>>` 23) =
+            ((to_sint a + 4194304) %/ 8388608) %% 4294967296.
++ rewrite -Hsar; move: (W32.to_uint_cmp ((a + W32.of_int 4194304) `|>>>` 23)) => /= Hub.
+  case (msb ((a + W32.of_int 4194304) `|>>>` 23)) => Hm.
+  + by rewrite (JWordExtra.W32_to_sint_neg _ Hm); smt().
+  by rewrite (JWordExtra.W32_to_sint_pos _ Hm); smt().
+have Hprod : ((a + W32.of_int 4194304) `|>>>` 23) * W32.of_int 8380417 =
+             W32.of_int (((to_sint a + 4194304) %/ 8388608) * q).
++ by rewrite W32.to_uint_eq W32.to_uintM !W32.of_uintK Hush /=; smt().
+have Hde : to_sint a + 4194304 =
+           (to_sint a + 4194304) %/ 8388608 * 8388608 + (to_sint a + 4194304) %% 8388608.
++ by smt(divz_eq).
+have Hmc : 0 <= (to_sint a + 4194304) %% 8388608 < 8388608 by smt(modz_cmp).
+have Hval : to_sint (reduce32_w a) = to_sint a - ((to_sint a + 4194304) %/ 8388608) * q.
++ rewrite /reduce32_w Hprod W32.to_sintB_small.
+  + by rewrite W32.to_sintK_small /=; smt().
+  by rewrite W32.to_sintK_small //; rewrite /q /=; smt().
+rewrite Hval; split; last by rewrite /q; smt().
+rewrite incoeffB incoeffM.
+have -> : incoeff q = Zq.zero by apply Zq.asint_inj; rewrite incoeffK Zq.zeroE; smt().
+by ring.
+qed.
+
 lemma polynomial__reduce32_correct (_a : W32.t Array256.t) :
     hoare [ M.polynomial__reduce32 :
         polynomial = _a /\
@@ -57,39 +96,15 @@ proc change ^while.1 : { a <- if (0 <= offset*8 <= 32*256-256) then BSWAS_256u32
 proc change ^while.6 : { polynomial <- if (0 <= offset*8 <= 32*256-256) then BSWAS_256u32_256.sliceset polynomial (offset*8) a else Array256.init (WArray1024.WArray1024.get32 (WArray1024.WArray1024.set256_direct (WArray1024.WArray1024.init32 (fun (i_0:int) => polynomial.[i_0])) offset a)); }; first (auto => /> &2; case (0 <= offset{2} * 8 <= 7936); [by move => *; rewrite BSWAS_256u32_256_slicesetE 1:/# | by auto]).
 unroll for ^while.
 wp 194.
-conseq (: polynomial = _a /\ wpoly_srng 2143289343 2143289343 _a ==> polynomial = BSWA_256u32.init (fun (i:int) => _a.[i] - ((_a.[i] + W32.of_int 4194304) `|>>>` 23) * W32.of_int 8380417)); last by circuit.
+conseq (: polynomial = _a /\ wpoly_srng 2143289343 2143289343 _a ==>
+          polynomial = BSWA_256u32.init (fun (i:int) => reduce32_w _a.[i])); last first.
++ by rewrite /reduce32_w; circuit.
 move => &hr [# _ Hrng] p0 ->; move: Hrng; rewrite /wpoly_srng !allP => Hrng.
-have key : forall (i:int), 0 <= i < n => to_sint (_a.[i] - ((_a.[i] + W32.of_int 4194304) `|>>>` q_bits) * W32.of_int q) = to_sint _a.[i] - ((to_sint _a.[i] + 4194304) %/ 2^23) * q.
-+ move => i Hi; have /= Hs := Hrng i Hi.
-  have H22 : to_sint (W32.of_int 4194304) = 4194304 by rewrite W32.to_sintE W32.of_uintK /smod /=.
-  have H23 : 2 ^ 23 = 8388608 by done.
-  have Hadd : to_sint (_a.[i] + W32.of_int 4194304) = to_sint _a.[i] + 4194304.
-  + rewrite W32.to_sintD_small; first (rewrite H22 /=; smt()).
-    by rewrite H22.
-  have Hsar : to_sint ((_a.[i] + W32.of_int 4194304) `|>>>` q_bits) = (to_sint _a.[i] + 4194304) %/ 8388608 by rewrite JWordExtra.WE32.to_sint_sar 1:/# Hadd H23.
-  have Hk : -255 <= (to_sint _a.[i] + 4194304) %/ 8388608 <= 255 by smt().
-  have Hush : to_uint ((_a.[i] + W32.of_int 4194304) `|>>>` q_bits) = ((to_sint _a.[i] + 4194304) %/ 8388608) %% 4294967296.
-  + have Hmod : W32.modulus = 4294967296 by done.
-    rewrite -Hsar; move: (W32.to_uint_cmp ((_a.[i] + W32.of_int 4194304) `|>>>` q_bits)); rewrite Hmod => Hub; case (msb ((_a.[i] + W32.of_int 4194304) `|>>>` q_bits)) => Hm; [ rewrite (JWordExtra.W32_to_sint_neg _ Hm) | rewrite (JWordExtra.W32_to_sint_pos _ Hm) ]; smt().
-  have Hprod : ((_a.[i] + W32.of_int 4194304) `|>>>` q_bits) * W32.of_int q = W32.of_int (((to_sint _a.[i] + 4194304) %/ 8388608) * q).
-  + rewrite W32.to_uint_eq W32.to_uintM !W32.of_uintK Hush /=; smt().
-  have Hqv : q = 8380417 by done.
-  have Hrange : -6283009 <= to_sint _a.[i] - ((to_sint _a.[i] + 4194304) %/ 8388608) * q <= 6283008.
-  + have Hde : to_sint _a.[i] + 4194304 = (to_sint _a.[i] + 4194304) %/ 8388608 * 8388608 + (to_sint _a.[i] + 4194304) %% 8388608 by smt(divz_eq).
-    have Hmc : 0 <= (to_sint _a.[i] + 4194304) %% 8388608 < 8388608 by smt(modz_cmp).
-    rewrite /q; smt().
-  rewrite Hprod W32.to_sintB_small.
-  + rewrite W32.to_sintK_small /=; smt().
-  rewrite W32.to_sintK_small //; rewrite /q /=; smt().
 split.
-+ apply Array256.tP => i Hi; rewrite /lifts_wpoly !mapiE 1,2:/# /= /BSWA_256u32.init initiE 1:/# /= (key i Hi).
-  rewrite incoeffB incoeffM.
-  have Hq0 : incoeff q = Zq.zero by apply Zq.asint_inj; rewrite incoeffK Zq.zeroE; smt().
-  by rewrite Hq0; ring.
-move => i Hi; have /= Hs := Hrng i Hi; rewrite /BSWA_256u32.init initiE 1:/# /= (key i Hi).
-have Hde : to_sint _a.[i] + 4194304 = (to_sint _a.[i] + 4194304) %/ 8388608 * 8388608 + (to_sint _a.[i] + 4194304) %% 8388608 by smt(divz_eq).
-have Hmc : 0 <= (to_sint _a.[i] + 4194304) %% 8388608 < 8388608 by smt(modz_cmp).
-rewrite /q; smt().
++ apply Array256.tP => i Hi; rewrite /lifts_wpoly !mapiE 1,2:/# /= /BSWA_256u32.init initiE 1:/# /=.
+  by have [-> _] := reduce32_wE _a.[i] (Hrng i Hi).
+move => i Hi; rewrite /BSWA_256u32.init initiE 1:/# /=.
+by have [_ ->] := reduce32_wE _a.[i] (Hrng i Hi).
 qed.
 
 lemma polynomial__reduce32_ph (_a : W32.t Array256.t) :

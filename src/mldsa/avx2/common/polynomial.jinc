@@ -134,6 +134,182 @@ namespace polynomial {
         return result;
     }
 
+    // sum = reduce32(lhs + rhs), and the infinity-norm test of the result.
+    // One pass instead of three (vpadd, reduce32, __check_infinity_norm);
+    // the only output besides the polynomial is the boolean of the norm test,
+    // as in __check_infinity_norm.
+    inline
+    fn __add_reduce32_check_infinity_norm(
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] sum_pointer lhs_pointer rhs_pointer,
+        inline int threshold
+    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL], reg u64
+    {
+        reg u256 lhs rhs sum t;
+        reg u256 two_pow_22 modulus;
+        reg u256 threshold_vector exceeds exceeds_any;
+        reg u32 msb_mask;
+        reg u64 result temp;
+        reg u8 res8;
+        reg bool zf;
+        reg ui64 offset;
+
+        two_pow_22 = TWO_POW_22_VECTOR;
+        modulus = MODULUS_VECTOR;
+        temp = threshold - 1;
+        threshold_vector = (256u)#VMOV(temp);
+        threshold_vector = #VPBROADCAST_8u32(threshold_vector);
+        exceeds_any = #set0_256();
+
+        offset = 0;
+        while (offset < BYTES_PER_UNCOMPRESSED_POLYNOMIAL) {
+            lhs = lhs_pointer.[:u256 offset];
+            rhs = rhs_pointer.[:u256 offset];
+            sum = #VPADD_8u32(lhs, rhs);
+
+            // reduce32: sum -= ((sum + 2^22) >> 23) * q
+            t = #VPADD_8u32(sum, two_pow_22);
+            t = #VPSRA_8u32(t, 23);
+            t = #VPMULL_8u32(t, modulus);
+            sum = #VPSUB_8u32(sum, t);
+            sum_pointer.[:u256 offset] = sum;
+
+            // |coefficient| >= threshold ?
+            sum = #VPABS_8u32(sum);
+            exceeds = #VPCMPGT_8u32(sum, threshold_vector);
+            exceeds_any = #VPOR_256(exceeds_any, exceeds);
+
+            offset += 32;
+        }
+
+        msb_mask = #MOVEMASK_8u32(exceeds_any);
+        _, _, _, _, zf = #TEST_32(msb_mask, msb_mask);
+        res8 = #SETcc(!zf);
+        result = (64u)res8;
+
+        return sum_pointer, result;
+    }
+
+    // difference = reduce32(lhs - rhs), and the infinity-norm test of the result.
+    // One pass instead of three (vpsub, reduce32, __check_infinity_norm);
+    // the only output besides the polynomial is the boolean of the norm test,
+    // as in __check_infinity_norm.
+    inline
+    fn __subtract_reduce32_check_infinity_norm(
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] difference_pointer lhs_pointer rhs_pointer,
+        inline int threshold
+    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL], reg u64
+    {
+        reg u256 lhs rhs sum t;
+        reg u256 two_pow_22 modulus;
+        reg u256 threshold_vector exceeds exceeds_any;
+        reg u32 msb_mask;
+        reg u64 result temp;
+        reg u8 res8;
+        reg bool zf;
+        reg ui64 offset;
+
+        two_pow_22 = TWO_POW_22_VECTOR;
+        modulus = MODULUS_VECTOR;
+        temp = threshold - 1;
+        threshold_vector = (256u)#VMOV(temp);
+        threshold_vector = #VPBROADCAST_8u32(threshold_vector);
+        exceeds_any = #set0_256();
+
+        offset = 0;
+        while (offset < BYTES_PER_UNCOMPRESSED_POLYNOMIAL) {
+            lhs = lhs_pointer.[:u256 offset];
+            rhs = rhs_pointer.[:u256 offset];
+            sum = #VPSUB_8u32(lhs, rhs);
+
+            // reduce32: sum -= ((sum + 2^22) >> 23) * q
+            t = #VPADD_8u32(sum, two_pow_22);
+            t = #VPSRA_8u32(t, 23);
+            t = #VPMULL_8u32(t, modulus);
+            sum = #VPSUB_8u32(sum, t);
+            difference_pointer.[:u256 offset] = sum;
+
+            // |coefficient| >= threshold ?
+            sum = #VPABS_8u32(sum);
+            exceeds = #VPCMPGT_8u32(sum, threshold_vector);
+            exceeds_any = #VPOR_256(exceeds_any, exceeds);
+
+            offset += 32;
+        }
+
+        msb_mask = #MOVEMASK_8u32(exceeds_any);
+        _, _, _, _, zf = #TEST_32(msb_mask, msb_mask);
+        res8 = #SETcc(!zf);
+        result = (64u)res8;
+
+        return difference_pointer, result;
+    }
+
+    // sum = lhs + reduce32(rhs), with the infinity-norm test of reduce32(rhs)
+    // compiled only when bound >= threshold (the caller passes the static bound
+    // on rhs: the test on c*t0 cannot fail for ML-DSA-65 and ML-DSA-87). One
+    // pass instead of three (reduce32, __check_infinity_norm, add); the
+    // reduced rhs is not stored.
+    inline
+    fn __add_reduce32_check_infinity_norm_rhs(
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] sum_pointer lhs_pointer rhs_pointer,
+        inline int threshold,
+        inline int bound
+    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL], reg u64
+    {
+        reg u256 lhs rhs t;
+        reg u256 two_pow_22 modulus;
+        reg u256 threshold_vector exceeds exceeds_any;
+        reg u32 msb_mask;
+        reg u64 result temp;
+        reg u8 res8;
+        reg bool zf;
+        reg ui64 offset;
+
+        two_pow_22 = TWO_POW_22_VECTOR;
+        modulus = MODULUS_VECTOR;
+        // Set up unconditionally: the SCT checker does not resolve the
+        // compile-time condition and would see these uninitialised (hence
+        // secret) on the path where the test is not compiled.
+        temp = threshold - 1;
+        threshold_vector = (256u)#VMOV(temp);
+        threshold_vector = #VPBROADCAST_8u32(threshold_vector);
+        exceeds_any = #set0_256();
+
+        offset = 0;
+        while (offset < BYTES_PER_UNCOMPRESSED_POLYNOMIAL) {
+            rhs = rhs_pointer.[:u256 offset];
+
+            // reduce32: rhs -= ((rhs + 2^22) >> 23) * q
+            t = #VPADD_8u32(rhs, two_pow_22);
+            t = #VPSRA_8u32(t, 23);
+            t = #VPMULL_8u32(t, modulus);
+            rhs = #VPSUB_8u32(rhs, t);
+
+            lhs = lhs_pointer.[:u256 offset];
+            lhs = #VPADD_8u32(lhs, rhs);
+            sum_pointer.[:u256 offset] = lhs;
+
+            if (bound >= threshold) {
+                // |coefficient| >= threshold ?
+                rhs = #VPABS_8u32(rhs);
+                exceeds = #VPCMPGT_8u32(rhs, threshold_vector);
+                exceeds_any = #VPOR_256(exceeds_any, exceeds);
+            }
+
+            offset += 32;
+        }
+
+        if (bound >= threshold) {
+            msb_mask = #MOVEMASK_8u32(exceeds_any);
+            _, _, _, _, zf = #TEST_32(msb_mask, msb_mask);
+            res8 = #SETcc(!zf);
+            result = (64u)res8;
+        } else {
+            result = 0;
+        }
+        return sum_pointer, result;
+    }
+
     inline
     fn __shift_coefficients_left(reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] {
         reg u256 coefficients;
