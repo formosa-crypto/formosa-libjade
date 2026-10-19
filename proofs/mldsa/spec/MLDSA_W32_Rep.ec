@@ -54,8 +54,9 @@ op wpoly_intt_irng (p : wpoly) = wpoly_srng q q p.
 
 (* ------------------------------------------------------------------ *)
 (* Output bound of polynomial__invert_ntt_montgomery: the last          *)
-(* operation on every coefficient is a Montgomery multiplication by     *)
-(* 41978 = 2^64/256 mod q, whence |x| <= (41978 + q)/2.                 *)
+(* operation on every coefficient is a Montgomery multiplication, by    *)
+(* 41978 = 2^64/256 mod q (sums) or by the root of the last level times *)
+(* it, -3975713 (differences), whence |x| <= (3975713 + q)/2.           *)
 (*                                                                      *)
 (* It is tight enough that add(_, s2) stays within the tolerance        *)
 (* [-q+1, q-1] of conditionally_add_modulus -- as the comment in        *)
@@ -63,7 +64,7 @@ op wpoly_intt_irng (p : wpoly) = wpoly_srng q q p.
 (*   "the output of the invntt [must be] small enough such that the     *)
 (*    addition of s2 does not result in absolute values >= MLDSA_Q"     *)
 (* ------------------------------------------------------------------ *)
-op invntt_obound : int = 4211197.
+op invntt_obound : int = 6178065.
 
 
 (* ------------------------------------------------------------------ *)

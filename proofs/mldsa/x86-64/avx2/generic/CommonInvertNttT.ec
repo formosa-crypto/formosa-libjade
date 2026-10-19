@@ -23,7 +23,7 @@ import Round ZModQ Zq.
 (*           the input is read in Montgomery form (times 2^32): this   *)
 (*           is the factor the NTT-domain products leave out           *)
 (*         wpoly_srng invntt_obound invntt_obound res                  *)
-(*           (the final scaling step is an mmr by 41978)               *)
+(*           (the last level ends with an mmr by 41978 or -3975713)    *)
 (* ================================================================== *)
 
 lemma polynomial__invert_ntt_montgomery_ll : islossless M.polynomial__invert_ntt_montgomery.
@@ -42,7 +42,7 @@ lemma polynomial__invert_ntt_montgomery_correct (_a : W32.t Array256.t) :
 proof.
 conseq (polynomial__invert_ntt_montgomeryP _a) => /> hrng.
 have [_ ->] // := intt_link _a q _ _ _ => //; 1: by rewrite -srng_cbnd.
-by split; [| exact iscale_rng].
+by split; [| exact ifinal_rng].
 qed.
 
 lemma polynomial__invert_ntt_montgomery_ph (_a : W32.t Array256.t) :

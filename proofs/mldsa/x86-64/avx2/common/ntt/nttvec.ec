@@ -536,3 +536,51 @@ qed.
 lemma iscale_frame (p p' : wpoly) (P : int -> bool) :
   agree P p p' => agree P (iscale p) (iscale p').
 proof. by move=> hag t rgt Pt; rewrite /iscale !mapiE // hag. qed.
+
+(* ==================================================================== *)
+(* The last inverse level, with the scaling folded in                   *)
+(* ==================================================================== *)
+lemma ilevels5_7E (p : wpoly) : ilevels p 5 7 = ireduce_level (ireduce_level p 5) 6.
+proof. by rewrite /ilevels /range /= -iotaredE. qed.
+
+lemma invtree7E (p : wpoly) : invtree p 7 = ilevels (ilevels p 0 5) 5 7.
+proof. by rewrite ilevels0_5E ilevels5_7E /invtree /range /= -iotaredE. qed.
+
+lemma vec_ifinal_lo (q : wpoly) (o : int) : 0 <= o => o + 8 <= 128 =>
+  vec (ifinal q) o =
+    W8u32.pack8 (mkseq (fun l => mmr (q.[o + l] + q.[o + 128 + l]) (W32.of_int 41978)) 8).
+proof.
+move=> 2?; rewrite /vec &(congr1 W8u32.pack8) &(eq_in_mkseq) => l rgl /=.
+by rewrite /ifinal initiE 1:/# /= ifT 1:/#; do 3! congr; ring.
+qed.
+
+lemma vec_ifinal_hi (q : wpoly) (o : int) : 0 <= o => o + 8 <= 128 =>
+  vec (ifinal q) (o + 128) =
+    W8u32.pack8 (mkseq (fun l =>
+      mmr (q.[o + 128 + l] - q.[o + l]) (W32.of_int (-3975713))) 8).
+proof.
+move=> 2?; rewrite /vec &(congr1 W8u32.pack8) &(eq_in_mkseq) => l rgl /=.
+by rewrite /ifinal initiE 1:/# /= ifF 1:/#; do 4! congr; ring.
+qed.
+
+lemma ifinal_frame (p p' : wpoly) (P : int -> bool) :
+  closed 7 P => agree P p p' => agree P (ifinal p) (ifinal p').
+proof.
+move=> [hlo hhi] hag t rgt Pt; rewrite /ifinal !initiE //=.
+case: (t < 128) => ht.
+- by rewrite (hag t) // (hag (t + 128)) 1:/#; [apply hlo => /# | done].
+by rewrite (hag t) // (hag (t - 128)) 1:/#; [apply hhi => /# | done].
+qed.
+
+(* the 8 stores of a column of registers *)
+lemma store_colE (s p : wpoly) (j t : int) : 0 <= j < 4 => 0 <= t < 256 =>
+  (fill (fun i => vec s (8 * j + 224) \bits32 (i - (8 * j + 224))) (8 * j + 224) 8
+  (fill (fun i => vec s (8 * j + 192) \bits32 (i - (8 * j + 192))) (8 * j + 192) 8
+  (fill (fun i => vec s (8 * j + 160) \bits32 (i - (8 * j + 160))) (8 * j + 160) 8
+  (fill (fun i => vec s (8 * j + 128) \bits32 (i - (8 * j + 128))) (8 * j + 128) 8
+  (fill (fun i => vec s (8 * j + 96) \bits32 (i - (8 * j + 96))) (8 * j + 96) 8
+  (fill (fun i => vec s (8 * j + 64) \bits32 (i - (8 * j + 64))) (8 * j + 64) 8
+  (fill (fun i => vec s (8 * j + 32) \bits32 (i - (8 * j + 32))) (8 * j + 32) 8
+  (fill (fun i => vec s (8 * j) \bits32 (i - 8 * j)) (8 * j) 8 p)))))))).[t]
+  = if t %/ 8 %% 4 = j then s.[t] else p.[t].
+proof. by move=> rgj rgt; rewrite !Array256.filliE //; smt(vec_bits). qed.

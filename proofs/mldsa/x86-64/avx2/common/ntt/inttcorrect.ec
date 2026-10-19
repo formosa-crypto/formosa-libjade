@@ -89,6 +89,21 @@ ecall (mmrP differences zetas0); auto => &hr [#] -> -> -> /= ? ->.
 by rewrite (ivec_small q 0 jb o) 1..4:/# (ivec_small q 0 jb2 o2) 1..4:/# /vec /=.
 qed.
 
+(* level 7 with the scaling folded in *)
+lemma gs_butterfly_scaledP (q : wpoly) (o o2 : int) :
+  0 <= o => o + 8 <= 128 => o2 = o + 128 =>
+  hoare[M.polynomial____gs_butterfly_scaled :
+       a = vec q o /\ b = vec q o2
+    /\ zetas_f = W8u32.pack8 (nseq 8 (W32.of_int (-3975713)))
+    /\ f = W8u32.pack8 (nseq 8 (W32.of_int 41978))
+    ==> res = (vec (ifinal q) o, vec (ifinal q) o2)].
+proof.
+hint +listred.
+move=> 2? o2E; proc; ecall (mmrP a f); ecall (mmrP b_minus_a zetas_f).
+auto => &hr [#] -> -> -> -> /= ? -> ? ->.
+by rewrite o2E vec_ifinal_lo // vec_ifinal_hi // /vec /=.
+qed.
+
 (* the broadcast of a scalar twiddle *)
 lemma broadcast_zetaP (z : W32.t) :
   hoare[M.polynomial____broadcast_zeta : zeta_0 = z ==> res = W8u32.pack8 (nseq 8 z)].
@@ -208,7 +223,7 @@ qed.
 (* ==================================================================== *)
 lemma intt_layers_5_6_7P (p : wpoly) (j_ : int) : 0 <= j_ < 4 =>
   hoare[M.polynomial____invert_ntt_layers_5_6_7 :
-    arg = (p, j_) ==> res = merge (fun t => t %/ 8 %% 4 = j_) p (iscale (ilevels p 5 8))].
+    arg = (p, j_) ==> res = merge (fun t => t %/ 8 %% 4 = j_) p (ifinal (ilevels p 5 7))].
 proof.
 hint +listred.
 move=> rgj; proc.
@@ -251,35 +266,25 @@ seq 8 : (polynomial = p /\ j = j_ /\
   ecall (gs_butterflyP q5 6 0 (8 * j_) (8 * j_) (8 * j_ + 64) _ _ _ _ _ _); 2..7: smt().
   ecall (broadcast_zetaP zeta_0); wp; skip.
   by rewrite !izetas6E.
-pose q7 := ireduce_level q6 7.
-seq 6 : (polynomial = p /\ j = j_ /\
-     r0 = vec q7 (8 * j_ +   0) /\ r1 = vec q7 (8 * j_ +  32)
-  /\ r2 = vec q7 (8 * j_ +  64) /\ r3 = vec q7 (8 * j_ +  96)
-  /\ r4 = vec q7 (8 * j_ + 128) /\ r5 = vec q7 (8 * j_ + 160)
-  /\ r6 = vec q7 (8 * j_ + 192) /\ r7 = vec q7 (8 * j_ + 224)).
-- ecall (gs_butterflyP q6 7 0 (8 * j_ + 96) (8 * j_ + 96) (8 * j_ + 224) _ _ _ _ _ _); 2..7: smt().
-  ecall (gs_butterflyP q6 7 0 (8 * j_ + 64) (8 * j_ + 64) (8 * j_ + 192) _ _ _ _ _ _); 2..7: smt().
-  ecall (gs_butterflyP q6 7 0 (8 * j_ + 32) (8 * j_ + 32) (8 * j_ + 160) _ _ _ _ _ _); 2..7: smt().
-  ecall (gs_butterflyP q6 7 0 (8 * j_) (8 * j_) (8 * j_ + 128) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0).
-  by auto => />; rewrite izj7E.
-pose s7 := iscale q7.
-seq 10 : (polynomial = p /\ j = j_ /\
+pose s7 := ifinal q6.
+seq 8 : (polynomial = p /\ j = j_ /\
      r0 = vec s7 (8 * j_ +   0) /\ r1 = vec s7 (8 * j_ +  32)
   /\ r2 = vec s7 (8 * j_ +  64) /\ r3 = vec s7 (8 * j_ +  96)
   /\ r4 = vec s7 (8 * j_ + 128) /\ r5 = vec s7 (8 * j_ + 160)
   /\ r6 = vec s7 (8 * j_ + 192) /\ r7 = vec s7 (8 * j_ + 224)).
-- ecall (mmrP r7 zetas); ecall (mmrP r6 zetas); ecall (mmrP r5 zetas); ecall (mmrP r4 zetas).
-  ecall (mmrP r3 zetas); ecall (mmrP r2 zetas); ecall (mmrP r1 zetas); ecall (mmrP r0 zetas).
-  ecall (broadcast_zetaP zeta_0); auto => />.
-  by rewrite /s7 !vec_iscale 1..16:/# /vec /=.
+- ecall (gs_butterfly_scaledP q6 (8 * j_ + 96) (8 * j_ + 224) _ _ _); 2..4: smt().
+  ecall (gs_butterfly_scaledP q6 (8 * j_ + 64) (8 * j_ + 192) _ _ _); 2..4: smt().
+  ecall (gs_butterfly_scaledP q6 (8 * j_ + 32) (8 * j_ + 160) _ _ _); 2..4: smt().
+  ecall (gs_butterfly_scaledP q6 (8 * j_) (8 * j_ + 128) _ _ _); 2..4: smt().
+  ecall (broadcast_zetaP zeta_0); wp.
+  by ecall (broadcast_zetaP zeta_0); auto.
 auto => />.
 rewrite (set256_initE _ _ (8 * j_ + 224)) 1,2:/# (set256_initE _ _ (8 * j_ + 192)) 1,2:/#.
 rewrite (set256_initE _ _ (8 * j_ + 160)) 1,2:/# (set256_initE _ _ (8 * j_ + 128)) 1,2:/#.
 rewrite (set256_initE _ _ (8 * j_ + 96)) 1,2:/# (set256_initE _ _ (8 * j_ + 64)) 1,2:/#.
 rewrite (set256_initE _ _ (8 * j_ + 32)) 1,2:/# (set256_initE _ _ (8 * j_)) 1,2:/#.
-apply Array256.tP => t rgt; rewrite /merge Array256.initiE //= ilevels5_8E.
-by rewrite !Array256.filliE //; smt(vec_bits).
+apply Array256.tP => t rgt; rewrite /merge Array256.initiE //= ilevels5_7E.
+by rewrite store_colE.
 qed.
 
 (* ==================================================================== *)
@@ -287,7 +292,7 @@ qed.
 (* ==================================================================== *)
 lemma polynomial__invert_ntt_montgomeryP (p_ : wpoly) :
   hoare[M.polynomial__invert_ntt_montgomery :
-    polynomial = p_ ==> res = iscale (invtree p_ 8)].
+    polynomial = p_ ==> res = ifinal (invtree p_ 7)].
 proof.
 proc.
 pose R := ilevels p_ 0 5.
@@ -311,23 +316,24 @@ seq 2 : (polynomial = R).
   - by move=> u rgu /= hu; rewrite /m /merge initiE //= ifF 1:/#.
 (* levels 5 to 7 and the scaling, column by column *)
 while (0 <= i <= 4 /\
-  polynomial = merge (fun t => t %/ 8 %% 4 < i) R (iscale (ilevels R 5 8))); last first.
+  polynomial = merge (fun t => t %/ 8 %% 4 < i) R (ifinal (ilevels R 5 7))); last first.
 - auto => />; split.
   - by apply Array256.tP => t rgt; rewrite /merge initiE //= /#.
   move=> i ? 2? @/merge; apply Array256.tP => t rgt.
-  by rewrite initiE //= ifT 1:/# /R invtree8E.
+  by rewrite initiE //= ifT 1:/# /R invtree7E.
 exlim polynomial, i => q i_.
 case@[ambient]: (0 <= i_ < 4) => rgi; last first.
 - by conseq (_ : false ==> _); [smt() | exfalso].
 wp; call (intt_layers_5_6_7P q i_ rgi); auto => /> 3?; split; 1: smt().
-pose m := merge (fun t => t %/ 8 %% 4 < i_) R (iscale (ilevels R 5 8)).
+pose m := merge (fun t => t %/ 8 %% 4 < i_) R (ifinal (ilevels R 5 7)).
 apply Array256.tP => t rgt; rewrite /merge !initiE //=.
 case: (t %/ 8 %% 4 = i_) => ht; last by rewrite /m /merge initiE //= /#.
-rewrite ifT 1:/#; apply (iscale_frame _ _ (fun t => t %/ 8 %% 4 = i_)) => //.
-apply (ilevels_frame _ _ 5 8) => //.
+have hcl : forall k, 5 <= k < 8 => closed k (fun t => t %/ 8 %% 4 = i_).
 - move=> k rgk; have : k = 5 \/ k = 6 \/ k = 7 by smt().
   by case=> [->|[->|->]]; rewrite /closed /=; split => u rgu hu _; smt().
-- by move=> u rgu /= hu; rewrite /m /merge initiE //= ifF 1:/#.
+rewrite ifT 1:/#; apply (ifinal_frame _ _ (fun t => t %/ 8 %% 4 = i_)) => //; 1: by apply hcl.
+apply (ilevels_frame _ _ 5 7) => //; 1: by move=> k rgk; apply hcl => /#.
+by move=> u rgu /= hu; rewrite /m /merge initiE //= ifF 1:/#.
 qed.
 
 end InttcorrectT.
