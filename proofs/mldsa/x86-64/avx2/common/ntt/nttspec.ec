@@ -339,31 +339,59 @@ move=> _.
 by apply hup.
 qed.
 
-(* the exact reading: the low-word multiplier t makes u*z - t*q        *)
-(* divisible by 2^32, and mmr is the exact quotient                     *)
+(* Montgomery reduction of a 64-bit value: mmr is its instance on a
+   product, mmr u w = mred (u \sx w). The dot product reduces a sum of
+   products with it. *)
+op mred (a : W64.t) : W32.t =
+  let t = W2u32.truncateu32 (a * W64.of_int 58728449) in
+  let t = t \sx W32.of_int 8380417 in
+  W2u32.truncateu32 ((a - t) `>>>` 32).
+
+lemma mmr_mred (u w : W32.t) : mmr u w = mred (u \sx w).
+proof. by []. qed.
+
+(* the exact reading of mred: with |a| <= 2^62, the low-word multiplier t
+   makes a - t*q divisible by 2^32, and mred a is the exact quotient *)
+lemma mred_exact (a : W64.t) : `|W64.to_sint a| <= 2^62 => exists t,
+  -2^31 <= t < 2^31 /\ 2^32 * sval (mred a) = W64.to_sint a - t * q.
+proof.
+(* on the words: the low word of a - t*q is zero, and a 64-bit word
+   with a zero low word is 2^32 times its high word *)
+have hlow : forall (x : W64.t), W2u32.truncateu32
+    (x - (W2u32.truncateu32 (x * W64.of_int 58728449) \sx W32.of_int 8380417)) = W32.zero.
++ by rewrite /(\sx); circuit.
+have hhigh : forall (d : W64.t), W2u32.truncateu32 d = W32.zero =>
+    d = W2u32.sigextu64 (W2u32.truncateu32 (d `>>` W8.of_int 32)) * W64.of_int 4294967296.
++ by circuit.
+move=> ha; pose tw := W2u32.truncateu32 (a * W64.of_int 58728449).
+exists (sval tw); split; 1: by have := W32.to_sint_cmp tw => /#.
+have hq : sval (W32.of_int 8380417) = q by rewrite W32.to_sintK_small.
+have htw := W32.to_sint_cmp tw.
+(* on the integers: no overflow *)
+have hT : W64.to_sint (tw \sx W32.of_int 8380417) = sval tw * q.
++ rewrite /(\sx) /sigextu64 W64.of_intM hq W64.to_sintK_small //.
+  by move: htw; rewrite /q /=; smt().
+have hD : W64.to_sint (a - (tw \sx W32.of_int 8380417)) = W64.to_sint a - sval tw * q.
++ by rewrite W64.to_sintB_small hT //; move: ha htw; rewrite /q /=; smt().
+have := hhigh _ (hlow a); rewrite W64.shr_shrw // -/tw => hE.
+have hm : mred a = W2u32.truncateu32 ((a - (tw \sx W32.of_int 8380417)) `>>>` 32).
++ by rewrite /mred.
+rewrite -hD hE -hm /sigextu64 W64.of_intM W64.to_sintK_small /=; 2: by ring.
+by have := W32.to_sint_cmp (mred a) => /#.
+qed.
+
+(* the exact reading of mmr, the instance of mred on a product *)
 lemma mmr_exact (u z : W32.t) : exists t,
   -2^31 <= t < 2^31 /\ 2^32 * sval (mmr u z) = sval u * sval z - t * q.
 proof.
-pose t := sval (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)).
-exists t; split.
-- by have := W32.to_sint_cmp (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449)) => /#.
-have hA : W64.to_uint (u \sx z) = (sval u * sval z) %% W64.modulus.
-- by rewrite /(\sx) W64.to_uintM /sigextu64 !W64.of_uintK modzMml modzMmr.
-have hu : W32.to_uint (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449))
-    = (sval u * sval z * 58728449) %% 2^32.
-- rewrite W2u32.to_uint_truncateu32 W64.to_uintM hA W64.of_uintK.
-  rewrite modzMml modzMmr (: W64.modulus = 2^64) 1:// (: W32.modulus = 2^32) 1://.
-  by rewrite modz_dvd_pow 1://.
-have hT : t %% 2^32 = (sval u * sval z * 58728449) %% 2^32.
-- rewrite /t W32.to_sintE /W32.smod /=.
-  by case (2147483648 <= W32.to_uint (W2u32.truncateu32 ((u \sx z) * W64.of_int 58728449))) => _;
-       rewrite hu; smt().
-have hdvd : 2^32 %| (sval u * sval z - t * q).
-- rewrite dvdzE -modzBm -(modzMml t q) hT (modzMml (sval u * sval z * 58728449) q) modzBm.
-  have -> : sval u * sval z - sval u * sval z * 58728449 * q
-          = (sval u * sval z) * (1 - 58728449 * q) by ring.
-  by rewrite -modzMmr (: (1 - 58728449 * q) %% W32.modulus = 0) 1:/q.
-by rewrite mmr_svalE -/t mulzC divzK.
+have hb : `|sval u * sval z| <= 2^62.
++ rewrite normrM (: 2^62 = 2^31 * 2^31) 1://.
+  have /= hu := W32.to_sint_cmp u; have /= hz := W32.to_sint_cmp z.
+  by rewrite (: 4611686018427387904 = 2147483648 * 2147483648) 1:// IntOrder.ler_pmul; smt().
+have hp : W64.to_sint (u \sx z) = sval u * sval z.
++ rewrite /(\sx) /sigextu64 W64.of_intM W64.to_sintK_small //.
+  by move: hb => /=; smt().
+by rewrite mmr_mred -hp; apply mred_exact; rewrite hp.
 qed.
 
 (* the product bound: wide operands are fine as long as their product  *)
@@ -374,6 +402,23 @@ proof.
 move=> hP; have [t [rgt E]] := mmr_exact u z.
 have -> : 2^32 * `|sval (mmr u z)| = `|sval u * sval z - t * q| by rewrite -E normrM.
 by move: hP rgt; rewrite /q /=; smt().
+qed.
+
+(* bound and congruence of mred, from its exact reading *)
+lemma mred_bnd (a : W64.t) (P : int) :
+  `|W64.to_sint a| <= P => P <= 2^62 =>
+  2^32 * `|sval (mred a)| <= P + 2^31 * q.
+proof.
+move=> hP hP62; have [t [rgt E]] := mred_exact a (IntOrder.ler_trans _ _ _ hP hP62).
+have -> : 2^32 * `|sval (mred a)| = `|W64.to_sint a - t * q| by rewrite -E normrM.
+by move: hP hP62 rgt; rewrite /q /=; smt().
+qed.
+
+lemma mred_mont (a : W64.t) : `|W64.to_sint a| <= 2^62 =>
+  (2^32 * sval (mred a)) %% q = W64.to_sint a %% q.
+proof.
+move=> ha; have [t [_ ->]] := mred_exact a ha.
+by rewrite -modzBm modzMl /= modz_mod.
 qed.
 
 (* 2^32 is invertible mod q (q odd): cancellation *)

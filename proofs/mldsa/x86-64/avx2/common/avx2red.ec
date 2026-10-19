@@ -113,6 +113,17 @@ proof. by cbv delta. qed.
 hint simplify VPADD_8u32E.
 
 (* -------------------------------------------------------------------- *)
+lemma VPADD_4u64E (u w : W256.t) :
+    VPADD_4u64 u w
+  = W4u64.pack4 [
+      (u \bits64 0) + (w \bits64 0); (u \bits64 1) + (w \bits64 1);
+      (u \bits64 2) + (w \bits64 2); (u \bits64 3) + (w \bits64 3)
+    ].
+proof. by cbv delta. qed.
+
+hint simplify VPADD_4u64E.
+
+(* -------------------------------------------------------------------- *)
 lemma VPSUB_4u64E (u w : W256.t) :
     VPSUB_4u64 u w
   = W4u64.pack4 [
