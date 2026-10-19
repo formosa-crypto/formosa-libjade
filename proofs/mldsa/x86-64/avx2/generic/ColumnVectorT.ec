@@ -499,12 +499,12 @@ qed.
 lemma column_vector____decompose_correct (_v : W32.t Array_kpolys.t) :
     hoare [ M.column_vector____decompose :
         vector = _v /\
-        wpolykvec_urng (kvec_unflatten256 _v) q
+        wpolykvec_srng (kvec_unflatten256 _v) (q-1) (q-1)
         ==>
         lifts_wpolykvec (kvec_unflatten256 res.`1) =
-          polykvec_LowBits (liftu_wpolykvec (kvec_unflatten256 _v)) /\
+          polykvec_LowBits (lifts_wpolykvec (kvec_unflatten256 _v)) /\
         liftu_wpolykvec (kvec_unflatten256 res.`2) =
-          polykvec_HighBits (liftu_wpolykvec (kvec_unflatten256 _v)) /\
+          polykvec_HighBits (lifts_wpolykvec (kvec_unflatten256 _v)) /\
         wpolykvec_srng (kvec_unflatten256 res.`1) gamma2 gamma2 /\
         wpolykvec_urng (kvec_unflatten256 res.`2) ((q - 1) %/ (2 * gamma2))
     ].
@@ -512,12 +512,12 @@ proof.
 have kvec_val := gt0_k.
 proc.
 while (0 <= i <= kvec /\ vector = _v /\
-       wpolykvec_urng (kvec_unflatten256 _v) q /\
+       wpolykvec_srng (kvec_unflatten256 _v) (q-1) (q-1) /\
        (forall k, 0 <= k < i =>
           lifts_wpoly (kvec_unflatten256 low).[k] =
-            poly_LowBits (liftu_wpoly (kvec_unflatten256 _v).[k]) /\
+            poly_LowBits (lifts_wpoly (kvec_unflatten256 _v).[k]) /\
           liftu_wpoly (kvec_unflatten256 high).[k] =
-            poly_HighBits (liftu_wpoly (kvec_unflatten256 _v).[k]) /\
+            poly_HighBits (lifts_wpoly (kvec_unflatten256 _v).[k]) /\
           wpoly_srng gamma2 gamma2 (kvec_unflatten256 low).[k] /\
           wpoly_urng ((q - 1) %/ (2 * gamma2)) (kvec_unflatten256 high).[k])
       ); last first.
@@ -526,11 +526,11 @@ while (0 <= i <= kvec /\ vector = _v /\
   move => i0 h0 l0 Hng Hi1 Hi2 Hdone; do split.
   + (* lifts_wpolykvec low = polykvec_LowBits *)
     rewrite /polykvec_LowBits; apply KArray.tP => k kb.
-    rewrite /lifts_wpolykvec /liftu_wpolykvec mapiE 1:/# /= mapiE 1:/# /= mapiE 1:/# /=.
+    rewrite /lifts_wpolykvec mapiE 1:/# /= mapiE 1:/# /= mapiE 1:/# /=.
     by have /= [-> _] := Hdone k _; smt(gt0_k).
   + (* liftu_wpolykvec high = polykvec_HighBits *)
     rewrite /polykvec_HighBits; apply KArray.tP => k kb.
-    rewrite /liftu_wpolykvec mapiE 1:/# /= mapiE 1:/# /= mapiE 1:/# /=.
+    rewrite /liftu_wpolykvec /lifts_wpolykvec mapiE 1:/# /= mapiE 1:/# /= mapiE 1:/# /=.
     by have /= [_ [-> _]] := Hdone k _; smt(gt0_k).
   + by rewrite /wpolykvec_srng allP => k kb;
        have /= [_ [_ [? _]]] := Hdone k _; smt(gt0_k).
@@ -542,10 +542,10 @@ wp; ecall (polynomial__decompose_correct
              (Array256.init (fun j => high.[i * 256 + j]))
              (Array256.init (fun j => vector.[i * 256 + j]))).
 auto => /> &hr Hi1 Hi2 Hurng Hdone Hguard; split.
-+ (* Pre: wpoly_urng q (slice of _v) *)
++ (* Pre: wpoly_srng (q-1) (q-1) (slice of _v) *)
   rewrite -kvec_slice_eq; 1,2: smt().
   have -> : i{hr} * n %/ n = i{hr} by smt().
-  by move: Hurng; rewrite /wpolykvec_urng KArray.allP => H; apply H; smt().
+  by move: Hurng; rewrite /wpolykvec_srng KArray.allP => H; apply H; smt().
 + (* Post: invariant at i+1 *)
   move => _ result H_low_eq H_low_rng H_high_eq H_high_rng; split; 1: smt().
   move => k ? Hk.
@@ -576,12 +576,12 @@ qed.
 lemma column_vector____decompose_ph (_v : W32.t Array_kpolys.t) :
     phoare [ M.column_vector____decompose :
         vector = _v /\
-        wpolykvec_urng (kvec_unflatten256 _v) q
+        wpolykvec_srng (kvec_unflatten256 _v) (q-1) (q-1)
         ==>
         lifts_wpolykvec (kvec_unflatten256 res.`1) =
-          polykvec_LowBits (liftu_wpolykvec (kvec_unflatten256 _v)) /\
+          polykvec_LowBits (lifts_wpolykvec (kvec_unflatten256 _v)) /\
         liftu_wpolykvec (kvec_unflatten256 res.`2) =
-          polykvec_HighBits (liftu_wpolykvec (kvec_unflatten256 _v)) /\
+          polykvec_HighBits (lifts_wpolykvec (kvec_unflatten256 _v)) /\
         wpolykvec_srng (kvec_unflatten256 res.`1) gamma2 gamma2 /\
         wpolykvec_urng (kvec_unflatten256 res.`2) ((q - 1) %/ (2 * gamma2))
     ] = 1%r

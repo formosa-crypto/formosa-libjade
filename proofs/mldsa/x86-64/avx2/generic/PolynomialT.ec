@@ -24,6 +24,24 @@ op abs32 (w : W32.t) : W32.t = if w \slt W32.zero then - w else w.
 op check_inf_norm_w (_a : W32.t Array256.t) (tw : W32.t) : bool =
   all (fun i => !(tw \slt abs32 _a.[i])) (iotared 0 256).
 
+(* The broadcast threshold: the low 32 bits of a 64-bit VMOV. *)
+lemma vmov_truncate (x : W64.t) : truncateu32 (zeroextu256 (VMOV_64 x)) = truncateu32 x.
+proof.
+rewrite /truncateu32 to_uint_zeroextu256 /VMOV_64.
+have -> : pack2 [x; W64.zero] = W2u64.zeroextu128 x.
++ apply W128.wordP => i hi; rewrite pack2wE //= /zeroextu128 W128.of_intwE hi /= W64.get_to_uint.
+  case: (i %/ 64 = 0) => hd /=.
+  + rewrite hd get_of_list // /= (_ : i %% 64 = i) 1:/# /int_bit.
+    rewrite (_ : 0 <= i < 64) 1:/# /= (pmod_small (to_uint x)); 2: done.
+    smt(W64.to_uint_cmp StdOrder.IntOrder.ler_weexpn2l pow2_64).
+  rewrite get_of_list 1:/# (_ : i %/ 64 = 1) 1:/# /= /int_bit.
+  have hx := W64.to_uint_cmp x.
+  have h64 : 2 ^ 64 <= 2 ^ i by apply StdOrder.IntOrder.ler_weexpn2l => /#.
+  rewrite (pmod_small (to_uint x)); 1: smt(pow2_64).
+  by rewrite divz_small; smt(pow2_64).
+by rewrite to_uint_zeroextu128.
+qed.
+
 lemma cin_circuit (_a : W32.t Array256.t) (tw : W32.t) :
   hoare [ M.polynomial____check_infinity_norm :
     polynomial = _a /\ truncateu32 (W64.of_int (threshold - 1)) = tw
@@ -31,19 +49,7 @@ lemma cin_circuit (_a : W32.t Array256.t) (tw : W32.t) :
 proof.
 proc => /=.
 seq 3 : (polynomial = _a /\ threshold_vector = VPBROADCAST_8u32 tw).
-+ auto => /> &hr; move: (W64.of_int (threshold{hr} - 1)) => x.
-  congr; rewrite /truncateu32 to_uint_zeroextu256 /VMOV_64.
-  have -> : pack2 [x; W64.zero] = W2u64.zeroextu128 x.
-  + apply W128.wordP => i hi; rewrite pack2wE //= /zeroextu128 W128.of_intwE hi /= W64.get_to_uint.
-    case: (i %/ 64 = 0) => hd /=.
-    + rewrite hd get_of_list // /= (_ : i %% 64 = i) 1:/# /int_bit.
-      rewrite (_ : 0 <= i < 64) 1:/# /= (pmod_small (to_uint x)); 2: done.
-      smt(W64.to_uint_cmp StdOrder.IntOrder.ler_weexpn2l pow2_64).
-    rewrite get_of_list 1:/# (_ : i %/ 64 = 1) 1:/# /= /int_bit.
-    have hx := W64.to_uint_cmp x; have h64 : 2 ^ 64 <= 2 ^ i by apply StdOrder.IntOrder.ler_weexpn2l => /#.
-    rewrite (pmod_small (to_uint x)); 1: smt(pow2_64).
-    by rewrite divz_small; smt(pow2_64).
-  by rewrite to_uint_zeroextu128.
++ by auto => /> &hr; rewrite vmov_truncate.
 proc change ^while.1 : { coefficients <- if (0 <= offset*8 <= 32*256-256)
                                          then BSWAS_256u32_256.sliceget polynomial (offset*8)
                                          else get256_direct (WArray1024.init32 (fun i => polynomial.[i])) offset; }.
@@ -80,6 +86,43 @@ have h0 : W32.to_sint W32.zero = 0 by rewrite W32.to_sintE /smod.
 smt().
 qed.
 
+(* The threshold the tests broadcast, t - 1, as a 32-bit word. *)
+lemma threshold_truncate (t : int) :
+  1 <= t < 2147483648 => truncateu32 (W64.of_int (t - 1)) = W32.of_int (t - 1).
+proof.
+by move=> ht; rewrite /truncateu32 W64.of_uintK (pmod_small (t - 1)) //; smt(pow2_64).
+qed.
+
+(* The circuit-level test is the infinity-norm predicate on centred inputs. *)
+lemma check_inf_normE (_a : W32.t Array256.t) (t : int) :
+  1 <= t < 2147483648 => wpoly_srng 6283009 6283008 _a =>
+  check_inf_norm_w _a (W32.of_int (t - 1)) = wpoly_infnorm_lt t _a.
+proof.
+move=> [ht1 ht2] hrng.
+rewrite /check_inf_norm_w /wpoly_infnorm_lt /wpoly_srng iotaredE eq_iff; split.
++ move=> h; rewrite Array256.allP => i hi.
+  move: hrng h; rewrite /wpoly_srng Array256.allP List.allP => /(_ i hi) hr /(_ i _).
+  + by rewrite mem_iota /#.
+  by move: hr => /= hr; rewrite abs32_bnd /#.
+move=> h; rewrite List.allP => i /mem_iota hi /=.
+move: hrng h; rewrite /wpoly_srng !Array256.allP => hr1 hr2.
+have /= h1 := hr1 i _; 1: smt().
+have /= h2 := hr2 i _; 1: smt().
+by rewrite abs32_bnd /#.
+qed.
+
+(* The test result as returned: zero when the norm is below t, one otherwise. *)
+lemma check_inf_norm_res (_a : W32.t Array256.t) (t : int) :
+  1 <= t < 2147483648 => wpoly_srng 6283009 6283008 _a =>
+  (wpoly_infnorm_lt t _a =>
+     zeroextu64 (SETcc (! check_inf_norm_w _a (W32.of_int (t - 1)))) = W64.zero) /\
+  (!wpoly_infnorm_lt t _a =>
+     zeroextu64 (SETcc (! check_inf_norm_w _a (W32.of_int (t - 1)))) = W64.one).
+proof.
+move=> ht hrng; rewrite check_inf_normE //.
+by case: (wpoly_infnorm_lt t _a) => h /=; rewrite /SETcc /= /zeroextu64.
+qed.
+
 lemma polynomial____check_infinity_norm_correct (_a : W32.t Array256.t) (_threshold : int) :
    hoare [ M.polynomial____check_infinity_norm :
        1 <= _threshold < 2147483648 /\
@@ -91,21 +134,9 @@ lemma polynomial____check_infinity_norm_correct (_a : W32.t Array256.t) (_thresh
    ].
 proof.
 conseq (cin_circuit _a (W32.of_int (_threshold - 1))).
-+ move=> &hr [#] ht1 ht2 -> -> _ /=.
-  by rewrite /truncateu32 W64.of_uintK (pmod_small (_threshold - 1)) //; smt(pow2_64).
++ by move=> &hr [#] ht1 ht2 -> -> _ /=; rewrite threshold_truncate.
 move=> &hr [#] ht1 ht2 _ _ hrng r ->.
-have -> : check_inf_norm_w _a (W32.of_int (_threshold - 1)) = wpoly_infnorm_lt _threshold _a.
-+ rewrite /check_inf_norm_w /wpoly_infnorm_lt /wpoly_srng iotaredE eq_iff; split.
-  + move=> h; rewrite Array256.allP => i hi.
-    move: hrng h; rewrite /wpoly_srng Array256.allP List.allP => /(_ i hi) hr /(_ i _).
-    + by rewrite mem_iota /#.
-    by move: hr => /= hr; rewrite abs32_bnd /#.
-  move=> h; rewrite List.allP => i /mem_iota hi /=.
-  move: hrng h; rewrite /wpoly_srng !Array256.allP => hr1 hr2.
-  have /= h1 := hr1 i _; 1: smt().
-  have /= h2 := hr2 i _; 1: smt().
-  by rewrite abs32_bnd /#.
-by case: (wpoly_infnorm_lt _threshold _a) => h /=; rewrite /SETcc /= /zeroextu64.
+by apply (check_inf_norm_res _a _threshold).
 qed.
 
 lemma polynomial____check_infinity_norm_ll : islossless M.polynomial____check_infinity_norm.

@@ -3,12 +3,13 @@ from Jasmin require import JModel_x86.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 require import XArray256 Array256 WArray1024.
 require import CircuitBindings Bindings MldsaConstants.
-require BaseT.
+require BaseT CommonReduceT.
 
 abstract theory RoundingT.
 
 clone import BaseT.BaseT as B.
 import S R MLDSAParams.
+clone import CommonReduceT.CommonReduceT as CR with theory B <- B.
 
 import Round ZModQ Zq Array5.
 
@@ -17,12 +18,13 @@ import Round ZModQ Zq Array5.
 (* polynomial__decompose                                                *)
 (* Decomposes each coefficient into (LowBits, HighBits) per FIPS 204. *)
 (* Uses gamma2 = (q-1)/32 for ML-DSA-65.                              *)
-(* Input: polynomial in [0, q-1] (after conditionally_add_modulus).    *)
+(* Input: polynomial in [-(q-1), q-1]; the pass first brings each      *)
+(*        coefficient to [0, q-1] (caddq_w).                           *)
 (* Output: lows in [-gamma2, gamma2] (see lb32_rng),                     *)
 (*         highs in [0, (q-1)/(2*gamma2)]                             *)
 (* Spec connection (via Decompose from GFq.ec):                        *)
-(*   lows.[i]  = LowBits((liftu_wpoly _a).[i])                       *)
-(*   highs.[i] = HighBits((liftu_wpoly _a).[i])                      *)
+(*   lows.[i]  = LowBits((lifts_wpoly _a).[i])                       *)
+(*   highs.[i] = HighBits((lifts_wpoly _a).[i])                      *)
 (* ================================================================== *)
 
 lemma polynomial__decompose_gamma2_32_ll : islossless M.polynomial__decompose_gamma2_32.
@@ -103,13 +105,31 @@ proof.
 rewrite /wpoly_urng allP /= => H Hi; by apply (H i _); smt().
 qed.
 
-lemma urng_to_lanes (a : W32.t Array256.t) :
-    wpoly_urng q a =>
-    List.all (fun i => a.[i] \ult W32.of_int 8380417) (iotared 0 256).
+lemma srng_at (a : W32.t Array256.t) (i : int) :
+    wpoly_srng (q-1) (q-1) a => 0 <= i < 256 =>
+    0 <= W32.to_uint (caddq_w a.[i]) < q /\
+    incoeff (W32.to_uint (caddq_w a.[i])) = (lifts_wpoly a).[i].
+proof.
+rewrite /wpoly_srng allP /= => H Hi.
+by rewrite /lifts_wpoly mapiE //= caddq_w_val; apply (H i _); smt().
+qed.
+
+lemma srng_to_lanes (a : W32.t Array256.t) :
+    wpoly_srng (q-1) (q-1) a =>
+    List.all (fun i => caddq_w a.[i] \ult W32.of_int 8380417) (iotared 0 256).
 proof.
 move => Hrng; rewrite iotaredE allP => x; rewrite mem_iota /= => Hx.
-have Hb := urng_at a x Hrng _; first smt().
+have [Hb _] := srng_at a x Hrng _; first smt().
 by rewrite W32.ultE /q W32.of_uintK /=; smt().
+qed.
+
+(* The input range of use_hints, [0, q-1], is within that of decompose. *)
+lemma urng_srng (a : W32.t Array256.t) :
+    wpoly_urng q a => wpoly_srng (q-1) (q-1) a /\ lifts_wpoly a = liftu_wpoly a.
+proof.
+move=> Hu; split; last exact wpoly_urng_lifts_eq_liftu.
+move: Hu; rewrite /wpoly_urng /wpoly_srng !allP => H i Hi /=.
+have /= Hi' := H i Hi; rewrite W32.to_sintE /smod; smt().
 qed.
 
 (* The lane functions as integer operations. *)
@@ -184,15 +204,15 @@ lemma polynomial__decompose_gamma2_32_correct
     gamma2 = 261888 =>
     hoare [ M.polynomial__decompose_gamma2_32 :
         lows = _low /\ highs = _high /\ polynomial = _a /\
-        wpoly_urng q _a  (* input in [0, q-1] *)
+        wpoly_srng (q-1) (q-1) _a
         ==>
         (* LowBits: signed, [-gamma2, gamma2] *)
         (forall i, 0 <= i < 256 =>
-            W32.to_sint res.`1.[i] = LowBits ((liftu_wpoly _a).[i])) /\
+            W32.to_sint res.`1.[i] = LowBits ((lifts_wpoly _a).[i])) /\
         wpoly_srng gamma2 gamma2 res.`1 /\
         (* HighBits: unsigned, [0, (q-1)/(2*gamma2)] *)
         (forall i, 0 <= i < 256 =>
-            W32.to_uint res.`2.[i] = HighBits ((liftu_wpoly _a).[i])) /\
+            W32.to_uint res.`2.[i] = HighBits ((lifts_wpoly _a).[i])) /\
         wpoly_urng ((q - 1) %/ (2 * gamma2)) res.`2
     ].
 proof.
@@ -204,13 +224,13 @@ proc change ^while.1 : {
                   else get256_direct (init32 (fun i => polynomial.[i])) offset; }.
 + auto => /> &2; case (0 <= offset{2} * 8 <= 7936); last by auto.
   by move => *; rewrite -BSWAS_256u32_256_slicegetE 1:/#.
-proc change ^while.12 : {
+proc change ^while.15 : {
   lows <- if (0 <= offset*8 <= 32*256-256)
           then BSWAS_256u32_256.sliceset lows (offset*8) lower
           else Array256.init (get32 (set256_direct (init32 (fun i => lows.[i])) offset lower)); }.
 + auto => /> &2; case (0 <= offset{2} * 8 <= 7936); last by auto.
   by move => *; rewrite BSWAS_256u32_256_slicesetE 1:/#.
-proc change ^while.13 : {
+proc change ^while.16 : {
   highs <- if (0 <= offset*8 <= 32*256-256)
            then BSWAS_256u32_256.sliceset highs (offset*8) upper
            else Array256.init (get32 (set256_direct (init32 (fun i => highs.[i])) offset upper)); }.
@@ -221,32 +241,32 @@ unroll for ^while.
 wp -1.
 (* Refine to the two lane maps; the four spec conjuncts follow from them. *)
 conseq (: polynomial = _a /\
-          List.all (fun i => _a.[i] \ult W32.of_int 8380417) (iotared 0 256) ==>
-          lows  = BSWA_256u32.init (fun (i:int) => lo_lane32 _a.[i]) /\
-          highs = BSWA_256u32.init (fun (i:int) => hi_lane32 _a.[i])).
-+ by move => &hr [# _ _ -> Hrng]; split; [ done | exact urng_to_lanes ].
+          List.all (fun i => caddq_w _a.[i] \ult W32.of_int 8380417) (iotared 0 256) ==>
+          lows  = BSWA_256u32.init (fun (i:int) => lo_lane32 (caddq_w _a.[i])) /\
+          highs = BSWA_256u32.init (fun (i:int) => hi_lane32 (caddq_w _a.[i]))).
++ by move => &hr [# _ _ -> Hrng]; split; [ done | apply (srng_to_lanes _a Hrng) ].
 + move => &hr [# _ _ _ Hrng] lows0 highs0 [# -> ->].
   split; [| split; [| split ] ].
   (* lows value *)
   + move => i Hi; rewrite /BSWA_256u32.init initiE 1:/# /=.
-    have Hai : 0 <= W32.to_uint _a.[i] < q by exact (urng_at _a i).
-    by rewrite (lo_lane32_val _ Hg Hai) /liftu_wpoly mapiE 1:/#.
+    have [Hai <-] := srng_at _a i Hrng Hi.
+    by rewrite (lo_lane32_val _ Hg Hai).
   (* lows range *)
   + rewrite /wpoly_srng allP => x; rewrite /BSWA_256u32.init /= => Hx.
     rewrite initiE 1:/# /=.
-    have Hai : 0 <= W32.to_uint _a.[x] < q by exact (urng_at _a x).
+    have [Hai _] := srng_at _a x Hrng Hx.
     by rewrite (lo_lane32_val _ Hg Hai); exact (lb32_rng _ Hg Hai).
   (* highs value *)
   + move => i Hi; rewrite /BSWA_256u32.init initiE 1:/# /=.
-    have Hai : 0 <= W32.to_uint _a.[i] < q by exact (urng_at _a i).
-    by rewrite (hi_lane32_val _ Hai) /liftu_wpoly mapiE 1:/# /= hb32_spec.
+    have [Hai <-] := srng_at _a i Hrng Hi.
+    by rewrite (hi_lane32_val _ Hai) /= hb32_spec.
   (* highs range *)
   rewrite Hg /= /wpoly_urng allP => i Hi.
   by rewrite /BSWA_256u32.init initiE 1:/# /=; smt(hi_lane32_rng).
 (* One circuit per array: a two-array post defeats lane collapsing. *)
 hoare split.
-+ by rewrite /hi_lane32 /=; circuit.
-by rewrite /lo_lane32 /hi_lane32 /=; circuit.
++ by rewrite /hi_lane32 /caddq_w /=; circuit.
+by rewrite /lo_lane32 /hi_lane32 /caddq_w /=; circuit.
 qed.
 
 (* ------------------------------------------------------------------ *)
@@ -416,6 +436,9 @@ module D88 = {
     while (offset < 1024) {
       coefficients <- get256_direct
                         (init32 (fun i => polynomial.[i])) offset;
+      mask <- VPCMPGT_8u32 zeros coefficients;
+      mask <- VPAND_256 mask modulus;
+      coefficients <- VPADD_8u32 coefficients mask;
       upper <- VPADD_8u32 coefficients offs;
       upper <- VPSRL_8u32 upper (W128.of_int 7);
       upper <- VPMULHU_16u16 upper v;
@@ -482,10 +505,10 @@ qed.
 lemma D88_decompose_lanes (_a : W32.t Array256.t) :
     hoare [ D88.decompose :
         polynomial = _a /\
-        List.all (fun i => _a.[i] \ult W32.of_int 8380417) (iotared 0 256)
+        List.all (fun i => caddq_w _a.[i] \ult W32.of_int 8380417) (iotared 0 256)
         ==>
-        res.`1 = BSWA_256u32.init (fun (i:int) => lo_lane88 _a.[i]) /\
-        res.`2 = BSWA_256u32.init (fun (i:int) => hi_lane88 _a.[i]) ].
+        res.`1 = BSWA_256u32.init (fun (i:int) => lo_lane88 (caddq_w _a.[i])) /\
+        res.`2 = BSWA_256u32.init (fun (i:int) => hi_lane88 (caddq_w _a.[i])) ].
 proof.
 proc => /=.
 proc change ^while.1 : {
@@ -494,13 +517,13 @@ proc change ^while.1 : {
                   else get256_direct (init32 (fun i => polynomial.[i])) offset; }.
 + auto => /> &2; case (0 <= offset{2} * 8 <= 7936); last by auto.
   by move => *; rewrite -BSWAS_256u32_256_slicegetE 1:/#.
-proc change ^while.14 : {
+proc change ^while.17 : {
   lows <- if (0 <= offset*8 <= 32*256-256)
           then BSWAS_256u32_256.sliceset lows (offset*8) lower
           else Array256.init (get32 (set256_direct (init32 (fun i => lows.[i])) offset lower)); }.
 + auto => /> &2; case (0 <= offset{2} * 8 <= 7936); last by auto.
   by move => *; rewrite BSWAS_256u32_256_slicesetE 1:/#.
-proc change ^while.15 : {
+proc change ^while.18 : {
   highs <- if (0 <= offset*8 <= 32*256-256)
            then BSWAS_256u32_256.sliceset highs (offset*8) upper
            else Array256.init (get32 (set256_direct (init32 (fun i => highs.[i])) offset upper)); }.
@@ -510,44 +533,45 @@ unroll for ^while.
 wp -1.
 (* One circuit per array: a two-array post defeats lane collapsing. *)
 hoare split.
-+ by rewrite /hi_lane88 /=; circuit.
-by rewrite /lo_lane88 /hi_lane88 /=; circuit.
++ by rewrite /hi_lane88 /caddq_w /=; circuit.
+by rewrite /lo_lane88 /hi_lane88 /caddq_w /=; circuit.
 qed.
 
 lemma D88_decompose_correct (_a : W32.t Array256.t) :
     gamma2 = 95232 =>
     hoare [ D88.decompose :
-        polynomial = _a /\ wpoly_urng q _a
+        polynomial = _a /\ wpoly_srng (q-1) (q-1) _a
         ==>
         (forall i, 0 <= i < 256 =>
-            W32.to_sint res.`1.[i] = LowBits ((liftu_wpoly _a).[i])) /\
+            W32.to_sint res.`1.[i] = LowBits ((lifts_wpoly _a).[i])) /\
         wpoly_srng gamma2 gamma2 res.`1 /\
         (forall i, 0 <= i < 256 =>
-            W32.to_uint res.`2.[i] = HighBits ((liftu_wpoly _a).[i])) /\
+            W32.to_uint res.`2.[i] = HighBits ((lifts_wpoly _a).[i])) /\
         wpoly_urng ((q - 1) %/ (2 * gamma2)) res.`2
     ].
 proof.
 move=> Hg; conseq (D88_decompose_lanes _a).
-+ by move=> &hr [-> Hrng]; split; [done | exact urng_to_lanes].
++ by move=> &hr [-> Hrng]; split; [done | apply (srng_to_lanes _a Hrng)].
 move=> &hr [_ Hrng] [lows0 highs0] /= [-> ->].
 split; [| split; [| split ] ].
 (* lows value *)
 + move=> i Hi; rewrite /BSWA_256u32.init initiE 1:/# /=.
-  have Hai : 0 <= W32.to_uint _a.[i] < q by exact (urng_at _a i).
-  by rewrite (lo_lane88_val _ Hg Hai) /liftu_wpoly mapiE 1:/#.
+  have [Hai <-] := srng_at _a i Hrng Hi.
+  by rewrite (lo_lane88_val _ Hg Hai).
 (* lows range *)
 + rewrite /wpoly_srng allP => x; rewrite /BSWA_256u32.init /= => Hx.
   rewrite initiE 1:/# /=.
-  have Hai : 0 <= W32.to_uint _a.[x] < q by exact (urng_at _a x).
-  by rewrite (lo_lane88_val _ Hg Hai); have := Decompose_cases (incoeff (to_uint _a.[x])).
+  have [Hai _] := srng_at _a x Hrng Hx.
+  rewrite (lo_lane88_val _ Hg Hai).
+  by have := Decompose_cases (incoeff (to_uint (caddq_w _a.[x]))).
 (* highs value *)
 + move=> i Hi; rewrite /BSWA_256u32.init initiE 1:/# /=.
-  have Hai : 0 <= W32.to_uint _a.[i] < q by exact (urng_at _a i).
-  by rewrite (hi_lane88_val _ Hai) /liftu_wpoly mapiE 1:/# /= -hb88_spec.
+  have [Hai <-] := srng_at _a i Hrng Hi.
+  by rewrite (hi_lane88_val _ Hai) /= -hb88_spec.
 (* highs range *)
 rewrite Hg /wpoly_urng allP => i Hi /=.
 rewrite /BSWA_256u32.init initiE 1:/# /=.
-have Hai : 0 <= W32.to_uint _a.[i] < q by exact (urng_at _a i).
+have [Hai _] := srng_at _a i Hrng Hi.
 by rewrite (hi_lane88_val _ Hai) /= hb88_round //; smt().
 qed.
 
@@ -556,13 +580,13 @@ lemma polynomial__decompose_gamma2_88_correct
     gamma2 = 95232 =>
     hoare [ M.polynomial__decompose_gamma2_88 :
         lows = _low /\ highs = _high /\ polynomial = _a /\
-        wpoly_urng q _a
+        wpoly_srng (q-1) (q-1) _a
         ==>
         (forall i, 0 <= i < 256 =>
-            W32.to_sint res.`1.[i] = LowBits ((liftu_wpoly _a).[i])) /\
+            W32.to_sint res.`1.[i] = LowBits ((lifts_wpoly _a).[i])) /\
         wpoly_srng gamma2 gamma2 res.`1 /\
         (forall i, 0 <= i < 256 =>
-            W32.to_uint res.`2.[i] = HighBits ((liftu_wpoly _a).[i])) /\
+            W32.to_uint res.`2.[i] = HighBits ((lifts_wpoly _a).[i])) /\
         wpoly_urng ((q - 1) %/ (2 * gamma2)) res.`2
     ].
 proof.
@@ -585,15 +609,15 @@ lemma polynomial__decompose_correct
       (_low : W32.t Array256.t) (_high : W32.t Array256.t) (_a : W32.t Array256.t) :
     hoare [ M.polynomial__decompose :
         lows = _low /\ highs = _high /\ polynomial = _a /\
-        wpoly_urng q _a  (* input in [0, q-1] *)
+        wpoly_srng (q-1) (q-1) _a
         ==>
         (* LowBits: signed, [-gamma2, gamma2] *)
         (forall i, 0 <= i < 256 =>
-            W32.to_sint res.`1.[i] = LowBits ((liftu_wpoly _a).[i])) /\
+            W32.to_sint res.`1.[i] = LowBits ((lifts_wpoly _a).[i])) /\
         wpoly_srng gamma2 gamma2 res.`1 /\
         (* HighBits: unsigned, [0, (q-1)/(2*gamma2)] *)
         (forall i, 0 <= i < 256 =>
-            W32.to_uint res.`2.[i] = HighBits ((liftu_wpoly _a).[i])) /\
+            W32.to_uint res.`2.[i] = HighBits ((lifts_wpoly _a).[i])) /\
         wpoly_urng ((q - 1) %/ (2 * gamma2)) res.`2
     ].
 proof.
@@ -608,13 +632,13 @@ lemma polynomial__decompose_ph
       (_low : W32.t Array256.t) (_high : W32.t Array256.t) (_a : W32.t Array256.t) :
     phoare [ M.polynomial__decompose :
         lows = _low /\ highs = _high /\ polynomial = _a /\
-        wpoly_urng q _a
+        wpoly_srng (q-1) (q-1) _a
         ==>
         (forall i, 0 <= i < 256 =>
-            W32.to_sint res.`1.[i] = LowBits ((liftu_wpoly _a).[i])) /\
+            W32.to_sint res.`1.[i] = LowBits ((lifts_wpoly _a).[i])) /\
         wpoly_srng gamma2 gamma2 res.`1 /\
         (forall i, 0 <= i < 256 =>
-            W32.to_uint res.`2.[i] = HighBits ((liftu_wpoly _a).[i])) /\
+            W32.to_uint res.`2.[i] = HighBits ((lifts_wpoly _a).[i])) /\
         wpoly_urng ((q - 1) %/ (2 * gamma2)) res.`2
     ] = 1%r
   by conseq polynomial__decompose_ll (polynomial__decompose_correct _low _high _a).
@@ -796,7 +820,12 @@ seq 5 : (commitment = _commitment /\ hint_polynomial = _hints /\
             to_uint highs.[i] = HighBits ((liftu_wpoly _commitment).[i])) /\
          wpoly_urng 16 highs).
 + call (polynomial__decompose_gamma2_32_correct witness witness _commitment Hg).
-  by auto => />; rewrite Hg.
+  auto => /> Hc _; have [Hs Hl] := urng_srng _ Hc.
+  split; 1: exact Hs.
+  move=> _ r Hlo _ Hhi Hhr; rewrite -Hl; do split.
+  + by move=> i h0 h1; apply Hlo.
+  + by move=> i h0 h1; apply Hhi.
+  by move: Hhr; rewrite Hg.
 unroll for ^while; wp -1.
 conseq (: hint_polynomial = _hints /\ zeros = W256.zero /\
           mask = polynomial__CONSTANTS_TABLE_gamma2_32.[0] /\
@@ -959,7 +988,12 @@ seq 5 : (commitment = _commitment /\ hint_polynomial = _hints /\
             to_uint highs.[i] = HighBits ((liftu_wpoly _commitment).[i])) /\
          wpoly_urng 44 highs).
 + call (polynomial__decompose_gamma2_88_correct witness witness _commitment Hg).
-  by auto => />; rewrite Hg.
+  auto => /> Hc _; have [Hs Hl] := urng_srng _ Hc.
+  split; 1: exact Hs.
+  move=> _ r Hlo _ Hhi Hhr; rewrite -Hl; do split.
+  + by move=> i h0 h1; apply Hlo.
+  + by move=> i h0 h1; apply Hhi.
+  by move: Hhr; rewrite Hg.
 unroll for ^while; wp -1.
 conseq (: hint_polynomial = _hints /\ zeros = W256.zero /\
           max = polynomial__CONSTANTS_TABLE_gamma2_88.[4] /\

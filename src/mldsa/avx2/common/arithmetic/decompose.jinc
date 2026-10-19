@@ -26,12 +26,13 @@ namespace polynomial {
         reg u256 offs shift mask;
         reg u256 coefficients comparisons;
 
-        reg u256 lower, upper;
+        reg u256 lower, upper, zeros;
 
         reg ui64 offset;
 
         modulus = MODULUS_VECTOR;
         modulus_halved = #VPSRL_8u32(modulus, 1);
+        zeros = #set0_256();
 
         mask = CONSTANTS_TABLE_gamma2_32[0]; // 15
         v = CONSTANTS_TABLE_gamma2_32[1]; // 1025
@@ -42,6 +43,11 @@ namespace polynomial {
         offset = 0;
         while (offset < BYTES_PER_UNCOMPRESSED_POLYNOMIAL) {
             coefficients = polynomial.[:u256 offset];
+
+            // Bring the coefficients, representatives in (-q, q), to [0, q).
+            comparisons = #VPCMPGT_8u32(zeros, coefficients);
+            comparisons = #VPAND_256(comparisons, modulus);
+            coefficients = #VPADD_8u32(coefficients, comparisons);
 
             // Compute the upper bits fist
 
@@ -151,6 +157,11 @@ namespace polynomial {
         while (offset < BYTES_PER_UNCOMPRESSED_POLYNOMIAL) {
             coefficients = polynomial.[:u256 offset];
 
+            // Bring the coefficients, representatives in (-q, q), to [0, q).
+            mask = #VPCMPGT_8u32(zeros, coefficients);
+            mask = #VPAND_256(mask, modulus);
+            coefficients = #VPADD_8u32(coefficients, mask);
+
             // Compute the upper bits fist
 
             // Compute ceil((r + 127) >> 7);
@@ -232,6 +243,9 @@ namespace polynomial {
 
     // Decompose and UseHint, for gamma2 = (q - 1) / 32 (ML-DSA-65, ML-DSA-87)
     // or gamma2 = (q - 1) / 88 (ML-DSA-44)
+
+    // Decompose a polynomial whose coefficients are representatives in
+    // (-q, q): the pass first adds the modulus to the negative ones.
     inline
     fn decompose(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] lows,

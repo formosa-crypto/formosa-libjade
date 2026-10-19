@@ -634,7 +634,7 @@ while (
    + by move => _ _ _ result_R _ Hdom; smt().
 
  sp 3 0.
- seq 0 8 : (#pre /\
+ seq 0 7 : (#pre /\
      lifts_wpolykvec (kvec_unflatten256 w0{2}) = w0{1} /\
      lifts_wpolykvec (kvec_unflatten256 w1{2}) = w1{1} /\
      wpolykvec_srng (kvec_unflatten256 w0{2}) gamma2 gamma2 /\
@@ -657,7 +657,6 @@ while (
      move => Hguard_neg [# Hj_lo Hj_hi Hj_mod Hcopied].
      apply Array_lpolys.tP => k Hk; apply Hcopied; smt().
    wp; ecall{2} (column_vector____decompose_ph w{2}).
-   wp; ecall{2} (column_vector____conditionally_add_modulus_ph w{2}).
    wp; ecall{2} (column_vector__invert_ntt_montgomery_ph w{2}).
    wp; ecall{2} (column_vector__reduce32_ph w{2}).
    wp; ecall{2} (row_vector____multiply_with_matrix_A_ph matrix_A{2} mask_as_ntt{2}).
@@ -675,22 +674,20 @@ while (
    move => _ result2 Hinvntt_eq Hinvntt_srng.
    split;
      first by apply (wpolykvec_srng_widen _ invntt_obound invntt_obound (q-1) (q-1)); smt().
-   move => _ result3 Hcond_eq Hcond_urng.
-   move => result4 Hw0_eq Hw1_eq Hw0_srng Hw1_urng.
+   move => _ result4 Hw0_eq Hw1_eq Hw0_srng Hw1_urng.
    (* After `auto => |> &1 &2 *`, _A{1} and y{1} have been substituted out;
       goal uses (liftu_wpolymat (mat_unflatten256 matrix_A{2})) and
       (lifts_wpolylvec (lvec_unflatten256 mask{2})) directly. Chain via the
       ecall post equalities, no need for intermediate HA_lift / Hmask_lift. *)
-   have Hreachable : lifts_wpolykvec (kvec_unflatten256 result3) =
+   have Hreachable : lifts_wpolykvec (kvec_unflatten256 result2) =
                      invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2}))
                                          (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2})))).
-   + by rewrite Hcond_eq Hinvntt_eq (liftm_wpolykvec_lifts _ _ Hred_eq) Hmul_eq Hntt_eq.
-   have Heq_liftu_lifts := wpolykvec_urng_lifts_eq_liftu _ Hcond_urng.
+   + by rewrite Hinvntt_eq (liftm_wpolykvec_lifts _ _ Hred_eq) Hmul_eq Hntt_eq.
    have Hw1_lifts : lifts_wpolykvec (kvec_unflatten256 result4.`2) =
                     liftu_wpolykvec (kvec_unflatten256 result4.`2).
    + apply wpolykvec_urng_lifts_eq_liftu;
      apply (wpolykvec_urng_widen _ ((q-1) %/ (2*gamma2)) q); smt(gamma2_cases).
-   rewrite Hw0_eq Hw1_lifts Hw1_eq -Heq_liftu_lifts Hreachable; done.
+   by rewrite Hw0_eq Hw1_lifts Hw1_eq Hreachable.
 
  seq 3 3 : (#pre /\
      ct{1} = BytesCT.init (fun i => commitment_hash{2}.[i]) /\

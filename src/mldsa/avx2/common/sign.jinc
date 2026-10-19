@@ -62,17 +62,20 @@ inline fn __compute_signer_response_element(
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] verifier_challenge,
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] mask_element,
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] signer_response_element
-) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
+) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL], reg u64
 {
     stack u32[COEFFICIENTS_IN_POLYNOMIAL] cs1;
+    reg u64 infinity_norm_check_result;
 
     cs1 = polynomial::pointwise_montgomery_multiply_and_reduce(cs1, s1_element, verifier_challenge);
     cs1 = polynomial::invert_ntt_montgomery(cs1);
 
-    signer_response_element = polynomial::add(signer_response_element, cs1, mask_element);
-    signer_response_element = polynomial::reduce32(signer_response_element);
+    // z = reduce32(mask + c*s1) and its norm test, in one pass
+    signer_response_element, infinity_norm_check_result =
+        polynomial::__add_reduce32_check_infinity_norm(
+            signer_response_element, cs1, mask_element, (GAMMA1 - BETA));
 
-    return signer_response_element;
+    return signer_response_element, infinity_norm_check_result;
 }
 
 // Compute z = mask + c*s1 for each column element, check infinity norm.
@@ -95,17 +98,12 @@ inline fn __compute_z_and_check_norm(
             base = COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL;
         }
     } (base < COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL) {
-        signer_response[base : COEFFICIENTS_IN_POLYNOMIAL] =
+        signer_response[base : COEFFICIENTS_IN_POLYNOMIAL], infinity_norm_check_result =
             __compute_signer_response_element(
                 s1[base : COEFFICIENTS_IN_POLYNOMIAL],
                 verifier_challenge,
                 mask[base : COEFFICIENTS_IN_POLYNOMIAL],
                 signer_response[base : COEFFICIENTS_IN_POLYNOMIAL]
-            );
-        infinity_norm_check_result =
-            polynomial::__check_infinity_norm(
-                signer_response[base : COEFFICIENTS_IN_POLYNOMIAL],
-                (GAMMA1 - BETA)
             );
         base = base + COEFFICIENTS_IN_POLYNOMIAL;
     }
@@ -138,17 +136,12 @@ inline fn __apply_cs2_and_check_norm(
                     s2[base : COEFFICIENTS_IN_POLYNOMIAL],
                     verifier_challenge);
         cs2 = polynomial::invert_ntt_montgomery(cs2);
-        w0_minus_cs2[base : COEFFICIENTS_IN_POLYNOMIAL] =
-            polynomial::subtract(
+        // w0 - c*s2 = reduce32(w0 - cs2) and its norm test, in one pass
+        w0_minus_cs2[base : COEFFICIENTS_IN_POLYNOMIAL], infinity_norm_check_result =
+            polynomial::__subtract_reduce32_check_infinity_norm(
                 w0_minus_cs2[base : COEFFICIENTS_IN_POLYNOMIAL],
                 w0[base : COEFFICIENTS_IN_POLYNOMIAL],
-                cs2);
-        w0_minus_cs2[base : COEFFICIENTS_IN_POLYNOMIAL] =
-            polynomial::reduce32(
-                w0_minus_cs2[base : COEFFICIENTS_IN_POLYNOMIAL]);
-        infinity_norm_check_result =
-            polynomial::__check_infinity_norm(
-                w0_minus_cs2[base : COEFFICIENTS_IN_POLYNOMIAL],
+                cs2,
                 (GAMMA2 - BETA));
         base = base + COEFFICIENTS_IN_POLYNOMIAL;
     }
@@ -201,20 +194,19 @@ inline fn __apply_ct0_and_check_norm(
                     t0[base : COEFFICIENTS_IN_POLYNOMIAL],
                     verifier_challenge);
         ct0 = polynomial::invert_ntt_montgomery(ct0);
-        // The inverse NTT returns a representative in (-q, q); reduce32
-        // centres it, which __make_hint relies on even when the test is
-        // not compiled.
-        ct0 = polynomial::reduce32(ct0);
-        if (CT0_NORM_BOUND >= GAMMA2) {
-            ct0_norm_check_result_row =
-                polynomial::__check_infinity_norm(ct0, GAMMA2);
-            ct0_norm_check_result |= ct0_norm_check_result_row;
-        }
-        w0_minus_cs2_plus_ct0[base : COEFFICIENTS_IN_POLYNOMIAL] =
-            polynomial::add(
+        // w0_minus_cs2_plus_ct0[i] = w0_minus_cs2[i] + reduce32(ct0), with the
+        // norm test of reduce32(ct0) compiled only when CT0_NORM_BOUND >= GAMMA2,
+        // in one pass. The inverse NTT returns a representative in (-q, q);
+        // reduce32 centres it, which __make_hint relies on even when the test
+        // is not compiled.
+        w0_minus_cs2_plus_ct0[base : COEFFICIENTS_IN_POLYNOMIAL], ct0_norm_check_result_row =
+            polynomial::__add_reduce32_check_infinity_norm_rhs(
                 w0_minus_cs2_plus_ct0[base : COEFFICIENTS_IN_POLYNOMIAL],
                 w0_minus_cs2[base : COEFFICIENTS_IN_POLYNOMIAL],
-                ct0);
+                ct0, GAMMA2, CT0_NORM_BOUND);
+        if (CT0_NORM_BOUND >= GAMMA2) {
+            ct0_norm_check_result |= ct0_norm_check_result_row;
+        }
         base = base + COEFFICIENTS_IN_POLYNOMIAL;
     }
     ct0_norm_check_result_row = ct0_norm_check_result;
@@ -399,7 +391,7 @@ fn __sign_internal(
         w = column_vector::reduce32(w);
         w = column_vector::invert_ntt_montgomery(w);
 
-        w = column_vector::__conditionally_add_modulus(w);
+        // decompose brings the (-q, q) representative to [0, q) itself
         w0, w1 = column_vector::__decompose(w);
 
         commitment_encoded = commitment::__encode(w1);

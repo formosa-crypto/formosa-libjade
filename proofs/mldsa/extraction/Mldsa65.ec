@@ -1797,18 +1797,20 @@ module M = {
   W32.t Array256.t * W32.t Array256.t = {
     var modulus:W256.t;
     var modulus_halved:W256.t;
+    var zeros:W256.t;
     var mask:W256.t;
     var v:W256.t;
     var alpha:W256.t;
     var offs:W256.t;
     var shift:W256.t;
     var coefficients:W256.t;
+    var comparisons:W256.t;
     var upper:W256.t;
     var lower:W256.t;
-    var comparisons:W256.t;
     var offset:int;
     modulus <- mODULUS_VECTOR;
     modulus_halved <- (VPSRL_8u32 modulus (W128.of_int 1));
+    zeros <- (set0_256);
     mask <- polynomial__CONSTANTS_TABLE_gamma2_32.[0];
     v <- polynomial__CONSTANTS_TABLE_gamma2_32.[1];
     alpha <- polynomial__CONSTANTS_TABLE_gamma2_32.[2];
@@ -1818,6 +1820,9 @@ module M = {
     while ((offset < ((256 * 32) %/ 8))) {
       coefficients <-
       (get256_direct (WArray1024.init32 (fun i => polynomial.[i])) offset);
+      comparisons <- (VPCMPGT_8u32 zeros coefficients);
+      comparisons <- (VPAND_256 comparisons modulus);
+      coefficients <- (VPADD_8u32 coefficients comparisons);
       upper <- (VPADD_8u32 coefficients offs);
       upper <- (VPSRL_8u32 upper (W128.of_int 7));
       upper <- (VPMULHU_16u16 upper v);
@@ -1897,8 +1902,8 @@ module M = {
     var zeros:W256.t;
     var offset:W64.t;
     var coefficients:W256.t;
-    var upper:W256.t;
     var mask:W256.t;
+    var upper:W256.t;
     var lower:W256.t;
     modulus <- mODULUS_VECTOR;
     modulus_halved <- (VPSRL_8u32 modulus (W128.of_int 1));
@@ -1913,6 +1918,9 @@ module M = {
       coefficients <-
       (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
       (W64.to_uint offset));
+      mask <- (VPCMPGT_8u32 zeros coefficients);
+      mask <- (VPAND_256 mask modulus);
+      coefficients <- (VPADD_8u32 coefficients mask);
       upper <- (VPADD_8u32 coefficients offs);
       upper <- (VPSRL_8u32 upper (W128.of_int 7));
       upper <- (VPMULHU_16u16 upper v);
@@ -14561,6 +14569,185 @@ module M = {
     result <- (zeroextu64 res8);
     return result;
   }
+  proc polynomial____add_reduce32_check_infinity_norm (sum_pointer:W32.t Array256.t,
+                                                       lhs_pointer:W32.t Array256.t,
+                                                       rhs_pointer:W32.t Array256.t,
+                                                       threshold:int) : 
+  W32.t Array256.t * W64.t = {
+    var result:W64.t;
+    var two_pow_22:W256.t;
+    var modulus:W256.t;
+    var temp:W64.t;
+    var threshold_vector:W256.t;
+    var exceeds_any:W256.t;
+    var lhs:W256.t;
+    var rhs:W256.t;
+    var sum:W256.t;
+    var t:W256.t;
+    var exceeds:W256.t;
+    var msb_mask:W32.t;
+    var zf:bool;
+    var res8:W8.t;
+    var offset:int;
+    var  _0:bool;
+    var  _1:bool;
+    var  _2:bool;
+    var  _3:bool;
+    two_pow_22 <- tWO_POW_22_VECTOR;
+    modulus <- mODULUS_VECTOR;
+    temp <- (W64.of_int (threshold - 1));
+    threshold_vector <- (zeroextu256 (VMOV_64 temp));
+    threshold_vector <- (VPBROADCAST_8u32 (truncateu32 threshold_vector));
+    exceeds_any <- (set0_256);
+    offset <- 0;
+    while ((offset < ((256 * 32) %/ 8))) {
+      lhs <-
+      (get256_direct (WArray1024.init32 (fun i => lhs_pointer.[i])) offset);
+      rhs <-
+      (get256_direct (WArray1024.init32 (fun i => rhs_pointer.[i])) offset);
+      sum <- (VPADD_8u32 lhs rhs);
+      t <- (VPADD_8u32 sum two_pow_22);
+      t <- (VPSRA_8u32 t (W128.of_int 23));
+      t <- (VPMULL_8u32 t modulus);
+      sum <- (VPSUB_8u32 sum t);
+      sum_pointer <-
+      (Array256.init
+      (WArray1024.get32
+      (WArray1024.set256_direct
+      (WArray1024.init32 (fun i => sum_pointer.[i])) offset sum)));
+      sum <- (VPABS_8u32 sum);
+      exceeds <- (VPCMPGT_8u32 sum threshold_vector);
+      exceeds_any <- (VPOR_256 exceeds_any exceeds);
+      offset <- (offset + 32);
+    }
+    msb_mask <- (MOVEMASK_8u32 exceeds_any);
+    ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
+    res8 <- (SETcc (! zf));
+    result <- (zeroextu64 res8);
+    return (sum_pointer, result);
+  }
+  proc polynomial____subtract_reduce32_check_infinity_norm (difference_pointer:W32.t Array256.t,
+                                                            lhs_pointer:W32.t Array256.t,
+                                                            rhs_pointer:W32.t Array256.t,
+                                                            threshold:int) : 
+  W32.t Array256.t * W64.t = {
+    var result:W64.t;
+    var two_pow_22:W256.t;
+    var modulus:W256.t;
+    var temp:W64.t;
+    var threshold_vector:W256.t;
+    var exceeds_any:W256.t;
+    var lhs:W256.t;
+    var rhs:W256.t;
+    var sum:W256.t;
+    var t:W256.t;
+    var exceeds:W256.t;
+    var msb_mask:W32.t;
+    var zf:bool;
+    var res8:W8.t;
+    var offset:int;
+    var  _0:bool;
+    var  _1:bool;
+    var  _2:bool;
+    var  _3:bool;
+    two_pow_22 <- tWO_POW_22_VECTOR;
+    modulus <- mODULUS_VECTOR;
+    temp <- (W64.of_int (threshold - 1));
+    threshold_vector <- (zeroextu256 (VMOV_64 temp));
+    threshold_vector <- (VPBROADCAST_8u32 (truncateu32 threshold_vector));
+    exceeds_any <- (set0_256);
+    offset <- 0;
+    while ((offset < ((256 * 32) %/ 8))) {
+      lhs <-
+      (get256_direct (WArray1024.init32 (fun i => lhs_pointer.[i])) offset);
+      rhs <-
+      (get256_direct (WArray1024.init32 (fun i => rhs_pointer.[i])) offset);
+      sum <- (VPSUB_8u32 lhs rhs);
+      t <- (VPADD_8u32 sum two_pow_22);
+      t <- (VPSRA_8u32 t (W128.of_int 23));
+      t <- (VPMULL_8u32 t modulus);
+      sum <- (VPSUB_8u32 sum t);
+      difference_pointer <-
+      (Array256.init
+      (WArray1024.get32
+      (WArray1024.set256_direct
+      (WArray1024.init32 (fun i => difference_pointer.[i])) offset sum)));
+      sum <- (VPABS_8u32 sum);
+      exceeds <- (VPCMPGT_8u32 sum threshold_vector);
+      exceeds_any <- (VPOR_256 exceeds_any exceeds);
+      offset <- (offset + 32);
+    }
+    msb_mask <- (MOVEMASK_8u32 exceeds_any);
+    ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
+    res8 <- (SETcc (! zf));
+    result <- (zeroextu64 res8);
+    return (difference_pointer, result);
+  }
+  proc polynomial____add_reduce32_check_infinity_norm_rhs (sum_pointer:W32.t Array256.t,
+                                                           lhs_pointer:W32.t Array256.t,
+                                                           rhs_pointer:W32.t Array256.t,
+                                                           threshold:int,
+                                                           bound:int) : 
+  W32.t Array256.t * W64.t = {
+    var result:W64.t;
+    var two_pow_22:W256.t;
+    var modulus:W256.t;
+    var temp:W64.t;
+    var threshold_vector:W256.t;
+    var exceeds_any:W256.t;
+    var rhs:W256.t;
+    var t:W256.t;
+    var lhs:W256.t;
+    var exceeds:W256.t;
+    var msb_mask:W32.t;
+    var zf:bool;
+    var res8:W8.t;
+    var offset:int;
+    var  _0:bool;
+    var  _1:bool;
+    var  _2:bool;
+    var  _3:bool;
+    two_pow_22 <- tWO_POW_22_VECTOR;
+    modulus <- mODULUS_VECTOR;
+    temp <- (W64.of_int (threshold - 1));
+    threshold_vector <- (zeroextu256 (VMOV_64 temp));
+    threshold_vector <- (VPBROADCAST_8u32 (truncateu32 threshold_vector));
+    exceeds_any <- (set0_256);
+    offset <- 0;
+    while ((offset < ((256 * 32) %/ 8))) {
+      rhs <-
+      (get256_direct (WArray1024.init32 (fun i => rhs_pointer.[i])) offset);
+      t <- (VPADD_8u32 rhs two_pow_22);
+      t <- (VPSRA_8u32 t (W128.of_int 23));
+      t <- (VPMULL_8u32 t modulus);
+      rhs <- (VPSUB_8u32 rhs t);
+      lhs <-
+      (get256_direct (WArray1024.init32 (fun i => lhs_pointer.[i])) offset);
+      lhs <- (VPADD_8u32 lhs rhs);
+      sum_pointer <-
+      (Array256.init
+      (WArray1024.get32
+      (WArray1024.set256_direct
+      (WArray1024.init32 (fun i => sum_pointer.[i])) offset lhs)));
+      if ((threshold <= bound)) {
+        rhs <- (VPABS_8u32 rhs);
+        exceeds <- (VPCMPGT_8u32 rhs threshold_vector);
+        exceeds_any <- (VPOR_256 exceeds_any exceeds);
+      } else {
+        
+      }
+      offset <- (offset + 32);
+    }
+    if ((threshold <= bound)) {
+      msb_mask <- (MOVEMASK_8u32 exceeds_any);
+      ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
+      res8 <- (SETcc (! zf));
+      result <- (zeroextu64 res8);
+    } else {
+      result <- (W64.of_int 0);
+    }
+    return (sum_pointer, result);
+  }
   proc polynomial____shift_coefficients_left (polynomial:W32.t Array256.t) : 
   W32.t Array256.t = {
     var coefficients:W256.t;
@@ -16857,16 +17044,16 @@ module M = {
                                           verifier_challenge:W32.t Array256.t,
                                           mask_element:W32.t Array256.t,
                                           signer_response_element:W32.t Array256.t) : 
-  W32.t Array256.t = {
+  W32.t Array256.t * W64.t = {
+    var infinity_norm_check_result:W64.t;
     var cs1:W32.t Array256.t;
     cs1 <- witness;
     cs1 <@ polynomial__pointwise_montgomery_multiply_and_reduce (cs1,
     s1_element, verifier_challenge);
     cs1 <@ polynomial__invert_ntt_montgomery (cs1);
-    signer_response_element <@ polynomial__add (signer_response_element, 
-    cs1, mask_element);
-    signer_response_element <@ polynomial__reduce32 (signer_response_element);
-    return signer_response_element;
+    (signer_response_element, infinity_norm_check_result) <@ polynomial____add_reduce32_check_infinity_norm (
+    signer_response_element, cs1, mask_element, ((1 `<<` 19) - (49 * 4)));
+    return (signer_response_element, infinity_norm_check_result);
   }
   proc __compute_z_and_check_norm (s1:W32.t Array1280.t,
                                    verifier_challenge:W32.t Array256.t,
@@ -16875,6 +17062,7 @@ module M = {
                                    infinity_norm_check_result:W64.t) : 
   W32.t Array1280.t * W64.t = {
     var aux:W32.t Array256.t;
+    var aux_0:W64.t;
     var base:int;
     var  _0:W64.t;
     base <- 0;
@@ -16886,8 +17074,11 @@ module M = {
       
     }
     while ((base < (5 * 256))) {
-      aux <@ __compute_signer_response_element ((Array256.init
-                                                (fun i => s1.[(base + i)])),
+      (aux, aux_0) <@ __compute_signer_response_element ((Array256.init
+                                                         (fun i => s1.[
+                                                                   (base + 
+                                                                   i)])
+                                                         ),
       verifier_challenge, (Array256.init (fun i => mask.[(base + i)])),
       (Array256.init (fun i => signer_response.[(base + i)])));
       signer_response <-
@@ -16895,9 +17086,7 @@ module M = {
       (fun i => (if (base <= i < (base + 256)) then aux.[(i - base)] else 
                 signer_response.[i]))
       );
-      infinity_norm_check_result <@ polynomial____check_infinity_norm (
-      (Array256.init (fun i => signer_response.[(base + i)])),
-      ((1 `<<` 19) - (49 * 4)));
+      infinity_norm_check_result <- aux_0;
       base <- (base + 256);
       (* Erased call to declassify *)
        _0 <- (init_msf);
@@ -16916,6 +17105,7 @@ module M = {
                                    infinity_norm_check_result:W64.t) : 
   W32.t Array1536.t * W64.t = {
     var aux:W32.t Array256.t;
+    var aux_0:W64.t;
     var cs2:W32.t Array256.t;
     var base:int;
     var  _0:W64.t;
@@ -16932,24 +17122,16 @@ module M = {
       cs2 <@ polynomial__pointwise_montgomery_multiply_and_reduce (cs2,
       (Array256.init (fun i => s2.[(base + i)])), verifier_challenge);
       cs2 <@ polynomial__invert_ntt_montgomery (cs2);
-      aux <@ polynomial__subtract ((Array256.init
-                                   (fun i => w0_minus_cs2.[(base + i)])),
-      (Array256.init (fun i => w0.[(base + i)])), cs2);
-      w0_minus_cs2 <-
-      (Array1536.init
-      (fun i => (if (base <= i < (base + 256)) then aux.[(i - base)] else 
-                w0_minus_cs2.[i]))
-      );
-      aux <@ polynomial__reduce32 ((Array256.init
-                                   (fun i => w0_minus_cs2.[(base + i)])));
-      w0_minus_cs2 <-
-      (Array1536.init
-      (fun i => (if (base <= i < (base + 256)) then aux.[(i - base)] else 
-                w0_minus_cs2.[i]))
-      );
-      infinity_norm_check_result <@ polynomial____check_infinity_norm (
+      (aux, aux_0) <@ polynomial____subtract_reduce32_check_infinity_norm (
       (Array256.init (fun i => w0_minus_cs2.[(base + i)])),
+      (Array256.init (fun i => w0.[(base + i)])), cs2,
       (((8380417 - 1) %/ 32) - (49 * 4)));
+      w0_minus_cs2 <-
+      (Array1536.init
+      (fun i => (if (base <= i < (base + 256)) then aux.[(i - base)] else 
+                w0_minus_cs2.[i]))
+      );
+      infinity_norm_check_result <- aux_0;
       base <- (base + 256);
       (* Erased call to declassify *)
        _0 <- (init_msf);
@@ -16968,6 +17150,7 @@ module M = {
                                    infinity_norm_check_result:W64.t) : 
   W32.t Array1536.t * W64.t = {
     var aux:W32.t Array256.t;
+    var aux_0:W64.t;
     var ct0_norm_check_result_row:W64.t;
     var ct0_norm_check_result:W64.t;
     var ct0:W32.t Array256.t;
@@ -16985,23 +17168,22 @@ module M = {
       ct0 <@ polynomial__pointwise_montgomery_multiply_and_reduce (ct0,
       (Array256.init (fun i => t0.[(base + i)])), verifier_challenge);
       ct0 <@ polynomial__invert_ntt_montgomery (ct0);
-      ct0 <@ polynomial__reduce32 (ct0);
-      if ((((8380417 - 1) %/ 32) <= (49 * (1 `<<` (13 - 1))))) {
-        ct0_norm_check_result_row <@ polynomial____check_infinity_norm (
-        ct0, ((8380417 - 1) %/ 32));
-        ct0_norm_check_result <-
-        (ct0_norm_check_result `|` ct0_norm_check_result_row);
-      } else {
-        
-      }
-      aux <@ polynomial__add ((Array256.init
-                              (fun i => w0_minus_cs2_plus_ct0.[(base + i)])),
-      (Array256.init (fun i => w0_minus_cs2.[(base + i)])), ct0);
+      (aux, aux_0) <@ polynomial____add_reduce32_check_infinity_norm_rhs (
+      (Array256.init (fun i => w0_minus_cs2_plus_ct0.[(base + i)])),
+      (Array256.init (fun i => w0_minus_cs2.[(base + i)])), ct0,
+      ((8380417 - 1) %/ 32), (49 * (1 `<<` (13 - 1))));
       w0_minus_cs2_plus_ct0 <-
       (Array1536.init
       (fun i => (if (base <= i < (base + 256)) then aux.[(i - base)] else 
                 w0_minus_cs2_plus_ct0.[i]))
       );
+      ct0_norm_check_result_row <- aux_0;
+      if ((((8380417 - 1) %/ 32) <= (49 * (1 `<<` (13 - 1))))) {
+        ct0_norm_check_result <-
+        (ct0_norm_check_result `|` ct0_norm_check_result_row);
+      } else {
+        
+      }
       base <- (base + 256);
     }
     ct0_norm_check_result_row <- ct0_norm_check_result;
@@ -17178,7 +17360,6 @@ module M = {
       w <@ row_vector____multiply_with_matrix_A (matrix_A, mask_as_ntt);
       w <@ column_vector__reduce32 (w);
       w <@ column_vector__invert_ntt_montgomery (w);
-      w <@ column_vector____conditionally_add_modulus (w);
       (w0, w1) <@ column_vector____decompose (w);
       commitment_encoded <@ commitment____encode (w1);
       (* Erased call to spill *)
