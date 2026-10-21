@@ -1,0 +1,57 @@
+name: publish-merged
+
+# On a push to main, gives the commits before the pushed head the results of
+# their PR runs (scripts/publish-merged-records.py), in the results repo
+# (https://github.com/strub/jasmin-nist-timing): a merged stack of PRs gets
+# one record per PR in main's history, proofs and benchmarks, without running
+# them again. The head commit is published by its own runs (proofs.yml,
+# bench.yml). Only this repo's main code runs here, on a GitHub-hosted
+# runner, and it only copies records already in the results repo.
+
+on:
+  push:
+    branches: [main]
+
+# pull-requests: read to find the PR merged as each commit.
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+          persist-credentials: false
+      - name: Copy and push
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          DEPLOY_KEY: ${{ secrets.TIMING_DEPLOY_KEY }}
+          REPO: strub/jasmin-nist-timing
+        run: |
+          set -euo pipefail
+          key="$RUNNER_TEMP/results_deploy_key"
+          printf '%s\n' "$DEPLOY_KEY" > "$key" && chmod 600 "$key"
+          ssh="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          export GIT_SSH_COMMAND="$ssh"
+          site="$RUNNER_TEMP/results"
+          git clone -q --depth 1 "git@github.com:$REPO.git" "$site"
+          python3 -I scripts/publish-merged-records.py "$BEFORE" "$GITHUB_SHA" "$site"
+          git -C "$site" add data
+          if git -C "$site" diff --cached --quiet; then
+            echo "nothing to copy"; exit 0
+          fi
+          git -C "$site" -c user.name='jasmin-nist-ci' \
+              -c user.email='jasmin-nist-ci@users.noreply.github.com' \
+              commit -qm "data: merged commits from their PR runs (run $GITHUB_RUN_ID)"
+          # the proofs and bench publishers push meanwhile: rebase onto them
+          # (distinct files, never a conflict)
+          for i in 1 2 3 4 5; do
+            git -C "$site" push -q && exit 0
+            sleep $((i * 3))
+            git -C "$site" pull -q --rebase
+          done
+          echo "could not push after 5 attempts" >&2; exit 1
