@@ -14,9 +14,16 @@ on:
 permissions:
   contents: read
 
+# GitHub keeps at most one pending run per concurrency group, so a shared
+# group would cancel the queued runs of the other PRs; the runners queue the
+# jobs instead. A PR has its own group, where a new push cancels the run in
+# progress; every other run has a group of its own.
 concurrency:
-  group: bench
-  cancel-in-progress: false
+  group: >-
+    bench-${{ github.event_name == 'pull_request_target'
+              && format('pr-{0}', github.event.pull_request.number)
+              || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
 
 # The toolchain (jasminc + a pinned C compiler) comes from flake.nix's bench
 # shell, served by the host's shared nix store (MOUNT_NIX=1 on the runner
