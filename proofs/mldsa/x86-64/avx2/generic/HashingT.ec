@@ -1,12 +1,13 @@
 require import AllCore IntDiv List.
 from Jasmin require import JModel_x86.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
-require import Array2 Array25 Array26 Array32 Array64 Array66 Array128 Array136.
-require import WArray2 Array7 WArray32 WArray64 WArray66 WArray128 WArray136 WArray200 WArray208.
+require import Array2 Array7 Array25 Array26 Array32 Array64 Array66 Array128 Array136.
+require import WArray2 WArray32 WArray64 WArray66 WArray128 WArray136 WArray200 WArray208.
 require import JWordList.
 from Keccak require import Keccakf1600.
 from Keccak require import Keccak1600_ref.
 from Keccak require import Keccak1600_fixedsizes_ref.
+from Keccak require import Keccakf1600_avx2 Keccak1600_avx2 Keccak1600_fixedsizes_avx2.
 require import Keccak1600_updstate_finish.
 from Keccak require import Keccak1600_updstate_ref.
 require BaseT.
@@ -38,59 +39,98 @@ equiv state_init_eq:
  : ={arg} ==> ={res}
  by sim.
 
-equiv keccakf1600_eq:
- M._keccakf1600 ~ Keccak1600_Jazz.M._keccakf1600
+equiv state_init_avx2_eq:
+ M.__state_init_avx2 ~ Keccak1600_Jazz.M.__state_init_avx2
  : ={arg} ==> ={res}
  by sim.
 
+equiv keccakf1600_avx2_eq:
+ M._keccakf1600_avx2 ~ Keccak1600_Jazz.M._keccakf1600_avx2
+ : ={arg} ==> ={res}
+ by sim.
+
+equiv keccakf1600_st25_avx2_eq:
+ M._keccakf1600_st25_avx2 ~ Keccak1600_Jazz.M._keccakf1600_st25_avx2
+ : ={arg} ==> ={res}
+ by sim.
+
+(* M._keccakf1600 dispatches to the AVX2 permutation (KECCAK_F = 3), while
+   Keccak1600_Jazz.M._keccakf1600 dispatches to the OPT one (KECCAK_F = 2):
+   they are related through their common specification keccak_f1600_op. *)
+phoare M_keccakf1600_ph _a:
+ [ M._keccakf1600
+ : a = _a
+ ==> res = keccak_f1600_op _a
+ ] = 1%r.
+proof.
+proc; inline M.__KECCAK_F.
+rcondf 4; first by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+rcondf 4; first by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+rcondt 4; first by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+call (: st25 = _a ==> res = keccak_f1600_op _a).
++ by conseq keccakf1600_st25_avx2_eq (keccakf1600_st25_avx2_ph _a) => // /#.
+by auto.
+qed.
+
+equiv keccakf1600_eq:
+ M._keccakf1600 ~ Keccak1600_Jazz.M._keccakf1600
+ : ={arg} ==> ={res}.
+proof.
+proc*; exlim a{1} => _a.
+call{1} (M_keccakf1600_ph _a); call{2} (keccakf1600_ph _a).
+by auto.
+qed.
+
 (****************************************************************************)
-(* Clone KeccakArrayRef for each array size used in hashing.jinc            *)
+(* Clone KeccakArrayRef/KeccakArrayAvx2 for each array size used in         *)
+(* hashing.jinc (the AVX2 ones for the one-block SHAKE256 hashes, the ref   *)
+(* ones for the streaming message representative)                          *)
 (****************************************************************************)
 
 
-clone KeccakArrayRef as A2ref
+clone KeccakArrayAvx2 as A2avx2
  with op _ASIZE <- 2,
       theory A <- Array2,
       theory WA <- WArray2
       proof _ASIZE_ge0 by done
       proof _ASIZE_u64 by done.
 
-clone KeccakArrayRef as A32ref
+clone KeccakArrayAvx2 as A32avx2
  with op _ASIZE <- 32,
       theory A <- Array32,
       theory WA <- WArray32
       proof _ASIZE_ge0 by done
       proof _ASIZE_u64 by done.
 
-clone KeccakArrayRef as ACTref
+clone KeccakArrayAvx2 as ACTavx2
  with op _ASIZE <- ctilde,
       theory A <- Array_ctilde,
       theory WA <- WArray_ctilde
       proof _ASIZE_ge0 by exact ge0_ctilde
       proof _ASIZE_u64 by smt(param_sets).
 
-clone KeccakArrayRef as A64ref
+clone KeccakArrayAvx2 as A64avx2
  with op _ASIZE <- 64,
       theory A <- Array64,
       theory WA <- WArray64
       proof _ASIZE_ge0 by done
       proof _ASIZE_u64 by done.
 
-clone KeccakArrayRef as A128ref
+clone KeccakArrayAvx2 as A128avx2
  with op _ASIZE <- 128,
       theory A <- Array128,
       theory WA <- WArray128
       proof _ASIZE_ge0 by done
       proof _ASIZE_u64 by done.
 
-clone KeccakArrayRef as AW1ref
+clone KeccakArrayAvx2 as AW1avx2
  with op _ASIZE <- w1vec_enc,
       theory A <- Array_w1vec_enc,
       theory WA <- WArray_w1vec_enc
       proof _ASIZE_ge0 by exact ge0_w1vec_enc
       proof _ASIZE_u64 by smt(param_sets).
 
-clone KeccakArrayRef as APKref
+clone KeccakArrayAvx2 as APKavx2
  with op _ASIZE <- pk_enc,
       theory A <- Array_pk_enc,
       theory WA <- WArray_pk_enc
@@ -115,33 +155,28 @@ clone KeccakUpdstateRef as A64updstate
 (* Equiv lemmas: M.primitive ~ KeccakArray.MM.primitive                     *)
 (****************************************************************************)
 
-equiv a2__absorb_eq:
- M.a2____absorb ~ A2ref.MM.__absorb
+equiv a2__absorb_avx2_eq:
+ M.a2____absorb_avx2 ~ A2avx2.MM.__absorb_avx2
  : ={arg} ==> ={res}
  by sim.
 
-equiv a32__absorb_eq:
- M.a32____absorb ~ A32ref.MM.__absorb
+equiv a32__absorb_avx2_eq:
+ M.a32____absorb_avx2 ~ A32avx2.MM.__absorb_avx2
  : ={arg} ==> ={res}
  by sim.
 
-equiv a64__absorb_eq:
- M.a64____absorb ~ A64ref.MM.__absorb
+equiv a64__absorb_avx2_eq:
+ M.a64____absorb_avx2 ~ A64avx2.MM.__absorb_avx2
  : ={arg} ==> ={res}
  by sim.
 
-equiv a66__absorb_eq:
- M.a66____absorb ~ A66ref.MM.__absorb
+equiv a128__absorb_avx2_eq:
+ M.a128____absorb_avx2 ~ A128avx2.MM.__absorb_avx2
  : ={arg} ==> ={res}
  by sim.
 
-equiv a128__absorb_eq:
- M.a128____absorb ~ A128ref.MM.__absorb
- : ={arg} ==> ={res}
- by sim.
-
-equiv a_ENCODED_COMMITMENT__absorb_eq:
- M.a_ENCODED_COMMITMENT____absorb ~ AW1ref.MM.__absorb
+equiv a_ENCODED_COMMITMENT__absorb_avx2_eq:
+ M.a_ENCODED_COMMITMENT____absorb_avx2 ~ AW1avx2.MM.__absorb_avx2
  : ={arg} ==> ={res}.
 proof.
 proc; seq 2 2 : (={st, aT, buf, _TRAILB, _RATE8, offset, _LEN}).
@@ -149,8 +184,8 @@ proc; seq 2 2 : (={st, aT, buf, _TRAILB, _RATE8, offset, _LEN}).
 by sim.
 qed.
 
-equiv a_VERIFICATION_KEY__absorb_eq:
- M.a_VERIFICATION_KEY____absorb ~ APKref.MM.__absorb
+equiv a_VERIFICATION_KEY__absorb_avx2_eq:
+ M.a_VERIFICATION_KEY____absorb_avx2 ~ APKavx2.MM.__absorb_avx2
  : ={arg} ==> ={res}.
 proof.
 proc; seq 2 2 : (={st, aT, buf, _TRAILB, _RATE8, offset, _LEN}).
@@ -158,30 +193,49 @@ proc; seq 2 2 : (={st, aT, buf, _TRAILB, _RATE8, offset, _LEN}).
 by sim.
 qed.
 
-equiv a_COMMITMENT_HASH__squeeze_eq:
- M.a_COMMITMENT_HASH____squeeze ~ ACTref.MM.__squeeze
+equiv a_COMMITMENT_HASH__dumpstate_avx2_eq:
+ M.a_COMMITMENT_HASH____dumpstate_avx2 ~ ACTavx2.MM.__dumpstate_avx2
  : ={arg} ==> ={res}
  by sim.
 
-equiv a64__squeeze_eq:
- M.a64____squeeze ~ A64ref.MM.__squeeze
+equiv a64__dumpstate_avx2_eq:
+ M.a64____dumpstate_avx2 ~ A64avx2.MM.__dumpstate_avx2
  : ={arg} ==> ={res}
  by sim.
 
-equiv a128__squeeze_eq:
- M.a128____squeeze ~ A128ref.MM.__squeeze
+equiv a128__dumpstate_avx2_eq:
+ M.a128____dumpstate_avx2 ~ A128avx2.MM.__dumpstate_avx2
  : ={arg} ==> ={res}
  by sim.
+
+(* the ref absorb calls the scalar permutation _keccakf1600 *)
+equiv a66__absorb_eq:
+ M.a66____absorb ~ A66ref.MM.__absorb
+ : ={arg} ==> ={res}.
+proof.
+by proc; sim (M._keccakf1600 ~ Keccak1600_Jazz.M._keccakf1600 : true); conseq keccakf1600_eq.
+qed.
 
 equiv add_m_updstate_eq:
  M._add_m_updstate ~ Keccak1600_Jazz.M._add_m_updstate
  : ={arg, Glob.mem} ==> ={res, Glob.mem}
  by sim.
 
+(* M's streaming procedures do not spill around the (AVX2) permutation,
+   Keccak1600_Jazz.M's ones do (OPT permutation). *)
 equiv absorb_m_state_eq:
  M._absorb_m_state ~ Keccak1600_Jazz.M._absorb_m_state
- : ={arg, Glob.mem} ==> ={res, Glob.mem}
- by sim.
+ : ={arg, Glob.mem} ==> ={res, Glob.mem}.
+proof.
+proc; inline{1} M.__KECCAK_F; inline{2} Keccak1600_Jazz.M.__KECCAK_F.
+seq 5 5 : (={st, r8, at, buf, len, Glob.mem} /\ !sPILL{1} /\ sPILL{2}).
++ by auto => />; rewrite (: 255 = 2^8 - 1) // !W256.and_mod.
+seq 1 1 : (={st, r8, at, buf, len, Glob.mem}).
++ while (={st, r8, at, buf, len, Glob.mem} /\ !sPILL{1} /\ sPILL{2}); 2: by auto.
+  seq 1 1 : (={st, r8, at, buf, len, Glob.mem} /\ !sPILL{1} /\ sPILL{2}); 1: by call add_m_updstate_eq; auto.
+  by rcondf{1} 1; [auto | rcondt{2} 1; [auto | wp; call keccakf1600_eq; auto]].
+by sim.
+qed.
 
 equiv finish_state_eq:
  M._finish_state ~ Keccak1600_Jazz.M._finish_state
@@ -192,60 +246,54 @@ equiv a64_squeeze_state_eq:
  M.a64___squeeze_state ~ A64updstate.MM._squeeze_state
  : ={arg} ==> ={res}.
 proof.
-proc; inline{1} M.__KECCAK_F; inline{2} Keccak1600_Jazz.M.__KECCAK_F.
-seq 4 4 : (={st, r8, at, buf, len} /\ sPILL{1} /\ !sPILL{2}); 1: by auto => />; rewrite (: 255 = 2^8 - 1) // !W256.and_mod.
-seq 1 1 : (={st, r8, at, buf, len} /\ sPILL{1} /\ !sPILL{2}).
-+ if => //.
-  by rcondt{1} 1; [auto | rcondf{2} 1; [auto | wp; call keccakf1600_eq; auto]].
-seq 3 3 : (={st, r8, at, buf, len, off}).
-+ while (={st, r8, at, buf, len, off} /\ sPILL{1} /\ !sPILL{2}); 2: by auto.
-  seq 1 1 : (={st, r8, at, buf, len, off} /\ sPILL{1} /\ !sPILL{2}); 1: by call (: ={arg} ==> ={res}); [sim | auto].
-  by rcondt{1} 1; [auto | rcondf{2} 1; [auto | wp; call keccakf1600_eq; auto]].
-by sim.
+by proc; sim (M._keccakf1600 ~ Keccak1600_Jazz.M._keccakf1600 : true); conseq keccakf1600_eq.
 qed.
 
 (****************************************************************************)
 (* Module K: keccak-library wrapper mirroring M's hashing procedures        *)
 (****************************************************************************)
 
+(* The fixed-size SHAKE256 hashes absorb at most one block and squeeze at
+   most one block: they run on the 7-ymm AVX2 state (one permutation between
+   the absorption and the dump of the output). *)
 module K = {
 
   proc _shake256_A128__A32_A2 (out:W8.t Array128.t, seed:W8.t Array32.t,
                                extra:W8.t Array2.t) : W8.t Array128.t = {
-    var lanes:W64.t Array25.t;
+    var state:W256.t Array7.t;
     var  _0:int;
     var  _1:int;
-    var  _2:W64.t Array25.t;
-    lanes <- witness;
-    lanes <@ Keccak1600_Jazz.M.__state_init (lanes);
-    (lanes,  _0) <@ A32ref.MM.__absorb (lanes, 0, seed, 0, 136);
-    (lanes,  _1) <@ A2ref.MM.__absorb (lanes, 32, extra, 31, 136);
-    ( _2, out) <@ A128ref.MM.__squeeze (lanes, out, 136);
+    var  _2:int;
+    state <@ Keccak1600_Jazz.M.__state_init_avx2 ();
+    (state,  _0) <@ A32avx2.MM.__absorb_avx2 (state, 0, seed, 0, 136);
+    (state,  _1) <@ A2avx2.MM.__absorb_avx2 (state, 32, extra, 31, 136);
+    state <@ Keccak1600_Jazz.M._keccakf1600_avx2 (state);
+    (out,  _2) <@ A128avx2.MM.__dumpstate_avx2 (out, 0, 128, state);
     return out;
   }
 
   proc _shake256_A64__A128 (out:W8.t Array64.t, in_0:W8.t Array128.t) :
   W8.t Array64.t = {
-    var lanes:W64.t Array25.t;
+    var state:W256.t Array7.t;
     var  _0:int;
-    var  _1:W64.t Array25.t;
-    lanes <- witness;
-    lanes <@ Keccak1600_Jazz.M.__state_init (lanes);
-    (lanes,  _0) <@ A128ref.MM.__absorb (lanes, 0, in_0, 31, 136);
-    ( _1, out) <@ A64ref.MM.__squeeze (lanes, out, 136);
+    var  _1:int;
+    state <@ Keccak1600_Jazz.M.__state_init_avx2 ();
+    (state,  _0) <@ A128avx2.MM.__absorb_avx2 (state, 0, in_0, 31, 136);
+    state <@ Keccak1600_Jazz.M._keccakf1600_avx2 (state);
+    (out,  _1) <@ A64avx2.MM.__dumpstate_avx2 (out, 0, 64, state);
     return out;
   }
 
   proc hash_verification_key (verification_key_hash:W8.t Array64.t,
                               verification_key:W8.t Array_pk_enc.t) :
   W8.t Array64.t = {
-    var lanes:W64.t Array25.t;
+    var state:W256.t Array7.t;
     var  _0:int;
-    var  _1:W64.t Array25.t;
-    lanes <- witness;
-    lanes <@ Keccak1600_Jazz.M.__state_init (lanes);
-    (lanes,  _0) <@ APKref.MM.__absorb (lanes, 0, verification_key, 31, 136);
-    ( _1, verification_key_hash) <@ A64ref.MM.__squeeze (lanes, verification_key_hash, 136);
+    var  _1:int;
+    state <@ Keccak1600_Jazz.M.__state_init_avx2 ();
+    (state,  _0) <@ APKavx2.MM.__absorb_avx2 (state, 0, verification_key, 31, 136);
+    state <@ Keccak1600_Jazz.M._keccakf1600_avx2 (state);
+    (verification_key_hash,  _1) <@ A64avx2.MM.__dumpstate_avx2 (verification_key_hash, 0, 64, state);
     return verification_key_hash;
   }
 
@@ -253,17 +301,18 @@ module K = {
                                  message_representative:W8.t Array64.t,
                                  encoded_commitment:W8.t Array_w1vec_enc.t) :
   W8.t Array_ctilde.t = {
-    var lanes:W64.t Array25.t;
+    var state:W256.t Array7.t;
     var  _0:int;
     var  _1:int;
-    var  _2:W64.t Array25.t;
-    lanes <- witness;
-    lanes <@ Keccak1600_Jazz.M.__state_init (lanes);
-    (lanes,  _0) <@ A64ref.MM.__absorb (lanes, 0, message_representative, 0, 136);
-    (lanes,  _1) <@ AW1ref.MM.__absorb (lanes, 64, encoded_commitment, 31, 136);
-    ( _2, commitment_hash) <@ ACTref.MM.__squeeze (lanes, commitment_hash, 136);
+    var  _2:int;
+    state <@ Keccak1600_Jazz.M.__state_init_avx2 ();
+    (state,  _0) <@ A64avx2.MM.__absorb_avx2 (state, 0, message_representative, 0, 136);
+    (state,  _1) <@ AW1avx2.MM.__absorb_avx2 (state, 64, encoded_commitment, 31, 136);
+    state <@ Keccak1600_Jazz.M._keccakf1600_avx2 (state);
+    (commitment_hash,  _2) <@ ACTavx2.MM.__dumpstate_avx2 (commitment_hash, 0, ctilde, state);
     return commitment_hash;
   }
+
 
   (* Absorbs (randomness || [kvec; lvec]) via SHAKE256 and squeezes 128 bytes,
      corresponding to the keygen PRF expansion step in __keygen_internal. *)
@@ -362,8 +411,9 @@ equiv shake256_A128__A32_A2_eq:
  : ={arg} ==> ={res}.
 proof.
 proc; inline{1} M.__KECCAK_F.
-rcondf{1} 7; first by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
-call a128__squeeze_eq; call a2__absorb_eq; call a32__absorb_eq; call state_init_eq.
+rcondt{1} 7; first by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+call a128__dumpstate_avx2_eq; wp; call keccakf1600_avx2_eq.
+call a2__absorb_avx2_eq; call a32__absorb_avx2_eq; call state_init_avx2_eq.
 by auto.
 qed.
 
@@ -372,8 +422,9 @@ equiv shake256_A64__A128_eq:
  : ={arg} ==> ={res}.
 proof.
 proc; inline{1} M.__KECCAK_F.
-rcondf{1} 7; first by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
-call a64__squeeze_eq; call a128__absorb_eq; call state_init_eq.
+rcondt{1} 7; first by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+call a64__dumpstate_avx2_eq; wp; call keccakf1600_avx2_eq.
+call a128__absorb_avx2_eq; call state_init_avx2_eq.
 by auto.
 qed.
 
@@ -382,8 +433,9 @@ equiv hash_verification_key_eq:
  : ={arg} ==> ={res}.
 proof.
 proc; inline{1} M.__KECCAK_F.
-rcondf{1} 7; first by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
-call a64__squeeze_eq; call a_VERIFICATION_KEY__absorb_eq; call state_init_eq.
+rcondt{1} 7; first by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+call a64__dumpstate_avx2_eq; wp; call keccakf1600_avx2_eq.
+call a_VERIFICATION_KEY__absorb_avx2_eq; call state_init_avx2_eq.
 by auto.
 qed.
 
@@ -392,9 +444,9 @@ equiv derive_commitment_hash_eq:
  : ={arg} ==> ={res}.
 proof.
 proc; inline{1} M.__KECCAK_F.
-rcondf{1} 7; first by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
-call a_COMMITMENT_HASH__squeeze_eq; call a_ENCODED_COMMITMENT__absorb_eq.
-call a64__absorb_eq; call state_init_eq.
+rcondt{1} 7; first by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+call a_COMMITMENT_HASH__dumpstate_avx2_eq; wp; call keccakf1600_avx2_eq.
+call a_ENCODED_COMMITMENT__absorb_avx2_eq; call a64__absorb_avx2_eq; call state_init_avx2_eq.
 by auto.
 qed.
 
@@ -429,6 +481,19 @@ qed.
 (* Correctness lemmas                                                       *)
 (****************************************************************************)
 
+
+(* One-block SHAKE256: when at most one block is squeezed, the output is a
+   prefix of the bytes of the absorbed state after one permutation. *)
+lemma nth_SHAKE256_one_block (l: W8.t list) len i:
+ 0 <= i < len => len <= 136 =>
+ nth witness (SHAKE256 l len) i
+ = (stbytes (keccak_f1600_op (ABSORB1600 (W8.of_int 31) 136 l))).[i].
+proof.
+move=> Hi Hlen; rewrite (nth_change_dfl W8.zero); 1: by rewrite size_SHAKE256 /#.
+rewrite /SHAKE256 /KECCAK1600 /SHAKE_DS_BYTE /c512_r8 Keccak1600_Spec.nth_SQUEEZE1600 1,2:/#.
+by rewrite divz_small 1:/# modz_small 1:/# /st_i iter1.
+qed.
+
 (* ---------- _shake256_A128__A32_A2 ---------- *)
 
 hoare shake256_A128__A32_A2_h' _seed _extra :
@@ -437,22 +502,26 @@ hoare shake256_A128__A32_A2_h' _seed _extra :
  ==> res = Array128.of_list witness (SHAKE256 (to_list _seed ++ to_list _extra) 128).
 proof.
 proc.
-ecall (A128ref.squeeze_h out lanes 136).
-ecall (A2ref.absorb_h (to_list seed) extra 31 136).
-ecall (A32ref.absorb_h [<:W8.t>] seed 0 136).
-ecall (state_init_h 136).
-auto => &hr [Hs He] r0 h0; split => // [st1 a1] /= [Ha _]; split; 1: by rewrite size_to_list.
-move=> _ [st2 a2] /= Ha2 [st3 o3] /= [_ Ho]; rewrite -(Array128.to_listK witness o3) Ho Ha2 -Hs -He.
-by rewrite /SHAKE256 /KECCAK1600 /SHAKE_DS_BYTE /c512_r8.
+ecall (A128avx2.dumpstate_avx2_h out 0 128 state).
+ecall (keccakf1600_avx2_h (ABSORB1600 (W8.of_int 31) 136 (to_list seed ++ to_list extra))).
+ecall (A2avx2.absorb_avx2_h (to_list seed) extra 31 136).
+ecall (A32avx2.absorb_avx2_h [<:W8.t>] seed 0 136).
+ecall (state_init_avx2_h 136).
+auto => &hr [Hs He] st0 H0; split => // [st1 a1] /= [Ha _]; split; 1: by rewrite size_to_list.
+move=> _ [st2 a2] /= Ha2; split; 1: by rewrite Ha2.
+move=> _ st3 -> [o3 a3] /= [-> _]; rewrite -Hs -He stavx2_from_st25K.
+apply Array128.tP => i Hi; rewrite Array128.filliE // ifT 1:/# /= Array128.get_of_list //.
+by rewrite nth_SHAKE256_one_block /#.
 qed.
 
 lemma shake256_A128__A32_A2_ll : islossless K._shake256_A128__A32_A2.
 proof.
 proc.
-call A128ref.squeeze_ll.
-call A2ref.absorb_ll.
-call A32ref.absorb_ll.
-call state_init_ll.
+call A128avx2.dumpstate_avx2_ll.
+call keccakf1600_avx2_ll.
+call A2avx2.absorb_avx2_ll.
+call A32avx2.absorb_avx2_ll.
+call state_init_avx2_ll.
 by auto.
 qed.
 
@@ -464,20 +533,23 @@ hoare shake256_A64__A128_h' _in :
  ==> res = Array64.of_list witness (SHAKE256 (to_list _in) 64).
 proof.
 proc.
-ecall (A64ref.squeeze_h out lanes 136).
-ecall (A128ref.absorb_h [<:W8.t>] in_0 31 136).
-ecall (state_init_h 136).
-auto => &hr Hin r0 h0; split => // [st1 a1] /= Ha [st2 o2] /= [_ Ho].
-rewrite -(Array64.to_listK witness o2) Ho Ha -Hin.
-by rewrite /SHAKE256 /KECCAK1600 /SHAKE_DS_BYTE /c512_r8.
+ecall (A64avx2.dumpstate_avx2_h out 0 64 state).
+ecall (keccakf1600_avx2_h (ABSORB1600 (W8.of_int 31) 136 (to_list in_0))).
+ecall (A128avx2.absorb_avx2_h [<:W8.t>] in_0 31 136).
+ecall (state_init_avx2_h 136).
+auto => &hr Hin st0 H0; split => // [st1 a1] /= Ha; split; 1: by rewrite Ha.
+move=> _ st2 -> [o2 a2] /= [-> _]; rewrite -Hin stavx2_from_st25K.
+apply Array64.tP => i Hi; rewrite Array64.filliE // ifT 1:/# /= Array64.get_of_list //.
+by rewrite nth_SHAKE256_one_block /#.
 qed.
 
 lemma shake256_A64__A128_ll : islossless K._shake256_A64__A128.
 proof.
 proc.
-call A64ref.squeeze_ll.
-call A128ref.absorb_ll.
-call state_init_ll.
+call A64avx2.dumpstate_avx2_ll.
+call keccakf1600_avx2_ll.
+call A128avx2.absorb_avx2_ll.
+call state_init_avx2_ll.
 by auto.
 qed.
 
@@ -489,21 +561,25 @@ hoare hash_verification_key_h' _vk :
  ==> res = Array64.of_list witness (Bytes64.to_list (H_tr (BytesPK.of_list (to_list _vk)))).
 proof.
 proc.
-ecall (A64ref.squeeze_h verification_key_hash lanes 136).
-ecall (APKref.absorb_h [<:W8.t>] verification_key 31 136).
-ecall (state_init_h 136).
-auto => &hr Hvk r0 h0; split => // [st1 a1] /= Ha [st2 o2] /= [_ Ho].
-rewrite -(Array64.to_listK witness o2) Ho Ha -Hvk /H_tr.
+ecall (A64avx2.dumpstate_avx2_h verification_key_hash 0 64 state).
+ecall (keccakf1600_avx2_h (ABSORB1600 (W8.of_int 31) 136 (to_list verification_key))).
+ecall (APKavx2.absorb_avx2_h [<:W8.t>] verification_key 31 136).
+ecall (state_init_avx2_h 136).
+auto => &hr Hvk st0 H0; split => // [st1 a1] /= Ha; split; 1: by rewrite Ha.
+move=> _ st2 -> [o2 a2] /= [-> _]; rewrite -Hvk stavx2_from_st25K /H_tr.
 rewrite BytesPK.of_listK 1:Array_pk_enc.size_to_list 1:pk_encE //.
-by rewrite Bytes64.of_listK 1:size_SHAKE256 // /SHAKE256 /KECCAK1600 /SHAKE_DS_BYTE /c512_r8.
+rewrite Bytes64.of_listK 1:size_SHAKE256 //.
+apply Array64.tP => i Hi; rewrite Array64.filliE // ifT 1:/# /= Array64.get_of_list //.
+by rewrite nth_SHAKE256_one_block /#.
 qed.
 
 lemma hash_verification_key_ll : islossless K.hash_verification_key.
 proof.
 proc.
-call A64ref.squeeze_ll.
-call APKref.absorb_ll.
-call state_init_ll.
+call A64avx2.dumpstate_avx2_ll.
+call keccakf1600_avx2_ll.
+call APKavx2.absorb_avx2_ll.
+call state_init_avx2_ll.
 by auto.
 qed.
 
@@ -533,24 +609,30 @@ hoare derive_commitment_hash_h' _mu _w1 :
  ==> res = Array_ctilde.of_list witness (BytesCT.to_list (H_ct (Bytes64.of_list (to_list _mu)) (BytesW1.of_list (to_list _w1)))).
 proof.
 proc.
-ecall (ACTref.squeeze_h commitment_hash lanes 136).
-ecall (AW1ref.absorb_h (to_list message_representative) encoded_commitment 31 136).
-ecall (A64ref.absorb_h [<:W8.t>] message_representative 0 136).
-ecall (state_init_h 136).
-auto => &hr [Hmu Hw1] r0 h0; split => // [st1 a1] /= [Ha _]; split; 1: by rewrite size_to_list.
-move=> _ [st2 a2] /= Ha2 [st3 o3] /= [_ Ho]; rewrite -(Array_ctilde.to_listK witness o3) Ho Ha2 -Hmu -Hw1 /H_ct.
+ecall (ACTavx2.dumpstate_avx2_h commitment_hash 0 ctilde state).
+ecall (keccakf1600_avx2_h (ABSORB1600 (W8.of_int 31) 136 (to_list message_representative ++ to_list encoded_commitment))).
+ecall (AW1avx2.absorb_avx2_h (to_list message_representative) encoded_commitment 31 136).
+ecall (A64avx2.absorb_avx2_h [<:W8.t>] message_representative 0 136).
+ecall (state_init_avx2_h 136).
+auto => &hr [Hmu Hw1] st0 H0; split => // _ [st1 a1] /= [Ha _]; split; 1: by rewrite size_to_list.
+move=> _ [st2 a2] /= Ha2; split; 1: exact Ha2.
+move=> _ _ ->; split; 1: by have := ge0_ctilde; smt(param_sets).
+move=> _ [o3 a3] /= [-> _]; rewrite -Hmu -Hw1 stavx2_from_st25K /H_ct.
 rewrite Bytes64.of_listK 1:Array64.size_to_list //.
 rewrite BytesW1.of_listK 1:Array_w1vec_enc.size_to_list 1:w1vec_encE //.
-by rewrite BytesCT.of_listK 1:size_SHAKE256 //; exact ge0_ctilde.
+rewrite BytesCT.of_listK 1:size_SHAKE256 //; 1: exact ge0_ctilde.
+apply Array_ctilde.tP => i Hi; rewrite Array_ctilde.filliE // ifT 1:/# /= Array_ctilde.get_of_list //.
+rewrite nth_SHAKE256_one_block //; move: Hi; rewrite /ctilde; smt(param_sets).
 qed.
 
 lemma derive_commitment_hash_ll : islossless K.__derive_commitment_hash.
 proof.
 proc.
-call ACTref.squeeze_ll.
-call AW1ref.absorb_ll.
-call A64ref.absorb_ll.
-call state_init_ll.
+call ACTavx2.dumpstate_avx2_ll.
+call keccakf1600_avx2_ll.
+call AW1avx2.absorb_avx2_ll.
+call A64avx2.absorb_avx2_ll.
+call state_init_avx2_ll.
 by auto.
 qed.
 

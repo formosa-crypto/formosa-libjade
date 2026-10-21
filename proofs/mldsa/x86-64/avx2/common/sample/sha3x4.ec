@@ -185,29 +185,64 @@ equiv state_init_avx2x4_fips202 :
   M.__state_init_avx2x4 ~ Keccak1600_Jazz.M.__state_init_avx2x4 : ={arg} ==> ={res}
 by sim.
 
-equiv keccakf1600_fips202 :
-  M._keccakf1600 ~ Keccak1600_Jazz.M._keccakf1600 : ={arg} ==> ={res}
+equiv keccakf1600_st25_avx2_fips202 :
+  M._keccakf1600_st25_avx2 ~ Keccak1600_Jazz.M._keccakf1600_st25_avx2 : ={arg} ==> ={res}
 by sim.
+
+(* the scalar interface dispatches to the AVX2 permutation, where the   *)
+(* FIPS 202 model takes the scalar one: both compute [keccak_f1600_op]  *)
+phoare keccakf1600_ph' _a :
+  [ M._keccakf1600 : a = _a ==> res = keccak_f1600_op _a ] = 1%r.
+proof.
+proc; inline M.__KECCAK_F.
+rcondf 4; 1: by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+rcondf 4; 1: by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+rcondt 4; 1: by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+call (_ : st25 = _a ==> res = keccak_f1600_op _a); last by auto.
+by conseq keccakf1600_st25_avx2_fips202 (keccakf1600_st25_avx2_ph _a) => // &1 ->; exists _a.
+qed.
+
+equiv keccakf1600_fips202 :
+  M._keccakf1600 ~ Keccak1600_Jazz.M._keccakf1600 : ={arg} ==> ={res}.
+proof.
+proc*; exlim a{1} => a0.
+call{1} (keccakf1600_ph' a0); call{2} (keccakf1600_ph a0).
+by auto.
+qed.
 
 equiv keccakf1600_avx2_fips202 :
   M._keccakf1600_avx2 ~ Keccak1600_Jazz.M._keccakf1600_avx2 : ={arg} ==> ={res}
 by sim.
 
+(* the two models select the same 4-way permutation, under different  *)
+(* single-lane selectors                                                 *)
 equiv keccakf1600_avx2x4_fips202 :
-  M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : ={arg} ==> ={res}
-by sim.
+  M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : ={arg} ==> ={res}.
+proof.
+proc; seq 1 1 : (={a, kECCAK_F}); last by sim.
+by inline *; auto => />; congr; circuit.
+qed.
 
 equiv a2_absorb_fips202 :
-  M.a2____absorb ~ Ref2.MM.__absorb : ={arg} ==> ={res}
-by sim.
+  M.a2____absorb ~ Ref2.MM.__absorb : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600 ~ Keccak1600_Jazz.M._keccakf1600 : true).
+by conseq keccakf1600_fips202.
+qed.
 
 equiv act_absorb_fips202 :
-  M.a_COMMITMENT_HASH____absorb ~ RefCt.MM.__absorb : ={arg} ==> ={res}
-by sim.
+  M.a_COMMITMENT_HASH____absorb ~ RefCt.MM.__absorb : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600 ~ Keccak1600_Jazz.M._keccakf1600 : true).
+by conseq keccakf1600_fips202.
+qed.
 
 equiv a64_absorb_fips202 :
-  M.a64____absorb ~ Ref64.MM.__absorb : ={arg} ==> ={res}
-by sim.
+  M.a64____absorb ~ Ref64.MM.__absorb : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600 ~ Keccak1600_Jazz.M._keccakf1600 : true).
+by conseq keccakf1600_fips202.
+qed.
 
 equiv a136_dumpstate_fips202 :
   M.a136____dumpstate ~ Ref136.MM.__dumpstate : ={arg} ==> ={res}
@@ -230,16 +265,25 @@ equiv a136_dumpstate_avx2_fips202 :
 by sim.
 
 equiv a2_absorb_avx2x4_fips202 :
-  M.a2____absorb_avx2x4 ~ X4_2.MM.__absorb_avx2x4 : ={arg} ==> ={res}
-by sim.
+  M.a2____absorb_avx2x4 ~ X4_2.MM.__absorb_avx2x4 : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : true).
+by conseq keccakf1600_avx2x4_fips202.
+qed.
 
 equiv a32_absorb_bcast_avx2x4_fips202 :
-  M.a32____absorb_bcast_avx2x4 ~ X4_32.MM.__absorb_bcast_avx2x4 : ={arg} ==> ={res}
-by sim.
+  M.a32____absorb_bcast_avx2x4 ~ X4_32.MM.__absorb_bcast_avx2x4 : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : true).
+by conseq keccakf1600_avx2x4_fips202.
+qed.
 
 equiv a64_absorb_bcast_avx2x4_fips202 :
-  M.a64____absorb_bcast_avx2x4 ~ X4_64.MM.__absorb_bcast_avx2x4 : ={arg} ==> ={res}
-by sim.
+  M.a64____absorb_bcast_avx2x4 ~ X4_64.MM.__absorb_bcast_avx2x4 : ={arg} ==> ={res}.
+proof.
+proc; sim (M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : true).
+by conseq keccakf1600_avx2x4_fips202.
+qed.
 
 equiv a136_dumpstate_avx2x4_fips202 :
   M.a136____dumpstate_avx2x4 ~ X4_136.MM.__dumpstate_avx2x4 : ={arg} ==> ={res}
@@ -655,110 +699,139 @@ qed.
 (* [shake256_xof] oracle as the four-lane instance, so the single lane  *)
 (* reads exactly the streams the staged lanes read.  [read] counts the  *)
 (* bytes made available by the permutations run so far: a state at      *)
-(* [mk_read (136 * (k + 1))] dumps block [k].                           *)
+(* [mk_read (136 * (k + 1))] dumps block [k].  The lane runs on the     *)
+(* AVX2 state layout (seven 256-bit words), related to the FIPS 202     *)
+(* sponge state through its 25-word view.                               *)
 
-op [opaque] (\sha3one) (st : W64.t Array25.t) (s : sha3_state) : bool =
-  sha3_lane 136 st s.
+op [opaque] (\sha3one) (st : W256.t Array7.t) (s : sha3_state) : bool =
+  stavx2INV st /\ sha3_lane 136 (stavx2_to_st25 st) s.
 
-lemma sha3oneE (st : W64.t Array25.t) (s : sha3_state) :
-  st \sha3one s <=> sha3_lane 136 st s.
+lemma sha3oneE (st : W256.t Array7.t) (s : sha3_state) :
+  st \sha3one s <=> stavx2INV st /\ sha3_lane 136 (stavx2_to_st25 st) s.
 proof. by rewrite /(\sha3one). qed.
 
 (* -------------------------------------------------------------------- *)
 (* the single-lane Keccak primitives (SHAKE256 flavor)                  *)
 
 lemma state_init_256P :
-  hoare[ M.__state_init : true ==> res \sha3one mk_absorbing [] ].
+  hoare[ M.__state_init_avx2 : true ==> res \sha3one mk_absorbing [] ].
 proof.
-conseq state_init_fips202 (state_init_h 136) => [&1 _ | &1 &2 ->]; 1: by exists arg{1}.
-by rewrite sha3oneE /sha3_lane /mk_absorbing /= pabsorb_spec_refE.
+conseq state_init_avx2_fips202 (state_init_avx2_h 136) => [&1 _ | &1 &2 ->]; 1: by exists arg{1}.
+by rewrite sha3oneE /sha3_lane /mk_absorbing /= pabsorb_spec_avx2E.
 qed.
 
 lemma absorb_64_256P (rho_ : W8.t Array64.t) :
-  hoare[ M.a64____absorb :
+  hoare[ M.a64____absorb_avx2 :
        st \sha3one mk_absorbing []
     /\ buf = rho_ /\ aT = 0 /\ _TRAILB = 0 /\ _RATE8 = 136
     ==> res.`1 \sha3one mk_absorbing (to_list rho_) ].
 proof.
-conseq a64_absorb_fips202 (Ref64.absorb_h [] rho_ 0 136).
-- move=> &1 [+ [hb [ha [ht hr]]]]; rewrite sha3oneE /sha3_lane /mk_absorbing /= => -[_ hst].
-  by exists arg{1}; rewrite ha hb ht hr pabsorb_spec_refE.
-move=> &1 &2 -> /= [+ _]; rewrite sha3oneE /sha3_lane /mk_absorbing /= pabsorb_spec_refE => ->.
+conseq a64_absorb_avx2_fips202 (Avx2_64.absorb_avx2_h [] rho_ 0 136).
+- move=> &1 [+ [hb [ha [ht hr]]]]; rewrite sha3oneE /sha3_lane /mk_absorbing /= => -[hi [_ hst]].
+  by exists arg{1}; rewrite ha hb ht hr pabsorb_spec_avx2E.
+move=> &1 &2 -> /= [+ _]; rewrite sha3oneE /sha3_lane /mk_absorbing /= pabsorb_spec_avx2E => -[-> ->].
 by rewrite size_to_list.
 qed.
 
+(* a final absorb leaves the absorbed state, in the AVX2 layout         *)
+lemma sha3one_absorbed (l : W8.t list) :
+  stavx2_from_st25 (ABSORB1600 (W8.of_int 31) 136 l) \sha3one mk_absorbed l.
+proof.
+by rewrite sha3oneE stavx2INV_from_st25 stavx2_from_st25K /sha3_lane /mk_absorbed /= iter0.
+qed.
+
 lemma absorb_2_final_256P (pre_ bs_ : W8.t list) :
-  hoare[ M.a2____absorb :
+  hoare[ M.a2____absorb_avx2 :
        st \sha3one mk_absorbing pre_
     /\ to_list buf = bs_
     /\ aT = size pre_ /\ _TRAILB = 31 /\ _RATE8 = 136
     ==> res.`1 \sha3one mk_absorbed (pre_ ++ bs_) ].
 proof.
 exlim buf => b; case: (to_list b = bs_) => [<<- | hb]; last by conseq (_ : false ==> _) => // /#.
-conseq a2_absorb_fips202 (Ref2.absorb_h pre_ b 31 136).
-- move=> &1 [-> [+ [_ [ha [ht hr]]]]]; rewrite sha3oneE /sha3_lane /mk_absorbing /= => -[hsz hst].
-  by exists arg{1}; rewrite ha ht hr pabsorb_spec_refE hst /= pmod_small // size_ge0.
-move=> &1 &2 ->; rewrite ifT // => ->.
-by rewrite sha3oneE /sha3_lane /mk_absorbed /= iter0.
+conseq a2_absorb_avx2_fips202 (Avx2_2.absorb_avx2_h pre_ b 31 136).
+- move=> &1 [-> [+ [_ [ha [ht hr]]]]]; rewrite sha3oneE /sha3_lane /mk_absorbing /= => -[hi [hsz hst]].
+  by exists arg{1}; rewrite ha ht hr pabsorb_spec_avx2E hi hst /= pmod_small // size_ge0.
+by move=> &1 &2 ->; rewrite ifT // => ->; apply sha3one_absorbed.
 qed.
 
 lemma absorb_commitment_hash_256P (ct_ : W8.t Array_ctilde.t) :
-  hoare[ M.a_COMMITMENT_HASH____absorb :
+  hoare[ M.a_COMMITMENT_HASH____absorb_avx2 :
        st \sha3one mk_absorbing []
     /\ buf = ct_ /\ aT = 0 /\ _TRAILB = 31 /\ _RATE8 = 136
     ==> res.`1 \sha3one mk_absorbed (to_list ct_) ].
 proof.
-conseq act_absorb_fips202 (RefCt.absorb_h [] ct_ 31 136).
-- move=> &1 [+ [hb [ha [ht hr]]]]; rewrite sha3oneE /sha3_lane /mk_absorbing /= => -[_ hst].
-  by exists arg{1}; rewrite ha hb ht hr pabsorb_spec_refE hst.
-move=> &1 &2 ->; rewrite ifT // => ->.
-by rewrite sha3oneE /sha3_lane /mk_absorbed /= iter0.
+conseq act_absorb_avx2_fips202 (Avx2_Ct.absorb_avx2_h [] ct_ 31 136).
+- move=> &1 [+ [hb [ha [ht hr]]]]; rewrite sha3oneE /sha3_lane /mk_absorbing /= => -[hi [_ hst]].
+  by exists arg{1}; rewrite ha hb ht hr pabsorb_spec_avx2E hi hst.
+by move=> &1 &2 ->; rewrite ifT // => ->; apply sha3one_absorbed.
 qed.
 
 lemma keccakf1600_256P (n : W8.t list) (k : int) :
-  hoare[ M._keccakf1600 :
-       0 <= k /\ a \sha3one mk_read (136 * k) n
+  hoare[ M._keccakf1600_avx2 :
+       0 <= k /\ state \sha3one mk_read (136 * k) n
     ==> res \sha3one mk_read (136 * (k + 1)) n ].
 proof.
 case: (0 <= k) => hk; last by conseq (_ : false ==> _) => // /#.
-conseq keccakf1600_fips202
-  (keccakf1600_h (iter k keccak_f1600_op (ABSORB1600 Keccak1600_Spec.SHAKE_DS_BYTE 136 n)))
+conseq keccakf1600_avx2_fips202
+  (keccakf1600_avx2_h (iter k keccak_f1600_op (ABSORB1600 Keccak1600_Spec.SHAKE_DS_BYTE 136 n)))
   => [&1 [_] | &1 &2 -> ->].
-- rewrite sha3oneE /sha3_lane /mk_read /= mulzC mulzK // => ->.
-  by exists (iter k keccak_f1600_op (ABSORB1600 Keccak1600_Spec.SHAKE_DS_BYTE 136 n)).
-by rewrite sha3oneE /sha3_lane /mk_read /= mulzC mulzK // iterS.
+- rewrite sha3oneE /sha3_lane /mk_read /= mulzC mulzK // => -[hi hst].
+  by exists arg{1}; rewrite -hst stavx2_to_st25K.
+rewrite sha3oneE stavx2INV_from_st25 stavx2_from_st25K /sha3_lane /mk_read /=.
+by rewrite mulzC mulzK // iterS.
 qed.
 
 lemma dumpstate_256P (n : W8.t list) (k : int) :
-  hoare[ M.a136____dumpstate :
+  hoare[ M.a136____dumpstate_avx2 :
        0 <= k /\ st \sha3one mk_read (136 * (k + 1)) n
     /\ offset = 0 /\ _LEN = 136
     ==> Array136.to_list res.`1 = Shake256x4.shake256_slice n (136 * k) 136 ].
 proof.
 case: (0 <= k) => hk; last by conseq (_ : false ==> _) => // /#.
-exlim buf => b.
-conseq a136_dumpstate_fips202
-  (Ref136.dumpstate_h b 0 136
-     (iter (k + 1) keccak_f1600_op (ABSORB1600 Keccak1600_Spec.SHAKE_DS_BYTE 136 n))).
-- move=> &1 [-> [_ [+ [ho hl]]]]; rewrite sha3oneE /sha3_lane /mk_read /= mulzC mulzK // => hst.
-  by exists arg{1}; rewrite ho hl hst.
+exlim buf, st => b s.
+case: (s \sha3one mk_read (136 * (k + 1)) n) => hs; last by conseq (_ : false ==> _) => // /#.
+conseq a136_dumpstate_avx2_fips202 (Avx2_136.dumpstate_avx2_h b 0 136 s).
+- by move=> &1 [[-> ->] [_ [_ [ho hl]]]]; exists arg{1}; rewrite ho hl.
 move=> &1 &2 -> [-> _]; rewrite /to_list /Shake256x4.shake256_slice /Xof.slice.
 apply eq_in_mkseq => i rgi /=; rewrite Array136.filliE // rgi /= shake256_xofE 1:/#.
-by rewrite (sha3_lane_block 136 n k i) // /sha3_lane /mk_read /= mulzC mulzK.
+move: hs; rewrite sha3oneE => -[_ hs].
+by rewrite (sha3_lane_block 136 n k i).
 qed.
 
 (* -------------------------------------------------------------------- *)
-(* the sponge state crosses the hashing boundary in the first 25 words  *)
-(* of a 28-word buffer                                                   *)
+(* the sponge state crosses the hashing boundary as the seven 256-bit   *)
+(* words of a 28-word buffer                                             *)
 
-op lanes_of (st : W64.t Array28.t) : W64.t Array25.t =
-  Array25.init (fun i => st.[i]).
+op lanes_of (st : W64.t Array28.t) : W256.t Array7.t =
+  Array7.init (fun i => get256_direct (WArray224.init64 (fun j => st.[j])) (32 * i)).
 
-lemma lanes_of_store (st : W64.t Array28.t) (l : W64.t Array25.t) :
-  lanes_of (Array28.init (fun i => if 0 <= i < 0 + 25 then l.[i - 0] else st.[i])) = l.
+lemma load_shake256_stateP (_st : W64.t Array28.t) :
+  hoare[ M.__load_shake256_state : st = _st ==> res = lanes_of _st ].
 proof.
-rewrite Array25.tP => i hi; rewrite /lanes_of !initiE //=.
-by rewrite initiE 1:/# /= ifT 1:/#.
+proc; unroll for ^while; auto => />.
+by rewrite Array7.tP => i rgi; rewrite /lanes_of initiE //=; smt(Array7.get_setE).
+qed.
+
+(* the 28-word buffer is the 64-bit view of its byte array *)
+lemma init64_get64 (w : WArray224.t) :
+  WArray224.init64 (fun k => (Array28.init (WArray224.get64 w)).[k]) = w.
+proof.
+rewrite WArray224.tP => k rgk; rewrite /init64 initiE //= Array28.initiE 1:/# /=.
+rewrite /get64_direct W8u8.pack8bE 1:/# W8u8.Pack.initiE 1:/# /=.
+by congr; smt(divz_eq).
+qed.
+
+lemma store_shake256_stateP (_s : W256.t Array7.t) :
+  hoare[ M.__store_shake256_state : state = _s ==> lanes_of res = _s ].
+proof.
+proc; while (0 <= i <= 7 /\ state = _s /\ forall j, 0 <= j < i =>
+               get256 (WArray224.init64 (fun k => st.[k])) j = _s.[j]).
+- auto => &hr [#] hi0 hi7 -> hj hlt /=; rewrite init64_get64.
+  split; 1: smt().
+  by move=> j rgj; rewrite get_set256E 1,2:/#; case: (j = i{hr}) => [-> // | hne]; apply hj => /#.
+auto => &hr /= ->; split; 1: smt().
+move=> i st0 hi [#] _ hi7 _ hj.
+by rewrite Array7.tP => j rgj; rewrite /lanes_of initiE //= hj /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -771,9 +844,10 @@ lemma shake256_squeezeblockP (n : W8.t list) (k : int) :
      /\ Array136.to_list res.`2 = Shake256x4.shake256_slice n (136 * k) 136 ].
 proof.
 proc; inline M.__KECCAK_F.
-rcondf 6; 1: by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
-ecall (dumpstate_256P n k); wp; ecall (keccakf1600_256P n k); auto => &hr |> h0 hst r0 hr0.
-by have := lanes_of_store st{hr} hr0; rewrite /lanes_of /= => ->.
+rcondt 6; 1: by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+ecall (dumpstate_256P n k); wp; ecall (store_shake256_stateP state).
+ecall (keccakf1600_256P n k); ecall (load_shake256_stateP st).
+by auto => &hr |> h0 hst r0 hr0 r1 ->.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -784,10 +858,11 @@ hoare[ M.shake256_absorb_66 :
   ==> lanes_of res \sha3one mk_absorbed (to_list rho_ ++ W2u8.to_list ds_) ].
 proof.
 proc; inline M.__KECCAK_F.
-rcondf 8; 1: by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
-wp; ecall (absorb_2_final_256P (to_list rho_) (W2u8.to_list ds_)).
+rcondt 8; 1: by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+ecall (store_shake256_stateP state).
+ecall (absorb_2_final_256P (to_list rho_) (W2u8.to_list ds_)).
 ecall (absorb_64_256P rho_); call state_init_256P.
-by auto => &hr |> r0 h0 r1 h1; rewrite pack2_set16_to_listE Array64.size_to_list /= => r2 h2; rewrite lanes_of_store.
+by auto => &hr |> r0 h0 r1 h1; rewrite pack2_set16_to_listE Array64.size_to_list /= => r2 h2 r3 ->.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -797,9 +872,10 @@ hoare[ M.shake256_absorb_commitment_hash :
     commitment_hash = ct_ ==> lanes_of res \sha3one mk_absorbed (to_list ct_) ].
 proof.
 proc; inline M.__KECCAK_F.
-rcondf 6; 1: by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
-wp; ecall (absorb_commitment_hash_256P ct_); call state_init_256P.
-by auto => &hr |> r0 h0 r1 h1; rewrite lanes_of_store.
+rcondt 6; 1: by auto => />; rewrite (: 255 = 2^8 - 1) // W256.and_mod.
+ecall (store_shake256_stateP state).
+ecall (absorb_commitment_hash_256P ct_); call state_init_256P.
+by auto => &hr |> r0 h0 r1 h1 r2 ->.
 qed.
 
 (* ==================================================================== *)

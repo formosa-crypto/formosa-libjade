@@ -4552,7 +4552,7 @@ module M = {
   }
   proc _keccakf1600 (a:W64.t Array25.t) : W64.t Array25.t = {
     var kECCAK_F:int;
-    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
     if ((kECCAK_F = 2)) {
       a <@ _keccakf1600_opt (a);
     } else {
@@ -6393,7 +6393,7 @@ module M = {
   }
   proc _keccakf1600_avx2x4 (a:W256.t Array25.t) : W256.t Array25.t = {
     var kECCAK_F:int;
-    kECCAK_F <@ __KECCAK_Fx4 ((2 + 512));
+    kECCAK_F <@ __KECCAK_Fx4 ((3 + 512));
     if ((kECCAK_F = 256)) {
       a <@ _keccakf1600_avx2x4_alt (a);
     } else {
@@ -6551,7 +6551,7 @@ module M = {
     var kECCAK_F:int;
     var sPILL:bool;
     var  _0:int;
-    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
     sPILL <- (kECCAK_F <> 3);
     len <- (len + at);
     while ((r8 <= len)) {
@@ -8811,7 +8811,7 @@ module M = {
     var sPILL:bool;
     var off:int;
     var  _0:int;
-    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
     sPILL <- (kECCAK_F <> 3);
     if ((at = 0)) {
       if (sPILL) {
@@ -12405,7 +12405,7 @@ module M = {
     ds <- witness;
     lanes <- witness;
     state <- witness;
-    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
     ds <-
     (Array2.init
     (WArray2.get8
@@ -12436,7 +12436,7 @@ module M = {
     var  _1:int;
     lanes <- witness;
     state <- witness;
-    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
     if ((kECCAK_F = 3)) {
       state <@ __state_init_avx2 ();
       (state,  _1) <@ a_COMMITMENT_HASH____absorb_avx2 (state, 0,
@@ -12463,7 +12463,7 @@ module M = {
     var  _1:int;
     lanes <- witness;
     state <- witness;
-    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
     if ((kECCAK_F = 3)) {
       state <@ __load_shake256_state (st);
       state <@ _keccakf1600_avx2 (state);
@@ -12499,7 +12499,7 @@ module M = {
      _2 <- witness;
     lanes <- witness;
     state <- witness;
-    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
     if ((kECCAK_F = 3)) {
       state <@ __state_init_avx2 ();
       (state,  _3) <@ a32____absorb_avx2 (state, 0, seed, 0, 136);
@@ -12528,7 +12528,7 @@ module M = {
      _1 <- witness;
     lanes <- witness;
     state <- witness;
-    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
     if ((kECCAK_F = 3)) {
       state <@ __state_init_avx2 ();
       (state,  _2) <@ a128____absorb_avx2 (state, 0, in_0, 31, 136);
@@ -12613,7 +12613,7 @@ module M = {
      _1 <- witness;
     lanes <- witness;
     state <- witness;
-    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
     if ((kECCAK_F = 3)) {
       state <@ __state_init_avx2 ();
       (state,  _2) <@ a_VERIFICATION_KEY____absorb_avx2 (state, 0,
@@ -12650,7 +12650,7 @@ module M = {
      _2 <- witness;
     lanes <- witness;
     state <- witness;
-    kECCAK_F <@ __KECCAK_F ((2 + 512));
+    kECCAK_F <@ __KECCAK_F ((3 + 512));
     if ((kECCAK_F = 3)) {
       state <@ __state_init_avx2 ();
       (state,  _3) <@ a64____absorb_avx2 (state, 0, message_representative,
