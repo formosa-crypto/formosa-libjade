@@ -49,7 +49,17 @@ jobs:
           PR: ${{ github.event.workflow_run.pull_requests[0].number }}
         run: |
           set -euo pipefail
-          [ -n "$PR" ] || { echo "no pull request for this run"; exit 1; }
+          # The event lists open PRs only: a PR merged or closed before its
+          # proofs run ended is found from its head commit.
+          if [ -z "$PR" ]; then
+            PR=$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD/pulls" \
+                   --jq "[.[] | select(.head.sha == \"$HEAD\")][0].number // empty")
+          fi
+          if [ -z "$PR" ]; then
+            echo "::notice::no pull request has $HEAD as head: nothing to publish"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" > "$RUNNER_TEMP/pr.json"
           base=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["base"]["sha"])' "$RUNNER_TEMP/pr.json")
           mb=$(gh api "repos/$GITHUB_REPOSITORY/compare/$base...$HEAD" \
@@ -62,7 +72,8 @@ jobs:
                                    "head_ref": pr["head"]["ref"], "base": pr["base"]["sha"],
                                    "merge_base": sha, "merge_base_date": date}}))' "$RUNNER_TEMP/pr.json")
           { echo "dest=data/pr/$PR/proofs"; echo "commit=$HEAD"; echo "meta=$meta"; } >> "$GITHUB_OUTPUT"
-      - uses: ./.github/actions/publish-result
+      - if: steps.target.outputs.skip != 'true'
+        uses: ./.github/actions/publish-result
         with:
           file: result/proofs-timing.json
           dest: ${{ steps.target.outputs.dest }}
