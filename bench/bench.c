@@ -4,10 +4,16 @@
  *
  * dlopen's a single backend's common-ABI .so, runs each derand operation
  * BENCH_ITERS times (env, default 10000) and reports median CPU cycles via
- * rdtsc. One backend per process: different .so files can define the same
- * global symbols (e.g. randombytes), so co-loading them risks cross-lib
- * interposition. The bench / bench-all make targets loop, invoking this once
- * per (scheme, backend) in a fresh process. x86-64 + AVX2 only.
+ * rdtsc. Each iteration runs on fresh inputs, made untimed beforehand: the
+ * randomness of keypair, encaps, keygen and sign comes from a xorshift reset
+ * to a fixed seed at the start of each operation's bench, and decaps and
+ * verify take the ciphertext or signature of a fresh encaps or sign. The
+ * medians then cover the spread of the rejection loops, while every backend
+ * and commit runs on the same inputs. One backend per process:
+ * different .so files can define the same global symbols (e.g. randombytes),
+ * so co-loading them risks cross-lib interposition. The bench / bench-all make
+ * targets loop, invoking this once per (scheme, backend) in a fresh process.
+ * x86-64 + AVX2 only.
  *
  * Output is human-readable by default; set BENCH_FORMAT=csv for one row per
  * measurement -- "scheme,backend,operation,median_cycles" with no header (so
@@ -106,11 +112,27 @@ static void warmup(void) {
   for (uint64_t i = 0; i < 300000000ULL; i++) x += i * i + (x >> 1);
 }
 
-/* time `expr` ITERS times, store median cycles in *out */
-#define BENCH(iters, samples, out, expr)                                       \
+/* xorshift64 for the randomness of the operations (n a multiple of 8) */
+#define RND_SEED 0x9e3779b97f4a7c15ULL
+static uint64_t rnd_state;
+static void next_rnd(uint8_t *p, size_t n) {
+  for (size_t i = 0; i < n; i += 8) {
+    rnd_state ^= rnd_state << 13;
+    rnd_state ^= rnd_state >> 7;
+    rnd_state ^= rnd_state << 17;
+    memcpy(p + i, &rnd_state, 8);
+  }
+}
+
+/* time `expr` ITERS times, each after an untimed `setup`, store median cycles
+ * in *out; the xorshift restarts from RND_SEED, so every bench of an
+ * operation sees the same inputs */
+#define BENCH(iters, samples, out, setup, expr)                                \
   do {                                                                         \
+    rnd_state = RND_SEED;                                                      \
     for (size_t _i = 0; _i < (iters); _i++) {                                  \
       unsigned _aux;                                                           \
+      setup;                                                                   \
       uint64_t _t0 = __rdtscp(&_aux);                                          \
       expr;                                                                    \
       uint64_t _t1 = __rdtscp(&_aux);                                          \
@@ -150,9 +172,10 @@ static void bench_backend(const char *path, const scheme_t *s, size_t iters,
     kem_dec_t dec = dlsym(h, "kem_dec");
     kp(A, B, coins);          /* A=pk B=sk */
     enc(C, ss, A, coins);     /* C=ct ss=ss */
-    BENCH(iters, samples, &m0, kp(A, B, coins));
-    BENCH(iters, samples, &m1, enc(C, ss, A, coins));
-    BENCH(iters, samples, &m2, dec(ss, C, B));
+    BENCH(iters, samples, &m0, next_rnd(coins, 64), kp(A, B, coins));
+    BENCH(iters, samples, &m1, next_rnd(coins, 32), enc(C, ss, A, coins));
+    BENCH(iters, samples, &m2, (next_rnd(coins, 32), enc(C, ss, A, coins)),
+          dec(ss, C, B));
     report(path, s, m0, m1, m2);
   } else {
     sig_keygen_t kg = dlsym(h, "sig_keygen");
@@ -160,9 +183,12 @@ static void bench_backend(const char *path, const scheme_t *s, size_t iters,
     sig_verify_t ver = dlsym(h, "sig_verify");
     kg(A, B, seed);                                   /* A=vk B=sk */
     sign(C, B, NULL, 0, msg, sizeof msg, rnd);        /* C=sig, empty context */
-    BENCH(iters, samples, &m0, kg(A, B, seed));
-    BENCH(iters, samples, &m1, sign(C, B, NULL, 0, msg, sizeof msg, rnd));
-    BENCH(iters, samples, &m2, ver(A, NULL, 0, msg, sizeof msg, C));
+    BENCH(iters, samples, &m0, next_rnd(seed, 32), kg(A, B, seed));
+    BENCH(iters, samples, &m1, next_rnd(rnd, 32),
+          sign(C, B, NULL, 0, msg, sizeof msg, rnd));
+    BENCH(iters, samples, &m2,
+          (next_rnd(rnd, 32), sign(C, B, NULL, 0, msg, sizeof msg, rnd)),
+          ver(A, NULL, 0, msg, sizeof msg, C));
     report(path, s, m0, m1, m2);
   }
   free(A); free(B); free(C);

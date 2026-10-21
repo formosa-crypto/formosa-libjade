@@ -125,7 +125,8 @@ def versions_table(versions):
 def render(data, order, exclude, require, versions):
     md = ["# Benchmark report", "",
           "Median CPU cycles (rdtsc) per operation, one process per backend, "
-          "identical derandomized inputs across backends. With several passes, "
+          "fresh derandomized inputs at each iteration, the same sequence "
+          "across backends. With several passes, "
           "each cell is the median of the per-pass medians, ± half their range.",
           ""]
     if versions:
