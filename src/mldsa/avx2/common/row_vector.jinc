@@ -16,37 +16,43 @@ namespace row_vector {
         return vector;
     }
 
-    // output = sum_i lhs_i * rhs_i (pointwise, Montgomery domain), with the
-    // COLUMNS_IN_MATRIX_A products of each coefficient accumulated on 64 bits
-    // and reduced once, in a single pass over the polynomial: one Montgomery
-    // reduction per coefficient instead of one per product, and no store or
-    // addition pass per product. The sum of at most 7 products |a b| < q 2^31
-    // stays below 2^63, and the reduction of a 64-bit T with |T| < 7 q 2^31
-    // returns a value in (-4q, 4q), which the reduce32 that follows centres.
+    // output = reduce32(sum_i lhs_i * rhs_i) (pointwise, Montgomery domain),
+    // with the COLUMNS_IN_MATRIX_A products of each coefficient accumulated on
+    // 64 bits and reduced once, in a single pass over the polynomial: one
+    // Montgomery reduction per coefficient instead of one per product, and no
+    // store or addition pass per product. The sum of at most 7 products
+    // |a b| < q 2^31 stays below 2^63, and the reduction of a 64-bit T with
+    // |T| < 7 q 2^31 returns a value in (-4q, 4q), which the reduce32 fused at
+    // the end of the pass centres.
+    // rhs_high holds the odd 32-bit lanes of rhs moved to the even positions
+    // (vmovshdup), computed once per vector by the caller instead of once per
+    // row: the odd products need both operands in that form and vmovshdup
+    // only runs on port 5, which the multiplications leave idle.
     inline
     fn __dot_product(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] output,
-        reg ptr u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] lhs rhs
+        reg ptr u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] lhs rhs rhs_high
     ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
     {
-        reg u256 lhs_coeffs rhs_coeffs lhs_high rhs_high;
+        reg u256 lhs_coeffs rhs_coeffs lhs_high rhs_high_coeffs;
         reg u256 product_low product_high acc_low acc_high;
-        reg u256 t_low t_high qinv modulus;
+        reg u256 t_low t_high qinv modulus two_pow_22;
         reg ui64 offset;
         inline int i;
 
         qinv = INVERSE_OF_MODULUS_MOD_MONTGOMERY_R_VECTOR;
         modulus = MODULUS_VECTOR;
+        two_pow_22 = TWO_POW_22_VECTOR;
 
         offset = 0;
         while (offset < BYTES_PER_UNCOMPRESSED_POLYNOMIAL) {
             for i = 0 to COLUMNS_IN_MATRIX_A {
                 lhs_coeffs = lhs.[:u256 offset + i * BYTES_PER_UNCOMPRESSED_POLYNOMIAL];
                 rhs_coeffs = rhs.[:u256 offset + i * BYTES_PER_UNCOMPRESSED_POLYNOMIAL];
+                rhs_high_coeffs = rhs_high.[:u256 offset + i * BYTES_PER_UNCOMPRESSED_POLYNOMIAL];
                 lhs_high = #VMOVSHDUP_256(lhs_coeffs);
-                rhs_high = #VMOVSHDUP_256(rhs_coeffs);
                 product_low = #VPMUL_256(lhs_coeffs, rhs_coeffs);
-                product_high = #VPMUL_256(lhs_high, rhs_high);
+                product_high = #VPMUL_256(lhs_high, rhs_high_coeffs);
                 if (i == 0) {
                     acc_low = product_low;
                     acc_high = product_high;
@@ -66,6 +72,12 @@ namespace row_vector {
             acc_high = #VPSUB_4u64(acc_high, t_high);
             acc_low = #VMOVSHDUP_256(acc_low);
             acc_low = #VPBLEND_8u32(acc_low, acc_high, 0b1_0_1_0_1_0_1_0);
+
+            // reduce32: acc -= ((acc + 2^22) >> 23) * q
+            t_low = #VPADD_8u32(acc_low, two_pow_22);
+            t_low = #VPSRA_8u32(t_low, 23);
+            t_low = #VPMULL_8u32(t_low, modulus);
+            acc_low = #VPSUB_8u32(acc_low, t_low);
             output.[:u256 offset] = acc_low;
 
             offset += 32;
@@ -74,7 +86,7 @@ namespace row_vector {
         return output;
     }
 
-    // Compute A * NTT(vector)
+    // Compute reduce32(A * NTT(vector))
     inline
     fn __multiply_with_matrix_A(
         reg ptr u32[ROWS_IN_MATRIX_A * COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] matrix_A,
@@ -82,14 +94,28 @@ namespace row_vector {
     ) -> stack u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL]
     {
         stack u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] out;
+        stack u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] vector_high;
+        reg u256 coefficients;
+        reg ui64 offset;
 
         inline int i;
+
+        // The odd lanes of the vector, once for every row
+        offset = 0;
+        while (offset < COLUMNS_IN_MATRIX_A * BYTES_PER_UNCOMPRESSED_POLYNOMIAL) {
+            coefficients = vector.[:u256 offset];
+            coefficients = #VMOVSHDUP_256(coefficients);
+            vector_high.[:u256 offset] = coefficients;
+            offset += 32;
+        }
+
         for i = 0 to ROWS_IN_MATRIX_A {
             out[COEFFICIENTS_IN_POLYNOMIAL * i : COEFFICIENTS_IN_POLYNOMIAL] =
                 __dot_product(
                     out[COEFFICIENTS_IN_POLYNOMIAL * i : COEFFICIENTS_IN_POLYNOMIAL],
                     matrix_A[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL * i : COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL],
-                    vector
+                    vector,
+                    vector_high
                 );
         }
 

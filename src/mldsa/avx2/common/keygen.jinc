@@ -32,7 +32,6 @@ inline fn __compute_t0_t1(
     stack u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] t t0 t1;
 
     t = row_vector::__multiply_with_matrix_A(matrix_A, s1);
-    t = column_vector::reduce32(t);
     t = column_vector::invert_ntt_montgomery(t);
 
     t = column_vector::__add(t, s2);
