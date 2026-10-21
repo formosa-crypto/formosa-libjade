@@ -28,8 +28,8 @@ inline fn montgomery_multiply_and_reduce(reg u256 lhs, reg u256 rhs) -> reg u256
     reg u256 product_low product_high;
     reg u256 t_low t_high;
 
-    lhs_high = #VMOVSHDUP_256(lhs);
-    rhs_high = #VMOVSHDUP_256(rhs);
+    lhs_high = #VPSRL_4u64(lhs, 32);
+    rhs_high = #VPSRL_4u64(rhs, 32);
 
     // Multiply
     product_low = #VPMUL_256(lhs, rhs);
