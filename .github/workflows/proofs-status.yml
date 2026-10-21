@@ -1,0 +1,55 @@
+name: proofs-status
+
+# Reports a proofs run started by hand (workflow_dispatch) as the commit
+# status `proofs` of the commit it checks: pending when the run is
+# requested, then success or failure when it completes. A PR shows the
+# statuses of its head commit whatever their origin, but not the checks of
+# a dispatched run, so this status is what the PR shows (and what a merge
+# rule can require). This workflow always runs main's version
+# (workflow_run), never the branch's copy of the proofs workflow.
+
+on:
+  workflow_run:
+    workflows: [proofs]
+    types: [requested, completed]
+
+# actions: read to find the latest proofs run of the commit; statuses: write
+# to set its status.
+permissions:
+  actions: read
+  statuses: write
+
+jobs:
+  status:
+    if: >-
+      github.event.workflow_run.event == 'workflow_dispatch' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTION: ${{ github.event.action }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN: ${{ github.event.workflow_run.id }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+          # A run cancelled by a newer one on the same commit (the concurrency
+          # group) completes after the newer one is requested: only the latest
+          # dispatched run of the commit sets its status.
+          runs="repos/$GITHUB_REPOSITORY/actions/workflows/proofs.yml/runs"
+          latest=$(gh api "$runs?event=workflow_dispatch&head_sha=$SHA&per_page=1" \
+                     --jq '.workflow_runs[0].id')
+          if [ "$latest" != "$RUN" ]; then
+            echo "::notice::run $latest supersedes run $RUN on $SHA"
+            exit 0
+          fi
+          case "$ACTION/$CONCLUSION" in
+            requested/*)       state=pending; desc="Checking the proofs" ;;
+            completed/success) state=success; desc="Proofs checked" ;;
+            completed/*)       state=failure; desc="Proofs run: $CONCLUSION" ;;
+          esac
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state="$state" \
+            -f context=proofs -f description="$desc" -f target_url="$URL" > /dev/null

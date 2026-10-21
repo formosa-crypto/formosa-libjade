@@ -1,15 +1,15 @@
 name: proofs
 
-# SECURITY: the plain pull_request trigger is safe while this repo is
-# PRIVATE (only collaborators can open PRs). Before making the repo public,
-# adopt bench.yml's model (pull_request_target + label + same-repo gate) so
-# fork code can never run on the self-hosted machine.
+# Pull requests are checked on demand: run this workflow on the PR's branch
+# (Actions > proofs > Run workflow, or `gh workflow run proofs.yml --ref
+# <branch>`). proofs-status reports the run as the commit status `proofs`
+# of the branch's head, which the PR shows until the next push. Only users
+# with write access can start it, and only on branches of this repo.
 
 on:
   workflow_dispatch:
   push:
     branches: [main, 'ci-*']
-  pull_request:
 
 permissions:
   contents: read
@@ -32,14 +32,11 @@ jobs:
     runs-on: [self-hosted, linux, proofs]
     timeout-minutes: 240
     steps:
-      # On a PR, check the PR's head (as bench does) rather than GitHub's
-      # temporary merge commit, so the published timing is for that commit.
       - name: Checkout
         uses: actions/checkout@v7
         with:
           submodules: false
           persist-credentials: false
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       # Builds (or reuses from the store) the whole toolchain; this is the
       # long step on a cold store or after an easycrypt pin advance.
@@ -75,7 +72,6 @@ jobs:
       - name: Job summary
         env:
           PUBLISHED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || '' }}
         run: |
           $ECDEV python3 -I - proofs-timing.json >> "$GITHUB_STEP_SUMMARY" <<'EOF'
           import json, sys
@@ -84,10 +80,10 @@ jobs:
                 f"{m['files']} files ({m.get('machine', {}).get('jobs', '?')} jobs).")
           EOF
           site=https://www.strub.nu/jasmin-nist-timing
-          if [ -n "$PR" ]; then
-            echo "**[Compare with the merge base]($site/#/pr/$PR)** on the results dashboard (published by publish-pr-proofs a minute after this run)." >> "$GITHUB_STEP_SUMMARY"
-          elif [ "$PUBLISHED" = true ]; then
+          if [ "$PUBLISHED" = true ]; then
             echo "**[Results for this commit]($site/#/results/$GITHUB_SHA)** · **[compare with the previous commit]($site/#/compare/$GITHUB_SHA)** on the results dashboard (updated a minute after this run)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "If this commit is the head of a PR, its page on the **[results dashboard]($site/)** compares it with the merge base (published by publish-pr-proofs a minute after this run)." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload timing artifact

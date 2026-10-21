@@ -5,11 +5,12 @@ name: publish-pr-proofs
 # data/pr/<number>/proofs/<head>.json with the PR's merge base, once its
 # proofs run has succeeded.
 #
-# The proofs workflow runs on pull_request, i.e. with the PR's own copy of
-# the workflow, so it must never hold the deploy key. This workflow is
-# triggered by its completion and always runs main's version (workflow_run):
-# it only downloads the run's artifact as data, validates it, and takes the
-# target (PR, head, merge base) from the event and the API.
+# A PR's proofs run is started by hand on its branch (workflow_dispatch),
+# i.e. with the branch's copy of the workflow, so it must never hold the
+# deploy key. This workflow is triggered by its completion and always runs
+# main's version (workflow_run): it only downloads the run's artifact as
+# data, validates it, and takes the target (PR, head, merge base) from the
+# event and the API.
 
 on:
   workflow_run:
@@ -26,7 +27,7 @@ permissions:
 jobs:
   publish:
     if: >-
-      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.event == 'workflow_dispatch' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
@@ -49,8 +50,9 @@ jobs:
           PR: ${{ github.event.workflow_run.pull_requests[0].number }}
         run: |
           set -euo pipefail
-          # The event lists open PRs only: a PR merged or closed before its
-          # proofs run ended is found from its head commit.
+          # The event may not list the PR (a dispatched run, or a PR merged or
+          # closed before its proofs run ended): find it from its head commit.
+          # A run on a commit that is no PR's head publishes nothing.
           if [ -z "$PR" ]; then
             PR=$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD/pulls" \
                    --jq "[.[] | select(.head.sha == \"$HEAD\")][0].number // empty")
