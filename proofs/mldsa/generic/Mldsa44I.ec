@@ -6,10 +6,10 @@
 require import AllCore IntDiv CoreMap List Distr.
 from Jasmin require import JModel_x86.
 require import Mldsa44.
-require import Array32 Array84 Array96 Array192 Array384 Array576 Array768
- Array1024 Array1280 Array1312 Array1664 Array2304 Array2420 Array2560
- Array4096 WArray32 WArray96 WArray192 WArray576 WArray768 WArray1312
- WArray2420 WArray2560 WArray4096.
+require import Array32 Array40 Array84 Array96 Array192 Array384 Array576
+ Array768 Array1024 Array1280 Array1312 Array1664 Array2048 Array2304
+ Array2420 Array2560 Array4096 WArray32 WArray96 WArray192 WArray576 WArray768
+ WArray1312 WArray2420 WArray2560 WArray4096.
 require Spec44 MldsaT.
 
 clone MldsaT.MldsaT as Mldsa44I with
@@ -23,6 +23,7 @@ clone MldsaT.MldsaT as Mldsa44I with
   theory Array_hint_enc <= Array84,
   theory Array_klpolys <= Array4096,
   theory Array_kpolys <= Array1024,
+  theory Array_kpolys2 <= Array2048,
   theory WArray_kpolys_bytes <= WArray4096,
   theory Array_lpolys <= Array1024,
   theory WArray_lpolys_bytes <= WArray4096,
@@ -36,6 +37,7 @@ clone MldsaT.MldsaT as Mldsa44I with
   theory WArray_sk_enc <= WArray2560,
   theory Array_t0_enc <= Array1664,
   theory Array_t1_enc <= Array1280,
+  theory Array_tau1 <= Array40,
   theory Array_w1_enc <= Array192,
   theory WArray_w1_enc <= WArray192,
   theory Array_w1vec_enc <= Array768,

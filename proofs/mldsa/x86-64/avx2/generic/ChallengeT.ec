@@ -487,4 +487,18 @@ ecall{2} (sample____challengeP s); ecall{1} (SampleInBall_correct ct).
 by auto=> />; smt(sampleInBall_norm).
 qed.
 
+lemma sample_challenge_correct_l1eq :
+    equiv [ SampleInBall(MLDSA_XOF_SIB).sample ~ M.sample____challenge :
+       arg{1} = BytesCT.of_list (to_list arg{2}.`2)
+       ==>
+       lifts_wpoly res{2} = res{1}.`1 /\
+       wpoly_srng 1 1 res{2} /\
+       l1 res{1}.`1 = tau
+    ].
+proof.
+proc*; exlim rho{1}, seed{2} => ct s.
+ecall{2} (sample____challengeP s); ecall{1} (SampleInBall_correct ct).
+by auto=> />; smt(sampleInBall_l1).
+qed.
+
 end ChallengeT.

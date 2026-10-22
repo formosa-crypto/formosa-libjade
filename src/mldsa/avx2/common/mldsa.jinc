@@ -6,6 +6,7 @@ from Common require "encoding/gamma1.jinc"
 from Common require "arithmetic/decompose.jinc"
 
 from Common require "arithmetic/rounding.jinc"
+from Common require "arithmetic/sparse.jinc"
 from Common require "arithmetic/modular.jinc"
 from Common require "arithmetic/zetas.jinc"
 from Common require "arithmetic/ntt.jinc"

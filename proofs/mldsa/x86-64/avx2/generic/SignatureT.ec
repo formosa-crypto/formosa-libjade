@@ -2,7 +2,7 @@ require import AllCore List IntDiv RealExp StdBigop.
 from Jasmin require import JModel_x86.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 require import ArrayExtra.
-require import JWordExtra EclibExtra JWordList.
+require import JWordExtra JModelExtra EclibExtra JWordList.
 require import Array256.
 require BaseT PreludeT Gamma1T.
 
@@ -331,44 +331,6 @@ op count_nonzero_prefix(v : polykvec) (i j : int) : int =
    else 0).
 
 
-(* -------------------------------------------------------------------- *)
-(* Generic facts on x86 instructions (MOVEMASK, VPCMPEQ).               *)
-(* -------------------------------------------------------------------- *)
-
-lemma movemask_8u32_bit (x : W256.t) (b : int) :
-  (zeroextu64 (MOVEMASK_8u32 x)).[b] = (0 <= b < 8 /\ msb (x \bits32 b)).
-proof.
-rewrite zeroextu64_bit /MOVEMASK_8u32 /=.
-case: (0 <= b < 8) => hb.
-+ rewrite (_ : 0 <= b < 32) 1:/# W32.get_bits2w 1:/#.
-  have : b = 0 \/ b = 1 \/ b = 2 \/ b = 3 \/ b = 4 \/ b = 5 \/ b = 6 \/ b = 7 by smt().
-  by move=> [|[|[|[|[|[|[|]]]]]]] -> /=.
-case: (0 <= b < 32) => hb1 //=.
-by rewrite W32.get_bits2w 1:/# nth_default /#.
-qed.
-
-lemma VPCMPEQ_8u32_bits32E (x y : W256.t) (i : int) : 0 <= i < 8 =>
-  VPCMPEQ_8u32 x y \bits32 i = if x \bits32 i = y \bits32 i then W32.onew else W32.zero.
-proof.
-move=> hi; rewrite /VPCMPEQ_8u32 W8u32.map2bE // /wcmp /=.
-move: (x \bits32 i) (y \bits32 i) => a b; case: (a = b) => [-> /=|hne].
-- by apply W32.to_uint_eq; rewrite W32.of_uintK W32.to_uint_onew.
-rewrite ifF // /W32.to_sint /W32.smod /=.
-by have := W32.to_uint_eq a b; have := W32.to_uint_cmp a; have := W32.to_uint_cmp b; smt().
-qed.
-
-(* bit b of the mask computed by the hint encoding: the coefficient b of the
-   group is non-zero *)
-lemma hint_mask_bits (c : W256.t) (b : int) :
-  (zeroextu64 (MOVEMASK_8u32 (VPCMPEQ_8u32 c W256.zero)) `^` W64.of_int 255).[b]
-  = (0 <= b < 8 /\ c \bits32 b <> W32.zero).
-proof.
-rewrite W64.xorwE movemask_8u32_bit (_ : 255 = 2 ^ 8 - 1) // W64.of_int_powm1 //.
-case: (0 <= b < 8) => hb /=; last by smt().
-rewrite VPCMPEQ_8u32_bits32E // W8u32.get_zero (_ : 0 <= b < 64) 1:/# (_ : b < 8) 1:/# /=.
-by case: (c \bits32 b = W32.zero) => _; rewrite /msb ?W32.to_uint_onew ?W32.to_uint0.
-qed.
-
 lemma hint_nzE (v : W32.t Array_kpolys.t) (i x : int) :
   0 <= i < kvec => 0 <= x < n =>
   wpolykvec_urng (kvec_unflatten256 v) 2 =>
@@ -386,31 +348,7 @@ qed.
 (* signature in which they are written from the hint byte c0.            *)
 (* -------------------------------------------------------------------- *)
 
-op hpos (p : poly) (j : int) : int list = filter (fun x => p.[x] = Zq.one) (iota_ 0 j).
-
-lemma hpos_cat (p : poly) (a d : int) : 0 <= a => 0 <= d =>
-  hpos p (a + d) = hpos p a ++ filter (fun x => p.[x] = Zq.one) (iota_ a d).
-proof. by move=> ha hd; rewrite /hpos iota_add // filter_cat. qed.
-
-lemma hpos_none (p : poly) (a b : int) : 0 <= a <= b =>
-  (forall x, a <= x < b => p.[x] <> Zq.one) => hpos p b = hpos p a.
-proof.
-move=> hab hn; rewrite (_ : b = a + (b - a)) 1:/# hpos_cat 1,2:/#.
-rewrite (_ : filter (fun x => p.[x] = Zq.one) (iota_ a (b - a)) = []) ?cats0 //.
-by rewrite -(filter_pred0 (iota_ a (b - a))); apply eq_in_filter => x /mem_iota /#.
-qed.
-
-lemma hposS (p : poly) (j : int) : 0 <= j =>
-  hpos p (j + 1) = if p.[j] = Zq.one then rcons (hpos p j) j else hpos p j.
-proof.
-by move=> hj; rewrite hpos_cat // iota1 /= -cats1; case: (p.[j] = Zq.one); rewrite ?cats0.
-qed.
-
-lemma size_hpos_mono (p : poly) (a b : int) : 0 <= a <= b =>
-  size (hpos p a) <= size (hpos p b).
-proof.
-by move=> hab; rewrite (_ : b = a + (b - a)) 1:/# hpos_cat 1,2:/# size_cat; smt(size_ge0).
-qed.
+abbrev hpos (p : poly) (j : int) = ipos (fun x => p.[x] = Zq.one) j.
 
 lemma size_hpos (p : poly) (j : int) : 0 <= j <= n =>
   size (hpos p j) = count (fun c => c = Zq.one) (take j (to_list p)).
@@ -585,36 +523,26 @@ while {2} (
   + move=> zz.
     auto => /> &hr hi0 hi1 hr hc hle hj0 hj1 hj8 t ht0 ht1 hb hnz.
     pose v := liftu_wpolykvec (kvec_unflatten256 hint_0{hr}).
-    have [hp0 [hpb hpq]] := WE64.lowbitP _ hnz.
-    pose p := WE64.lowbit nonzero{hr}.
-    have [hp1 hpone] : t <= p < 8 /\ v.[i{hr}].[j{hr} + p] = Zq.one by rewrite -hb.
-    have hnone : forall x, j{hr} + t <= x < j{hr} + p => v.[i{hr}].[x] <> Zq.one.
-    + move=> x hx; have := hb (x - j{hr}); have := hpq (x - j{hr}) _; 1: smt().
-      by move=> -> /= /#.
-    have e1 : hpos v.[i{hr}] (j{hr} + p) = hpos v.[i{hr}] (j{hr} + t) by apply hpos_none => /#.
-    have e2 := hposS v.[i{hr}] (j{hr} + p) _; 1: smt().
-    rewrite hpone /= e1 in e2.
-    have hsz := size_hpos_mono v.[i{hr}] (j{hr} + p + 1) 256 _; 1: smt().
-    rewrite e2 size_rcons in hsz.
+    have /= [[hp1 hp8] [hb' e]] :=
+      scan_step (fun x => v.[i{hr}].[x] = Zq.one) _ _ _ hj0 ht0 hnz hb.
+    pose p := to_uint (TZCNT_64 nonzero{hr}).`6.
+    have := size_ipos_mono (fun x => v.[i{hr}].[x] = Zq.one) (j{hr} + (p + 1)) 256 _; 1: smt().
+    rewrite e size_rcons => hsz.
     have -> /= : c0 + size (hpos v.[i{hr}] (j{hr} + t)) < w_hint by smt().
     split; last by apply WE64.blsr_lt.
     exists (p + 1); split; 1: smt().
-    split.
-    + move=> b; rewrite -W64.andwE WE64.blsrE // hb -/p.
-      case: (b = p) => [-> /= | hbp]; 1: smt().
-      have := hnone (j{hr} + b); smt().
-    rewrite (_ : j{hr} + (p + 1) = j{hr} + p + 1) 1:/# e2 size_rcons /=.
-    rewrite hint_offE /truncateu8 W64.to_uintD_small WE64.tzcntE -/p.
+    split; 1: exact hb'.
+    rewrite -/p e size_rcons /=; split; 1: ring.
+    rewrite hint_offE /truncateu8 W64.to_uintD_small -/p.
     + by rewrite W64.of_uintK /= pmod_small /#.
     rewrite W64.of_uintK /= pmod_small 1:/#.
-    split; 1: ring.
     by rewrite addzA (addzC p) hint_upd_rcons //; smt(gt0_k).
   auto => /> &hr hi0 hi1 hr hc hle hj0 hj1 hj8 hcg.
   have hjn : j{hr} < 256 by smt().
   have hkb : kpolys_bytes = 1024 * kvec by rewrite /kpolys_bytes /kpolys; ring.
   split.
   + split; 1: done.
-    exists 0 => /=; move=> b; rewrite /SLH64.protect_64 hint_mask_bits.
+    exists 0 => /=; move=> b; rewrite /SLH64.protect_64 mask_nz.
     case: (0 <= b < 8) => hb //=.
     rewrite WAE_kpolys_bytes.get256_direct_init32_bits32 1..4:/#.
     rewrite (_ : (1024 * i{hr} + 4 * j{hr}) %/ 4 + b = i{hr} * n + (j{hr} + b)) 1:/#.
@@ -622,11 +550,10 @@ while {2} (
   move=> cb nz; split.
   + by move=> _ t _ _ _ h; smt(W64.to_uint_eq W64.to_uint0 W64.to_uint_cmp).
   move=> _ _ hnz t ht0 ht1 hb.
-  have e : hpos (liftu_wpolykvec (kvec_unflatten256 hint_0{hr})).[i{hr}] (j{hr} + 8) =
-           hpos (liftu_wpolykvec (kvec_unflatten256 hint_0{hr})).[i{hr}] (j{hr} + t).
-  + apply hpos_none => [/# | x hx].
-    have := hb (x - j{hr}); rewrite (_ : nz = W64.zero) 1:/# W64.zerowE /#.
-  by rewrite e /=; smt().
+  rewrite (_ : nz = W64.zero) 1:/# in hb.
+  pose v := liftu_wpolykvec (kvec_unflatten256 hint_0{hr}).
+  have := scan_end (fun x => v.[i{hr}].[x] = Zq.one) _ _ _ _ hb; 1,2: smt().
+  by move=> -> /=; smt().
 (* the coefficients of the specification *)
 while {1} (
     0 <= i{1} < kvec /\ h{1} = _hint /\
@@ -637,16 +564,15 @@ while {1} (
     (256 - j{1}).
 + move=> &2 z.
   auto => /> &hr hi0 hi1 hc hle hj0 _ hj1.
-  have hsz := size_hpos_mono _hint.[i{hr}] (j{hr} + 1) 256 _; 1: smt().
-  have e := hposS _hint.[i{hr}] j{hr} _; 1: done.
+  have hsz := size_ipos_mono (fun x => _hint.[i{hr}].[x] = Zq.one) (j{hr} + 1) 256 _; 1: smt().
+  have /= e := iposS (fun x => _hint.[i{hr}].[x] = Zq.one) j{hr} _; 1: done.
   case: (_hint.[i{hr}].[j{hr}] = Zq.one) => hone.
   + move: e hsz; rewrite hone /= => -> hsz /=.
     have hlt : c0 + size (hpos _hint.[i{hr}] j{hr}) < hint_bytes by smt(size_rcons gt0_k).
     by rewrite put_hint_upd // size_rcons /#.
   by move: e hsz; rewrite hone /= => -> hsz /=; smt().
 auto => /> &2 Hr Hc Hi0 Hi1 Hix0 Hix1 Ht Hik.
-have hp0 : forall (p : poly), hpos p 0 = [] by move=> p; rewrite /hpos iota0.
-rewrite !hp0 /= hint_upd_nil /=.
+rewrite !ipos0 /= hint_upd_nil /=.
 have hcn := cnp_hpos (liftu_wpolykvec (kvec_unflatten256 hint_0{2})) i{2} n _ _; 1,2: smt().
 have hnx := cnp_next (liftu_wpolykvec (kvec_unflatten256 hint_0{2})) i{2} _; 1: smt().
 have hle := cnp_le (liftu_wpolykvec (kvec_unflatten256 hint_0{2})) (i{2} + 1) _; 1: smt().

@@ -1,0 +1,316 @@
+// Products by the challenge in the time domain.
+//
+// The challenge c has ONES_IN_VERIFIER_CHALLENGE (TAU) coefficients equal to
+// +1 or -1 and the others zero, and it is public once sampled (the signing
+// loop declassifies it). The product c * s in R_q = Z_q[X] / (X^256 + 1) is
+// then a signed sum of TAU rotations of s, computed exactly on the integers:
+// no NTT of s, c or the product, and no modular reduction, the sums staying
+// far below 2^31 (|c * s| <= TAU * eta for s1, s2 and TAU * 2^(d-1) for t0).
+//
+// For a rotation by p, X^p * s has coefficient j equal to s[j - p] when
+// j >= p and -s[j - p + 256] otherwise. With the doubled polynomial
+// D = [-s | s] (512 coefficients, D[t] = -s[t] for t < 256 and s[t - 256]
+// above), X^p * s = D[256 - p .. 512 - p): one contiguous, unaligned read
+// per rotation. The positions p are public, so the addresses are.
+//
+// s1 and s2 (|coefficient| <= eta <= 4) and their products (|.| <= TAU *
+// eta <= 240) fit 16-bit lanes: half the loads. t0 stays on 32 bits.
+namespace polynomial {
+    param int TAU = ONES_IN_VERIFIER_CHALLENGE;
+    param int DOUBLED_COEFFICIENTS = 2 * COEFFICIENTS_IN_POLYNOMIAL;
+
+    // The positions of the non-zero coefficients of the (public) challenge:
+    // those of the +1 first, in increasing order, from index 0 up; those of
+    // the -1 from index TAU - 1 down; the number of +1 at index TAU (kept
+    // in the array rather than in a register: the signing loop has none to
+    // spare).
+    #[safety =
+       { requires = is_arr_init(challenge,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(positions,0,4 * (TAU + 1))
+       }
+     ]
+    inline
+    fn __challenge_positions(
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] challenge
+    ) -> stack u32[TAU + 1]
+    {
+        stack u32[TAU + 1] positions;
+        #[msf] reg u64 ms;
+        reg u256 coefficients zeros positive negative;
+        reg u32 mask32;
+        reg u64 mask position n_plus;
+        reg ui64 offset j n_minus;
+        reg bool condition_group condition_bit;
+
+        // The array only ever holds positions of the public challenge; the
+        // entries are written by data-dependent loops, which the speculative
+        // constant-time checker cannot see fill it (without this it would
+        // type the uninitialised array, hence the positions, as secret).
+        ArrayInit(positions);
+
+        ms = #init_msf();
+        zeros = #set0_256();
+        n_plus = 0;
+        // decremented before each write: it never goes below 0 (at most TAU
+        // non-zero coefficients)
+        n_minus = TAU;
+
+        offset = 0;
+        j = 0;
+        while { condition_group = offset < BYTES_PER_UNCOMPRESSED_POLYNOMIAL; } (condition_group) {
+            ms = #update_msf(condition_group, ms);
+            coefficients = challenge.[:u256 offset];
+
+            positive = #VPCMPGT_8u32(coefficients, zeros);
+            mask32 = #MOVEMASK_8u32(positive);
+            mask = (64u) mask32;
+            mask = #protect(mask, ms);
+            while { condition_bit = mask != 0; } (condition_bit) {
+                ms = #update_msf(condition_bit, ms);
+                _, _, _, _, _, position = #TZCNT_64(mask);
+                position += (64u) j;
+                positions[n_plus] = (32u) position;
+                n_plus += 1;
+                position = mask;
+                position -= 1;
+                mask &= position;
+            }
+            ms = #update_msf(!condition_bit, ms);
+
+            negative = #VPCMPGT_8u32(zeros, coefficients);
+            mask32 = #MOVEMASK_8u32(negative);
+            mask = (64u) mask32;
+            mask = #protect(mask, ms);
+            while { condition_bit = mask != 0; } (condition_bit) {
+                ms = #update_msf(condition_bit, ms);
+                _, _, _, _, _, position = #TZCNT_64(mask);
+                position += (64u) j;
+                n_minus -= 1;
+                positions[n_minus] = (32u) position;
+                position = mask;
+                position -= 1;
+                mask &= position;
+            }
+            ms = #update_msf(!condition_bit, ms);
+
+            j += 8;
+            offset += 32;
+        }
+        ms = #update_msf(!condition_group, ms);
+        positions[TAU] = (32u) n_plus;
+
+        return positions;
+    }
+
+    // D = [-s | s] on 16-bit coefficients. The doubled polynomial is held in
+    // an array of 256 u32 (512 16-bit lanes): its slices are then indexed
+    // like those of the polynomials.
+    #[safety =
+       { requires = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(doubled,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
+    inline
+    fn __double_16(
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] doubled,
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
+    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
+    {
+        reg u256 low high packed zeros negated;
+        inline int i;
+
+        zeros = #set0_256();
+        for i = 0 to COEFFICIENTS_IN_POLYNOMIAL / 16 {
+            low = polynomial.[:u256 64 * i];
+            high = polynomial.[:u256 64 * i + 32];
+            packed = #VPACKSS_8u32(low, high);
+            packed = #VPERMQ(packed, 0b11_01_10_00);
+            negated = #VPSUB_16u16(zeros, packed);
+            doubled.[:u256 32 * i] = negated;
+            doubled.[:u256 2 * COEFFICIENTS_IN_POLYNOMIAL + 32 * i] = packed;
+        }
+
+        return doubled;
+    }
+
+    // D = [-s | s] on 32-bit coefficients
+    #[safety =
+       { requires = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(doubled,0,4 * DOUBLED_COEFFICIENTS)
+       }
+     ]
+    inline
+    fn __double_32(
+        reg ptr u32[DOUBLED_COEFFICIENTS] doubled,
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
+    ) -> reg ptr u32[DOUBLED_COEFFICIENTS]
+    {
+        reg u256 coefficients zeros negated;
+        inline int i;
+
+        zeros = #set0_256();
+        for i = 0 to COEFFICIENTS_IN_POLYNOMIAL / 8 {
+            coefficients = polynomial.[:u256 32 * i];
+            negated = #VPSUB_8u32(zeros, coefficients);
+            doubled.[:u256 32 * i] = negated;
+            doubled.[:u256 4 * COEFFICIENTS_IN_POLYNOMIAL + 32 * i] = coefficients;
+        }
+
+        return doubled;
+    }
+
+    // product = c * s on the integers, s given doubled on 16 bits; the
+    // product is written on 32 bits. Two chunks of 128 coefficients, each in
+    // eight registers, accumulated over the rotations.
+    #[safety =
+       { requires = is_arr_init(doubled,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                 && is_arr_init(positions,0,4 * (TAU + 1))
+       , ensures = is_arr_init(product,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
+    inline
+    fn __sparse_multiply_16(
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] product,
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] doubled,
+        reg ptr u32[TAU + 1] positions
+    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
+    {
+        #[msf] reg u64 ms;
+        reg u256[8] acc;
+        reg u256 rotated;
+        reg u128 half;
+        reg u64 position n_plus;
+        reg ui64 m element;
+        reg bool condition;
+        inline int chunk r;
+
+        // The checker types an array, even of registers, from its
+        // uninitialised state (secret) joined with its writes: the
+        // accumulators would be secret whatever they hold.
+        ArrayInit(acc);
+
+        ms = #init_msf();
+        n_plus = (64u) positions[TAU];
+        n_plus = #protect(n_plus, ms);
+        for chunk = 0 to 2 {
+            for r = 0 to 8 {
+                acc[r] = #set0_256();
+            }
+
+            m = 0;
+            while { condition = m < (64ui) n_plus; } (condition) {
+                ms = #update_msf(condition, ms);
+                position = (64u) positions[m];
+                position = #protect(position, ms);
+                element = COEFFICIENTS_IN_POLYNOMIAL + 128 * chunk;
+                element -= (64ui) position;
+                element <<= 1;
+                for r = 0 to 8 {
+                    rotated = doubled.[:u256 element + 32 * r];
+                    acc[r] = #VPADD_16u16(acc[r], rotated);
+                }
+                m += 1;
+            }
+            ms = #update_msf(!condition, ms);
+
+            while { condition = m < TAU; } (condition) {
+                ms = #update_msf(condition, ms);
+                position = (64u) positions[m];
+                position = #protect(position, ms);
+                element = COEFFICIENTS_IN_POLYNOMIAL + 128 * chunk;
+                element -= (64ui) position;
+                element <<= 1;
+                for r = 0 to 8 {
+                    rotated = doubled.[:u256 element + 32 * r];
+                    acc[r] = #VPSUB_16u16(acc[r], rotated);
+                }
+                m += 1;
+            }
+            ms = #update_msf(!condition, ms);
+
+            for r = 0 to 8 {
+                half = (128u) acc[r];
+                rotated = #VPMOVSX_8u16_8u32(half);
+                product.[:u256 4 * (128 * chunk + 16 * r)] = rotated;
+                half = #VEXTRACTI128(acc[r], 1);
+                rotated = #VPMOVSX_8u16_8u32(half);
+                product.[:u256 4 * (128 * chunk + 16 * r + 8)] = rotated;
+            }
+        }
+
+        return product;
+    }
+
+    // product = c * s on the integers, s given doubled on 32 bits. Four
+    // chunks of 64 coefficients. The caller passes its misspeculation flag
+    // (its loop has none of its own: it computes on public data only).
+    #[safety =
+       { requires = is_arr_init(doubled,0,4 * DOUBLED_COEFFICIENTS)
+                 && is_arr_init(positions,0,4 * (TAU + 1))
+       , ensures = is_arr_init(product,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
+    inline
+    fn __sparse_multiply_32(
+        reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] product,
+        reg ptr u32[DOUBLED_COEFFICIENTS] doubled,
+        reg ptr u32[TAU + 1] positions,
+        #[msf] reg u64 ms
+    ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL], reg u64
+    {
+        reg u256[8] acc;
+        reg u256 rotated;
+        reg u64 position n_plus;
+        reg ui64 m element;
+        reg bool condition;
+        inline int chunk r;
+
+        // (see __sparse_multiply_16 about the accumulators)
+        ArrayInit(acc);
+
+        n_plus = (64u) positions[TAU];
+        n_plus = #protect(n_plus, ms);
+        for chunk = 0 to 4 {
+            for r = 0 to 8 {
+                acc[r] = #set0_256();
+            }
+
+            m = 0;
+            while { condition = m < (64ui) n_plus; } (condition) {
+                ms = #update_msf(condition, ms);
+                position = (64u) positions[m];
+                position = #protect(position, ms);
+                element = COEFFICIENTS_IN_POLYNOMIAL + 64 * chunk;
+                element -= (64ui) position;
+                element <<= 2;
+                for r = 0 to 8 {
+                    rotated = doubled.[:u256 element + 32 * r];
+                    acc[r] = #VPADD_8u32(acc[r], rotated);
+                }
+                m += 1;
+            }
+            ms = #update_msf(!condition, ms);
+
+            while { condition = m < TAU; } (condition) {
+                ms = #update_msf(condition, ms);
+                position = (64u) positions[m];
+                position = #protect(position, ms);
+                element = COEFFICIENTS_IN_POLYNOMIAL + 64 * chunk;
+                element -= (64ui) position;
+                element <<= 2;
+                for r = 0 to 8 {
+                    rotated = doubled.[:u256 element + 32 * r];
+                    acc[r] = #VPSUB_8u32(acc[r], rotated);
+                }
+                m += 1;
+            }
+            ms = #update_msf(!condition, ms);
+
+            for r = 0 to 8 {
+                product.[:u256 4 * (64 * chunk + 8 * r)] = acc[r];
+            }
+        }
+
+        return product, ms;
+    }
+}

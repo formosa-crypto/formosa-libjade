@@ -464,6 +464,16 @@ require StdBigop.
 
 op l1 (p : poly) : int = StdBigop.Bigint.BIA.bigi predT (fun i => `|p.[i]|) 0 256.
 
+(* the coefficient of an integer sum *)
+lemma incoeff_big (F : int -> int) (l : int list) :
+  incoeff (StdBigop.Bigint.BIA.big predT F l) =
+  NR.P.BigCf.BCA.big predT (fun x => incoeff (F x)) l.
+proof.
+elim: l => [|x l ih].
++ by rewrite StdBigop.Bigint.BIA.big_nil NR.P.BigCf.BCA.big_nil incoeff0.
+by rewrite StdBigop.Bigint.BIA.big_cons NR.P.BigCf.BCA.big_cons /predT /= incoeffD ih.
+qed.
+
 lemma ge0_l1 (p : poly) : 0 <= l1 p.
 proof. by rewrite /l1 StdBigop.Bigint.sumr_ge0 => i _ /=; apply ge0_abs_zp. qed.
 

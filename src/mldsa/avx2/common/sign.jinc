@@ -64,15 +64,15 @@ fn derive_seed_for_mask(
 }
 
 #[safety =
-   { requires = is_arr_init(s1_element,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
-             && is_arr_init(verifier_challenge,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+   { requires = is_arr_init(s1_doubled,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+             && is_arr_init(challenge_positions,0,4 * (ONES_IN_VERIFIER_CHALLENGE + 1))
              && is_arr_init(mask_element,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
    , ensures = is_arr_init(signer_response_element,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
    }
  ]
 inline fn __compute_signer_response_element(
-    reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] s1_element,
-    reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] verifier_challenge,
+    reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] s1_doubled,
+    reg ptr u32[ONES_IN_VERIFIER_CHALLENGE + 1] challenge_positions,
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] mask_element,
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] signer_response_element
 ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL], reg u64
@@ -80,10 +80,12 @@ inline fn __compute_signer_response_element(
     stack u32[COEFFICIENTS_IN_POLYNOMIAL] cs1;
     reg u64 infinity_norm_check_result;
 
-    cs1 = polynomial::pointwise_montgomery_multiply_and_reduce(cs1, s1_element, verifier_challenge);
-    cs1 = polynomial::invert_ntt_montgomery(cs1);
+    // c * s1 on the integers (|.| <= TAU * eta), from the positions of the
+    // non-zero coefficients of the public challenge
+    cs1 = polynomial::__sparse_multiply_16(cs1, s1_doubled, challenge_positions);
 
-    // z = reduce32(mask + c*s1) and its norm test, in one pass
+    // z = reduce32(mask + c*s1) and its norm test, in one pass (the reduce32
+    // is the identity on these values)
     signer_response_element, infinity_norm_check_result =
         polynomial::__add_reduce32_check_infinity_norm(
             signer_response_element, cs1, mask_element, (GAMMA1 - BETA));
@@ -95,17 +97,17 @@ inline fn __compute_signer_response_element(
 // Mirrors mld_compute_pack_z from mldsa-native.
 // Returns updated signer_response and norm check result (0 = pass, non-zero = fail).
 #[safety =
-   { args = { s1, verifier_challenge, mask, signer_response, norm_check_result_in }
-   , requires = is_arr_init(s1,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
-             && is_arr_init(verifier_challenge,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+   { args = { s1_doubled, challenge_positions, mask, signer_response, norm_check_result_in }
+   , requires = is_arr_init(s1_doubled,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+             && is_arr_init(challenge_positions,0,4 * (ONES_IN_VERIFIER_CHALLENGE + 1))
              && is_arr_init(mask,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
    , ensures = (infinity_norm_check_result != 0 || is_arr_init(signer_response,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
             && (norm_check_result_in == 0 || infinity_norm_check_result != 0)
    }
  ]
 inline fn __compute_z_and_check_norm(
-    reg ptr u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] s1,
-    #[spill_to_mmx] reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] verifier_challenge,
+    reg ptr u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] s1_doubled,
+    #[spill_to_mmx] reg ptr u32[ONES_IN_VERIFIER_CHALLENGE + 1] challenge_positions,
     reg ptr u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] mask,
     reg ptr u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] signer_response,
     reg u64 infinity_norm_check_result
@@ -122,8 +124,8 @@ inline fn __compute_z_and_check_norm(
     } (base < COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL) {
         signer_response[base : COEFFICIENTS_IN_POLYNOMIAL], infinity_norm_check_result =
             __compute_signer_response_element(
-                s1[base : COEFFICIENTS_IN_POLYNOMIAL],
-                verifier_challenge,
+                s1_doubled[base : COEFFICIENTS_IN_POLYNOMIAL],
+                challenge_positions,
                 mask[base : COEFFICIENTS_IN_POLYNOMIAL],
                 signer_response[base : COEFFICIENTS_IN_POLYNOMIAL]
             );
@@ -136,10 +138,10 @@ inline fn __compute_z_and_check_norm(
 // check infinity norm. Output and input are separate buffers (disjoint reg ptr args).
 // Passes through any prior norm failure unchanged.
 #[safety =
-   { args = { w0_minus_cs2, w0, s2, verifier_challenge, norm_check_result_in }
+   { args = { w0_minus_cs2, w0, s2_doubled, challenge_positions, norm_check_result_in }
    , requires = is_arr_init(w0,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
-             && is_arr_init(s2,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
-             && is_arr_init(verifier_challenge,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+             && is_arr_init(s2_doubled,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+             && is_arr_init(challenge_positions,0,4 * (ONES_IN_VERIFIER_CHALLENGE + 1))
    , ensures = (infinity_norm_check_result != 0 || is_arr_init(w0_minus_cs2,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
             && (norm_check_result_in == 0 || infinity_norm_check_result != 0)
    }
@@ -147,8 +149,8 @@ inline fn __compute_z_and_check_norm(
 inline fn __apply_cs2_and_check_norm(
     reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] w0_minus_cs2,
     reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] w0,
-    reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] s2,
-    #[spill_to_mmx] reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] verifier_challenge,
+    reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] s2_doubled,
+    #[spill_to_mmx] reg ptr u32[ONES_IN_VERIFIER_CHALLENGE + 1] challenge_positions,
     reg u64 infinity_norm_check_result
 ) -> reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL], reg u64 {
     stack u32[COEFFICIENTS_IN_POLYNOMIAL] cs2;
@@ -162,11 +164,10 @@ inline fn __apply_cs2_and_check_norm(
             base = ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL;
         }
     } (base < ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL) {
-        cs2 = polynomial::pointwise_montgomery_multiply_and_reduce(
+        cs2 = polynomial::__sparse_multiply_16(
                     cs2,
-                    s2[base : COEFFICIENTS_IN_POLYNOMIAL],
-                    verifier_challenge);
-        cs2 = polynomial::invert_ntt_montgomery(cs2);
+                    s2_doubled[base : COEFFICIENTS_IN_POLYNOMIAL],
+                    challenge_positions);
         // w0 - c*s2 = reduce32(w0 - cs2) and its norm test, in one pass
         w0_minus_cs2[base : COEFFICIENTS_IN_POLYNOMIAL], infinity_norm_check_result =
             polynomial::__subtract_reduce32_check_infinity_norm(
@@ -198,8 +199,8 @@ param int CT0_NORM_BOUND =
 // c and t0 are public (declassified by __sign_internal), so this function
 // computes on public data only and declassifies nothing.
 #[safety =
-   { requires = is_arr_init(t0,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
-             && is_arr_init(verifier_challenge,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+   { requires = is_arr_init(t0_doubled,0,4 * (ROWS_IN_MATRIX_A * 2 * COEFFICIENTS_IN_POLYNOMIAL))
+             && is_arr_init(challenge_positions,0,4 * (ONES_IN_VERIFIER_CHALLENGE + 1))
              && (infinity_norm_check_result != 0 || is_arr_init(w0_minus_cs2,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
    , ensures = (infinity_norm_check_result != 0 || is_arr_init(w0_minus_cs2_plus_ct0,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
    }
@@ -207,8 +208,8 @@ param int CT0_NORM_BOUND =
 inline fn __apply_ct0_and_check_norm(
     reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] w0_minus_cs2_plus_ct0,
     reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] w0_minus_cs2,
-    reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] t0,
-    #[spill_to_mmx] reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] verifier_challenge,
+    reg ptr u32[ROWS_IN_MATRIX_A * 2 * COEFFICIENTS_IN_POLYNOMIAL] t0_doubled,
+    #[spill_to_mmx] reg ptr u32[ONES_IN_VERIFIER_CHALLENGE + 1] challenge_positions,
     reg u64 infinity_norm_check_result
 ) -> reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL], reg u64 {
     stack u32[COEFFICIENTS_IN_POLYNOMIAL] ct0;
@@ -216,6 +217,7 @@ inline fn __apply_ct0_and_check_norm(
     stack u64 ct0_norm_check_result;
     reg u64 ct0_norm_check_result_row;
     reg ui64 base;
+    #[msf] reg u64 ms;
 
     ct0_norm_check_result = 0;
     // The scratch buffer only ever holds c*t0, a function of public data.
@@ -227,16 +229,19 @@ inline fn __apply_ct0_and_check_norm(
         base = ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL;
     }
     while (base < ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL) {
-        ct0 = polynomial::pointwise_montgomery_multiply_and_reduce(
+        // The flag protects the loads of the challenge positions in the
+        // product (public values, but loaded from memory); the pass that
+        // follows has loops of its own and does not keep it.
+        ms = #init_msf();
+        ct0, ms = polynomial::__sparse_multiply_32(
                     ct0,
-                    t0[base : COEFFICIENTS_IN_POLYNOMIAL],
-                    verifier_challenge);
-        ct0 = polynomial::invert_ntt_montgomery(ct0);
+                    t0_doubled[base * 2 : 2 * COEFFICIENTS_IN_POLYNOMIAL],
+                    challenge_positions,
+                    ms);
         // w0_minus_cs2_plus_ct0[i] = w0_minus_cs2[i] + reduce32(ct0), with the
         // norm test of reduce32(ct0) compiled only when CT0_NORM_BOUND >= GAMMA2,
-        // in one pass. The inverse NTT returns a representative in (-q, q);
-        // reduce32 centres it, which __make_hint relies on even when the test
-        // is not compiled.
+        // in one pass. c*t0 is computed exactly (|.| <= CT0_NORM_BOUND < 2^22),
+        // so the reduce32 is the identity on it.
         w0_minus_cs2_plus_ct0[base : COEFFICIENTS_IN_POLYNOMIAL], ct0_norm_check_result_row =
             polynomial::__add_reduce32_check_infinity_norm_rhs(
                 w0_minus_cs2_plus_ct0[base : COEFFICIENTS_IN_POLYNOMIAL],
@@ -336,6 +341,12 @@ fn __sign_internal(
     stack u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] s1;
     stack u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] s2;
     stack u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] t0;
+    // s1, s2, t0 doubled ([-s | s]) for the products by the challenge
+    // (16-bit lanes, held in u32 arrays indexed like the polynomials)
+    stack u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] s1_doubled;
+    stack u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] s2_doubled;
+    stack u32[ROWS_IN_MATRIX_A * 2 * COEFFICIENTS_IN_POLYNOMIAL] t0_doubled;
+    stack u32[ONES_IN_VERIFIER_CHALLENGE + 1] challenge_positions;
 
     stack u32[ROWS_IN_MATRIX_A * COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] matrix_A;
     stack u8[MESSAGE_REPRESENTATIVE_SIZE] message_representative;
@@ -373,6 +384,7 @@ fn __sign_internal(
     reg u256 copied_32_bytes;
 
     reg ui64 j;
+    inline int i;
 
     () = #spill(signature, randomness, signing_key, context_pointer, context_size, message_pointer, message_size);
     seed_for_matrix_A = signing_key[0:32];
@@ -408,9 +420,29 @@ fn __sign_internal(
     // The leakage model treats t0 as public: it is declassified once here.
     () = #declassify(t0);
 
-    s1 = row_vector::ntt(s1);
-    s2 = column_vector::ntt(s2);
-    t0 = column_vector::ntt(t0);
+    // The products c * s1, c * s2, c * t0 are computed in the time domain
+    // from the positions of the non-zero coefficients of c: s1, s2 and t0
+    // are not transformed, only doubled. t0 is public (declassified above)
+    // and so is its doubled copy; the copy is declared initialised for the
+    // checker, which otherwise joins the type of the uninitialised array
+    // (secret) with that of the writes.
+    ArrayInit(t0_doubled);
+    for i = 0 to COLUMNS_IN_MATRIX_A {
+        s1_doubled[i * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL] =
+            polynomial::__double_16(
+                s1_doubled[i * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
+                s1[i * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL]);
+    }
+    for i = 0 to ROWS_IN_MATRIX_A {
+        s2_doubled[i * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL] =
+            polynomial::__double_16(
+                s2_doubled[i * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
+                s2[i * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL]);
+        t0_doubled[i * 2 * COEFFICIENTS_IN_POLYNOMIAL : 2 * COEFFICIENTS_IN_POLYNOMIAL] =
+            polynomial::__double_32(
+                t0_doubled[i * 2 * COEFFICIENTS_IN_POLYNOMIAL : 2 * COEFFICIENTS_IN_POLYNOMIAL],
+                t0[i * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL]);
+    }
 
     domain_separator_for_mask = 0;
 
@@ -455,24 +487,25 @@ fn __sign_internal(
         // The leakage model leaks the challenge c of every iteration.
         () = #declassify(verifier_challenge);
 
-        verifier_challenge = polynomial::ntt(verifier_challenge);
+        // The positions of its non-zero coefficients, for the products below
+        challenge_positions = polynomial::__challenge_positions(verifier_challenge);
 
         infinity_norm_check_result = 0;
 
         // b1: compute z = mask + c*s1, reject if z reveals the secret (mirrors mld_compute_pack_z).
         signer_response, infinity_norm_check_result =
-            __compute_z_and_check_norm(s1, verifier_challenge, mask, signer_response, infinity_norm_check_result);
+            __compute_z_and_check_norm(s1_doubled, challenge_positions, mask, signer_response, infinity_norm_check_result);
 
         // b2: compute w0_minus_cs2[i] = w0[i] - c*s2[i] for each row, check norm
         // (only once z passed).
         w0_minus_cs2, infinity_norm_check_result =
-            __apply_cs2_and_check_norm(w0_minus_cs2, w0, s2, verifier_challenge, infinity_norm_check_result);
+            __apply_cs2_and_check_norm(w0_minus_cs2, w0, s2_doubled, challenge_positions, infinity_norm_check_result);
 
         // b3: compute w0_minus_cs2_plus_ct0[i] = w0_minus_cs2[i] + c*t0[i] for each row,
         // check norm (ML-DSA-44 only, see CT0_NORM_BOUND). A public
         // computation: c and t0 are declassified.
         w0_minus_cs2_plus_ct0, ct0_norm_check_result =
-            __apply_ct0_and_check_norm(w0_minus_cs2_plus_ct0, w0_minus_cs2, t0, verifier_challenge, infinity_norm_check_result);
+            __apply_ct0_and_check_norm(w0_minus_cs2_plus_ct0, w0_minus_cs2, t0_doubled, challenge_positions, infinity_norm_check_result);
         // (The spill is unconditional: the spill lowering does not look
         // through the compile-time condition.)
         () = #spill(ct0_norm_check_result);

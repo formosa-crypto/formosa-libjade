@@ -295,6 +295,48 @@ lemma sampleInBall_norm (ct : BytesCT.t) :
     l1 (sampleInBall ct).`1 <= tau.
 proof. by have [ge1t _] := tau_bound; rewrite /sampleInBall /=; apply sib_iter_l1; smt(). qed.
 
+(* The bound is in fact an equality: the swap of Alg. 29 picks j <= i and the
+   coefficients at the indices i, i + 1, ... are still zero, so every outer
+   iteration adds exactly one to the l1 norm (needs the termination
+   criterion, which always holds: sib_terminates). *)
+lemma sib_iter_l1eq (ct : BytesCT.t) (n : int) : 0 <= n <= tau =>
+     l1 (sib_iter ct n).`1 = n
+  /\ forall k, 256 - tau + n <= k < 256 => (sib_iter ct n).`1.[k] = zero.
+proof.
+have [ge1t ltau] := tau_bound.
+have abs0 : `|Zq.zero| = 0 by rewrite -incoeff0 abs_incoeff.
+move=> [ge0m]; elim: n ge0m => [|m ge0m ih] lem.
+- have -> : (sib_iter ct 0).`1 = poly_zero by rewrite /sib_iter iota0.
+  split=> [|k rgk]; 2: by rewrite /poly_zero Array256.createiE 1:/#.
+  rewrite /l1 (StdBigop.Bigint.BIA.eq_big_int 0 256 _ (fun _ => 0)).
+  + by move=> i rgi /=; rewrite /poly_zero Array256.createiE.
+  by rewrite StdBigop.Bigint.BIA.big1_eq.
+have [ihl ihz] := ih _; 1: smt().
+have [_ [hj _]] :=
+  sib_skipP ct (256 - tau + m) (sib_iter ct m).`3 (sib_terminates ct m _); 1: smt().
+rewrite sib_iterS // /sib_step /=.
+pose c := (sib_iter ct m).`1.
+pose j := sib_byte ct ((sib_iter ct m).`3 + sib_skip ct (256 - tau + m) (sib_iter ct m).`3).
+have rgj : 0 <= j < 256.
+- by rewrite /j /sib_byte; move: (nth witness _ _) => w; have /= := W8.to_uint_cmp w.
+have hji : j <= 256 - tau + m by rewrite /j.
+split=> [|k rgk].
+- rewrite l1_set // l1_set 1:/#.
+  have -> : `|c.[256 - tau + m <- c.[j]].[j]| = `|c.[j]|.
+  + by rewrite Array256.get_setE 1:/#; case: (j = 256 - tau + m) => [->|].
+  have -> : `|if (sib_signs ct).[256 - tau + m + tau - 256] then incoeff (-1) else incoeff 1| = 1.
+  + by case: ((sib_signs ct).[256 - tau + m + tau - 256]) => _; rewrite abs_incoeff.
+  by rewrite /c ihz 1:/# abs0 ihl; ring.
+rewrite !Array256.get_setE 1,2:/# ifF 1:/# ifF 1:/#.
+by apply ihz => /#.
+qed.
+
+lemma sampleInBall_l1 (ct : BytesCT.t) : l1 (sampleInBall ct).`1 = tau.
+proof.
+have [ge1t _] := tau_bound; rewrite /sampleInBall /=.
+by have [-> _] := sib_iter_l1eq ct tau _; smt().
+qed.
+
 (*************** End SampleInBall CORRECTNESS BRIDGE ****************)
 
 

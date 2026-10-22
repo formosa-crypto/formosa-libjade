@@ -6,15 +6,16 @@ import SLH64.
 
 require import
 Array1 Array2 Array3 Array4 Array5 Array6 Array7 Array8 Array16 Array24
-Array25 Array28 Array32 Array64 Array66 Array83 Array96 Array128 Array136
-Array168 Array256 Array272 Array320 Array416 Array640 Array672 Array680
-Array768 Array848 Array1024 Array1792 Array2048 Array2560 Array2592 Array3328
-Array4480 Array4627 Array4896 Array14336 WArray2 WArray8 WArray16 WArray32
-WArray40 WArray64 WArray66 WArray83 WArray96 WArray128 WArray136 WArray160
-WArray168 WArray192 WArray200 WArray224 WArray256 WArray272 WArray320
-WArray416 WArray512 WArray640 WArray672 WArray680 WArray768 WArray800
-WArray848 WArray1024 WArray2048 WArray2560 WArray2592 WArray3328 WArray4480
-WArray4627 WArray4896 WArray7168 WArray8192 WArray57344.
+Array25 Array28 Array32 Array61 Array64 Array66 Array83 Array96 Array128
+Array136 Array168 Array256 Array272 Array320 Array416 Array512 Array640
+Array672 Array680 Array768 Array848 Array1024 Array1792 Array2048 Array2560
+Array2592 Array3328 Array4096 Array4480 Array4627 Array4896 Array14336
+WArray2 WArray8 WArray16 WArray32 WArray40 WArray64 WArray66 WArray83
+WArray96 WArray128 WArray136 WArray160 WArray168 WArray192 WArray200
+WArray224 WArray244 WArray256 WArray272 WArray320 WArray416 WArray512
+WArray640 WArray672 WArray680 WArray768 WArray800 WArray848 WArray1024
+WArray2048 WArray2560 WArray2592 WArray3328 WArray4480 WArray4627 WArray4896
+WArray7168 WArray8192 WArray16384 WArray57344.
 
 abbrev commitment__ENCODING_CONSTANTS_TABLE_bits6 =
 ((Array4.of_list witness)
@@ -2109,6 +2110,323 @@ module M = {
       offset <- (offset + 32);
     }
     return (highbits, lowbits);
+  }
+  proc polynomial____challenge_positions (challenge:W32.t Array256.t) : 
+  W32.t Array61.t = {
+    var positions:W32.t Array61.t;
+    var ms:W64.t;
+    var zeros:W256.t;
+    var n_plus:W64.t;
+    var condition_group:bool;
+    var coefficients:W256.t;
+    var positive:W256.t;
+    var mask32:W32.t;
+    var mask:W64.t;
+    var condition_bit:bool;
+    var position:W64.t;
+    var negative:W256.t;
+    var n_minus:int;
+    var offset:int;
+    var j:int;
+    var  _0:bool;
+    var  _1:bool;
+    var  _2:bool;
+    var  _3:bool;
+    var  _4:bool;
+    var  _5:bool;
+    var  _6:bool;
+    var  _7:bool;
+    var  _8:bool;
+    var  _9:bool;
+    positions <- witness;
+    positions <- witness;
+    ms <- (init_msf);
+    zeros <- (set0_256);
+    n_plus <- (W64.of_int 0);
+    n_minus <- 60;
+    offset <- 0;
+    j <- 0;
+    condition_group <- (offset < ((256 * 32) %/ 8));
+    while (condition_group) {
+      ms <- (update_msf condition_group ms);
+      coefficients <-
+      (get256_direct (WArray1024.init32 (fun i => challenge.[i])) offset);
+      positive <- (VPCMPGT_8u32 coefficients zeros);
+      mask32 <- (MOVEMASK_8u32 positive);
+      mask <- (zeroextu64 mask32);
+      mask <- (protect_64 mask ms);
+      condition_bit <- (mask <> (W64.of_int 0));
+      while (condition_bit) {
+        ms <- (update_msf condition_bit ms);
+        ( _0,  _1,  _2,  _3,  _4, position) <- (TZCNT_64 mask);
+        position <- (position + (W64.of_int j));
+        positions.[(W64.to_uint n_plus)] <- (truncateu32 position);
+        n_plus <- (n_plus + (W64.of_int 1));
+        position <- mask;
+        position <- (position - (W64.of_int 1));
+        mask <- (mask `&` position);
+        condition_bit <- (mask <> (W64.of_int 0));
+      }
+      ms <- (update_msf (! condition_bit) ms);
+      negative <- (VPCMPGT_8u32 zeros coefficients);
+      mask32 <- (MOVEMASK_8u32 negative);
+      mask <- (zeroextu64 mask32);
+      mask <- (protect_64 mask ms);
+      condition_bit <- (mask <> (W64.of_int 0));
+      while (condition_bit) {
+        ms <- (update_msf condition_bit ms);
+        ( _5,  _6,  _7,  _8,  _9, position) <- (TZCNT_64 mask);
+        position <- (position + (W64.of_int j));
+        n_minus <- (n_minus - 1);
+        positions.[n_minus] <- (truncateu32 position);
+        position <- mask;
+        position <- (position - (W64.of_int 1));
+        mask <- (mask `&` position);
+        condition_bit <- (mask <> (W64.of_int 0));
+      }
+      ms <- (update_msf (! condition_bit) ms);
+      j <- (j + 8);
+      offset <- (offset + 32);
+      condition_group <- (offset < ((256 * 32) %/ 8));
+    }
+    ms <- (update_msf (! condition_group) ms);
+    positions.[60] <- (truncateu32 n_plus);
+    return positions;
+  }
+  proc polynomial____double_16 (doubled:W32.t Array256.t,
+                                polynomial:W32.t Array256.t) : W32.t Array256.t = {
+    var inc:int;
+    var zeros:W256.t;
+    var i:int;
+    var low:W256.t;
+    var high:W256.t;
+    var packed:W256.t;
+    var negated:W256.t;
+    zeros <- (set0_256);
+    inc <- (256 %/ 16);
+    i <- 0;
+    while ((i < inc)) {
+      low <-
+      (get256_direct (WArray1024.init32 (fun i_0 => polynomial.[i_0]))
+      (64 * i));
+      high <-
+      (get256_direct (WArray1024.init32 (fun i_0 => polynomial.[i_0]))
+      ((64 * i) + 32));
+      packed <- (VPACKSS_8u32 low high);
+      packed <- (VPERMQ packed (W8.of_int 216));
+      negated <- (VPSUB_16u16 zeros packed);
+      doubled <-
+      (Array256.init
+      (WArray1024.get32
+      (WArray1024.set256_direct
+      (WArray1024.init32 (fun i_0 => doubled.[i_0])) (32 * i) negated)));
+      doubled <-
+      (Array256.init
+      (WArray1024.get32
+      (WArray1024.set256_direct
+      (WArray1024.init32 (fun i_0 => doubled.[i_0])) ((2 * 256) + (32 * i))
+      packed)));
+      i <- (i + 1);
+    }
+    return doubled;
+  }
+  proc polynomial____double_32 (doubled:W32.t Array512.t,
+                                polynomial:W32.t Array256.t) : W32.t Array512.t = {
+    var inc:int;
+    var zeros:W256.t;
+    var i:int;
+    var coefficients:W256.t;
+    var negated:W256.t;
+    zeros <- (set0_256);
+    inc <- (256 %/ 8);
+    i <- 0;
+    while ((i < inc)) {
+      coefficients <-
+      (get256_direct (WArray1024.init32 (fun i_0 => polynomial.[i_0]))
+      (32 * i));
+      negated <- (VPSUB_8u32 zeros coefficients);
+      doubled <-
+      (Array512.init
+      (WArray2048.get32
+      (WArray2048.set256_direct
+      (WArray2048.init32 (fun i_0 => doubled.[i_0])) (32 * i) negated)));
+      doubled <-
+      (Array512.init
+      (WArray2048.get32
+      (WArray2048.set256_direct
+      (WArray2048.init32 (fun i_0 => doubled.[i_0])) ((4 * 256) + (32 * i))
+      coefficients)));
+      i <- (i + 1);
+    }
+    return doubled;
+  }
+  proc polynomial____sparse_multiply_16 (product:W32.t Array256.t,
+                                         doubled:W32.t Array256.t,
+                                         positions:W32.t Array61.t) : 
+  W32.t Array256.t = {
+    var acc:W256.t Array8.t;
+    var ms:W64.t;
+    var n_plus:W64.t;
+    var r:int;
+    var condition:bool;
+    var position:W64.t;
+    var chunk:int;
+    var rotated:W256.t;
+    var half:W128.t;
+    var m:int;
+    var element:int;
+    acc <- witness;
+    acc <- witness;
+    ms <- (init_msf);
+    n_plus <- (zeroextu64 positions.[60]);
+    n_plus <- (protect_64 n_plus ms);
+    chunk <- 0;
+    while ((chunk < 2)) {
+      r <- 0;
+      while ((r < 8)) {
+        acc.[r] <- (set0_256);
+        r <- (r + 1);
+      }
+      m <- 0;
+      condition <- (m < (W64.to_uint n_plus));
+      while (condition) {
+        ms <- (update_msf condition ms);
+        position <- (zeroextu64 positions.[m]);
+        position <- (protect_64 position ms);
+        element <- (256 + (128 * chunk));
+        element <- (element - (W64.to_uint position));
+        element <- (element `<<` 1);
+        r <- 0;
+        while ((r < 8)) {
+          rotated <-
+          (get256_direct (WArray1024.init32 (fun i => doubled.[i]))
+          (element + (32 * r)));
+          acc.[r] <- (VPADD_16u16 acc.[r] rotated);
+          r <- (r + 1);
+        }
+        m <- (m + 1);
+        condition <- (m < (W64.to_uint n_plus));
+      }
+      ms <- (update_msf (! condition) ms);
+      condition <- (m < 60);
+      while (condition) {
+        ms <- (update_msf condition ms);
+        position <- (zeroextu64 positions.[m]);
+        position <- (protect_64 position ms);
+        element <- (256 + (128 * chunk));
+        element <- (element - (W64.to_uint position));
+        element <- (element `<<` 1);
+        r <- 0;
+        while ((r < 8)) {
+          rotated <-
+          (get256_direct (WArray1024.init32 (fun i => doubled.[i]))
+          (element + (32 * r)));
+          acc.[r] <- (VPSUB_16u16 acc.[r] rotated);
+          r <- (r + 1);
+        }
+        m <- (m + 1);
+        condition <- (m < 60);
+      }
+      ms <- (update_msf (! condition) ms);
+      r <- 0;
+      while ((r < 8)) {
+        half <- (truncateu128 acc.[r]);
+        rotated <- (VPMOVSX_8u16_8u32 half);
+        product <-
+        (Array256.init
+        (WArray1024.get32
+        (WArray1024.set256_direct (WArray1024.init32 (fun i => product.[i]))
+        (4 * ((128 * chunk) + (16 * r))) rotated)));
+        half <- (VEXTRACTI128 acc.[r] (W8.of_int 1));
+        rotated <- (VPMOVSX_8u16_8u32 half);
+        product <-
+        (Array256.init
+        (WArray1024.get32
+        (WArray1024.set256_direct (WArray1024.init32 (fun i => product.[i]))
+        (4 * (((128 * chunk) + (16 * r)) + 8)) rotated)));
+        r <- (r + 1);
+      }
+      chunk <- (chunk + 1);
+    }
+    return product;
+  }
+  proc polynomial____sparse_multiply_32 (product:W32.t Array256.t,
+                                         doubled:W32.t Array512.t,
+                                         positions:W32.t Array61.t, ms:W64.t) : 
+  W32.t Array256.t * W64.t = {
+    var acc:W256.t Array8.t;
+    var n_plus:W64.t;
+    var r:int;
+    var condition:bool;
+    var position:W64.t;
+    var chunk:int;
+    var rotated:W256.t;
+    var m:int;
+    var element:int;
+    acc <- witness;
+    acc <- witness;
+    n_plus <- (zeroextu64 positions.[60]);
+    n_plus <- (protect_64 n_plus ms);
+    chunk <- 0;
+    while ((chunk < 4)) {
+      r <- 0;
+      while ((r < 8)) {
+        acc.[r] <- (set0_256);
+        r <- (r + 1);
+      }
+      m <- 0;
+      condition <- (m < (W64.to_uint n_plus));
+      while (condition) {
+        ms <- (update_msf condition ms);
+        position <- (zeroextu64 positions.[m]);
+        position <- (protect_64 position ms);
+        element <- (256 + (64 * chunk));
+        element <- (element - (W64.to_uint position));
+        element <- (element `<<` 2);
+        r <- 0;
+        while ((r < 8)) {
+          rotated <-
+          (get256_direct (WArray2048.init32 (fun i => doubled.[i]))
+          (element + (32 * r)));
+          acc.[r] <- (VPADD_8u32 acc.[r] rotated);
+          r <- (r + 1);
+        }
+        m <- (m + 1);
+        condition <- (m < (W64.to_uint n_plus));
+      }
+      ms <- (update_msf (! condition) ms);
+      condition <- (m < 60);
+      while (condition) {
+        ms <- (update_msf condition ms);
+        position <- (zeroextu64 positions.[m]);
+        position <- (protect_64 position ms);
+        element <- (256 + (64 * chunk));
+        element <- (element - (W64.to_uint position));
+        element <- (element `<<` 2);
+        r <- 0;
+        while ((r < 8)) {
+          rotated <-
+          (get256_direct (WArray2048.init32 (fun i => doubled.[i]))
+          (element + (32 * r)));
+          acc.[r] <- (VPSUB_8u32 acc.[r] rotated);
+          r <- (r + 1);
+        }
+        m <- (m + 1);
+        condition <- (m < 60);
+      }
+      ms <- (update_msf (! condition) ms);
+      r <- 0;
+      while ((r < 8)) {
+        product <-
+        (Array256.init
+        (WArray1024.get32
+        (WArray1024.set256_direct (WArray1024.init32 (fun i => product.[i]))
+        (4 * ((64 * chunk) + (8 * r))) acc.[r])));
+        r <- (r + 1);
+      }
+      chunk <- (chunk + 1);
+    }
+    return (product, ms);
   }
   proc montgomery_multiply_and_reduce (lhs:W256.t, rhs:W256.t) : W256.t = {
     var product_low:W256.t;
@@ -14742,24 +15060,6 @@ module M = {
     }
     return vector;
   }
-  proc column_vector__ntt (vector:W32.t Array2048.t) : W32.t Array2048.t = {
-    var aux:W32.t Array256.t;
-    var i:int;
-    i <- 0;
-    while ((i < 8)) {
-      aux <@ polynomial__ntt ((Array256.init
-                              (fun i_0 => vector.[((i * 256) + i_0)])));
-      vector <-
-      (Array2048.init
-      (fun i_0 => (if ((i * 256) <= i_0 < ((i * 256) + 256)) then aux.[
-                                                                  (i_0 -
-                                                                  (i * 256))] else 
-                  vector.[i_0]))
-      );
-      i <- (i + 1);
-    }
-    return vector;
-  }
   proc column_vector__invert_ntt_montgomery (vector:W32.t Array2048.t) : 
   W32.t Array2048.t = {
     var aux:W32.t Array256.t;
@@ -16971,23 +17271,22 @@ module M = {
     seed_for_mask <@ _shake256_A64__A128 (seed_for_mask, block);
     return seed_for_mask;
   }
-  proc __compute_signer_response_element (s1_element:W32.t Array256.t,
-                                          verifier_challenge:W32.t Array256.t,
+  proc __compute_signer_response_element (s1_doubled:W32.t Array256.t,
+                                          challenge_positions:W32.t Array61.t,
                                           mask_element:W32.t Array256.t,
                                           signer_response_element:W32.t Array256.t) : 
   W32.t Array256.t * W64.t = {
     var infinity_norm_check_result:W64.t;
     var cs1:W32.t Array256.t;
     cs1 <- witness;
-    cs1 <@ polynomial__pointwise_montgomery_multiply_and_reduce (cs1,
-    s1_element, verifier_challenge);
-    cs1 <@ polynomial__invert_ntt_montgomery (cs1);
+    cs1 <@ polynomial____sparse_multiply_16 (cs1, s1_doubled,
+    challenge_positions);
     (signer_response_element, infinity_norm_check_result) <@ polynomial____add_reduce32_check_infinity_norm (
     signer_response_element, cs1, mask_element, ((1 `<<` 19) - (60 * 2)));
     return (signer_response_element, infinity_norm_check_result);
   }
-  proc __compute_z_and_check_norm (s1:W32.t Array1792.t,
-                                   verifier_challenge:W32.t Array256.t,
+  proc __compute_z_and_check_norm (s1_doubled:W32.t Array1792.t,
+                                   challenge_positions:W32.t Array61.t,
                                    mask:W32.t Array1792.t,
                                    signer_response:W32.t Array1792.t,
                                    infinity_norm_check_result:W64.t) : 
@@ -17006,11 +17305,11 @@ module M = {
     }
     while ((base < (7 * 256))) {
       (aux, aux_0) <@ __compute_signer_response_element ((Array256.init
-                                                         (fun i => s1.[
+                                                         (fun i => s1_doubled.[
                                                                    (base + 
                                                                    i)])
                                                          ),
-      verifier_challenge, (Array256.init (fun i => mask.[(base + i)])),
+      challenge_positions, (Array256.init (fun i => mask.[(base + i)])),
       (Array256.init (fun i => signer_response.[(base + i)])));
       signer_response <-
       (Array1792.init
@@ -17031,8 +17330,8 @@ module M = {
   }
   proc __apply_cs2_and_check_norm (w0_minus_cs2:W32.t Array2048.t,
                                    w0:W32.t Array2048.t,
-                                   s2:W32.t Array2048.t,
-                                   verifier_challenge:W32.t Array256.t,
+                                   s2_doubled:W32.t Array2048.t,
+                                   challenge_positions:W32.t Array61.t,
                                    infinity_norm_check_result:W64.t) : 
   W32.t Array2048.t * W64.t = {
     var aux:W32.t Array256.t;
@@ -17050,9 +17349,9 @@ module M = {
       
     }
     while ((base < (8 * 256))) {
-      cs2 <@ polynomial__pointwise_montgomery_multiply_and_reduce (cs2,
-      (Array256.init (fun i => s2.[(base + i)])), verifier_challenge);
-      cs2 <@ polynomial__invert_ntt_montgomery (cs2);
+      cs2 <@ polynomial____sparse_multiply_16 (cs2,
+      (Array256.init (fun i => s2_doubled.[(base + i)])),
+      challenge_positions);
       (aux, aux_0) <@ polynomial____subtract_reduce32_check_infinity_norm (
       (Array256.init (fun i => w0_minus_cs2.[(base + i)])),
       (Array256.init (fun i => w0.[(base + i)])), cs2,
@@ -17076,8 +17375,8 @@ module M = {
   }
   proc __apply_ct0_and_check_norm (w0_minus_cs2_plus_ct0:W32.t Array2048.t,
                                    w0_minus_cs2:W32.t Array2048.t,
-                                   t0:W32.t Array2048.t,
-                                   verifier_challenge:W32.t Array256.t,
+                                   t0_doubled:W32.t Array4096.t,
+                                   challenge_positions:W32.t Array61.t,
                                    infinity_norm_check_result:W64.t) : 
   W32.t Array2048.t * W64.t = {
     var aux:W32.t Array256.t;
@@ -17085,6 +17384,7 @@ module M = {
     var ct0_norm_check_result_row:W64.t;
     var ct0_norm_check_result:W64.t;
     var ct0:W32.t Array256.t;
+    var ms:W64.t;
     var base:int;
     ct0 <- witness;
     ct0_norm_check_result <- (W64.of_int 0);
@@ -17096,9 +17396,10 @@ module M = {
       
     }
     while ((base < (8 * 256))) {
-      ct0 <@ polynomial__pointwise_montgomery_multiply_and_reduce (ct0,
-      (Array256.init (fun i => t0.[(base + i)])), verifier_challenge);
-      ct0 <@ polynomial__invert_ntt_montgomery (ct0);
+      ms <- (init_msf);
+      (ct0, ms) <@ polynomial____sparse_multiply_32 (ct0,
+      (Array512.init (fun i => t0_doubled.[((base * 2) + i)])),
+      challenge_positions, ms);
       (aux, aux_0) <@ polynomial____add_reduce32_check_infinity_norm_rhs (
       (Array256.init (fun i => w0_minus_cs2_plus_ct0.[(base + i)])),
       (Array256.init (fun i => w0_minus_cs2.[(base + i)])), ct0,
@@ -17174,6 +17475,8 @@ module M = {
                         context_size:int, message_pointer:int,
                         message_size:int, randomness:W8.t Array32.t) : 
   W8.t Array4627.t * W64.t = {
+    var aux:W32.t Array256.t;
+    var aux_0:W32.t Array512.t;
     var result:W64.t;
     var seed_for_matrix_A:W8.t Array32.t;
     var matrix_A:W32.t Array14336.t;
@@ -17183,6 +17486,10 @@ module M = {
     var s1:W32.t Array1792.t;
     var s2:W32.t Array2048.t;
     var t0:W32.t Array2048.t;
+    var t0_doubled:W32.t Array4096.t;
+    var i:int;
+    var s1_doubled:W32.t Array1792.t;
+    var s2_doubled:W32.t Array2048.t;
     var domain_separator_for_mask:W16.t;
     var exit_rejection_sampling_loop:W64.t;
     var kappa_exceeded:W64.t;
@@ -17196,6 +17503,7 @@ module M = {
     var commitment_encoded:W8.t Array1024.t;
     var commitment_hash:W8.t Array64.t;
     var verifier_challenge:W32.t Array256.t;
+    var challenge_positions:W32.t Array61.t;
     var infinity_norm_check_result:W64.t;
     var signer_response:W32.t Array1792.t;
     var w0_minus_cs2:W32.t Array2048.t;
@@ -17213,6 +17521,7 @@ module M = {
     var  _3:bool;
     var  _4:bool;
     var  _5:W64.t;
+    challenge_positions <- witness;
     commitment_encoded <- witness;
     commitment_hash <- witness;
     hint_0 <- witness;
@@ -17221,11 +17530,14 @@ module M = {
     matrix_A <- witness;
     message_representative <- witness;
     s1 <- witness;
+    s1_doubled <- witness;
     s2 <- witness;
+    s2_doubled <- witness;
     seed_for_mask <- witness;
     seed_for_matrix_A <- witness;
     signer_response <- witness;
     t0 <- witness;
+    t0_doubled <- witness;
     verifier_challenge <- witness;
     w <- witness;
     w0 <- witness;
@@ -17233,7 +17545,7 @@ module M = {
     w0_minus_cs2_plus_ct0 <- witness;
     w1 <- witness;
     (* Erased call to spill *)
-    seed_for_matrix_A <- (Array32.init (fun i => signing_key.[(0 + i)]));
+    seed_for_matrix_A <- (Array32.init (fun i_0 => signing_key.[(0 + i_0)]));
     (* Erased call to declassify *)
     matrix_A <@ sample____matrix_A (seed_for_matrix_A);
     (* Erased call to unspill *)
@@ -17241,7 +17553,7 @@ module M = {
     signing_key <- (protect_ptr signing_key ms);
     (* Erased call to spill *)
     message_representative <@ __derive_message_representative (message_representative,
-    (Array64.init (fun i => signing_key.[(64 + i)])), context_pointer,
+    (Array64.init (fun i_0 => signing_key.[(64 + i_0)])), context_pointer,
     context_size, message_pointer, message_size);
     (* Erased call to unspill *)
     (* Erased call to unspill *)
@@ -17250,24 +17562,68 @@ module M = {
     signing_key <- (protect_ptr signing_key ms);
     (* Erased call to spill *)
     seed_for_mask <@ derive_seed_for_mask ((Array32.init
-                                           (fun i => signing_key.[(32 + i)])),
+                                           (fun i_0 => signing_key.[(32 +
+                                                                    i_0)])
+                                           ),
     randomness, message_representative, seed_for_mask);
     (* Erased call to unspill *)
     ms <- (init_msf);
     signing_key <- (protect_ptr signing_key ms);
     s1 <@ s1____decode (s1,
-    (Array672.init (fun i => signing_key.[(((32 + 32) + 64) + i)])));
+    (Array672.init (fun i_0 => signing_key.[(((32 + 32) + 64) + i_0)])));
     s2 <@ s2____decode (s2,
     (Array768.init
-    (fun i => signing_key.[((((32 + 32) + 64) + (7 * 96)) + i)])));
+    (fun i_0 => signing_key.[((((32 + 32) + 64) + (7 * 96)) + i_0)])));
     t0 <@ t0__decode (t0,
     (Array3328.init
-    (fun i => signing_key.[(((((32 + 32) + 64) + (7 * 96)) + (8 * 96)) + i)])
+    (fun i_0 => signing_key.[(((((32 + 32) + 64) + (7 * 96)) + (8 * 96)) +
+                             i_0)])
     ));
     (* Erased call to declassify *)
-    s1 <@ row_vector__ntt (s1);
-    s2 <@ column_vector__ntt (s2);
-    t0 <@ column_vector__ntt (t0);
+    t0_doubled <- witness;
+    i <- 0;
+    while ((i < 7)) {
+      aux <@ polynomial____double_16 ((Array256.init
+                                      (fun i_0 => s1_doubled.[((i * 256) +
+                                                              i_0)])
+                                      ),
+      (Array256.init (fun i_0 => s1.[((i * 256) + i_0)])));
+      s1_doubled <-
+      (Array1792.init
+      (fun i_0 => (if ((i * 256) <= i_0 < ((i * 256) + 256)) then aux.[
+                                                                  (i_0 -
+                                                                  (i * 256))] else 
+                  s1_doubled.[i_0]))
+      );
+      i <- (i + 1);
+    }
+    i <- 0;
+    while ((i < 8)) {
+      aux <@ polynomial____double_16 ((Array256.init
+                                      (fun i_0 => s2_doubled.[((i * 256) +
+                                                              i_0)])
+                                      ),
+      (Array256.init (fun i_0 => s2.[((i * 256) + i_0)])));
+      s2_doubled <-
+      (Array2048.init
+      (fun i_0 => (if ((i * 256) <= i_0 < ((i * 256) + 256)) then aux.[
+                                                                  (i_0 -
+                                                                  (i * 256))] else 
+                  s2_doubled.[i_0]))
+      );
+      aux_0 <@ polynomial____double_32 ((Array512.init
+                                        (fun i_0 => t0_doubled.[(((i * 2) *
+                                                                 256) +
+                                                                i_0)])
+                                        ),
+      (Array256.init (fun i_0 => t0.[((i * 256) + i_0)])));
+      t0_doubled <-
+      (Array4096.init
+      (fun i_0 => (if (((i * 2) * 256) <= i_0 < (((i * 2) * 256) + 512)) then 
+                  aux_0.[(i_0 - ((i * 2) * 256))] else t0_doubled.[i_0]))
+      );
+      i <- (i + 1);
+    }
     domain_separator_for_mask <- (W16.of_int 0);
     exit_rejection_sampling_loop <- (W64.of_int 0);
     kappa_exceeded <- (W64.of_int 0);
@@ -17279,12 +17635,13 @@ module M = {
       j <- 0;
       while ((j < (7 * ((256 * 32) %/ 8)))) {
         copied_32_bytes <-
-        (get256_direct (WArray7168.init32 (fun i => mask.[i])) j);
+        (get256_direct (WArray7168.init32 (fun i_0 => mask.[i_0])) j);
         mask_as_ntt <-
         (Array1792.init
         (WArray7168.get32
         (WArray7168.set256_direct
-        (WArray7168.init32 (fun i => mask_as_ntt.[i])) j copied_32_bytes)));
+        (WArray7168.init32 (fun i_0 => mask_as_ntt.[i_0])) j copied_32_bytes)
+        ));
         j <- (j + 32);
       }
       mask_as_ntt <@ row_vector__ntt (mask_as_ntt);
@@ -17300,15 +17657,16 @@ module M = {
       commitment_hash);
       (* Erased call to unspill *)
       (* Erased call to declassify *)
-      verifier_challenge <@ polynomial__ntt (verifier_challenge);
+      challenge_positions <@ polynomial____challenge_positions (verifier_challenge);
       infinity_norm_check_result <- (W64.of_int 0);
       (signer_response, infinity_norm_check_result) <@ __compute_z_and_check_norm (
-      s1, verifier_challenge, mask, signer_response,
+      s1_doubled, challenge_positions, mask, signer_response,
       infinity_norm_check_result);
       (w0_minus_cs2, infinity_norm_check_result) <@ __apply_cs2_and_check_norm (
-      w0_minus_cs2, w0, s2, verifier_challenge, infinity_norm_check_result);
+      w0_minus_cs2, w0, s2_doubled, challenge_positions,
+      infinity_norm_check_result);
       (w0_minus_cs2_plus_ct0, ct0_norm_check_result) <@ __apply_ct0_and_check_norm (
-      w0_minus_cs2_plus_ct0, w0_minus_cs2, t0, verifier_challenge,
+      w0_minus_cs2_plus_ct0, w0_minus_cs2, t0_doubled, challenge_positions,
       infinity_norm_check_result);
       (* Erased call to spill *)
       w0_minus_cs2_plus_ct0 <- w0_minus_cs2_plus_ct0;

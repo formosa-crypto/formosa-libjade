@@ -3,6 +3,14 @@
    safety checks of a run from initialised inputs is valid and the outputs
    are initialised.
 
+   The products by the challenge depend on its values: the positions of its
+   tau non-zero coefficients index the doubled polynomials, and their writes
+   need exactly tau of them. The contracts cannot state these facts, so the
+   lemmas of polynomial____challenge_positions, of the two sparse products
+   and of their four callers are their contracts with a precondition added
+   (cnz, pos_ok); __sign_internal establishes it from the count of non-zero
+   coefficients of the sampled challenge (sample____challenge_cnz).
+
    The Keccak wrappers called by ML-DSA are assumed (axioms below), to be
    discharged by the safety proofs of the fips202 implementation.
 
@@ -14,6 +22,7 @@
 require import AllCore IntDiv CoreMap List Distr.
 from Jasmin require import JModel_x86 Jcheck JSafety.
 require import Jmldsa87_safety ByteArrayInit.
+require import JWordExtra JModelExtra ChallengeSafety.
 
 require import BArray2 BArray8 BArray16 BArray32 BArray40 BArray64 BArray66 BArray83
   BArray96 BArray128 BArray136 BArray160 BArray168 BArray192 BArray200 BArray224 BArray256
@@ -26,6 +35,10 @@ require import SBArray128_32 SBArray128_64 SBArray224_200 SBArray272_136 SBArray
   SBArray4627_64 SBArray4627_83 SBArray4627_4480 SBArray4896_32 SBArray4896_64
   SBArray4896_672 SBArray4896_768 SBArray4896_3328 SBArray7168_1024 SBArray8192_1024
   SBArray57344_1024 SBArray57344_7168.
+require import BArray244 BArray16384 SBArray16384_2048.
+clone ByteArrayInit as BI244 with theory A <- BArray244.
+clone ByteArrayInit as BI16384 with theory A <- BArray16384.
+clone SubByteArrayInit as SBI16384_2048 with theory SB <- SBArray16384_2048.
 clone ByteArrayInit as BI2 with theory A <- BArray2.
 clone ByteArrayInit as BI8 with theory A <- BArray8.
 clone ByteArrayInit as BI16 with theory A <- BArray16.
@@ -1196,7 +1209,8 @@ while (196 <= to_uint i /\ to_uint i <= 256 /\ condition_loop = (to_uint i < 256
   rewrite W64.ultE hi /=.
   smt(W64.to_uint_cmp).
 (* absorb the seed, squeeze the first block *)
-auto; ecall (shake256_squeezeblock_proof param_2 (BArray224.init_arr (W8.of_int 255)) param_1 b_param).
+auto; ecall (shake256_squeezeblock_proof param_2 (BArray224.init_arr (W8.of_int 255))
+          param_1 b_param).
 auto; ecall (shake256_absorb_commitment_hash_proof param_0 b_param_0 param
                (BArray64.init_arr (W8.of_int 255))).
 (* the polynomial is zeroed 32 bytes at a time *)
@@ -1217,6 +1231,442 @@ while (to_uint i <= 1024 /\ to_uint i %% 32 = 0
 (* at the exit of the zeroing loop the polynomial is complete *)
 auto => /> hseed b0 i0 tr0 hge hle hmod hinit hv r0 _ _ r1 _ _ _.
 by move: hge; rewrite W64.ultE /= => hge; smt().
+qed.
+
+(* the challenge has exactly tau non-zero coefficients: each step of the
+   main loop sets one more coefficient, among those above i all zero *)
+lemma sample____challenge_cnz : hoare [M.sample____challenge : true ==> cnz res.`1 = 60].
+proof.
+hint +safety.
+proc.
+while (196 <= to_uint i <= 256 /\ condition_loop = (to_uint i < 256)
+    /\ (forall k, to_uint i <= k < 256 => BArray1024.get32 output_challenge k = W32.zero)
+    /\ cnz output_challenge = to_uint i - 196).
++ (* refill and sample, until the position is at most i *)
+  seq 8 : (196 <= to_uint i < 256
+      /\ (forall k, to_uint i <= k < 256 => BArray1024.get32 output_challenge k = W32.zero)
+      /\ cnz output_challenge = to_uint i - 196 /\ condition_resample = (i \ult sample_at)).
+  + sp; wp; if.
+    + wp; ecall (shake256_squeezeblock_proof param_4 (BArray224.init_arr (W8.of_int 255))
+                   param_3 (BArray136.init_arr (W8.of_int 255))).
+      by auto => /> /#.
+    by auto => /> /#.
+  seq 1 : (196 <= to_uint i < 256
+      /\ (forall k, to_uint i <= k < 256 => BArray1024.get32 output_challenge k = W32.zero)
+      /\ cnz output_challenge = to_uint i - 196 /\ !(i \ult sample_at)).
+  + while (196 <= to_uint i < 256
+        /\ (forall k, to_uint i <= k < 256 => BArray1024.get32 output_challenge k = W32.zero)
+        /\ cnz output_challenge = to_uint i - 196 /\ condition_resample = (i \ult sample_at)).
+    + sp; wp; if.
+      + wp; ecall (shake256_squeezeblock_proof param_4 (BArray224.init_arr (W8.of_int 255))
+                     param_3 (BArray136.init_arr (W8.of_int 255))).
+        by auto => /> /#.
+      by auto => /> /#.
+    by auto => /> /#.
+  (* the swap: c[i] <- c[s], c[s] <- +-1, with c[i] = 0 and s <= i *)
+  auto => /> &hr hi0 hi1 hz hc; rewrite W64.ultE => /lezNgt hs.
+  have hs0 := W64.to_uint_cmp sample_at{hr}.
+  have hi : to_uint (i{hr} + W64.one) = to_uint i{hr} + 1 by rewrite W64.to_uintD_small /= /#.
+  pose c := BArray1024.get32 output_challenge{hr} (to_uint sample_at{hr}).
+  pose c1 := BArray1024.set32 output_challenge{hr} (to_uint i{hr}) c.
+  have hc1 : forall k, BArray1024.get32 c1 k
+    = if to_uint i{hr} = k then c else BArray1024.get32 output_challenge{hr} k.
+  + by move=> k; rewrite /c1 BArray1024.get_set32E 1,2:/#.
+  rewrite W64.ultE hi /=.
+  split; 1: smt().
+  split => [k hk1 hk2 | ].
+  + by rewrite BArray1024.get_set32E 1,2:/# ifF 1:/# hc1 ifF 1:/#; apply hz => /#.
+  rewrite /cnz (size_ipos_upd (fun k => BArray1024.get32 c1 k <> W32.zero) _ 256
+    (to_uint sample_at{hr})) 1:/#.
+  + by move=> k hk /=; rewrite BArray1024.get_set32E 1,2:/# ifF 1:/#.
+  rewrite (size_ipos_upd (fun k => BArray1024.get32 output_challenge{hr} k <> W32.zero) _ 256
+    (to_uint i{hr})) 1:/#.
+  + by move=> k hk /=; rewrite hc1 ifF 1:/#.
+  rewrite /= BArray1024.get_set32E 1,2:/# /=.
+  have hv := sign_nz (truncateu32 signs{hr}).
+  rewrite (BArray1024.get_set32E c1 (to_uint sample_at{hr})) 1,2:/# /= hv /=.
+  rewrite hz 1:/# /= hc1 (_ : (if to_uint i{hr} = to_uint sample_at{hr} then c
+    else BArray1024.get32 output_challenge{hr} (to_uint sample_at{hr})) = c) 1:/#.
+  by rewrite -/(cnz output_challenge{hr}) hc /b2i; ring.
+(* absorb the seed, squeeze the first block *)
+wp; ecall (shake256_squeezeblock_proof param_2 (BArray224.init_arr (W8.of_int 255))
+          param_1 b_param).
+wp; ecall (shake256_absorb_commitment_hash_proof param_0 b_param_0 param
+             (BArray64.init_arr (W8.of_int 255))).
+(* the polynomial is zeroed 32 bytes at a time *)
+wp; while (to_uint i <= 1024 /\ to_uint i %% 32 = 0 /\ zeros_256 = W256.zero
+    /\ forall b, 0 <= b < to_uint i => output_challenge.[b] = W8.zero).
++ auto => /> &hr hle hmod hz; rewrite W64.ultE /= => hlt.
+  have hi : to_uint (i{hr} + W64.of_int 32) = to_uint i{hr} + 32.
+  + by rewrite W64.to_uintD_small W64.of_uintK /= /#.
+  rewrite hi; do 2! (split; 1: smt()).
+  move=> b hb0 hb1; rewrite BArray1024.get8_set256dE.
+  case: (to_uint i{hr} <= b < to_uint i{hr} + 32 /\ 0 <= b < 1024) => h.
+  + by apply W8.wordP => x hx; rewrite W32u8.bits8iE // W256.zerowE W8.zerowE.
+  by apply hz => /#.
+auto => /> &hr; split => [/# | ii oc0]; rewrite W64.ultE /= => hge hle _ hz r0 _ _ r1 _ _ _.
+have hz32 : forall k, 0 <= k < 256 => BArray1024.get32 oc0 k = W32.zero.
++ by move=> k hk; apply get32_zero => b hb; apply hz => /#.
+split.
++ split => [k hk1 hk2 | ]; 1: by apply hz32 => /#.
+  by rewrite /cnz (ipos_none _ 0 256) // ipos0.
+by move=> c1 i1 oc1 _ hi1 hi2 hlt _ ->; smt().
+qed.
+
+(* the entries of the positions written so far, [0, np) and [nm, tau):
+   initialised, each a coefficient index *)
+op slots (p b : BArray244.t) (np nm : int) =
+  forall m, (0 <= m < np \/ nm <= m < 60) =>
+    BArray244.is_init b (4 * m) 4 /\ to_uint (BArray244.get32 p m) < 256.
+
+(* what the products need from the positions: tau coefficient indices, and
+   at index tau the number of +1, at most tau *)
+op pos_ok (p : BArray244.t) =
+  (forall m, 0 <= m < 60 => to_uint (BArray244.get32 p m) <= 256)
+  /\ to_uint (BArray244.get32 p 60) <= 60.
+
+lemma slots_set (p b : BArray244.t) (np nm np' nm' n : int) (v : W32.t) :
+  slots p b np nm => 0 <= n < 61 => to_uint v < 256 =>
+  (forall m, (0 <= m < np' \/ nm' <= m < 60) => m = n \/ (0 <= m < np \/ nm <= m < 60)) =>
+  slots (BArray244.set32 p n v) (BArray244.set32d b (4 * n) (W32.of_int 4294967295)) np' nm'.
+proof.
+move=> hs hn hv hcov m /hcov [-> | hm].
++ by rewrite BArray244.get_set32E 1,2:/# /= BI244.is_init_set32d_sub.
+have [hi hp] := hs m hm.
+rewrite BArray244.get_set32E 1,2:/#.
+case: (n = m) => [-> /= | hnm /=]; 1: by rewrite BI244.is_init_set32d_sub.
+by rewrite BI244.is_init_set32d_out 1:/# hi hp.
+qed.
+
+(* The scans of the challenge: with exactly tau non-zero coefficients, the
+   +1 fill [0, n_plus) and the -1 fill [n_minus, tau) without meeting, and
+   the two ranges cover [0, tau) at the end. The contract cannot state the
+   count of non-zero coefficients: this lemma is the contract of the
+   procedure. *)
+lemma polynomial____challenge_positions_proof _challenge _b_challenge :
+  hoare [M.polynomial____challenge_positions :
+    challenge = _challenge /\ b_challenge = _b_challenge
+    /\ BArray1024.is_init _b_challenge 0 1024 /\ cnz _challenge = 60
+    ==> BArray244.is_init res.`2 0 244 /\ valid res.`3 /\ pos_ok res.`1].
+proof.
+hint +safety.
+proc.
+pose Pp := fun k => 0 < W32.to_sint (BArray1024.get32 _challenge k).
+pose Pm := fun k => W32.to_sint (BArray1024.get32 _challenge k) < 0.
+have hsum : cnz _challenge = size (ipos Pp 256) + size (ipos Pm 256) by exact: cnz_sign.
+have hmono : forall (P : int -> bool) a, 0 <= a <= 256 => size (ipos P a) <= size (ipos P 256).
++ by move=> P a ha; apply size_ipos_mono.
+seq 15 : (j = 256 /\ challenge = _challenge /\ cnz _challenge = 60
+    /\ to_uint n_plus = size (ipos Pp 256) /\ n_minus = 60 - size (ipos Pm 256)
+    /\ slots positions b_positions (to_uint n_plus) n_minus
+    /\ valid trace_polynomial____challenge_positions).
++ wp; while (0 <= j <= 256 /\ j %% 8 = 0 /\ offset = 4 * j /\ condition_group = (offset < 1024)
+      /\ challenge = _challenge /\ zeros = W256.zero /\ cnz _challenge = 60
+      /\ to_uint n_plus = size (ipos Pp j) /\ n_minus = 60 - size (ipos Pm j)
+      /\ slots positions b_positions (to_uint n_plus) n_minus
+      /\ valid trace_polynomial____challenge_positions).
+  + (* the scan of the -1 of a group of eight *)
+    wp; while (0 <= j < 256 /\ j %% 8 = 0 /\ offset = 4 * j
+        /\ challenge = _challenge /\ zeros = W256.zero /\ cnz _challenge = 60
+        /\ to_uint n_plus = size (ipos Pp (j + 8))
+        /\ condition_bit = (mask <> W64.zero)
+        /\ (exists t, 0 <= t <= 8 /\ (forall b, mask.[b] = (t <= b < 8 /\ Pm (j + b)))
+            /\ n_minus = 60 - size (ipos Pm (j + t)))
+        /\ slots positions b_positions (to_uint n_plus) n_minus
+        /\ valid trace_polynomial____challenge_positions).
+    + auto => &hr [#] hj0 hj1 hj8 hoff -> -> hc hnp hcb [t [#] ht0 ht1 hb hnm] hsl hv hcbt /=.
+      have hnz : mask{hr} <> W64.zero by rewrite -hcb.
+      have /= [[hp1 hp8] [hb' e]] := scan_step Pm _ _ _ hj0 ht0 hnz hb.
+      pose p := to_uint (TZCNT_64 mask{hr}).`6.
+      have := hmono Pm (j{hr} + (p + 1)) _; 1: smt().
+      have := size_ge0 (ipos Pp 256).
+      have := size_ge0 (ipos Pm (j{hr} + t)).
+      rewrite e size_rcons => hm0 hp0 hm1.
+      have hval : to_uint (truncateu32 ((TZCNT_64 mask{hr}).`6 + W64.of_int j{hr})) = j{hr} + p.
+      + rewrite W2u32.to_uint_truncateu32 W64.to_uintD_small -/p W64.of_uintK; 1: smt().
+        by rewrite !modz_small; smt().
+      do 5! (split; 1: smt()).
+      split.
+      + exists (p + 1); split; 1: smt().
+        split; 1: exact hb'.
+        by rewrite e size_rcons hnm; ring.
+      split; 2: smt().
+      rewrite (mulzC (n_minus{hr} - 1) 4).
+      apply (slots_set _ _ (to_uint n_plus{hr}) n_minus{hr}) => //; 1,2: smt().
+      by move=> m hm; smt().
+    (* the scan of the +1 *)
+    wp; while (0 <= j < 256 /\ j %% 8 = 0 /\ offset = 4 * j
+        /\ challenge = _challenge /\ zeros = W256.zero /\ cnz _challenge = 60
+        /\ coefficients = BArray1024.get256d _challenge offset
+        /\ n_minus = 60 - size (ipos Pm j)
+        /\ condition_bit = (mask <> W64.zero)
+        /\ (exists t, 0 <= t <= 8 /\ (forall b, mask.[b] = (t <= b < 8 /\ Pp (j + b)))
+            /\ to_uint n_plus = size (ipos Pp (j + t)))
+        /\ slots positions b_positions (to_uint n_plus) n_minus
+        /\ valid trace_polynomial____challenge_positions).
+    + auto => &hr [#] hj0 hj1 hj8 hoff -> -> hc hco hnm hcb [t [#] ht0 ht1 hb hnp] hsl hv hcbt /=.
+      have hnz : mask{hr} <> W64.zero by rewrite -hcb.
+      have /= [[hp1 hp8] [hb' e]] := scan_step Pp _ _ _ hj0 ht0 hnz hb.
+      pose p := to_uint (TZCNT_64 mask{hr}).`6.
+      have := hmono Pp (j{hr} + (p + 1)) _; 1: smt().
+      have := size_ge0 (ipos Pm j{hr}).
+      have := size_ge0 (ipos Pp (j{hr} + t)).
+      have := hmono Pm j{hr} _; 1: smt().
+      rewrite e size_rcons => hmj hp0 hm0 hp1'.
+      have hval : to_uint (truncateu32 ((TZCNT_64 mask{hr}).`6 + W64.of_int j{hr})) = j{hr} + p.
+      + rewrite W2u32.to_uint_truncateu32 W64.to_uintD_small -/p W64.of_uintK; 1: smt().
+        by rewrite !modz_small; smt().
+      have hnp1 : to_uint (n_plus{hr} + W64.one) = to_uint n_plus{hr} + 1.
+      + by rewrite W64.to_uintD_small /= /#.
+      do 6! (split; 1: smt()).
+      split.
+      + exists (p + 1); split; 1: smt().
+        split; 1: exact hb'.
+        by rewrite hnp1 e size_rcons hnp.
+      split; 2: smt().
+      rewrite hnp1 (mulzC (to_uint n_plus{hr}) 4).
+      apply (slots_set _ _ (to_uint n_plus{hr}) n_minus{hr}) => //; 1,2: smt().
+      by move=> m hm; smt().
+    (* the masks of a group, and the ends of the scans *)
+    auto => &hr [#] hj0 hj1 hj8 hoff hcgd -> -> hc hnp hnm hsl hv hcg.
+    have hj : j{hr} < 256 by smt().
+    have hcoef : forall b, 0 <= b < 8 =>
+      BArray1024.get256d _challenge offset{hr} \bits32 b = BArray1024.get32 _challenge (j{hr} + b).
+    + by move=> b hb; rewrite hoff get256d_bits32.
+    have hmp : forall b, (zeroextu64 (MOVEMASK_8u32 (VPCMPGT_8u32
+        (BArray1024.get256d _challenge offset{hr}) W256.zero))).[b]
+          = (0 <= b < 8 /\ Pp (j{hr} + b)).
+    + by move=> b; rewrite mask_pos; case: (0 <= b < 8) => // hb; rewrite hcoef.
+    have hmn : forall b, (zeroextu64 (MOVEMASK_8u32 (VPCMPGT_8u32 W256.zero
+        (BArray1024.get256d _challenge offset{hr})))).[b] = (0 <= b < 8 /\ Pm (j{hr} + b)).
+    + by move=> b; rewrite mask_neg; case: (0 <= b < 8) => // hb; rewrite hcoef.
+    rewrite /SLH64.protect_64 /=.
+    split.
+    + do 5! (split; 1: smt()).
+      split; 1: by exists 0 => /=; split; [exact hmp | ].
+      by do 2! (split; 1: done); smt().
+    move=> bp0 cb0 mask0 np0 pos0 tr0 hcb0 [#] _ _ _ _ _ _ hcbe [t [#] ht0 ht1 hbt hnp0] hsl0 hv0.
+    rewrite (_ : mask0 = W64.zero) 1:/# in hbt.
+    have e1 := scan_end Pp _ _ hj0 _ hbt; 1: smt().
+    split.
+    + do 4! (split; 1: smt()).
+      split; 1: by rewrite e1.
+      split; 1: by exists 0 => /=; split; [exact hmn | ].
+      by split.
+    move=> bp1 cb1 mask2 nm0 pos1 tr1 hcb1 [#] _ _ _ _ _ hnp1 hcbe1
+      [t' [#] ht0' ht1' hbt' hnm1] hsl1 hv1.
+    rewrite (_ : mask2 = W64.zero) 1:/# in hbt'.
+    have e2 := scan_end Pm _ _ hj0 _ hbt'; 1: smt().
+    do 5! (split; 1: smt()).
+    split; 1: by rewrite e2.
+    by split => //; smt().
+  auto => &hr [#] -> -> hb hc /=.
+  rewrite !ipos0 /= hb hc /=.
+  split; 1: by rewrite /slots => m /#.
+  move=> bp0 cg0 j0 nm0 np0 off0 pos0 tr0 hcg [#] hj0 hj1 hj8 hoff hcgd hnp hnm hsl hv.
+  have hj : j0 = 256 by smt().
+  by rewrite -hj.
+(* the two ranges meet: every entry below tau is written *)
+auto => &hr [#] _ _ hc hnp hnm hsl hv /=.
+have hnm' : n_minus{hr} = to_uint n_plus{hr} by smt().
+have hnp60 : to_uint n_plus{hr} <= 60 by smt(size_ge0).
+split.
++ rewrite /BArray244.is_init => i hi0 hi1.
+  rewrite /BArray244.is_init_cell => _.
+  have [hm _] := hsl (i %/ 4) _; 1: smt().
+  by have := hm i _ _; 1,2: smt(); rewrite /BArray244.is_init_cell /#.
+split => //; split => [m hm | ].
++ rewrite (BArray244.get_set32E positions{hr} 60 m) 1,2:/# ifF 1:/#.
+  by have [_ hp] := hsl m _; smt().
+rewrite (BArray244.get_set32E positions{hr} 60 60) 1,2:/# /=.
+by rewrite W2u32.to_uint_truncateu32 modz_small; smt(W64.to_uint_cmp).
+qed.
+
+lemma polynomial____double_16_proof _doubled _b_doubled _polynomial _b_polynomial :
+  polynomial____double_16_spec _doubled _b_doubled _polynomial _b_polynomial.
+proof.
+hint +safety.
+rewrite /polynomial____double_16_spec; proc.
+conseq (_ : b_polynomial = BArray1024.init_arr (W8.of_int 255)
+  ==> BArray1024.is_init b_doubled 0 1024 /\ valid trace_polynomial____double_16).
++ by move=> &hr />; rewrite -(BI1024.is_init_full _ 1024).
+unroll for ^while.
+by auto => /> *.
+qed.
+
+lemma polynomial____double_32_proof _doubled _b_doubled _polynomial _b_polynomial :
+  polynomial____double_32_spec _doubled _b_doubled _polynomial _b_polynomial.
+proof.
+hint +safety.
+rewrite /polynomial____double_32_spec; proc.
+conseq (_ : b_polynomial = BArray1024.init_arr (W8.of_int 255)
+  ==> BArray2048.is_init b_doubled 0 2048 /\ valid trace_polynomial____double_32).
++ by move=> &hr />; rewrite -(BI1024.is_init_full _ 1024).
+unroll for ^while.
+by auto => /> *.
+qed.
+
+lemma shl1E (x : int) : x `<<` 1 = x * 2.
+proof. by rewrite /JUtils.(`<<`). qed.
+
+(* the reads of the rotations stay in the doubled polynomial when the
+   positions are coefficient indices: the contract with pos_ok *)
+lemma polynomial____sparse_multiply_16_proof _product _b_product _doubled _b_doubled
+    _positions _b_positions :
+  hoare [M.polynomial____sparse_multiply_16 :
+    product = _product /\ b_product = _b_product /\ doubled = _doubled
+    /\ b_doubled = _b_doubled /\ positions = _positions /\ b_positions = _b_positions
+    /\ BArray1024.is_init _b_doubled 0 1024 /\ BArray244.is_init _b_positions 0 244
+    /\ pos_ok _positions
+    ==> BArray1024.is_init res.`2 0 1024 /\ valid res.`3].
+proof.
+hint +safety.
+proc.
+conseq (_ : b_doubled = BArray1024.init_arr (W8.of_int 255)
+    /\ b_positions = BArray244.init_arr (W8.of_int 255) /\ pos_ok positions
+  ==> BArray1024.is_init b_product 0 1024 /\ valid trace_polynomial____sparse_multiply_16).
++ by move=> &hr /> *; rewrite -(BI1024.is_init_full _ 1024) // -(BI244.is_init_full _ 244).
+(* one chunk of 128 coefficients per iteration *)
+while (0 <= chunk <= 2 /\ b_doubled = BArray1024.init_arr (W8.of_int 255)
+    /\ b_positions = BArray244.init_arr (W8.of_int 255) /\ pos_ok positions
+    /\ n_plus = zeroextu64 (BArray244.get32 positions 60)
+    /\ BArray1024.is_init b_product 0 (512 * chunk)
+    /\ valid trace_polynomial____sparse_multiply_16).
++ (* the stores of the chunk *)
+  wp; while (0 <= chunk < 2 /\ 0 <= r <= 8
+      /\ BArray256.is_init b_acc 0 256
+      /\ BArray1024.is_init b_product 0 (512 * chunk + 64 * r)
+      /\ valid trace_polynomial____sparse_multiply_16).
+  + auto => /> &hr hc0 hc1 hr0 _ hacc hprod hv hr1.
+    have hsub := BI256.is_init_sub b_acc{hr} 0 256.
+    rewrite (BI1024.is_init_set256d_in _ (4 * (128 * chunk{hr} + 16 * r{hr} + 8))) 1,2:/#.
+    rewrite (BI1024.is_init_set256d_in _ (4 * (128 * chunk{hr} + 16 * r{hr}))) 1,2:/#.
+    have hle0 := BI1024.is_init_le0.
+    have e : 4 * (128 * chunk{hr} + 16 * r{hr}) - 0 = 512 * chunk{hr} + 64 * r{hr} by ring.
+    rewrite e hprod /= hle0 1:/# hle0 1:/# /=.
+    smt().
+  (* the subtracted rotations, positions [n_plus, tau) *)
+  wp; while (0 <= chunk < 2 /\ 0 <= m <= 60 /\ condition = (m < 60)
+      /\ b_doubled = BArray1024.init_arr (W8.of_int 255)
+      /\ b_positions = BArray244.init_arr (W8.of_int 255) /\ pos_ok positions
+      /\ n_plus = zeroextu64 (BArray244.get32 positions 60)
+      /\ BArray256.is_init b_acc 0 256
+      /\ BArray1024.is_init b_product 0 (512 * chunk)
+      /\ valid trace_polynomial____sparse_multiply_16).
+  + unroll for ^while.
+    auto => /> &hr hc0 hc1 hm0 _ hpos hp60 hacc hprod hv hlt.
+    rewrite /SLH64.protect_64 to_uint_zeroextu64 !shl1E.
+    have hp := hpos m{hr} _; 1: smt().
+    have hp0 := W32.to_uint_cmp (BArray244.get32 positions{hr} m{hr}).
+    have hsub := BI256.is_init_sub b_acc{hr} 0 256.
+    smt().
+  (* the added rotations, positions [0, n_plus) *)
+  wp; while (0 <= chunk < 2 /\ 0 <= m <= to_uint n_plus /\ condition = (m < to_uint n_plus)
+      /\ b_doubled = BArray1024.init_arr (W8.of_int 255)
+      /\ b_positions = BArray244.init_arr (W8.of_int 255) /\ pos_ok positions
+      /\ n_plus = zeroextu64 (BArray244.get32 positions 60)
+      /\ BArray256.is_init b_acc 0 256
+      /\ BArray1024.is_init b_product 0 (512 * chunk)
+      /\ valid trace_polynomial____sparse_multiply_16).
+  + unroll for ^while.
+    auto => /> &hr hc0 hc1 hm0 _ hpos hp60 hacc hprod hv hlt.
+    rewrite /SLH64.protect_64 to_uint_zeroextu64 !shl1E.
+    have hp := hpos m{hr} _; 1: smt(to_uint_zeroextu64).
+    have hp0 := W32.to_uint_cmp (BArray244.get32 positions{hr} m{hr}).
+    have hsub := BI256.is_init_sub b_acc{hr} 0 256.
+    smt(to_uint_zeroextu64).
+  (* the accumulators are zeroed *)
+  unroll for 2.
+  auto => /> &hr hc0 _ hpos hp60 hprod hv hc1.
+  have hnp : to_uint (zeroextu64 (BArray244.get32 positions{hr} 60)) <= 60.
+  + by rewrite to_uint_zeroextu64.
+  split; 1: smt(W64.to_uint_cmp).
+  move=> acc0 c0 m0 tr0 _ hm0 hm1 _ hacc0 hv0; split; 1: smt().
+  move=> acc1 c1 m1 tr1 _ hm2 hm3 _ hacc1 hv1 p0 r0 hr0 hr1 hr2 hp0 hv2 _.
+  split; 1: smt().
+  by rewrite (_ : 512 * (chunk{hr} + 1) = 512 * chunk{hr} + 64 * r0) 1:/#.
+auto => /> &hr hdb hpb b0 c0 tr0 hc0 hc1 hc2 _ hp0 _.
+by rewrite (_ : 1024 = 512 * c0) 1:/#.
+qed.
+
+lemma shl2E (x : int) : x `<<` 2 = x * 4.
+proof. by rewrite /JUtils.(`<<`). qed.
+
+lemma polynomial____sparse_multiply_32_proof _product _b_product _doubled _b_doubled
+    _positions _b_positions _ms :
+  hoare [M.polynomial____sparse_multiply_32 :
+    product = _product /\ b_product = _b_product /\ doubled = _doubled
+    /\ b_doubled = _b_doubled /\ positions = _positions /\ b_positions = _b_positions
+    /\ ms = _ms
+    /\ BArray2048.is_init _b_doubled 0 2048 /\ BArray244.is_init _b_positions 0 244
+    /\ pos_ok _positions
+    ==> BArray1024.is_init res.`2 0 1024 /\ valid res.`4].
+proof.
+hint +safety.
+proc.
+conseq (_ : b_doubled = BArray2048.init_arr (W8.of_int 255)
+    /\ b_positions = BArray244.init_arr (W8.of_int 255) /\ pos_ok positions
+  ==> BArray1024.is_init b_product 0 1024 /\ valid trace_polynomial____sparse_multiply_32).
++ by move=> &hr /> *; rewrite -(BI2048.is_init_full _ 2048) // -(BI244.is_init_full _ 244).
+(* one chunk of 64 coefficients per iteration *)
+while (0 <= chunk <= 4 /\ b_doubled = BArray2048.init_arr (W8.of_int 255)
+    /\ b_positions = BArray244.init_arr (W8.of_int 255) /\ pos_ok positions
+    /\ to_uint n_plus = to_uint (BArray244.get32 positions 60)
+    /\ BArray1024.is_init b_product 0 (256 * chunk)
+    /\ valid trace_polynomial____sparse_multiply_32).
++ (* the stores of the chunk *)
+  wp; while (0 <= chunk < 4 /\ 0 <= r <= 8
+      /\ BArray256.is_init b_acc 0 256
+      /\ BArray1024.is_init b_product 0 (256 * chunk + 32 * r)
+      /\ valid trace_polynomial____sparse_multiply_32).
+  + auto => /> &hr hc0 hc1 hr0 _ hacc hprod hv hr1.
+    have hsub := BI256.is_init_sub b_acc{hr} 0 256.
+    rewrite (BI1024.is_init_set256d_in _ (4 * (64 * chunk{hr} + 8 * r{hr}))) 1,2:/#.
+    have e : 4 * (64 * chunk{hr} + 8 * r{hr}) - 0 = 256 * chunk{hr} + 32 * r{hr} by ring.
+    rewrite e hprod /= BI1024.is_init_le0 1:/# /=.
+    smt().
+  (* the subtracted rotations, positions [n_plus, tau) *)
+  wp; while (0 <= chunk < 4 /\ 0 <= m <= 60 /\ condition = (m < 60)
+      /\ b_doubled = BArray2048.init_arr (W8.of_int 255)
+      /\ b_positions = BArray244.init_arr (W8.of_int 255) /\ pos_ok positions
+      /\ to_uint n_plus = to_uint (BArray244.get32 positions 60)
+      /\ BArray256.is_init b_acc 0 256
+      /\ BArray1024.is_init b_product 0 (256 * chunk)
+      /\ valid trace_polynomial____sparse_multiply_32).
+  + unroll for ^while.
+    auto => /> &hr hc0 hc1 hm0 _ hpos hp60 hnp hacc hprod hv hlt.
+    rewrite /SLH64.protect_64 to_uint_zeroextu64 !shl2E.
+    have hp := hpos m{hr} _; 1: smt().
+    have hp0 := W32.to_uint_cmp (BArray244.get32 positions{hr} m{hr}).
+    have hsub := BI256.is_init_sub b_acc{hr} 0 256.
+    smt().
+  (* the added rotations, positions [0, n_plus) *)
+  wp; while (0 <= chunk < 4 /\ 0 <= m <= to_uint n_plus /\ condition = (m < to_uint n_plus)
+      /\ b_doubled = BArray2048.init_arr (W8.of_int 255)
+      /\ b_positions = BArray244.init_arr (W8.of_int 255) /\ pos_ok positions
+      /\ to_uint n_plus = to_uint (BArray244.get32 positions 60)
+      /\ BArray256.is_init b_acc 0 256
+      /\ BArray1024.is_init b_product 0 (256 * chunk)
+      /\ valid trace_polynomial____sparse_multiply_32).
+  + unroll for ^while.
+    auto => /> &hr hc0 hc1 hm0 _ hpos hp60 hnp hacc hprod hv hlt.
+    rewrite /SLH64.protect_64 to_uint_zeroextu64 !shl2E.
+    have hp := hpos m{hr} _; 1: smt().
+    have hp0 := W32.to_uint_cmp (BArray244.get32 positions{hr} m{hr}).
+    have hsub := BI256.is_init_sub b_acc{hr} 0 256.
+    smt().
+  (* the accumulators are zeroed *)
+  unroll for 2.
+  auto => /> &hr hc0 _ hpos hp60 hnp hprod hv hc1.
+  split; 1: smt(W64.to_uint_cmp).
+  move=> acc0 c0 m0 tr0 _ hm0 hm1 _ hacc0 hv0; split; 1: smt().
+  move=> acc1 c1 m1 tr1 _ hm2 hm3 _ hacc1 hv1 p0 r0 hr0 hr1 hr2 hp0 hv2 _.
+  split; 1: smt().
+  by rewrite (_ : 256 * (chunk{hr} + 1) = 256 * chunk{hr} + 32 * r0) 1:/#.
+auto => /> &hr hdb hpb.
+split; 1: by rewrite /SLH64.protect_64 to_uint_zeroextu64.
+move=> b0 c0 tr0 hc0 hc1 hc2 _ hp0 _.
+by rewrite (_ : 1024 = 256 * c0) 1:/#.
 qed.
 
 lemma shake256_squeeze_multiple_blocks_4x_proof _state _b_state _b0 _b_b0 _b1 _b_b1 _b2 _b_b2 _b3 _b_b3 :
@@ -1484,28 +1934,6 @@ auto; ecall (polynomial__reduce32_proof param b_param).
 auto; ecall (polynomial__reduce32_proof param b_param).
 auto; ecall (polynomial__reduce32_proof param b_param).
 auto; ecall (polynomial__reduce32_proof param b_param).
-by auto => /> *.
-qed.
-
-lemma column_vector__ntt_proof _vector _b_vector :
-      (column_vector__ntt_spec _vector _b_vector).
-proof.
-hint +safety.
-rewrite /column_vector__ntt_spec; proc.
-conseq (_ :
-     b_vector = BArray8192.init_arr (W8.of_int 255)
-  ==> BArray8192.is_init b_vector 0 8192
-   /\ valid trace_column_vector__ntt).
-+ by move=> &hr />; rewrite -!(BI8192.is_init_full _ 8192) //.
-unroll for ^while.
-auto; ecall (polynomial__ntt_proof param b_param).
-auto; ecall (polynomial__ntt_proof param b_param).
-auto; ecall (polynomial__ntt_proof param b_param).
-auto; ecall (polynomial__ntt_proof param b_param).
-auto; ecall (polynomial__ntt_proof param b_param).
-auto; ecall (polynomial__ntt_proof param b_param).
-auto; ecall (polynomial__ntt_proof param b_param).
-auto; ecall (polynomial__ntt_proof param b_param).
 by auto => /> *.
 qed.
 
@@ -2762,49 +3190,87 @@ auto; ecall (_shake256_A64__A128_proof param_0 b_param_0 param b_param).
 by auto => /> *.
 qed.
 
-lemma __compute_signer_response_element_proof _s1_element _b_s1_element _verifier_challenge _b_verifier_challenge _mask_element _b_mask_element _signer_response_element _b_signer_response_element :
-      (__compute_signer_response_element_spec _s1_element _b_s1_element
-      _verifier_challenge _b_verifier_challenge _mask_element _b_mask_element
-      _signer_response_element _b_signer_response_element).
+(* the contract of the challenge sampler, with its tau non-zero coefficients *)
+lemma sample____challenge_full _output_challenge _b_output_challenge _seed _b_seed :
+  hoare [M.sample____challenge :
+    output_challenge = _output_challenge /\ b_output_challenge = _b_output_challenge
+    /\ seed = _seed /\ b_seed = _b_seed /\ BArray64.is_init _b_seed 0 64
+    ==> (BArray1024.is_init res.`2 0 1024 /\ valid res.`3) /\ cnz res.`1 = 60].
+proof.
+have h := sample____challenge_proof _output_challenge _b_output_challenge _seed _b_seed.
+rewrite /sample____challenge_spec in h.
+conseq h sample____challenge_cnz => /> /#.
+qed.
+
+(* The products by the challenge need pos_ok of the positions, which the
+   contracts cannot state: the four lemmas below are the contracts of the
+   procedures with that precondition added. *)
+lemma __compute_signer_response_element_proof _s1_doubled _b_s1_doubled _challenge_positions
+    _b_challenge_positions _mask_element _b_mask_element _signer_response_element
+    _b_signer_response_element :
+  hoare [M.__compute_signer_response_element :
+    s1_doubled = _s1_doubled /\ b_s1_doubled = _b_s1_doubled
+    /\ challenge_positions = _challenge_positions
+    /\ b_challenge_positions = _b_challenge_positions
+    /\ mask_element = _mask_element /\ b_mask_element = _b_mask_element
+    /\ signer_response_element = _signer_response_element
+    /\ b_signer_response_element = _b_signer_response_element
+    /\ BArray1024.is_init _b_s1_doubled 0 1024
+    /\ BArray244.is_init _b_challenge_positions 0 244
+    /\ BArray1024.is_init _b_mask_element 0 1024 /\ pos_ok _challenge_positions
+    ==> BArray1024.is_init res.`2 0 1024 /\ valid res.`4].
 proof.
 hint +safety.
-rewrite /__compute_signer_response_element_spec; proc.
+proc.
 conseq (_ :
-     b_s1_element = BArray1024.init_arr (W8.of_int 255)
-  /\ b_verifier_challenge = BArray1024.init_arr (W8.of_int 255)
-  /\ b_mask_element = BArray1024.init_arr (W8.of_int 255)
-  ==> BArray1024.is_init b_signer_response_element 0 (4 * 256)
+     b_s1_doubled = BArray1024.init_arr (W8.of_int 255)
+  /\ b_challenge_positions = BArray244.init_arr (W8.of_int 255)
+  /\ b_mask_element = BArray1024.init_arr (W8.of_int 255) /\ pos_ok challenge_positions
+  ==> BArray1024.is_init b_signer_response_element 0 1024
    /\ valid trace___compute_signer_response_element).
-+ by move=> &hr />; rewrite -!(BI1024.is_init_full _ 1024) //.
-auto; ecall (polynomial____add_reduce32_check_infinity_norm_proof param_6 b_param param_5 ((BArray1024.init_arr (W8.of_int 255))) param_4 ((BArray1024.init_arr (W8.of_int 255))) param_3).
-auto; ecall (polynomial__invert_ntt_montgomery_proof param_2 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__pointwise_montgomery_multiply_and_reduce_proof param_1 b_param_0 param_0 ((BArray1024.init_arr (W8.of_int 255))) param ((BArray1024.init_arr (W8.of_int 255)))).
++ by move=> &hr />; rewrite -!(BI1024.is_init_full _ 1024) // -(BI244.is_init_full _ 244).
+auto; ecall (polynomial____add_reduce32_check_infinity_norm_proof param_5 b_param param_4
+               (BArray1024.init_arr (W8.of_int 255)) param_3 (BArray1024.init_arr (W8.of_int 255))
+               param_2).
+auto; ecall (polynomial____sparse_multiply_16_proof param_1 b_param_0 param_0
+               (BArray1024.init_arr (W8.of_int 255)) param (BArray244.init_arr (W8.of_int 255))).
 by auto => /> *.
 qed.
 
-lemma __compute_z_and_check_norm_proof _s1 _b_s1 _verifier_challenge _b_verifier_challenge _mask
-    _b_mask _signer_response _b_signer_response _infinity_norm_check_result :
-  __compute_z_and_check_norm_spec _s1 _b_s1 _verifier_challenge _b_verifier_challenge _mask
-    _b_mask _signer_response _b_signer_response _infinity_norm_check_result.
+lemma __compute_z_and_check_norm_proof _s1_doubled _b_s1_doubled _challenge_positions
+    _b_challenge_positions _mask _b_mask _signer_response _b_signer_response
+    _infinity_norm_check_result :
+  hoare [M.__compute_z_and_check_norm :
+    s1_doubled = _s1_doubled /\ b_s1_doubled = _b_s1_doubled
+    /\ challenge_positions = _challenge_positions
+    /\ b_challenge_positions = _b_challenge_positions
+    /\ mask = _mask /\ b_mask = _b_mask
+    /\ signer_response = _signer_response /\ b_signer_response = _b_signer_response
+    /\ infinity_norm_check_result = _infinity_norm_check_result
+    /\ BArray7168.is_init _b_s1_doubled 0 7168
+    /\ BArray244.is_init _b_challenge_positions 0 244
+    /\ BArray7168.is_init _b_mask 0 7168 /\ pos_ok _challenge_positions
+    ==> (res.`3 <> W64.zero \/ BArray7168.is_init res.`2 0 7168)
+     /\ (_infinity_norm_check_result = W64.zero \/ res.`3 <> W64.zero)
+     /\ valid res.`4].
 proof.
 hint +safety.
-rewrite /__compute_z_and_check_norm_spec; proc.
+proc.
 conseq (_ :
      _infinity_norm_check_result = infinity_norm_check_result
-  /\ b_s1 = BArray7168.init_arr (W8.of_int 255)
-  /\ b_verifier_challenge = BArray1024.init_arr (W8.of_int 255)
-  /\ b_mask = BArray7168.init_arr (W8.of_int 255)
-  ==> ((infinity_norm_check_result <> (W64.of_int 0)) \/ (BArray7168.is_init b_signer_response 0 (4 * (7 * 256))))
-   /\ ((_infinity_norm_check_result = (W64.of_int 0)) \/ (infinity_norm_check_result <> (W64.of_int 0)))
+  /\ b_s1_doubled = BArray7168.init_arr (W8.of_int 255)
+  /\ b_challenge_positions = BArray244.init_arr (W8.of_int 255)
+  /\ b_mask = BArray7168.init_arr (W8.of_int 255) /\ pos_ok challenge_positions
+  ==> (infinity_norm_check_result <> W64.of_int 0 \/ BArray7168.is_init b_signer_response 0 7168)
+   /\ (_infinity_norm_check_result = W64.of_int 0 \/ infinity_norm_check_result <> W64.of_int 0)
    /\ valid trace___compute_z_and_check_norm).
-+ by move=> &hr />; rewrite -!(BI7168.is_init_full _ 7168) // -!(BI1024.is_init_full _ 1024) //.
-+ by move=> />.
++ by move=> &hr />; rewrite -!(BI7168.is_init_full _ 7168) // -!(BI244.is_init_full _ 244) //.
 (* one element of the response per iteration; the loop stops early when the
    norm check of an element fails, and the response is complete otherwise; a
    failure reported on entry is kept *)
-while (b_s1 = BArray7168.init_arr (W8.of_int 255)
-    /\ b_verifier_challenge = BArray1024.init_arr (W8.of_int 255)
-    /\ b_mask = BArray7168.init_arr (W8.of_int 255)
+while (b_s1_doubled = BArray7168.init_arr (W8.of_int 255)
+    /\ b_challenge_positions = BArray244.init_arr (W8.of_int 255)
+    /\ b_mask = BArray7168.init_arr (W8.of_int 255) /\ pos_ok challenge_positions
     /\ 0 <= base <= 1792 /\ base %% 256 = 0
     /\ (base < 1792 => infinity_norm_check_result = W64.of_int 0)
     /\ (infinity_norm_check_result = W64.of_int 0
@@ -2812,8 +3278,8 @@ while (b_s1 = BArray7168.init_arr (W8.of_int 255)
     /\ (_infinity_norm_check_result = W64.of_int 0 \/ infinity_norm_check_result <> W64.of_int 0)
     /\ valid trace___compute_z_and_check_norm).
 + auto; ecall (__compute_signer_response_element_proof param_2 b_param_1 param_1
-                 (BArray1024.init_arr (W8.of_int 255)) param_0 b_param_0 param b_param).
-  auto => /> &hr h0 h1792 hmod hres hinit hmono hvalid hlt.
+                 (BArray244.init_arr (W8.of_int 255)) param_0 b_param_0 param b_param).
+  auto => /> &hr hpos hp60 h0 h1792 hmod hres hinit hmono hvalid hlt.
   rewrite SBI7168_1024.get_sub_init_arr 1,2:/# /=.
   move=> r hr2 hv.
   have hi := hinit (hres hlt).
@@ -2822,42 +3288,50 @@ while (b_s1 = BArray7168.init_arr (W8.of_int 255)
 by auto => /> *; smt().
 qed.
 
-lemma __apply_cs2_and_check_norm_proof _w0_minus_cs2 _b_w0_minus_cs2 _w0 _b_w0 _s2 _b_s2
-    _verifier_challenge _b_verifier_challenge _infinity_norm_check_result :
-  __apply_cs2_and_check_norm_spec _w0_minus_cs2 _b_w0_minus_cs2 _w0 _b_w0 _s2 _b_s2
-    _verifier_challenge _b_verifier_challenge _infinity_norm_check_result.
+lemma __apply_cs2_and_check_norm_proof _w0_minus_cs2 _b_w0_minus_cs2 _w0 _b_w0 _s2_doubled
+    _b_s2_doubled _challenge_positions _b_challenge_positions _infinity_norm_check_result :
+  hoare [M.__apply_cs2_and_check_norm :
+    w0_minus_cs2 = _w0_minus_cs2 /\ b_w0_minus_cs2 = _b_w0_minus_cs2
+    /\ w0 = _w0 /\ b_w0 = _b_w0 /\ s2_doubled = _s2_doubled /\ b_s2_doubled = _b_s2_doubled
+    /\ challenge_positions = _challenge_positions
+    /\ b_challenge_positions = _b_challenge_positions
+    /\ infinity_norm_check_result = _infinity_norm_check_result
+    /\ BArray8192.is_init _b_w0 0 8192 /\ BArray8192.is_init _b_s2_doubled 0 8192
+    /\ BArray244.is_init _b_challenge_positions 0 244 /\ pos_ok _challenge_positions
+    ==> (res.`3 <> W64.zero \/ BArray8192.is_init res.`2 0 8192)
+     /\ (_infinity_norm_check_result = W64.zero \/ res.`3 <> W64.zero)
+     /\ valid res.`4].
 proof.
 hint +safety.
-rewrite /__apply_cs2_and_check_norm_spec; proc.
+proc.
 conseq (_ :
      _infinity_norm_check_result = infinity_norm_check_result
   /\ b_w0 = BArray8192.init_arr (W8.of_int 255)
-  /\ b_s2 = BArray8192.init_arr (W8.of_int 255)
-  /\ b_verifier_challenge = BArray1024.init_arr (W8.of_int 255)
-  ==> ((infinity_norm_check_result <> (W64.of_int 0)) \/ (BArray8192.is_init b_w0_minus_cs2 0 (4 * (8 * 256))))
-   /\ ((_infinity_norm_check_result = (W64.of_int 0)) \/ (infinity_norm_check_result <> (W64.of_int 0)))
+  /\ b_s2_doubled = BArray8192.init_arr (W8.of_int 255)
+  /\ b_challenge_positions = BArray244.init_arr (W8.of_int 255) /\ pos_ok challenge_positions
+  ==> (infinity_norm_check_result <> W64.of_int 0 \/ BArray8192.is_init b_w0_minus_cs2 0 8192)
+   /\ (_infinity_norm_check_result = W64.of_int 0 \/ infinity_norm_check_result <> W64.of_int 0)
    /\ valid trace___apply_cs2_and_check_norm).
-+ by move=> &hr />; rewrite -!(BI8192.is_init_full _ 8192) // -!(BI1024.is_init_full _ 1024) //.
-+ by move=> />.
++ by move=> &hr />; rewrite -!(BI8192.is_init_full _ 8192) // -!(BI244.is_init_full _ 244) //.
 (* one row per iteration; the loop stops early when the norm check of a row
    fails, and the difference is complete otherwise; a failure reported on
    entry is kept *)
-while (b_w0 = BArray8192.init_arr (W8.of_int 255) /\ b_s2 = BArray8192.init_arr (W8.of_int 255)
-    /\ b_verifier_challenge = BArray1024.init_arr (W8.of_int 255)
+while (b_w0 = BArray8192.init_arr (W8.of_int 255)
+    /\ b_s2_doubled = BArray8192.init_arr (W8.of_int 255)
+    /\ b_challenge_positions = BArray244.init_arr (W8.of_int 255) /\ pos_ok challenge_positions
     /\ 0 <= base <= 2048 /\ base %% 256 = 0
     /\ (base < 2048 => infinity_norm_check_result = W64.of_int 0)
     /\ (infinity_norm_check_result = W64.of_int 0
         => BArray8192.is_init b_w0_minus_cs2 0 (4 * base))
     /\ (_infinity_norm_check_result = W64.of_int 0 \/ infinity_norm_check_result <> W64.of_int 0)
     /\ valid trace___apply_cs2_and_check_norm).
-+ auto; ecall (polynomial____subtract_reduce32_check_infinity_norm_proof param_6 b_param_0 param_5
-                 b_param param_4 (BArray1024.init_arr (W8.of_int 255)) param_3).
-  auto; ecall (polynomial__invert_ntt_montgomery_proof param_2 (BArray1024.init_arr (W8.of_int 255))).
-  auto; ecall (polynomial__pointwise_montgomery_multiply_and_reduce_proof param_1 b_param_2 param_0
-                 b_param_1 param (BArray1024.init_arr (W8.of_int 255))).
-  auto => /> &hr h0 h2048 hmod hres hinit hmono hvalid hlt.
++ auto; ecall (polynomial____subtract_reduce32_check_infinity_norm_proof param_5 b_param_0 param_4
+                 b_param param_3 (BArray1024.init_arr (W8.of_int 255)) param_2).
+  auto; ecall (polynomial____sparse_multiply_16_proof param_1 b_param_2 param_0 b_param_1 param
+                 (BArray244.init_arr (W8.of_int 255))).
+  auto => /> &hr hpos hp60 h0 h2048 hmod hres hinit hmono hvalid hlt.
   rewrite SBI8192_1024.get_sub_init_arr 1,2:/# /=.
-  move=> r0 hb0 hv0 r1 hb1 hv1 r2 hb2 hv2.
+  move=> r0 hb0 hv0 r1 hb1 hv1.
   have hi := hinit (hres hlt).
   rewrite SBI8192_1024.is_init_set_sub_in 1,2,3,4:/# /= hi /=.
   smt().
@@ -2865,28 +3339,42 @@ by auto => /> *; smt().
 qed.
 
 lemma __apply_ct0_and_check_norm_proof _w0_minus_cs2_plus_ct0 _b_w0_minus_cs2_plus_ct0
-    _w0_minus_cs2 _b_w0_minus_cs2 _t0 _b_t0 _verifier_challenge _b_verifier_challenge
-    _infinity_norm_check_result :
-  __apply_ct0_and_check_norm_spec _w0_minus_cs2_plus_ct0 _b_w0_minus_cs2_plus_ct0
-    _w0_minus_cs2 _b_w0_minus_cs2 _t0 _b_t0 _verifier_challenge _b_verifier_challenge
-    _infinity_norm_check_result.
+    _w0_minus_cs2 _b_w0_minus_cs2 _t0_doubled _b_t0_doubled _challenge_positions
+    _b_challenge_positions _infinity_norm_check_result :
+  hoare [M.__apply_ct0_and_check_norm :
+    w0_minus_cs2_plus_ct0 = _w0_minus_cs2_plus_ct0
+    /\ b_w0_minus_cs2_plus_ct0 = _b_w0_minus_cs2_plus_ct0
+    /\ w0_minus_cs2 = _w0_minus_cs2 /\ b_w0_minus_cs2 = _b_w0_minus_cs2
+    /\ t0_doubled = _t0_doubled /\ b_t0_doubled = _b_t0_doubled
+    /\ challenge_positions = _challenge_positions
+    /\ b_challenge_positions = _b_challenge_positions
+    /\ infinity_norm_check_result = _infinity_norm_check_result
+    /\ BArray16384.is_init _b_t0_doubled 0 16384
+    /\ BArray244.is_init _b_challenge_positions 0 244
+    /\ (_infinity_norm_check_result <> W64.zero \/ BArray8192.is_init _b_w0_minus_cs2 0 8192)
+    /\ pos_ok _challenge_positions
+    ==> (_infinity_norm_check_result <> W64.zero \/ BArray8192.is_init res.`2 0 8192)
+     /\ valid res.`4].
 proof.
 hint +safety.
-rewrite /__apply_ct0_and_check_norm_spec; proc.
+proc.
 conseq (_ :
      _infinity_norm_check_result = infinity_norm_check_result
-  /\ (_infinity_norm_check_result <> W64.of_int 0 \/ b_w0_minus_cs2 = BArray8192.init_arr (W8.of_int 255))
-  /\ b_t0 = BArray8192.init_arr (W8.of_int 255)
-  /\ b_verifier_challenge = BArray1024.init_arr (W8.of_int 255)
-  ==> ((_infinity_norm_check_result <> (W64.of_int 0)) \/ (BArray8192.is_init b_w0_minus_cs2_plus_ct0 0 (4 * (8 * 256))))
+  /\ (_infinity_norm_check_result <> W64.of_int 0
+      \/ b_w0_minus_cs2 = BArray8192.init_arr (W8.of_int 255))
+  /\ b_t0_doubled = BArray16384.init_arr (W8.of_int 255)
+  /\ b_challenge_positions = BArray244.init_arr (W8.of_int 255) /\ pos_ok challenge_positions
+  ==> (_infinity_norm_check_result <> W64.of_int 0
+       \/ BArray8192.is_init b_w0_minus_cs2_plus_ct0 0 8192)
    /\ valid trace___apply_ct0_and_check_norm).
-+ by move=> &hr />; rewrite -!(BI8192.is_init_full _ 8192) // -!(BI1024.is_init_full _ 1024) //.
++ by move=> &hr />; rewrite -!(BI8192.is_init_full _ 8192) // -!(BI16384.is_init_full _ 16384) //
+    -!(BI244.is_init_full _ 244).
 (* one row per iteration; the whole loop is skipped when an earlier norm
    check failed, and the difference is read only in the loop *)
 wp; while ((infinity_norm_check_result = W64.of_int 0
             => b_w0_minus_cs2 = BArray8192.init_arr (W8.of_int 255))
-    /\ b_t0 = BArray8192.init_arr (W8.of_int 255)
-    /\ b_verifier_challenge = BArray1024.init_arr (W8.of_int 255)
+    /\ b_t0_doubled = BArray16384.init_arr (W8.of_int 255)
+    /\ b_challenge_positions = BArray244.init_arr (W8.of_int 255) /\ pos_ok challenge_positions
     /\ _infinity_norm_check_result = infinity_norm_check_result
     /\ 0 <= base <= 2048 /\ base %% 256 = 0
     /\ (base < 2048 => infinity_norm_check_result = W64.of_int 0)
@@ -2895,13 +3383,12 @@ wp; while ((infinity_norm_check_result = W64.of_int 0
     /\ valid trace___apply_ct0_and_check_norm).
 + auto; ecall (polynomial____add_reduce32_check_infinity_norm_rhs_proof param_7 b_param_0 param_6
                  b_param param_5 (BArray1024.init_arr (W8.of_int 255)) param_4 param_3).
-  auto; ecall (polynomial__invert_ntt_montgomery_proof param_2 (BArray1024.init_arr (W8.of_int 255))).
-  auto; ecall (polynomial__pointwise_montgomery_multiply_and_reduce_proof param_1 b_param_2 param_0
-                 b_param_1 param (BArray1024.init_arr (W8.of_int 255))).
-  auto => /> &hr hw h0 h2048 hmod hres hinit hvalid hlt.
+  auto; ecall (polynomial____sparse_multiply_32_proof param_2 b_param_2 param_1 b_param_1 param_0
+                 (BArray244.init_arr (W8.of_int 255)) param).
+  auto => /> &hr hw hpos hp60 h0 h2048 hmod hres hinit hvalid hlt.
   have -> := hw (hres hlt).
-  rewrite SBI8192_1024.get_sub_init_arr 1,2:/# /=.
-  move=> r0 hb0 hv0 r1 hb1 hv1 r2 hb2 hv2.
+  rewrite SBI16384_2048.get_sub_init_arr 1,2:/# SBI8192_1024.get_sub_init_arr 1,2:/# /=.
+  move=> r0 hb0 hv0 r1 hb1 hv1.
   rewrite SBI8192_1024.is_init_set_sub_in 1,2,3,4:/# /=.
   smt().
 by auto => /> *; smt(BI8192.is_init_init_arr).
@@ -2966,73 +3453,92 @@ conseq (_ :
 (* the rejection sampling loop runs until an attempt passes every norm check
    or the budget of attempts is exhausted; the signature is encoded from the
    last attempt *)
-seq 275 : (exit_rejection_sampling_loop <> W64.zero
+seq < ^if : (exit_rejection_sampling_loop <> W64.zero
     /\ b_commitment_hash = BArray64.init_arr (W8.of_int 255)
     /\ (last_norm_check_result = W64.zero =>
           BArray7168.is_init b_signer_response 0 7168 /\ BArray8192.is_init b_hint 0 8192)
     /\ valid trace___sign_internal).
-+ while ((exit_rejection_sampling_loop <> W64.zero =>
++ wp; while ((exit_rejection_sampling_loop <> W64.zero =>
             b_commitment_hash = BArray64.init_arr (W8.of_int 255)
             /\ (last_norm_check_result = W64.zero =>
                   BArray7168.is_init b_signer_response 0 7168
                   /\ BArray8192.is_init b_hint 0 8192))
+      /\ b_s1_doubled = BArray7168.init_arr (W8.of_int 255)
+      /\ b_s2_doubled = BArray8192.init_arr (W8.of_int 255)
+      /\ b_t0_doubled = BArray16384.init_arr (W8.of_int 255)
       /\ valid trace___sign_internal).
   + (* one attempt; the norm checks are chained: a failed check is reported
        by every later one *)
-    seq 12 : (BArray7168.is_init b_mask_as_ntt 0 7168 /\ valid trace___sign_internal).
+    seq 12 : (BArray7168.is_init b_mask_as_ntt 0 7168
+        /\ b_s1_doubled = BArray7168.init_arr (W8.of_int 255)
+        /\ b_s2_doubled = BArray8192.init_arr (W8.of_int 255)
+        /\ b_t0_doubled = BArray16384.init_arr (W8.of_int 255)
+        /\ valid trace___sign_internal).
     + (* the mask is copied 32 bytes at a time *)
       while (0 <= j <= 7168 /\ j %% 32 = 0 /\ BArray7168.is_init b_mask_as_ntt 0 j
+          /\ b_s1_doubled = BArray7168.init_arr (W8.of_int 255)
+          /\ b_s2_doubled = BArray8192.init_arr (W8.of_int 255)
+          /\ b_t0_doubled = BArray16384.init_arr (W8.of_int 255)
           /\ valid trace___sign_internal).
       + auto => /> &hr h0 h1 hmod hinit hv hlt.
         by rewrite BI7168.is_init_set256d_in 1,2:/# /=; smt(BI7168.is_init_le0).
-      auto; ecall (sample____mask_proof param_20 (BArray64.init_arr (W8.of_int 255)) param_19).
+      auto; ecall (sample____mask_proof param_23 (BArray64.init_arr (W8.of_int 255)) param_22).
       by auto => /> *; smt().
-    auto; ecall (__make_hint_vector_proof param_52 b_param_5 param_51
-                  (BArray8192.init_arr (W8.of_int 255)) param_50 b_param_4 param_49).
-    auto; ecall (__apply_ct0_and_check_norm_proof param_48 b_param_7 param_47 b_param_6 param_46
-                  (BArray8192.init_arr (W8.of_int 255)) param_45 (BArray1024.init_arr (W8.of_int 255))
-                  param_44).
-    auto; ecall (__apply_cs2_and_check_norm_proof param_43 b_param_8 param_42
-                  (BArray8192.init_arr (W8.of_int 255)) param_41 (BArray8192.init_arr (W8.of_int 255))
-                  param_40 (BArray1024.init_arr (W8.of_int 255)) param_39).
-    auto; ecall (__compute_z_and_check_norm_proof param_38 (BArray7168.init_arr (W8.of_int 255))
-                  param_37 (BArray1024.init_arr (W8.of_int 255)) param_36
-                  (BArray7168.init_arr (W8.of_int 255)) param_35 b_param_9 param_34).
-    auto; ecall (polynomial__ntt_proof param_33 (BArray1024.init_arr (W8.of_int 255))).
-    auto; ecall (sample____challenge_proof param_32 b_param_10 param_31
+    auto; ecall (__make_hint_vector_proof param_55 b_param_5 param_54
+                  (BArray8192.init_arr (W8.of_int 255)) param_53 b_param_4 param_52).
+    auto; ecall (__apply_ct0_and_check_norm_proof param_51 b_param_8 param_50 b_param_7 param_49
+                  b_param_6 param_48 (BArray244.init_arr (W8.of_int 255)) param_47).
+    auto; ecall (__apply_cs2_and_check_norm_proof param_46 b_param_10 param_45
+                  (BArray8192.init_arr (W8.of_int 255)) param_44 b_param_9 param_43
+                  (BArray244.init_arr (W8.of_int 255)) param_42).
+    auto; ecall (__compute_z_and_check_norm_proof param_41 b_param_12 param_40
+                  (BArray244.init_arr (W8.of_int 255))
+                  param_39 (BArray7168.init_arr (W8.of_int 255))
+                  param_38 b_param_11 param_37).
+    (* the positions of the challenge, from its tau non-zero coefficients *)
+    auto; ecall (polynomial____challenge_positions_proof param_36
+                  (BArray1024.init_arr (W8.of_int 255))).
+    auto; ecall (sample____challenge_full param_35 b_param_13 param_34
                   (BArray64.init_arr (W8.of_int 255))).
-    auto; ecall (__derive_commitment_hash_proof param_30 b_param_11 param_29
-                  (BArray64.init_arr (W8.of_int 255)) param_28 (BArray1024.init_arr (W8.of_int 255))).
-    auto; ecall (commitment____encode_proof param_27 (BArray8192.init_arr (W8.of_int 255))).
-    auto; ecall (column_vector____decompose_proof param_26 (BArray8192.init_arr (W8.of_int 255))).
-    auto; ecall (column_vector__invert_ntt_montgomery_proof param_25
+    auto; ecall (__derive_commitment_hash_proof param_33 b_param_14 param_32
+                  (BArray64.init_arr (W8.of_int 255))
+                  param_31 (BArray1024.init_arr (W8.of_int 255))).
+    auto; ecall (commitment____encode_proof param_30 (BArray8192.init_arr (W8.of_int 255))).
+    auto; ecall (column_vector____decompose_proof param_29 (BArray8192.init_arr (W8.of_int 255))).
+    auto; ecall (column_vector__invert_ntt_montgomery_proof param_28
                   (BArray8192.init_arr (W8.of_int 255))).
-    auto; ecall (column_vector__reduce32_proof param_24 (BArray8192.init_arr (W8.of_int 255))).
-    auto; ecall (row_vector____multiply_with_matrix_A_proof param_23
-                  (BArray57344.init_arr (W8.of_int 255)) param_22 (BArray7168.init_arr (W8.of_int 255))).
-    auto; ecall (row_vector__ntt_proof param_21 b_param_12).
+    auto; ecall (column_vector__reduce32_proof param_27 (BArray8192.init_arr (W8.of_int 255))).
+    auto; ecall (row_vector____multiply_with_matrix_A_proof param_26
+                  (BArray57344.init_arr (W8.of_int 255))
+                  param_25 (BArray7168.init_arr (W8.of_int 255))).
+    auto; ecall (row_vector__ntt_proof param_24 b_param_15).
     by auto => /> *; smt(orw_eq0).
-  (* the key is decoded and the seeds derived before the loop *)
-  auto; ecall (column_vector__ntt_proof param_18 (BArray8192.init_arr (W8.of_int 255))).
-  auto; ecall (column_vector__ntt_proof param_17 (BArray8192.init_arr (W8.of_int 255))).
-  auto; ecall (row_vector__ntt_proof param_16 (BArray7168.init_arr (W8.of_int 255))).
-  auto; ecall (t0__decode_proof param_15 b_param_14 param_14 b_param_13).
-  auto; ecall (s2____decode_proof param_13 b_param_16 param_12 b_param_15).
-  auto; ecall (s1____decode_proof param_11 b_param_18 param_10 b_param_17).
-  auto; ecall (derive_seed_for_mask_proof param_9 b_param_20 param_8
+  (* the key is decoded, s1, s2 and t0 doubled, and the seeds derived before
+     the loop *)
+  unroll for ^while{2}; unroll for ^while.
+  wp.
+  do 8! (ecall (polynomial____double_32_proof param_21 b_param_17 param_20 b_param_16); wp;
+         ecall (polynomial____double_16_proof param_19 b_param_19 param_18 b_param_18); wp).
+  do 7! (ecall (polynomial____double_16_proof param_17 b_param_21 param_16 b_param_20); wp).
+  ecall (t0__decode_proof param_15 b_param_23 param_14 b_param_22).
+  auto; ecall (s2____decode_proof param_13 b_param_25 param_12 b_param_24).
+  auto; ecall (s1____decode_proof param_11 b_param_27 param_10 b_param_26).
+  auto; ecall (derive_seed_for_mask_proof param_9 b_param_29 param_8
                 (BArray32.init_arr (W8.of_int 255)) param_7 (BArray64.init_arr (W8.of_int 255))
-                param_6 b_param_19).
-  auto; ecall (__derive_message_representative_proof param_5 b_param_22 param_4 b_param_21 param_3
+                param_6 b_param_28).
+  auto; ecall (__derive_message_representative_proof param_5 b_param_31 param_4 b_param_30 param_3
                 param_2 param_1 param_0).
-  auto; ecall (sample____matrix_A_proof param b_param_23).
-  by auto => /> *; smt().
+  auto; ecall (sample____matrix_A_proof param b_param_32).
+  auto => /> *.
+  by rewrite -(BI7168.is_init_full _ 7168) // -(BI8192.is_init_full _ 8192) //
+    -(BI16384.is_init_full _ 16384).
 (* the signature is encoded only when the exiting attempt passed every norm
    check; otherwise every byte of it is set to zero *)
-sp; if.
-+ auto; ecall (signature____encode_proof param_56 b_param_2 param_55 b_param_1 param_54 b_param_0
-                param_53 b_param).
+wp; if.
++ auto; ecall (signature____encode_proof param_59 b_param_2 param_58 b_param_1 param_57 b_param_0
+                param_56 b_param).
   by auto => /> /#.
-auto; ecall (signature____zero_proof param_57 b_param_3).
+auto; ecall (signature____zero_proof param_60 b_param_3).
 by auto => /> *.
 qed.
 

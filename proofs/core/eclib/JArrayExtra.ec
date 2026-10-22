@@ -180,4 +180,87 @@ abstract theory WAE.
   rewrite (_: (k * 32 + b) %% 8 = b %% 8) 1:/#.
   by rewrite W4u8.get_bits8 1:/# /#.
   qed.
+
+  (* the 16-bit lanes, at any even offset *)
+  lemma get256_direct_bits16 (t : A.t) (j k : int) : 0 <= k < 16 => j %% 2 = 0 =>
+    get256_direct t j \bits16 k = get16 t (j %/ 2 + k).
+  proof.
+  move=> hk hj; rewrite get256E get16E; apply W16.wordP => b hb.
+  rewrite bits16iE // pack32wE 1:/# W32u8.Pack.initiE 1:/# /=.
+  rewrite W2u8.pack2wE // W2u8.Pack.initiE 1:/# /=.
+  by rewrite (_ : j + (k * 16 + b) %/ 8 = 2 * (j %/ 2 + k) + b %/ 8) 1:/#
+             (_ : (k * 16 + b) %% 8 = b %% 8) 1:/#.
+  qed.
+
+  lemma get16_set256_direct (t : A.t) (j i : int) (w : W256.t) :
+    0 <= j => j + 32 <= size => j %% 2 = 0 =>
+    get16 (set256_direct t j w) i =
+    if j %/ 2 <= i < j %/ 2 + 16 then w \bits16 (i - j %/ 2) else get16 t i.
+  proof.
+  move=> hj0 hj1 hj; rewrite set256E !get16E; apply W16.wordP => b hb.
+  rewrite W2u8.pack2wE // W2u8.Pack.initiE 1:/# /= initE.
+  case: (j %/ 2 <= i < j %/ 2 + 16) => hi.
+  + rewrite ifT 1:/# /= ifT 1:/# bits16iE // bits8iE 1:/#; congr; smt().
+  rewrite W2u8.pack2wE // W2u8.Pack.initiE 1:/# /=.
+  by case: (0 <= 2 * i + b %/ 8 < size) => hs /=; [rewrite ifF 1:/# | rewrite get_out].
+  qed.
+
+  lemma init32_get32 (f : int -> W32.t) (t : A.t) : size %% 4 = 0 =>
+    (forall i, 0 <= i < size %/ 4 => f i = get32 t i) => init32 f = t.
+  proof.
+  move=> hs hf; apply tP => i hi; rewrite /init32 initiE //= hf 1:/#.
+  rewrite get32E; apply W8.wordP => b hb.
+  rewrite bits8iE // W4u8.pack4wE 1:/# W4u8.Pack.initiE 1:/# /=.
+  rewrite (_ : 4 * (i %/ 4) + (i %% 4 * 8 + b) %/ 8 = i) 1:/#.
+  by rewrite (_ : (i %% 4 * 8 + b) %% 8 = b) 1:/#.
+  qed.
 end WAE.
+
+(* -------------------------------------------------------------------- *)
+(* An array of u32 and its byte view: the 32- and 16-bit lanes of the    *)
+(* 256-bit loads and stores through the byte view.                       *)
+abstract theory PWAE.
+  op size : int.
+  op wsize : int.
+  axiom wsizeE : wsize = 4 * size.
+
+  clone import PolyArray as P with op size <- size.
+  clone import WArray as W with op size <- wsize.
+  clone WAE as WE with op size <- wsize, theory A <- W.
+
+  (* the byte view of an array of u32 *)
+  abbrev bytes (p : W32.t P.t) = W.init32 (fun i => p.[i]).
+
+  (* the 16-bit lanes of an array of u32 (2 * size of them) *)
+  op lane16 (p : W32.t P.t) (t : int) : W16.t = W.get16 (bytes p) t.
+
+  lemma load_bits32 (p : W32.t P.t) (o k : int) :
+    0 <= o => o + 32 <= wsize => o %% 4 = 0 => 0 <= k < 8 =>
+    W.get256_direct (bytes p) o \bits32 k = p.[o %/ 4 + k].
+  proof. by move=> *; rewrite WE.get256_direct_init32_bits32. qed.
+
+  lemma load_bits16 (p : W32.t P.t) (o k : int) : o %% 2 = 0 => 0 <= k < 16 =>
+    W.get256_direct (bytes p) o \bits16 k = lane16 p (o %/ 2 + k).
+  proof. by move=> *; rewrite WE.get256_direct_bits16. qed.
+
+  lemma store_get (p : W32.t P.t) (o t : int) (w : W256.t) :
+    0 <= o => o + 32 <= wsize => o %% 4 = 0 => 0 <= t < size =>
+    (P.init (W.get32 (W.set256_direct (bytes p) o w))).[t] =
+    if o %/ 4 <= t < o %/ 4 + 8 then w \bits32 (t - o %/ 4) else p.[t].
+  proof.
+  move=> h0 h1 h2 ht; have hw := wsizeE.
+  rewrite P.initiE //= WE.get32_set256_direct_eq 1..5:/#.
+  by case: (o %/ 4 <= t < o %/ 4 + 8) => // _; rewrite WE.get32_init32 /#.
+  qed.
+
+  lemma store_lane16 (p : W32.t P.t) (o t : int) (w : W256.t) :
+    0 <= o => o + 32 <= wsize => o %% 2 = 0 =>
+    lane16 (P.init (W.get32 (W.set256_direct (bytes p) o w))) t =
+    if o %/ 2 <= t < o %/ 2 + 16 then w \bits16 (t - o %/ 2) else lane16 p t.
+  proof.
+  move=> h0 h1 h2; have hw := wsizeE; rewrite /lane16.
+  rewrite (WE.init32_get32 _ (W.set256_direct (bytes p) o w)) 1:/#.
+  + by move=> i hi /=; rewrite P.initiE /#.
+  by rewrite WE.get16_set256_direct.
+  qed.
+end PWAE.

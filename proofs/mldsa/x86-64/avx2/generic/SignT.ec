@@ -36,7 +36,7 @@ clone import S1T.S1T as S1E with theory B <- B, theory PR <- PR, theory EP <- EP
 clone import S2T.S2T as S2E with theory B <- B, theory PR <- PR, theory EP <- EP.
 clone import T0T.T0T as T0 with theory B <- B, theory PR <- PR.
 clone import HashingT.HashingT as HS with theory B <- B.
-import CR.
+import CR SP.
 
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq.
@@ -440,35 +440,86 @@ seq 0 1 : (#pre /\
     + by rewrite /t0_enc; smt().
     by rewrite Array_t0_enc.initiE /=; [rewrite /t0_enc; smt() | congr; ring].
     
-(* ── Step 12: NTT s1/s2/t0 + loop variable inits ───────────────────────
-   Jasmin: row_vector__ntt(s1); column_vector__ntt(s2); column_vector__ntt(t0)
+(* ── Step 12: doubling of s1/s2/t0 + loop variable inits ───────────────
+   Jasmin: s1_doubled[i] <- __double_16(s1[i])  (i < lvec)
+           s2_doubled[i] <- __double_16(s2[i]); t0_doubled[i] <- __double_32(t0[i])  (i < kvec)
+           (the products by the challenge are computed in the time domain,
+            s1, s2 and t0 are not transformed)
            domain_separator_for_mask <- 0
            exit_rejection_sampling_loop <- 0
            kappa_exceeded <- 0
-   Spec: (kappa <- 0, zh <- None already done; s1h/s2h/t0h from Step 2 above) *)
-seq 0 3 : (#{/~s1{2}}{/~s2{2}}{/~t0{2}}pre /\
-    lifts_wpolylvec (lvec_unflatten256 s1{2}) = s1h{1} /\
-    lifts_wpolykvec (kvec_unflatten256 s2{2}) = s2h{1} /\
-    lifts_wpolykvec (kvec_unflatten256 t0{2}) = t0h{1} /\
-    wpolylvec_ntt_orng (lvec_unflatten256 s1{2}) /\
-    wpolykvec_ntt_orng (kvec_unflatten256 s2{2}) /\
-    wpolykvec_ntt_orng (kvec_unflatten256 t0{2}) /\
-    PolyKVec.infnorm_lt t0{1} (dpow + 1) /\
-    t0h{1} = PolyKVec.nttv t0{1}).
-+ wp; ecall{2} (column_vector__ntt_ph t0{2}).
-  wp; ecall{2} (column_vector__ntt_ph s2{2}).
-  wp; ecall{2} (row_vector__ntt_ph s1{2}).
-  auto => |> &1 &2 *.
-  split; first by apply wpolylvec_srng_ntt_irng;
-    apply (wpolylvec_srng_widen _ Eta Eta (q-1) (q-1)); smt(param_sets).
-  move => _ result Hs1_lift Hs1_orng.
-  split; first by apply wpolykvec_srng_ntt_irng;
-    apply (wpolykvec_srng_widen _ Eta Eta (q-1) (q-1)); smt(param_sets).
-  move => _ result0 Hs2_lift Hs2_orng.
-  split; first by apply wpolykvec_srng_ntt_irng;
-    apply (wpolykvec_srng_widen _ (dpow-1) dpow (q-1) (q-1)); smt().
-  move => _ result1 Ht0_lift Ht0_orng.
-  by rewrite Hs1_lift Hs2_lift Ht0_lift /#.
+   Spec: (kappa <- 0, zh <- None already done; s1h/s2h/t0h = nttv s1/s2/t0 from Step 1) *)
+seq 0 3 : (#pre /\
+    (forall k, 0 <= k < lvec =>
+       doubled16_of (lvec_unflatten256 s1_doubled{2}).[k] (lvec_unflatten256 s1{2}).[k])).
++ conseq (_: wpolylvec_srng (lvec_unflatten256 s1{2}) Eta Eta ==>
+             forall k, 0 <= k < lvec =>
+               doubled16_of (lvec_unflatten256 s1_doubled{2}).[k] (lvec_unflatten256 s1{2}).[k]);
+    1,2: smt().
+  while{2} (0 <= i{2} <= lvec /\ wpolylvec_srng (lvec_unflatten256 s1{2}) Eta Eta /\
+            forall k, 0 <= k < i{2} =>
+              doubled16_of (lvec_unflatten256 s1_doubled{2}).[k] (lvec_unflatten256 s1{2}).[k])
+           (lvec - i{2}).
+  + move => _ z.
+    wp; ecall (polynomial____double_16_ph (Array256.init (fun i_0 => s1.[i * 256 + i_0]))).
+    auto => |> &hr Hi0 Hi1 Hs1 Hinv Hc.
+    have Heq : (lvec_unflatten256 s1{hr}).[i{hr}] =
+               Array256.init (fun i_0 => s1{hr}.[i{hr} * 256 + i_0]).
+    + by rewrite -(lvec_slice_eq s1{hr} (i{hr} * 256)) 1,2:/#; congr; smt().
+    split.
+    + by rewrite -Heq; move: Hs1; rewrite /wpolylvec_srng LArray.allP => H; apply H; smt().
+    move => _ r Hr; do split; 1,2,4: smt().
+    move => k hk0 hk1.
+    rewrite (lvec_unflatten256_writeback_iE s1_doubled{hr} r (i{hr} * 256) k) 1,2:/#.
+    case (k = i{hr} * 256 %/ 256) => hk /=; last by apply Hinv; smt().
+    by rewrite (_ : k = i{hr}) 1:/# Heq.
+  by auto => |> &2 Hs1; split; [smt(gt0_l) | move => i s1d *; smt()].
+
+seq 0 2 : (#pre /\
+    (forall k, 0 <= k < kvec =>
+       doubled16_of (kvec_unflatten256 s2_doubled{2}).[k] (kvec_unflatten256 s2{2}).[k]) /\
+    (forall k, 0 <= k < kvec =>
+       doubled32_of (kvec_slice512 t0_doubled{2} k) (kvec_unflatten256 t0{2}).[k])).
++ conseq (_: wpolykvec_srng (kvec_unflatten256 s2{2}) Eta Eta /\
+             wpolykvec_srng (kvec_unflatten256 t0{2}) (dpow - 1) dpow ==>
+             (forall k, 0 <= k < kvec =>
+               doubled16_of (kvec_unflatten256 s2_doubled{2}).[k] (kvec_unflatten256 s2{2}).[k]) /\
+             (forall k, 0 <= k < kvec =>
+               doubled32_of (kvec_slice512 t0_doubled{2} k) (kvec_unflatten256 t0{2}).[k]));
+    1,2: smt().
+  while{2} (0 <= i{2} <= kvec /\ wpolykvec_srng (kvec_unflatten256 s2{2}) Eta Eta /\
+            wpolykvec_srng (kvec_unflatten256 t0{2}) (dpow - 1) dpow /\
+            (forall k, 0 <= k < i{2} =>
+              doubled16_of (kvec_unflatten256 s2_doubled{2}).[k] (kvec_unflatten256 s2{2}).[k]) /\
+            (forall k, 0 <= k < i{2} =>
+              doubled32_of (kvec_slice512 t0_doubled{2} k) (kvec_unflatten256 t0{2}).[k]))
+           (kvec - i{2}).
+  + move => _ z.
+    wp; ecall (polynomial____double_32_ph (Array256.init (fun i_0 => t0.[i * 256 + i_0])));
+      2: by call polynomial____double_16_ll; auto.
+    wp; ecall (polynomial____double_16_ph (Array256.init (fun i_0 => s2.[i * 256 + i_0]))).
+    auto => |> &hr Hi0 Hi1 Hs2 Ht0 Hinv2 Hinv3 Hc.
+    have Heq2 : (kvec_unflatten256 s2{hr}).[i{hr}] =
+                Array256.init (fun i_0 => s2{hr}.[i{hr} * 256 + i_0]).
+    + by rewrite -(kvec_slice_eq s2{hr} (i{hr} * 256)) 1,2:/#; congr; smt().
+    have Heq3 : (kvec_unflatten256 t0{hr}).[i{hr}] =
+                Array256.init (fun i_0 => t0{hr}.[i{hr} * 256 + i_0]).
+    + by rewrite -(kvec_slice_eq t0{hr} (i{hr} * 256)) 1,2:/#; congr; smt().
+    split.
+    + by rewrite -Heq2; move: Hs2; rewrite /wpolykvec_srng KArray.allP => H; apply H; smt().
+    move => _ r2 Hr2; split.
+    + by rewrite -Heq3; move: Ht0; rewrite /wpolykvec_srng KArray.allP /dpow /= => H; apply H; smt().
+    move => _ r3 Hr3; do split; 1,2,5: smt().
+    + move => k hk0 hk1.
+      rewrite (kvec_unflatten256_writeback_iE s2_doubled{hr} r2 (i{hr} * 256) k) 1,2:/#.
+      case (k = i{hr} * 256 %/ 256) => hk /=; last by apply Hinv2; smt().
+      by rewrite (_ : k = i{hr}) 1:/# Heq2.
+    move => k hk0 hk1.
+    rewrite (kvec_slice512_writeback_iE t0_doubled{hr} r3 i{hr} k) 1,2:/#.
+    case (k = i{hr}) => hk /=; last by apply Hinv3; smt().
+    by rewrite hk Heq3.
+  auto => |> &2 Hs2 Ht0; split; 1: smt(gt0_k).
+  by move => i s2d t0d; split => [/#|? ? ? Hd16 Hd32]; split => k *; [apply Hd16 | apply Hd32]; smt().
 
 (* ── Rejection sampling loop + post-loop ──────────────────────────────── *)
 
@@ -477,14 +528,22 @@ liftu_wpolymat (mat_unflatten256 matrix_A{2}) = _A{1} /\
     wpolymat_urng (mat_unflatten256 matrix_A{2}) q /\
     seed_for_mask{2} = Array64.of_list witness (Bytes64.to_list rhopp{1}) /\
     message_representative{2} = Array64.of_list witness (Bytes64.to_list mu{1}) /\
-    lifts_wpolylvec (lvec_unflatten256 s1{2}) = s1h{1} /\
-    lifts_wpolykvec (kvec_unflatten256 s2{2}) = s2h{1} /\
-    lifts_wpolykvec (kvec_unflatten256 t0{2}) = t0h{1} /\
-    wpolylvec_ntt_orng (lvec_unflatten256 s1{2}) /\
-    wpolykvec_ntt_orng (kvec_unflatten256 s2{2}) /\
-    wpolykvec_ntt_orng (kvec_unflatten256 t0{2}) /\
-    PolyKVec.infnorm_lt t0{1} (dpow + 1) /\
+    lifts_wpolylvec (lvec_unflatten256 s1{2}) = s1{1} /\
+    lifts_wpolykvec (kvec_unflatten256 s2{2}) = s2{1} /\
+    lifts_wpolykvec (kvec_unflatten256 t0{2}) = t0{1} /\
+    s1h{1} = PolyLVec.nttv s1{1} /\
+    s2h{1} = PolyKVec.nttv s2{1} /\
     t0h{1} = PolyKVec.nttv t0{1} /\
+    wpolylvec_srng (lvec_unflatten256 s1{2}) Eta Eta /\
+    wpolykvec_srng (kvec_unflatten256 s2{2}) Eta Eta /\
+    wpolykvec_srng (kvec_unflatten256 t0{2}) (dpow - 1) dpow /\
+    PolyKVec.infnorm_lt t0{1} (dpow + 1) /\
+    (forall k, 0 <= k < lvec =>
+       doubled16_of (lvec_unflatten256 s1_doubled{2}).[k] (lvec_unflatten256 s1{2}).[k]) /\
+    (forall k, 0 <= k < kvec =>
+       doubled16_of (kvec_unflatten256 s2_doubled{2}).[k] (kvec_unflatten256 s2{2}).[k]) /\
+    (forall k, 0 <= k < kvec =>
+       doubled32_of (kvec_slice512 t0_doubled{2} k) (kvec_unflatten256 t0{2}).[k]) /\
     W16.to_uint domain_separator_for_mask{2} = kappa{1} * lvec /\
     (kappa_exceeded{2} = one) = (kappa_max <= kappa{1}) /\
     (kappa_exceeded{2} <> one => kappa_exceeded{2} = zero) /\
@@ -512,7 +571,7 @@ liftu_wpolymat (mat_unflatten256 matrix_A{2}) = _A{1} /\
   (* success: zh <> None, so last_norm_check_result = W64.zero *)
   rcondt {2} 3; 1: by move => &1; auto => /> /#.
   wp; ecall (signature_encode commitment_hash{2} signer_response{2} hint_0{2}).
-  auto => |> &1 &2 15?; do split; 1..6:smt().
+  auto => |> &1 &2 17?; do split; 1..6:smt().
   + move => 6? rr1 rr2 ?.
     have -> : last_norm_check_result{2} = W64.zero by smt().
     split; 1: by rewrite negb_and; left; rewrite wordP /= minus_one /= /(`<<`) /(`|>>`) /= sarE negb_forall; exists 0 => /=.
@@ -528,14 +587,22 @@ while (
     wpolymat_urng (mat_unflatten256 matrix_A{2}) q /\
     seed_for_mask{2} = Array64.of_list witness (Bytes64.to_list rhopp{1}) /\
     message_representative{2} = Array64.of_list witness (Bytes64.to_list mu{1}) /\
-    lifts_wpolylvec (lvec_unflatten256 s1{2}) = s1h{1} /\
-    lifts_wpolykvec (kvec_unflatten256 s2{2}) = s2h{1} /\
-    lifts_wpolykvec (kvec_unflatten256 t0{2}) = t0h{1} /\
-    wpolylvec_ntt_orng (lvec_unflatten256 s1{2}) /\
-    wpolykvec_ntt_orng (kvec_unflatten256 s2{2}) /\
-    wpolykvec_ntt_orng (kvec_unflatten256 t0{2}) /\
-    PolyKVec.infnorm_lt t0{1} (dpow + 1) /\
+    lifts_wpolylvec (lvec_unflatten256 s1{2}) = s1{1} /\
+    lifts_wpolykvec (kvec_unflatten256 s2{2}) = s2{1} /\
+    lifts_wpolykvec (kvec_unflatten256 t0{2}) = t0{1} /\
+    s1h{1} = PolyLVec.nttv s1{1} /\
+    s2h{1} = PolyKVec.nttv s2{1} /\
     t0h{1} = PolyKVec.nttv t0{1} /\
+    wpolylvec_srng (lvec_unflatten256 s1{2}) Eta Eta /\
+    wpolykvec_srng (kvec_unflatten256 s2{2}) Eta Eta /\
+    wpolykvec_srng (kvec_unflatten256 t0{2}) (dpow - 1) dpow /\
+    PolyKVec.infnorm_lt t0{1} (dpow + 1) /\
+    (forall k, 0 <= k < lvec =>
+       doubled16_of (lvec_unflatten256 s1_doubled{2}).[k] (lvec_unflatten256 s1{2}).[k]) /\
+    (forall k, 0 <= k < kvec =>
+       doubled16_of (kvec_unflatten256 s2_doubled{2}).[k] (kvec_unflatten256 s2{2}).[k]) /\
+    (forall k, 0 <= k < kvec =>
+       doubled32_of (kvec_slice512 t0_doubled{2} k) (kvec_unflatten256 t0{2}).[k]) /\
     W16.to_uint domain_separator_for_mask{2} = kappa{1} * lvec /\
     (kappa_exceeded{2} = W64.of_int 1) = (kappa_max <= kappa{1}) /\
     (kappa_exceeded{2} <> W64.of_int 1 => kappa_exceeded{2} = W64.zero) /\
@@ -631,13 +698,13 @@ while (
  seq 3 3 : (#pre /\
      ct{1} = BytesCT.init (fun i => commitment_hash{2}.[i]) /\
      lifts_wpoly verifier_challenge{2} = c{1} /\
-     wpoly_ntt_irng verifier_challenge{2} /\
-     l1 c{1} <= tau).
+     wpoly_srng 1 1 verifier_challenge{2} /\
+     l1 c{1} = tau).
  + seq 0 1 : (#pre /\ BytesW1.of_list (to_list commitment_encoded{2}) = w1Encode w1{1}); last first.
    + inline {1} SIB_RO(MLDSA_XOF_SIB).get.
      sp 3 0.
      wp.
-     call sample_challenge_correct_l1.
+     call sample_challenge_correct_l1eq.
      ecall{2} (derive_commitment_hash_ph message_representative{2} commitment_encoded{2}).
      auto => |> &1 &2 *.
      rewrite Array64.of_listK 1:Bytes64.size_to_list //.
@@ -645,13 +712,12 @@ while (
      rewrite Array_ctilde.of_listK; 1: by rewrite BytesCT.size_to_list.
      rewrite BytesCT.to_listK.
      split; first by smt().
-     move => Hcteq result_L result_R Hrl Hsrng Hl1; split.
-     + rewrite Hcteq; apply BytesCT.tP => i Hi; rewrite BytesCT.initiE 1:/# /=.
-       smt(Array_ctilde.get_of_list BytesCT.size_to_list BytesCT.get_to_list).
-     apply wpoly_srng_ntt_irng; apply (wpoly_srng_widen _ 1 1 (q-1) (q-1)); smt().
+     move => Hcteq result_L result_R Hrl Hsrng Hl1.
+     rewrite Hcteq; apply BytesCT.tP => i Hi; rewrite BytesCT.initiE 1:/# /=.
+     smt(Array_ctilde.get_of_list BytesCT.size_to_list BytesCT.get_to_list).
    (* Step 1: commitment_encode bridge, polynomial by polynomial against w1Encode *)
    ecall{2} (commitment_encode_ph w1{2}).
-   auto => |> &1 &2 19? result1 Hunflat.
+   auto => |> &1 &2 21? result1 Hunflat.
    rewrite /w1Encode.
    have Hw1eq : liftu_wpolykvec (kvec_unflatten256 w1{2}) =
                 lifts_wpolykvec (kvec_unflatten256 w1{2}).
@@ -673,11 +739,13 @@ while (
 sp 6 0.
 seq 1 0 : #pre; 1: by auto.
 
- seq 0 1 : (#{~lifts_wpoly verifier_challenge{2} = c{1}}{~wpoly_ntt_irng verifier_challenge{2}}pre /\
-     wpoly_ntt_orng verifier_challenge{2} /\
-     lifts_wpoly verifier_challenge{2} = ch{1}).
- + ecall{2} (polynomial__ntt_ph verifier_challenge{2}).
-   by auto => |> /#.
+ (* the positions of the non-zero coefficients of c (time domain) *)
+ seq 0 1 : (#pre /\
+     challenge_shape (lifts_wpoly verifier_challenge{2}) /\
+     positions_of challenge_positions{2} (lifts_wpoly verifier_challenge{2})).
+ + ecall{2} (polynomial____challenge_positions_ph verifier_challenge{2}).
+   auto => |> &1 &2 *.
+   by apply challenge_shape_of_l1 => /#.
 
  (* Jasmin pure: infinity_norm_check_result <- 0 *)
  sp 0 1.
@@ -686,39 +754,42 @@ seq 1 0 : #pre; 1: by auto.
        whose outcome index the model leaks regardless of the others) ──── *)
  seq 0 1 : (#{~infinity_norm_check_result{2} = W64.zero}pre /\
      (infinity_norm_check_result{2} = W64.zero \/ infinity_norm_check_result{2} = W64.one) /\
-     (infinity_norm_check_result{2} = W64.zero <=> PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.invnttv (PolyLVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta)) /\
-     (PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.invnttv (PolyLVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta) =>
+     (infinity_norm_check_result{2} = W64.zero <=> PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta)) /\
+     (PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta) =>
         wpolylvec_infnorm_lt (gamma1 - Beta) (lvec_unflatten256 signer_response{2}) /\
-        lifts_wpolylvec (lvec_unflatten256 signer_response{2}) = (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.invnttv (PolyLVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) /\
+        lifts_wpolylvec (lvec_unflatten256 signer_response{2}) = (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) /\
         wpolylvec_srng (lvec_unflatten256 signer_response{2}) (gamma1 - 1) gamma1)).
  + ecall{2} (__compute_z_and_check_norm_ph
-              s1{2} verifier_challenge{2} mask{2} signer_response{2} W64.zero).
+              s1_doubled{2} s1{2} verifier_challenge{2} challenge_positions{2}
+              mask{2} signer_response{2} W64.zero).
    by auto => |> &1 &2 *; smt().
 
  (* ── b2: w0 - c s2 norm check (only once z passed) ─────────────────── *)
- seq 0 1 : (#{~(infinity_norm_check_result{2} = W64.zero <=> PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.invnttv (PolyLVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta))}pre /\
+ seq 0 1 : (#{~(infinity_norm_check_result{2} = W64.zero <=> PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta))}pre /\
      (infinity_norm_check_result{2} = W64.zero <=>
-        PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.invnttv (PolyLVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta) /\ PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2})))) (gamma2 - Beta)) /\
-     (PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.invnttv (PolyLVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta) /\ PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2})))) (gamma2 - Beta) =>
+        PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta) /\ PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) (gamma2 - Beta)) /\
+     (PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta) /\ PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) (gamma2 - Beta) =>
         wpolykvec_infnorm_lt (gamma2 - Beta) (kvec_unflatten256 w0_minus_cs2{2}) /\
-        lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2{2}) = (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2})))))).
+        lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2{2}) = (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))))).
  + ecall{2} (__apply_cs2_and_check_norm_ph
-              w0_minus_cs2{2} w0{2} s2{2} verifier_challenge{2} infinity_norm_check_result{2}).
+              w0_minus_cs2{2} w0{2} s2_doubled{2} s2{2} verifier_challenge{2}
+              challenge_positions{2} infinity_norm_check_result{2}).
    by auto => |> &1 &2 *; smt().
 
  (* ── b3: c t0, a public computation: added to w0 - c s2 in every case,
        its norm tested only when the test is compiled (ML-DSA-44) ────── *)
  seq 0 1 : (#pre /\
      (ct0_norm_check_result{2} = W64.zero \/ ct0_norm_check_result{2} = W64.one) /\
-     (!(PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.invnttv (PolyLVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta) /\ PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2})))) (gamma2 - Beta)) =>
+     (!(PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta) /\ PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) (gamma2 - Beta)) =>
         ct0_norm_check_result{2} = W64.zero) /\
-     (PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.invnttv (PolyLVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta) /\ PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2})))) (gamma2 - Beta) =>
-        (ct0_norm_check_result{2} = W64.zero <=> (tau * 4096 < gamma2 \/ PolyKVec.infnorm_lt (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2})))) gamma2)) /\
-        lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2_plus_ct0{2}) = (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2})))) + (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2})))) /\
-        (PolyKVec.infnorm_lt (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2})))) gamma2 =>
+     (PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta) /\ PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) (gamma2 - Beta) =>
+        (ct0_norm_check_result{2} = W64.zero <=> (tau * 4096 < gamma2 \/ PolyKVec.infnorm_lt (PolyKVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2}))) gamma2)) /\
+        lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2_plus_ct0{2}) = (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) + (PolyKVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2}))) /\
+        (PolyKVec.infnorm_lt (PolyKVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2}))) gamma2 =>
            wpolykvec_srng (kvec_unflatten256 w0_minus_cs2_plus_ct0{2}) (2*gamma2 - Beta - 2) (2*gamma2 - Beta - 2)))).
  + ecall{2} (__apply_ct0_and_check_norm_ph
-              w0_minus_cs2_plus_ct0{2} w0_minus_cs2{2} t0{2} verifier_challenge{2} infinity_norm_check_result{2}).
+              w0_minus_cs2_plus_ct0{2} w0_minus_cs2{2} t0_doubled{2} t0{2}
+              verifier_challenge{2} challenge_positions{2} infinity_norm_check_result{2}).
    by auto => |> &1 &2 *; smt().
 
  (* ── b4: hint (only once z and w0 - c s2 passed; run whether or not the
@@ -726,9 +797,9 @@ seq 1 0 : #pre; 1: by auto.
  seq 0 2 : (#{/~infinity_norm_check_result{2}}pre /\
      (infinity_norm_check_result{2} = W64.zero \/ infinity_norm_check_result{2} = W64.one) /\
      (infinity_norm_check_result{2} = W64.zero =>
-        PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.invnttv (PolyLVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta) /\ PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2})))) (gamma2 - Beta)) /\
-     (PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.invnttv (PolyLVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta) /\ PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2})))) (gamma2 - Beta) /\
-      PolyKVec.infnorm_lt (PolyKVec.invnttv (PolyKVec.ntt_smul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2})))) gamma2 =>
+        PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta) /\ PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) (gamma2 - Beta)) /\
+     (PolyLVec.infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + PolyLVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta) /\ PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 w0{2}) - PolyKVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) (gamma2 - Beta) /\
+      PolyKVec.infnorm_lt (PolyKVec.psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2}))) gamma2 =>
         (infinity_norm_check_result{2} = W64.zero <=> PolyKVec.hammw (MakeHintImpl (lifts_wpolykvec (kvec_unflatten256 w1{2})) (lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2_plus_ct0{2}))) w_hint) /\
         (infinity_norm_check_result{2} = W64.zero =>
            liftu_wpolykvec (kvec_unflatten256 hint_0{2}) = MakeHintImpl (lifts_wpolykvec (kvec_unflatten256 w1{2})) (lifts_wpolykvec (kvec_unflatten256 w0_minus_cs2_plus_ct0{2})) /\
@@ -749,29 +820,30 @@ seq 1 0 : #pre; 1: by auto.
  have Hgq : (8380416 %/ gamma2_div <= tau * (1 `<<` 12)) = (gamma2 <= tau * 4096)
    by rewrite /gamma2 /(`<<`) /=.
  rewrite Hgq.
+ (* the products of the specification, in the time domain *)
+ rewrite !PolyLVec.invnttv_ntt_smul !PolyKVec.invnttv_ntt_smul.
  (* ||c t0||_inf <= tau 2^(d-1) < gamma2 when the test is not compiled *)
- have Ht0h : lifts_wpolykvec (kvec_unflatten256 t0{2}) = PolyKVec.nttv t0{1} by smt().
- have Ht0b : PolyKVec.infnorm_lt t0{1} (dpow + 1) by smt().
- have Hl1 : l1 c{1} <= tau by smt().
- have Hbound : tau * 4096 < gamma2 => infnorm_lt (invnttv (ntt_smul (ntt c{1}) (lifts_wpolykvec (kvec_unflatten256 t0{2})))) gamma2.
- + move => Hg; rewrite Ht0h; apply (infnorm_lt_le _ (tau * dpow + 1)); 1: by rewrite /dpow /#.
-   by apply (smul_norm_bound c{1} t0{1} dpow); [smt() | exact Hl1 | exact Ht0b].
+ have Ht0b : PolyKVec.infnorm_lt (lifts_wpolykvec (kvec_unflatten256 t0{2})) (dpow + 1) by smt().
+ have Hl1 : l1 (lifts_wpoly verifier_challenge{2}) <= tau by smt().
+ have Hbound : tau * 4096 < gamma2 => infnorm_lt (psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2}))) gamma2.
+ + move => Hg; apply (infnorm_lt_le _ (tau * dpow + 1)); 1: by rewrite /dpow /#.
+   by apply (smul_norm_bound (lifts_wpoly verifier_challenge{2}) _ dpow); [smt() | exact Hl1 | exact Ht0b].
  (* the facts of the four tests, named *)
  have HFbit : infinity_norm_check_result{2} = zero \/ infinity_norm_check_result{2} = one by smt().
- have HFimp : infinity_norm_check_result{2} = zero => infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + invnttv (ntt_smul (ntt c{1}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta) /\ infnorm_lt (polykvec_LowBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2}))))) - invnttv (ntt_smul (ntt c{1}) (lifts_wpolykvec (kvec_unflatten256 s2{2})))) (gamma2 - Beta) by smt().
- have HFhint : infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + invnttv (ntt_smul (ntt c{1}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta) /\ infnorm_lt (polykvec_LowBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2}))))) - invnttv (ntt_smul (ntt c{1}) (lifts_wpolykvec (kvec_unflatten256 s2{2})))) (gamma2 - Beta) /\ infnorm_lt (invnttv (ntt_smul (ntt c{1}) (lifts_wpolykvec (kvec_unflatten256 t0{2})))) gamma2 =>
-    (infinity_norm_check_result{2} = zero <=> hammw (MakeHintImpl (polykvec_HighBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2})))))) (polykvec_LowBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2}))))) - invnttv (ntt_smul (ntt c{1}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) + invnttv (ntt_smul (ntt c{1}) (lifts_wpolykvec (kvec_unflatten256 t0{2}))))) w_hint) /\
+ have HFimp : infinity_norm_check_result{2} = zero => infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta) /\ infnorm_lt (polykvec_LowBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2}))))) - psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) (gamma2 - Beta) by smt().
+ have HFhint : infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta) /\ infnorm_lt (polykvec_LowBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2}))))) - psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) (gamma2 - Beta) /\ infnorm_lt (psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2}))) gamma2 =>
+    (infinity_norm_check_result{2} = zero <=> hammw (MakeHintImpl (polykvec_HighBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2})))))) (polykvec_LowBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2}))))) - psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2})) + psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2})))) w_hint) /\
     (infinity_norm_check_result{2} = zero =>
-       liftu_wpolykvec (kvec_unflatten256 hint_0{2}) = MakeHintImpl (polykvec_HighBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2})))))) (polykvec_LowBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2}))))) - invnttv (ntt_smul (ntt c{1}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) + invnttv (ntt_smul (ntt c{1}) (lifts_wpolykvec (kvec_unflatten256 t0{2})))) /\
+       liftu_wpolykvec (kvec_unflatten256 hint_0{2}) = MakeHintImpl (polykvec_HighBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2})))))) (polykvec_LowBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2}))))) - psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2})) + psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2}))) /\
        wpolykvec_urng (kvec_unflatten256 hint_0{2}) 2) by smt().
  have Hc0bit : ct0_norm_check_result{2} = zero \/ ct0_norm_check_result{2} = one by smt().
- have Hc0skip : !(infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + invnttv (ntt_smul (ntt c{1}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta) /\ infnorm_lt (polykvec_LowBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2}))))) - invnttv (ntt_smul (ntt c{1}) (lifts_wpolykvec (kvec_unflatten256 s2{2})))) (gamma2 - Beta)) => ct0_norm_check_result{2} = zero by smt().
- have Hc0 : infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + invnttv (ntt_smul (ntt c{1}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta) /\ infnorm_lt (polykvec_LowBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2}))))) - invnttv (ntt_smul (ntt c{1}) (lifts_wpolykvec (kvec_unflatten256 s2{2})))) (gamma2 - Beta) =>
-    (ct0_norm_check_result{2} = zero <=> (tau * 4096 < gamma2 \/ infnorm_lt (invnttv (ntt_smul (ntt c{1}) (lifts_wpolykvec (kvec_unflatten256 t0{2})))) gamma2)) by smt().
- have Hzf : infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + invnttv (ntt_smul (ntt c{1}) (lifts_wpolylvec (lvec_unflatten256 s1{2})))) (gamma1 - Beta) =>
+ have Hc0skip : !(infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta) /\ infnorm_lt (polykvec_LowBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2}))))) - psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) (gamma2 - Beta)) => ct0_norm_check_result{2} = zero by smt().
+ have Hc0 : infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta) /\ infnorm_lt (polykvec_LowBits (invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2})) (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2}))))) - psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 s2{2}))) (gamma2 - Beta) =>
+    (ct0_norm_check_result{2} = zero <=> (tau * 4096 < gamma2 \/ infnorm_lt (psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolykvec (kvec_unflatten256 t0{2}))) gamma2)) by smt().
+ have Hzf : infnorm_lt (lifts_wpolylvec (lvec_unflatten256 mask{2}) + psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) (gamma1 - Beta) =>
     lifts_wpolylvec (lvec_unflatten256 signer_response{2}) =
       lifts_wpolylvec (lvec_unflatten256 mask{2}) +
-      invnttv (ntt_smul (ntt c{1}) (lifts_wpolylvec (lvec_unflatten256 s1{2}))) /\
+      psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2})) /\
     wpolylvec_srng (lvec_unflatten256 signer_response{2}) (gamma1 - 1) gamma1 by smt().
  split.
  + (* the test on c t0 is compiled: the flag joins the result *)

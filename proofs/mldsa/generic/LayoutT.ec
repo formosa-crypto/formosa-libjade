@@ -32,6 +32,8 @@ require Parameters.
      sig_enc      (2420, 3309, 4627) SIGNATURE_SIZE
      lpolys       (1024, 1280, 1792) COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL
      kpolys       (1024, 1536, 2048) ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL
+     kpolys2      (2048, 3072, 4096) ROWS_IN_MATRIX_A * 2 * COEFFICIENTS_IN_POLYNOMIAL (t0 doubled)
+     tau1         (40, 50, 61)       ONES_IN_VERIFIER_CHALLENGE + 1 (challenge positions)
      klpolys      (4096, 7680, 14336) ROWS * COLUMNS * COEFFICIENTS_IN_POLYNOMIAL
      lpolys_bytes (4096, 5120, 7168) bytes of an L-vector of u32 polynomials
      kpolys_bytes (4096, 6144, 8192) bytes of a K-vector of u32 polynomials
@@ -60,6 +62,8 @@ op sk_enc : int = 128 + s1_enc + s2_enc + t0_enc.
 op sig_enc : int = ctilde + z_enc + hint_enc.
 op lpolys : int = P.lvec * 256.
 op kpolys : int = P.kvec * 256.
+op kpolys2 : int = 2 * kpolys.
+op tau1 : int = P.tau + 1.
 op klpolys : int = P.kvec * P.lvec * 256.
 op lpolys_bytes : int = 4 * lpolys.
 op kpolys_bytes : int = 4 * kpolys.
@@ -107,6 +111,10 @@ lemma ge0_lpolys : 0 <= lpolys.
 proof. by rewrite /lpolys; smt(P.param_sets). qed.
 lemma ge0_kpolys : 0 <= kpolys.
 proof. by rewrite /kpolys; smt(P.param_sets). qed.
+lemma ge0_kpolys2 : 0 <= kpolys2.
+proof. by rewrite /kpolys2; smt(P.param_sets ge0_kpolys). qed.
+lemma ge0_tau1 : 0 <= tau1.
+proof. by rewrite /tau1; smt(P.param_sets). qed.
 lemma ge0_klpolys : 0 <= klpolys.
 proof. by rewrite /klpolys; smt(P.param_sets). qed.
 lemma ge0_lpolys_bytes : 0 <= lpolys_bytes.
@@ -133,6 +141,8 @@ clone PolyArray as Array_klpolys with op size <- klpolys
   proof ge0_size by exact ge0_klpolys.
 clone PolyArray as Array_kpolys with op size <- kpolys
   proof ge0_size by exact ge0_kpolys.
+clone PolyArray as Array_kpolys2 with op size <- kpolys2
+  proof ge0_size by exact ge0_kpolys2.
 clone WArray as WArray_kpolys_bytes with op size <- kpolys_bytes
   proof ge0_size by exact ge0_kpolys_bytes.
 clone PolyArray as Array_lpolys with op size <- lpolys
@@ -159,6 +169,8 @@ clone PolyArray as Array_t0_enc with op size <- t0_enc
   proof ge0_size by exact ge0_t0_enc.
 clone PolyArray as Array_t1_enc with op size <- t1_enc
   proof ge0_size by exact ge0_t1_enc.
+clone PolyArray as Array_tau1 with op size <- tau1
+  proof ge0_size by exact ge0_tau1.
 clone PolyArray as Array_w1_enc with op size <- w1_enc
   proof ge0_size by exact ge0_w1_enc.
 clone WArray as WArray_w1_enc with op size <- w1_enc

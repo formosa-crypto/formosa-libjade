@@ -413,6 +413,35 @@ lemma w2bits_int2bsE (w : W32.t) : w2bits w = BS2Int.int2bs 32 (W32.to_uint w).
 proof. rewrite to_uintE; smt(W32.size_w2bits BS2Int.bs2intK). qed.
 
 (* -------------------------------------------------------------------- *)
+(* Lanes of lanes, and the signed value of zero                         *)
+lemma bits32_128 (w : W256.t) (h i : int) : 0 <= i < 4 =>
+  (w \bits128 h) \bits32 i = w \bits32 (4 * h + i).
+proof.
+move=> hi; apply W32.wordP => b hb.
+by rewrite W4u32.bits32iE // W2u128.bits128iE 1:/# W8u32.bits32iE //; congr; smt().
+qed.
+
+lemma bits16_128 (w : W256.t) (k : int) : 0 <= k < 16 =>
+  w \bits16 k = (w \bits128 (k %/ 8)) \bits16 (k %% 8).
+proof.
+move=> hk; apply W16.wordP => b hb.
+by rewrite W16u16.bits16iE // W8u16.bits16iE // W2u128.bits128iE 1:/#; congr; smt().
+qed.
+
+lemma bits16_32 (a : W128.t) (j : int) :
+  a \bits16 (2 * j) = (a \bits32 j) \bits16 0.
+proof.
+apply W16.wordP => b hb.
+by rewrite W8u16.bits16iE // W2u16.bits16iE // W4u32.bits32iE 1:/#; congr; smt().
+qed.
+
+lemma to_sint16_0 : W16.to_sint W16.zero = 0.
+proof. by rewrite W16.to_sintE /smod. qed.
+
+lemma to_sint32_0 : W32.to_sint W32.zero = 0.
+proof. by rewrite W32.to_sintE /smod. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma lzcnt_decomp (l : bool list) : true \in l =>
   l = nseq (lzcnt l) false ++ true :: drop (lzcnt l + 1) l.
 proof.
@@ -630,6 +659,68 @@ clone WE as WE128 with
 clone WE as WE256 with
   op     size <- 256,
   theory W    <- W256 { rename "_XX" as "_256" } .
+
+(* -------------------------------------------------------------------- *)
+(* Scanning the set bits of a mask (TZCNT, then clearing the lowest set *)
+(* bit) for the indices satisfying P, in increasing order.               *)
+(* -------------------------------------------------------------------- *)
+op ipos (P : int -> bool) (k : int) : int list = filter P (iota_ 0 k).
+
+lemma ipos0 (P : int -> bool) : ipos P 0 = [].
+proof. by rewrite /ipos iota0. qed.
+
+lemma iposS (P : int -> bool) (k : int) : 0 <= k =>
+  ipos P (k + 1) = if P k then rcons (ipos P k) k else ipos P k.
+proof. by move=> hk; rewrite /ipos iotaSr // filter_rcons. qed.
+
+lemma ipos_none (P : int -> bool) (a k : int) : 0 <= a <= k =>
+  (forall x, a <= x < k => !P x) => ipos P k = ipos P a.
+proof.
+move=> hak hn; rewrite /ipos (_ : k = a + (k - a)) 1:#ring iota_add 1,2:/# filter_cat.
+rewrite (_ : filter P (iota_ a (k - a)) = []) ?cats0 //.
+by rewrite -(filter_pred0 (iota_ a (k - a))); apply eq_in_filter => x /mem_iota /#.
+qed.
+
+lemma size_ipos_mono (P : int -> bool) (a k : int) : 0 <= a <= k =>
+  size (ipos P a) <= size (ipos P k).
+proof.
+move=> hak; rewrite /ipos (_ : k = a + (k - a)) 1:#ring iota_add 1,2:/# filter_cat size_cat.
+smt(size_ge0).
+qed.
+
+(* one step on a mask whose set bits are the x in [t, 8) such that P (j + x):
+   the lowest set bit p is the next index, and clearing it moves t to p + 1 *)
+lemma scan_step (P : int -> bool) (j t : int) (w : W64.t) :
+  0 <= j => 0 <= t => w <> W64.zero =>
+  (forall x, w.[x] = (t <= x < 8 /\ P (j + x))) =>
+  let p = to_uint (TZCNT_64 w).`6 in
+     t <= p < 8
+  /\ (forall x, (w `&` (w - W64.one)).[x] = (p + 1 <= x < 8 /\ P (j + x)))
+  /\ ipos P (j + (p + 1)) = rcons (ipos P (j + t)) (j + p).
+proof.
+move=> hj ht hw hb /=; rewrite WE64.tzcntE.
+have [hp0 [hpb hpq]] := WE64.lowbitP _ hw.
+pose p := WE64.lowbit w.
+have [hp1 hpP] : t <= p < 8 /\ P (j + p) by rewrite -hb.
+have hnone : forall x, j + t <= x < j + p => !P x.
++ move=> x hx; have := hb (x - j); have := hpq (x - j) _; 1: smt().
+  by move=> -> /= /#.
+split; 1: smt().
+split.
++ move=> x; rewrite -W64.andwE WE64.blsrE // hb -/p.
+  case: (x = p) => [-> /= | hxp]; 1: smt().
+  by have := hnone (j + x); smt().
+rewrite (_ : j + (p + 1) = j + p + 1) 1:#ring iposS 1:/# hpP /=.
+by congr; apply ipos_none => /#.
+qed.
+
+(* the end of the scan: no index of [j + t, j + 8) satisfies P *)
+lemma scan_end (P : int -> bool) (j t : int) : 0 <= j => 0 <= t <= 8 =>
+  (forall x, W64.zero.[x] = (t <= x < 8 /\ P (j + x))) => ipos P (j + 8) = ipos P (j + t).
+proof.
+move=> hj ht hb; apply ipos_none => [/# | x hx].
+by have := hb (x - j); rewrite W64.zerowE /#.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (* the uniform distribution on words of any size                        *)
