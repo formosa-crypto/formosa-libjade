@@ -9,7 +9,7 @@ require import Mldsa87.
 require import Array64 Array83 Array96 Array128 Array640 Array672 Array768
  Array1024 Array1792 Array2048 Array2560 Array2592 Array3328 Array4480
  Array4627 Array4896 Array14336 WArray64 WArray96 WArray128 WArray640
- WArray1024 WArray2592 WArray4627 WArray4896 WArray7168.
+ WArray1024 WArray2592 WArray4627 WArray4896 WArray7168 WArray8192.
 require Spec87 MldsaT.
 
 clone MldsaT.MldsaT as Mldsa87I with
@@ -23,6 +23,7 @@ clone MldsaT.MldsaT as Mldsa87I with
   theory Array_hint_enc <= Array83,
   theory Array_klpolys <= Array14336,
   theory Array_kpolys <= Array2048,
+  theory WArray_kpolys_bytes <= WArray8192,
   theory Array_lpolys <= Array1792,
   theory WArray_lpolys_bytes <= WArray7168,
   theory Array_pk_enc <= Array2592,

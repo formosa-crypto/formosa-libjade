@@ -9,7 +9,7 @@ require import Mldsa65.
 require import Array48 Array61 Array128 Array640 Array768 Array1280 Array1536
  Array1920 Array1952 Array2496 Array3200 Array3309 Array4032 Array7680
  WArray48 WArray128 WArray640 WArray768 WArray1952 WArray3309 WArray4032
- WArray5120.
+ WArray5120 WArray6144.
 require Spec65 MldsaT.
 
 clone MldsaT.MldsaT as Mldsa65I with
@@ -23,6 +23,7 @@ clone MldsaT.MldsaT as Mldsa65I with
   theory Array_hint_enc <= Array61,
   theory Array_klpolys <= Array7680,
   theory Array_kpolys <= Array1536,
+  theory WArray_kpolys_bytes <= WArray6144,
   theory Array_lpolys <= Array1280,
   theory WArray_lpolys_bytes <= WArray5120,
   theory Array_pk_enc <= Array1952,

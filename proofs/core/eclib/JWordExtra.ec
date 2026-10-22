@@ -413,6 +413,16 @@ lemma w2bits_int2bsE (w : W32.t) : w2bits w = BS2Int.int2bs 32 (W32.to_uint w).
 proof. rewrite to_uintE; smt(W32.size_w2bits BS2Int.bs2intK). qed.
 
 (* -------------------------------------------------------------------- *)
+lemma lzcnt_decomp (l : bool list) : true \in l =>
+  l = nseq (lzcnt l) false ++ true :: drop (lzcnt l + 1) l.
+proof.
+elim: l => //= b l ih; case: b => /= [_ | hl].
++ by rewrite nseq0 drop0.
+move=> hl'; have h0 := lzcnt_size l; rewrite ifF 1:/# addzC nseqS 1:/# /=.
+by rewrite -ih.
+qed.
+
+(* -------------------------------------------------------------------- *)
 abstract theory WE.
   op size : int.
 
@@ -525,6 +535,69 @@ abstract theory WE.
   rewrite sarSl // to_sint_sar1 ih.
   rewrite -divz_mulp ~-1:// 1:IntOrder.expr_gt0 ~-1://.
   by rewrite -Ring.IntID.exprSr.
+  qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* The lowest set bit of a word (TZCNT) and its clearing (BLSR:       *)
+  (* w & (w - 1)).                                                       *)
+  op lowbit (w : W.t) : int = lzcnt (w2bits w).
+
+  lemma lowbit_in (w : W.t) : w <> W.zero => true \in w2bits w.
+  proof.
+  move=> hw; case: (true \in w2bits w) => // hn; apply hw; apply W.wordP => q hq.
+  have := mem_nth false (w2bits w) q; rewrite W.size_w2bits hq W.get_w2bits /=.
+  by case: (w.[q]) => // _ /hn.
+  qed.
+
+  lemma lowbitP (w : W.t) : w <> W.zero =>
+    0 <= lowbit w < size /\ w.[lowbit w] /\ forall q, q < lowbit w => !w.[q].
+  proof.
+  move=> /lowbit_in hin; have e := lzcnt_decomp _ hin.
+  have hs := lzcnt_size (w2bits w); rewrite /lowbit.
+  pose p := lzcnt (w2bits w); pose r := drop (p + 1) (w2bits w).
+  have hsz : size (w2bits w) = p + 1 + size r by rewrite {1}e size_cat size_nseq /#.
+  have hp : 0 <= p < size by smt(W.size_w2bits size_ge0).
+  rewrite hp /=; split.
+  + by rewrite -W.get_w2bits e nth_cat size_nseq ifF 1:/# /= /#.
+  move=> q hq; rewrite -W.get_w2bits e nth_cat size_nseq.
+  by case: (q < max 0 p) => h; [rewrite nth_nseq_if | ]; smt().
+  qed.
+
+  lemma tzcntE (w : W.t) : to_uint (W.ALU.TZCNT_XX w).`6 = lowbit w.
+  proof.
+  have := lzcnt_size (w2bits w); rewrite W.size_w2bits => hs.
+  have hlt : forall n, 0 <= n => n < 2 ^ n.
+  + by elim => // n hn ih; rewrite exprS //; smt().
+  by rewrite /TZCNT_XX /= W.of_uintK /lowbit modz_small; smt(W.gt0_size).
+  qed.
+
+  lemma blsrE (w : W.t) (q : int) : w <> W.zero =>
+    (w `&` (w - W.one)).[q] = (w.[q] /\ q <> lowbit w).
+  proof.
+  move=> hw; have e := lzcnt_decomp _ (lowbit_in _ hw).
+  have := lowbitP _ hw; rewrite /lowbit.
+  pose p := lzcnt (w2bits w); pose r := drop (p + 1) (w2bits w).
+  move=> [hp _].
+  have hsz : size r = size - 1 - p by rewrite /r size_drop 1:/# W.size_w2bits /#.
+  have hm : w - W.one = W.bits2w (nseq p true ++ false :: r).
+  + rewrite W.to_uint_eq W.to_uintB.
+    + by rewrite W.uleE W.to_uint1; smt(W.to_uint_eq W.to_uint0 W.to_uint_cmp).
+    rewrite W.to_uint1 !W.to_uintE W.bits2wK 1:size_cat 1:size_nseq 1:/#.
+    rewrite e !bs2int_cat !bs2int_nseq /= !size_nseq !bs2int_cons /b2i /=.
+    by rewrite -/p -/r ifT 1:/# (_ : max 0 p = p) 1:/#; ring.
+  rewrite W.andwE hm.
+  case: (0 <= q < size) => hq; last by rewrite W.get_out.
+  rewrite W.get_bits2w // -W.get_w2bits e !nth_cat !size_nseq.
+  case: (q < max 0 p) => h; 1: by rewrite !nth_nseq_if /#.
+  by case: (q - max 0 p = 0) => h1 /#.
+  qed.
+
+  lemma blsr_lt (w : W.t) : w <> W.zero =>
+    to_uint (w `&` (w - W.one)) < to_uint w.
+  proof.
+  move=> hw; have h1 : 1 <= to_uint w by smt(W.to_uint_eq W.to_uint0 W.to_uint_cmp).
+  have := W.to_uint_ule_andw (w - W.one) w.
+  by rewrite W.andwC W.to_uintB 1:W.uleE 1:W.to_uint1 // W.to_uint1 /#.
   qed.
 end WE.
 

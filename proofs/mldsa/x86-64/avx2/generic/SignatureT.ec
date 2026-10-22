@@ -2,7 +2,7 @@ require import AllCore List IntDiv RealExp StdBigop.
 from Jasmin require import JModel_x86.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 require import ArrayExtra.
-require import JWord_extra EclibExtra JWordList.
+require import JWordExtra EclibExtra JWordList.
 require import Array256.
 require BaseT PreludeT Gamma1T.
 
@@ -330,32 +330,159 @@ op count_nonzero_prefix(v : polykvec) (i j : int) : int =
      count (fun c => c = Zq.one) (take j (to_list v.[i]))
    else 0).
 
-lemma count_nonzero_prefix_one(v : W32.t Array_kpolys.t) (i j : int)  :
-   0 <= i < kvec =>
-   0 <= j < n =>
-   (liftu_wpolykvec (kvec_unflatten256 v)).[i].[j] = Zq.one =>
-   count_nonzero_coeffs_kvec (liftu_wpolykvec (kvec_unflatten256 v)) <= w_hint =>
-      count_nonzero_prefix (liftu_wpolykvec (kvec_unflatten256 v)) i j < w_hint.
-move => ???.
-rewrite /count_nonzero_coeffs_kvec /count_nonzero_prefix ifT 1:/#.
-have {1}<- := cat_take_drop i (to_list (liftu_wpolykvec (kvec_unflatten256 v))).
-rewrite big_cat.
-have {1}<- := cat_take_drop 1 (drop i (to_list (liftu_wpolykvec (kvec_unflatten256 v)))).
-rewrite (drop_take1_nth witness);1: by rewrite size_to_list 1:/#.
-rewrite big_cat /= drop_drop 1,2:/# /= big_cons big_nil /=.
-have :  count (fun (c : coeff) => c = Zq.one) (take j (to_list (liftu_wpolykvec (kvec_unflatten256 v)).[i])) <
-  count_nonzero_coeffs (liftu_wpolykvec (kvec_unflatten256 v)).[i]; last by smt(count_ge0 sumr_ge0_seq).
-rewrite /count_nonzero_coeffs.
-have {2}<- := cat_take_drop j (to_list (liftu_wpolykvec (kvec_unflatten256 v)).[i]).
-rewrite count_cat.
-have {1}<- := cat_take_drop 1 (drop j (to_list (liftu_wpolykvec (kvec_unflatten256 v)).[i])).
-rewrite (drop_take1_nth witness);1: by rewrite size_to_list 1:/#.
-by rewrite count_cat /= drop_drop 1,2:/# /=;smt(count_ge0).
+
+(* -------------------------------------------------------------------- *)
+(* Generic facts on x86 instructions (MOVEMASK, VPCMPEQ).               *)
+(* -------------------------------------------------------------------- *)
+
+lemma movemask_8u32_bit (x : W256.t) (b : int) :
+  (zeroextu64 (MOVEMASK_8u32 x)).[b] = (0 <= b < 8 /\ msb (x \bits32 b)).
+proof.
+rewrite zeroextu64_bit /MOVEMASK_8u32 /=.
+case: (0 <= b < 8) => hb.
++ rewrite (_ : 0 <= b < 32) 1:/# W32.get_bits2w 1:/#.
+  have : b = 0 \/ b = 1 \/ b = 2 \/ b = 3 \/ b = 4 \/ b = 5 \/ b = 6 \/ b = 7 by smt().
+  by move=> [|[|[|[|[|[|[|]]]]]]] -> /=.
+case: (0 <= b < 32) => hb1 //=.
+by rewrite W32.get_bits2w 1:/# nth_default /#.
+qed.
+
+lemma VPCMPEQ_8u32_bits32E (x y : W256.t) (i : int) : 0 <= i < 8 =>
+  VPCMPEQ_8u32 x y \bits32 i = if x \bits32 i = y \bits32 i then W32.onew else W32.zero.
+proof.
+move=> hi; rewrite /VPCMPEQ_8u32 W8u32.map2bE // /wcmp /=.
+move: (x \bits32 i) (y \bits32 i) => a b; case: (a = b) => [-> /=|hne].
+- by apply W32.to_uint_eq; rewrite W32.of_uintK W32.to_uint_onew.
+rewrite ifF // /W32.to_sint /W32.smod /=.
+by have := W32.to_uint_eq a b; have := W32.to_uint_cmp a; have := W32.to_uint_cmp b; smt().
+qed.
+
+(* bit b of the mask computed by the hint encoding: the coefficient b of the
+   group is non-zero *)
+lemma hint_mask_bits (c : W256.t) (b : int) :
+  (zeroextu64 (MOVEMASK_8u32 (VPCMPEQ_8u32 c W256.zero)) `^` W64.of_int 255).[b]
+  = (0 <= b < 8 /\ c \bits32 b <> W32.zero).
+proof.
+rewrite W64.xorwE movemask_8u32_bit (_ : 255 = 2 ^ 8 - 1) // W64.of_int_powm1 //.
+case: (0 <= b < 8) => hb /=; last by smt().
+rewrite VPCMPEQ_8u32_bits32E // W8u32.get_zero (_ : 0 <= b < 64) 1:/# (_ : b < 8) 1:/# /=.
+by case: (c \bits32 b = W32.zero) => _; rewrite /msb ?W32.to_uint_onew ?W32.to_uint0.
+qed.
+
+lemma hint_nzE (v : W32.t Array_kpolys.t) (i x : int) :
+  0 <= i < kvec => 0 <= x < n =>
+  wpolykvec_urng (kvec_unflatten256 v) 2 =>
+  (v.[i * n + x] <> W32.zero) = ((liftu_wpolykvec (kvec_unflatten256 v)).[i].[x] = Zq.one).
+proof.
+move=> hi hx hr.
+have /= Hr := kvec_unflatten256E i x v (fun (ii : W32.t) => 0 <= to_uint ii < 2) _ _ _; 1..3: smt().
+have /= Hp := kvec_unflatten256P i x v (liftu_wpolykvec (kvec_unflatten256 v))
+  (fun (ii : W32.t) => incoeff (to_uint ii)) _ _ _; 1..3: smt().
+by rewrite -Hp W32.to_uint_eq /=; smt(incoeffK).
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* The positions of the non-zero hints of a polynomial below j, and the *)
+(* signature in which they are written from the hint byte c0.            *)
+(* -------------------------------------------------------------------- *)
+
+op hpos (p : poly) (j : int) : int list = filter (fun x => p.[x] = Zq.one) (iota_ 0 j).
+
+lemma hpos_cat (p : poly) (a d : int) : 0 <= a => 0 <= d =>
+  hpos p (a + d) = hpos p a ++ filter (fun x => p.[x] = Zq.one) (iota_ a d).
+proof. by move=> ha hd; rewrite /hpos iota_add // filter_cat. qed.
+
+lemma hpos_none (p : poly) (a b : int) : 0 <= a <= b =>
+  (forall x, a <= x < b => p.[x] <> Zq.one) => hpos p b = hpos p a.
+proof.
+move=> hab hn; rewrite (_ : b = a + (b - a)) 1:/# hpos_cat 1,2:/#.
+rewrite (_ : filter (fun x => p.[x] = Zq.one) (iota_ a (b - a)) = []) ?cats0 //.
+by rewrite -(filter_pred0 (iota_ a (b - a))); apply eq_in_filter => x /mem_iota /#.
+qed.
+
+lemma hposS (p : poly) (j : int) : 0 <= j =>
+  hpos p (j + 1) = if p.[j] = Zq.one then rcons (hpos p j) j else hpos p j.
+proof.
+by move=> hj; rewrite hpos_cat // iota1 /= -cats1; case: (p.[j] = Zq.one); rewrite ?cats0.
+qed.
+
+lemma size_hpos_mono (p : poly) (a b : int) : 0 <= a <= b =>
+  size (hpos p a) <= size (hpos p b).
+proof.
+by move=> hab; rewrite (_ : b = a + (b - a)) 1:/# hpos_cat 1,2:/# size_cat; smt(size_ge0).
+qed.
+
+lemma size_hpos (p : poly) (j : int) : 0 <= j <= n =>
+  size (hpos p j) = count (fun c => c = Zq.one) (take j (to_list p)).
+proof.
+move=> hj; rewrite /Array256.to_list take_mkseq 1:// /mkseq count_map size_filter.
+by apply eq_count => x; rewrite /preim.
+qed.
+
+lemma cnp_hpos (v : polykvec) (i j : int) : 0 <= i < kvec => 0 <= j <= n =>
+  count_nonzero_prefix v i j = count_nonzero_prefix v i 0 + size (hpos v.[i] j).
+proof. by move=> hi hj; rewrite /count_nonzero_prefix !ifT 1,2:// take0 /= size_hpos. qed.
+
+lemma cnp_next (v : polykvec) (i : int) : 0 <= i < kvec =>
+  count_nonzero_prefix v (i + 1) 0 = count_nonzero_prefix v i n.
+proof.
+move=> hi; rewrite /count_nonzero_prefix take0 /= hi /= (take_nth witness) 1:size_to_list 1:/#.
+rewrite big_rcons /predT /=.
+by rewrite (take_oversize n (to_list v.[i])) 1:Array256.size_to_list.
+qed.
+
+lemma cnp_le (v : polykvec) (i : int) : 0 <= i <= kvec =>
+  count_nonzero_prefix v i 0 <= count_nonzero_coeffs_kvec v.
+proof.
+move=> hi; rewrite /count_nonzero_prefix take0 /= /count_nonzero_coeffs_kvec.
+rewrite -{2}(cat_take_drop i (to_list v)) big_cat.
+have : 0 <= big predT count_nonzero_coeffs (drop i (to_list v)).
++ by apply sumr_ge0_seq => ??; smt(count_ge0).
+smt().
 qed.
 
 op touch_hint(sig_in sig_out : W8.t Array_sig_enc.t) =
     forall k, 0<=k<hint_off =>
        sig_in.[k] = sig_out.[k].
+
+op hint_upd (s0 : W8.t Array_sig_enc.t) (c0 : int) (l : int list) : W8.t Array_sig_enc.t =
+  Array_sig_enc.init (fun k =>
+    if hint_off + c0 <= k < hint_off + c0 + size l
+    then W8.of_int (nth 0 l (k - (hint_off + c0))) else s0.[k]).
+
+lemma hint_upd_nil (s0 : W8.t Array_sig_enc.t) (c0 : int) : hint_upd s0 c0 [] = s0.
+proof. by rewrite tP => k hk; rewrite initiE //= /#. qed.
+
+lemma hint_upd_rcons (s0 : W8.t Array_sig_enc.t) (c0 : int) (l : int list) (x : int) :
+  0 <= c0 => hint_off + c0 + size l < sig_enc =>
+  (hint_upd s0 c0 l).[hint_off + c0 + size l <- W8.of_int x] = hint_upd s0 c0 (rcons l x).
+proof.
+move=> hc hs; have h0 := ge0_hint_off; have hl := size_ge0 l; rewrite tP => k hk.
+rewrite get_setE 1:/# !initiE //= size_rcons nth_rcons.
+by case: (k = hint_off + c0 + size l) => [-> /= | hne]; smt().
+qed.
+
+lemma hint_upd_touch (sig s0 : W8.t Array_sig_enc.t) (c0 : int) (l : int list) :
+  0 <= c0 => touch_hint sig s0 => touch_hint sig (hint_upd s0 c0 l).
+proof.
+move=> hc ht k hk; have hs := sig_encE; have h0 := ge0_hint_off.
+have hb : 0 <= hint_bytes by smt(gt0_k param_sets).
+by rewrite initiE 1:/# /= ifF 1:/# ht.
+qed.
+
+lemma put_hint_upd (s0 : W8.t Array_sig_enc.t) (c0 : int) (l : int list) (x : int) :
+  0 <= c0 => c0 + size l < hint_bytes =>
+  put (mkseq (fun k => (hint_upd s0 c0 l).[hint_off + k]) hint_bytes) (c0 + size l) (W8.of_int x)
+  = mkseq (fun k => (hint_upd s0 c0 (rcons l x)).[hint_off + k]) hint_bytes.
+proof.
+move=> hc hs; have h0 := ge0_hint_off; have hsig := sig_encE.
+rewrite -hint_upd_rcons 1,2:/#; apply (eq_from_nth witness); 1: by rewrite size_put !size_mkseq.
+move=> k; rewrite size_put size_mkseq => hk.
+have hl := size_ge0 l.
+rewrite nth_put 1:size_mkseq 1:/# !nth_mkseq 1,2:/# /= get_setE 1:/#.
+by rewrite (_ : (hint_off + k = hint_off + c0 + size l) = (c0 + size l = k)) 1:/#.
+qed.
+
 
 lemma encode_hint _signature _hint :
     equiv [ HintPackUnpack.hintBitPack ~ M.signature____encode_hint :
@@ -370,131 +497,178 @@ lemma encode_hint _signature _hint :
    ].
 proof.
 proc => /=.
-seq 3 5 : (#{/~signature{2} = _signature}pre
-   /\ y{1} = mkseq (fun i => signature{2}.[hint_off + i]) (w_hint+kvec)
-   /\ touch_hint _signature signature{2}
-   /\ index{1} = 0
-   /\ hints_written{2} = 0
-   /\ i{1} = 0
-   /\ i{2} = 0).
-+ (* Initialize y to zeros and set counters to 0 *)
-  conseq (: _ ==>
-     y{1} = mkseq (fun (i0 : int) => signature{2}.[hint_off + i0]) hint_bytes
-     /\ touch_hint _signature signature{2}
-     /\ index{1} = 0
-     /\ i{1} = 0
-     /\ hints_written{2} = 0
-     /\ i{2} = 0); 1: by smt().
-  inline *; wp.
-  while {2} (0 <= i{2} <= w_hint+kvec
-   /\ (forall k, 0 <= k < i{2} =>
-               signature{2}.[hint_off + k] = W8.zero)
-   /\ touch_hint _signature signature{2});
-   last first.
-  + auto => /> &2 _ _; split; 1: smt(param_sets).
-    move=> i s h1 h2 h3 H Ht; rewrite (_ : kvec + w_hint = hint_bytes) 1:/#.
-    by apply eq_in_mkseq => k hk /=; rewrite H /#.
-  + move=> _; auto => /> &hr; rewrite hint_offE.
-    have hs := sig_encE; have h0 := ge0_hint_off.
-    move=> h1 h2 H Ht hlt; do split; 1,2: smt().
-    + move=> k k0 k1; rewrite Array_sig_enc.get_setE 1:/#.
-      by case (k = i{hr}) => [-> /= | hne]; [| rewrite ifF 1:/# H /#].
-    move: Ht; rewrite /touch_hint => Ht k hk.
-    by rewrite Array_sig_enc.get_setE 1:/# ifF 1:/#; apply Ht.
-  by move => ?;while(true) (hint_bytes-i); auto => /> /#.
-(* Main nested loops *)
-seq 1 2 : (#{/~i{1}}{i{2}}{index{1}}{hints_written{2}}pre
-    /\ count_nonzero_coeffs_kvec  _hint <= w_hint
-   /\ touch_hint _signature signature{2}
-   /\ size y{1} = w_hint + kvec
-   /\ i{1} = kvec
-   /\ i{2} = i{1}
-   /\ index{1} = hints_written{2}
-   /\ index{1} <= w_hint
-   /\  y{1} = mkseq (fun (i0 : int) => signature{2}.[hint_off + i0]) hint_bytes); last by auto.
-+ (* Outer loop over polynomials *)
-  while (
+have hs := sig_encE; have h0 := ge0_hint_off.
+have hhb : 0 < hint_bytes by smt(gt0_k param_sets).
+(* Clear the hint area: 8 bytes at a time, then byte by byte *)
+seq 3 12 : (
+     wpolykvec_urng (kvec_unflatten256 hint_0{2}) 2
+  /\ count_nonzero_coeffs_kvec _hint <= w_hint
+  /\ h{1} = _hint
+  /\ liftu_wpolykvec (kvec_unflatten256 hint_0{2}) = _hint
+  /\ zeros{2} = W256.zero
+  /\ y{1} = mkseq (fun i => signature{2}.[hint_off + i]) hint_bytes
+  /\ touch_hint _signature signature{2}
+  /\ index{1} = 0 /\ hints_written{2} = 0 /\ i{1} = 0 /\ i{2} = 0
+  /\ condition_row{2} = (i{2} < kvec)).
++ wp.
+  while {2} (8 * (hint_bytes %/ 8) <= k{2} <= hint_bytes /\ inc{2} = hint_bytes
+    /\ (forall q, 0 <= q < k{2} => signature{2}.[hint_off + q] = W8.zero)
+    /\ touch_hint _signature signature{2}) (inc{2} - k{2}).
+  + move=> _ z; auto => /> &hr; rewrite hint_offE => h1 h2 H Ht hlt.
+    do split; 1,2,5: smt().
+    + move=> q q0 q1; rewrite get_setE 1:/#.
+      by case (q = k{hr}) => [-> /= | hne]; [| rewrite ifF 1:/# H /#].
+    by move=> k hk; rewrite get_setE 1:/# ifF 1:/# Ht.
+  wp; while {2} (0 <= k{2} <= inc{2} /\ inc{2} = hint_bytes %/ 8 /\ zero{2} = W64.zero
+    /\ (forall q, 0 <= q < 8 * k{2} => signature{2}.[hint_off + q] = W8.zero)
+    /\ touch_hint _signature signature{2}) (inc{2} - k{2}).
+  + move=> _ z; auto => /> &hr; rewrite hint_offE => h1 h2 H Ht hlt.
+    do split; 1,2,5: smt().
+    + move=> q q0 q1; rewrite initiE 1:/# /= WArray_sig_enc.get8_set64_directE 1,2:/#.
+      case: (hint_off + 8 * k{hr} <= hint_off + q < hint_off + 8 * k{hr} + 8) => hc.
+      + by rewrite W8u8.get_zero.
+      by rewrite /WArray_sig_enc.get8 WArray_sig_enc.initiE 1:/# /= H /#.
+    move=> k hk; rewrite initiE 1:/# /= WArray_sig_enc.get8_set64_directE 1,2:/# ifF 1:/#.
+    by rewrite /WArray_sig_enc.get8 WArray_sig_enc.initiE 1:/# /= Ht.
+  auto => /> &2 *.
+  split; 1: smt().
+  move=> k1 s1; split; 1: smt().
+  move=> hk1 hk1' hk1'' H1 Ht1; split; 1: by split; [smt() | move=> q ??; apply H1 => /#].
+  move=> k2 s2; split; 1: smt().
+  move=> hk2 hk2' hk2'' H2 Ht2.
+  by rewrite (_ : kvec + w_hint = hint_bytes) 1:/#; apply eq_in_mkseq => q hq /=; rewrite H2 /#.
+(* Main loop over the polynomials *)
+wp.
+while (
     wpolykvec_urng (kvec_unflatten256 hint_0{2}) 2 /\
     count_nonzero_coeffs_kvec _hint <= w_hint /\
-    h{1} =  _hint /\
-    liftu_wpolykvec (kvec_unflatten256 hint_0{2}) =  _hint /\           
-    size y{1} = hint_bytes /\
+    h{1} = _hint /\
+    liftu_wpolykvec (kvec_unflatten256 hint_0{2}) = _hint /\
+    zeros{2} = W256.zero /\
     0 <= i{1} <= kvec /\
     i{1} = i{2} /\
     0 <= index{1} <= w_hint /\
     index{1} = hints_written{2} /\
     index{1} = count_nonzero_prefix _hint i{1} 0 /\
-   y{1} = mkseq (fun (i0 : int) => signature{2}.[hint_off + i0]) hint_bytes /\
+    y{1} = mkseq (fun (i0 : int) => signature{2}.[hint_off + i0]) hint_bytes /\
     touch_hint _signature signature{2} /\
-    condition1{2} = (i{2} < kvec)
-  ); last first.
- + auto => /> &1 &2 ??; split; last by smt().
-   do split; [smt(size_mkseq param_sets) | smt(gt0_k) | smt(param_sets) | ].
-   by rewrite /count_nonzero_prefix /= !take0 big_nil /#.
-  wp. (* Inner while loop *)
+    condition_row{2} = (i{2} < kvec)); last first.
++ auto => /> &2 *; split; 1: smt(gt0_k param_sets).
+  split; 1: smt(param_sets).
+  by rewrite /count_nonzero_prefix /= !take0 big_nil.
+wp; exlim signature{2}, hints_written{2} => s0 c0.
+(* the groups of 8 coefficients of the implementation *)
+while {2} (
+    0 <= i{2} < kvec /\ zeros{2} = W256.zero /\
+    wpolykvec_urng (kvec_unflatten256 hint_0{2}) 2 /\
+    liftu_wpolykvec (kvec_unflatten256 hint_0{2}) = _hint /\
+    0 <= c0 /\ c0 + size (hpos _hint.[i{2}] 256) <= w_hint /\
+    offset{2} = 1024 * i{2} + 4 * j{2} /\ bound{2} = 1024 * i{2} + 1024 /\
+    0 <= j{2} <= 256 /\ j{2} %% 8 = 0 /\
+    condition_group{2} = (offset{2} < bound{2}) /\
+    hints_written{2} = c0 + size (hpos _hint.[i{2}] j{2}) /\
+    signature{2} = hint_upd s0 c0 (hpos _hint.[i{2}] j{2})) (256 - j{2}).
++ move=> &1 z.
+  wp.
   while (
-       wpolykvec_urng (kvec_unflatten256 hint_0{2}) 2 /\
-       count_nonzero_coeffs_kvec _hint <= w_hint /\
-        h{1} =  _hint /\
-        liftu_wpolykvec (kvec_unflatten256 hint_0{2}) =  _hint /\           
-        size y{1} = hint_bytes /\
-        0 <= i{1} < kvec /\
-        i{1} = i{2} /\
-        0 <= index{1} <= w_hint /\
-        index{1} = hints_written{2} /\
-        index{1} = count_nonzero_prefix _hint i{1} j{1} /\
-        0 <= j{1} <= 256 /\
-        j{1} = j{2} /\
-        y{1} = mkseq (fun (i0 : int) => signature{2}.[hint_off + i0]) hint_bytes /\
-        touch_hint _signature signature{2} /\
-        condition2{2} = (j{2} < 256)
-  ); last first.
-  + auto => /> &1 &2 Hrng 8? c1 j2 s2 *.
-    have hs := sig_encE; have h0 := ge0_hint_off.
-    rewrite !hint_offE; do split; 1..3: smt(size_put).
-    + rewrite /count_nonzero_prefix ifT 1:/#.
-      case (i{1} + 1 = kvec) => ?.
-      + rewrite ifF 1:/# /= (take_nth witness) /=;1:smt(KArray.size_to_list).
-        by rewrite big_rcons ifT 1:/# (take_oversize c1) ?size_to_list /#.
-      rewrite ifT 1:/# (take_nth witness);1:smt(KArray.size_to_list).
-      by rewrite big_rcons ifT 1:/# /= take0 /= (take_oversize c1) ?size_to_list /#.
-    + apply (eq_from_nth witness);1:smt(size_put size_mkseq).
-      move => k; rewrite size_put size_mkseq /max ifT 1:/# /= => kb.
-      rewrite nth_put 1:/# /= !nth_mkseq 1,2:/# /= /=.
-      rewrite get_setE 1:/#  /truncateu8 /= of_uintK /=;smt(W8.to_uint_cmp pow2_8).
-    rewrite /touch_hint => k hk; rewrite Array_sig_enc.get_setE 1:/# ifF 1:/#; smt().
-
- seq 0 6 : (#pre /\
-     to_uint hint_coefficient{2} = asint h{1}.[i{1}].[j{1}]).
- + auto => /> &2 Hrng ? Hh2 ????????.
-   have  /= Hrngp := kvec_unflatten256E i{2} j{2} hint_0{2} (fun (ii : W32.t) => 0 <= to_uint ii < 2) _ _ _;1..3:smt().
-   have  /= Hh2p := kvec_unflatten256P i{2} j{2} hint_0{2} (liftu_wpolykvec (kvec_unflatten256 hint_0{2})) (fun (ii : W32.t) => incoeff (to_uint ii)) _ _ _;1..3: smt().
-   rewrite /SLH64.protect_32 /(`<<`) /= -Hh2p;smt( incoeffK).
-
- seq 0 1 : (#pre /\ condition_hint{2} = (hint_coefficient{2} <> W32.zero)); 1: by auto.
-
-if.
- + auto => /> &2 Hrng ? Hh2 ?????????.
-   have  /= Hrngp := kvec_unflatten256E i{2} j{2} hint_0{2} (fun (ii : W32.t) => 0 <= to_uint ii < 2) _ _ _;1..3:smt().
-   have  /= Hh2p := kvec_unflatten256P i{2} j{2} hint_0{2} (liftu_wpolykvec (kvec_unflatten256 hint_0{2})) (fun (ii : W32.t) => incoeff (to_uint ii)) _ _ _;1..3: smt(). 
-   by rewrite !to_uint_eq /=;smt( incoeffK).
-
- + auto => /> &1 &2 11? Hone.
-   have hs := sig_encE; have h0 := ge0_hint_off.
-   rewrite !hint_offE; do split; 1,2,5,6: smt(size_put).
-   + by smt(count_nonzero_prefix_one).
-   + move : Hone;rewrite /kvec_unflatten256 /count_nonzero_prefix ifT 1:/# ifT 1:/# /= (take_nth witness);1: by rewrite size_to_list /#.
-     rewrite mapiE 1:/# /= initiE 1:/# /= mapiE 1:/# get_of_list 1:/# nth_sub 1:/# /= => -> /=.
-     by rewrite -cats1 count_cat /= /#.
-   + apply (eq_from_nth witness);1:smt(size_put size_mkseq).
-     move => k; rewrite size_put size_mkseq /max ifT 1:/# /= => kb.
-     rewrite nth_put 1:/# /= !nth_mkseq 1,2:/# /= /=.
-     rewrite get_setE 1:/#  /truncateu8 /= of_uintK /=;smt(W8.to_uint_cmp pow2_8).
-   rewrite /touch_hint => k hk; rewrite Array_sig_enc.get_setE 1:/# ifF 1:/#; smt().
-+ auto => /> &1 &2 11? Hone; do split; 2..:smt().
-   + move : Hone;rewrite /kvec_unflatten256 /count_nonzero_prefix ifT 1:/# ifT 1:/# /=  (take_nth witness);1: by rewrite size_to_list /#.
-     rewrite mapiE 1:/# /= initiE 1:/# /= mapiE 1:/# /=get_of_list 1:/# nth_sub 1:/# /=.
-     by rewrite -cats1 count_cat /= /#.
+    0 <= i < kvec /\ zeros = W256.zero /\
+    wpolykvec_urng (kvec_unflatten256 hint_0) 2 /\
+    liftu_wpolykvec (kvec_unflatten256 hint_0) = _hint /\
+    0 <= c0 /\ c0 + size (hpos _hint.[i] 256) <= w_hint /\
+    offset = 1024 * i + 4 * j /\ bound = 1024 * i + 1024 /\
+    0 <= j < 256 /\ j %% 8 = 0 /\
+    condition_bit = (nonzero <> W64.zero) /\
+    exists t, 0 <= t <= 8 /\
+      (forall b, nonzero.[b] = (t <= b < 8 /\ _hint.[i].[j + b] = Zq.one)) /\
+      hints_written = c0 + size (hpos _hint.[i] (j + t)) /\
+      signature = hint_upd s0 c0 (hpos _hint.[i] (j + t))) (to_uint nonzero).
+  + move=> zz.
+    auto => /> &hr hi0 hi1 hr hc hle hj0 hj1 hj8 t ht0 ht1 hb hnz.
+    pose v := liftu_wpolykvec (kvec_unflatten256 hint_0{hr}).
+    have [hp0 [hpb hpq]] := WE64.lowbitP _ hnz.
+    pose p := WE64.lowbit nonzero{hr}.
+    have [hp1 hpone] : t <= p < 8 /\ v.[i{hr}].[j{hr} + p] = Zq.one by rewrite -hb.
+    have hnone : forall x, j{hr} + t <= x < j{hr} + p => v.[i{hr}].[x] <> Zq.one.
+    + move=> x hx; have := hb (x - j{hr}); have := hpq (x - j{hr}) _; 1: smt().
+      by move=> -> /= /#.
+    have e1 : hpos v.[i{hr}] (j{hr} + p) = hpos v.[i{hr}] (j{hr} + t) by apply hpos_none => /#.
+    have e2 := hposS v.[i{hr}] (j{hr} + p) _; 1: smt().
+    rewrite hpone /= e1 in e2.
+    have hsz := size_hpos_mono v.[i{hr}] (j{hr} + p + 1) 256 _; 1: smt().
+    rewrite e2 size_rcons in hsz.
+    have -> /= : c0 + size (hpos v.[i{hr}] (j{hr} + t)) < w_hint by smt().
+    split; last by apply WE64.blsr_lt.
+    exists (p + 1); split; 1: smt().
+    split.
+    + move=> b; rewrite -W64.andwE WE64.blsrE // hb -/p.
+      case: (b = p) => [-> /= | hbp]; 1: smt().
+      have := hnone (j{hr} + b); smt().
+    rewrite (_ : j{hr} + (p + 1) = j{hr} + p + 1) 1:/# e2 size_rcons /=.
+    rewrite hint_offE /truncateu8 W64.to_uintD_small WE64.tzcntE -/p.
+    + by rewrite W64.of_uintK /= pmod_small /#.
+    rewrite W64.of_uintK /= pmod_small 1:/#.
+    split; 1: ring.
+    by rewrite addzA (addzC p) hint_upd_rcons //; smt(gt0_k).
+  auto => /> &hr hi0 hi1 hr hc hle hj0 hj1 hj8 hcg.
+  have hjn : j{hr} < 256 by smt().
+  have hkb : kpolys_bytes = 1024 * kvec by rewrite /kpolys_bytes /kpolys; ring.
+  split.
+  + split; 1: done.
+    exists 0 => /=; move=> b; rewrite /SLH64.protect_64 hint_mask_bits.
+    case: (0 <= b < 8) => hb //=.
+    rewrite WAE_kpolys_bytes.get256_direct_init32_bits32 1..4:/#.
+    rewrite (_ : (1024 * i{hr} + 4 * j{hr}) %/ 4 + b = i{hr} * n + (j{hr} + b)) 1:/#.
+    by rewrite hint_nzE // /#.
+  move=> cb nz; split.
+  + by move=> _ t _ _ _ h; smt(W64.to_uint_eq W64.to_uint0 W64.to_uint_cmp).
+  move=> _ _ hnz t ht0 ht1 hb.
+  have e : hpos (liftu_wpolykvec (kvec_unflatten256 hint_0{hr})).[i{hr}] (j{hr} + 8) =
+           hpos (liftu_wpolykvec (kvec_unflatten256 hint_0{hr})).[i{hr}] (j{hr} + t).
+  + apply hpos_none => [/# | x hx].
+    have := hb (x - j{hr}); rewrite (_ : nz = W64.zero) 1:/# W64.zerowE /#.
+  by rewrite e /=; smt().
+(* the coefficients of the specification *)
+while {1} (
+    0 <= i{1} < kvec /\ h{1} = _hint /\
+    0 <= c0 /\ c0 + size (hpos _hint.[i{1}] 256) <= w_hint /\
+    0 <= j{1} <= 256 /\
+    index{1} = c0 + size (hpos _hint.[i{1}] j{1}) /\
+    y{1} = mkseq (fun k => (hint_upd s0 c0 (hpos _hint.[i{1}] j{1})).[hint_off + k]) hint_bytes)
+    (256 - j{1}).
++ move=> &2 z.
+  auto => /> &hr hi0 hi1 hc hle hj0 _ hj1.
+  have hsz := size_hpos_mono _hint.[i{hr}] (j{hr} + 1) 256 _; 1: smt().
+  have e := hposS _hint.[i{hr}] j{hr} _; 1: done.
+  case: (_hint.[i{hr}].[j{hr}] = Zq.one) => hone.
+  + move: e hsz; rewrite hone /= => -> hsz /=.
+    have hlt : c0 + size (hpos _hint.[i{hr}] j{hr}) < hint_bytes by smt(size_rcons gt0_k).
+    by rewrite put_hint_upd // size_rcons /#.
+  by move: e hsz; rewrite hone /= => -> hsz /=; smt().
+auto => /> &2 Hr Hc Hi0 Hi1 Hix0 Hix1 Ht Hik.
+have hp0 : forall (p : poly), hpos p 0 = [] by move=> p; rewrite /hpos iota0.
+rewrite !hp0 /= hint_upd_nil /=.
+have hcn := cnp_hpos (liftu_wpolykvec (kvec_unflatten256 hint_0{2})) i{2} n _ _; 1,2: smt().
+have hnx := cnp_next (liftu_wpolykvec (kvec_unflatten256 hint_0{2})) i{2} _; 1: smt().
+have hle := cnp_le (liftu_wpolykvec (kvec_unflatten256 hint_0{2})) (i{2} + 1) _; 1: smt().
+split; 1: smt().
+move=> jL; split; 1: smt().
+move=> hjL _ _ hjL0 hjL1; split; 1: by rewrite /(`<<`) /= /#.
+move=> cg jR; split; 1: smt().
+move=> hcg _ hb hjR0 hjR1 hjR8 hcgf.
+have ->> : jL = 256 by smt().
+have ->> : jR = 256 by smt().
+split; 1: smt().
+split; 1: smt(size_ge0).
+split; 1: by [].
+split; 1: by rewrite hnx hcn.
+rewrite hint_offE; split.
++ apply (eq_from_nth witness); 1: by rewrite size_put !size_mkseq.
+  move=> k; rewrite size_put size_mkseq => hk.
+  rewrite nth_put 1:size_mkseq 1:/# !nth_mkseq 1,2:/# /= get_setE 1:/#.
+  case (w_hint + i{2} = k) => hk'; [rewrite ifT 1:/# | rewrite ifF 1:/#] => //.
+  rewrite /truncateu8 W64.of_uintK modz_small //; smt(size_ge0 param_sets).
+move=> k hk; rewrite get_setE 1:/# ifF 1:/#.
+by apply (hint_upd_touch _signature s0) => //; smt().
 qed.
 
 (* ================================================================ *)
@@ -508,12 +682,18 @@ qed.
 
 lemma signature____encode_hint_ll : islossless M.signature____encode_hint.
 proof.
-proc;wp.
-while (0<=i<=kvec /\ condition1 = (i<kvec)) (kvec-i).
-+ move => ?; wp; while (0<=i<=kvec /\ condition1 = (i<kvec) /\ (i < kvec) /\
-                        0<=j<=256 /\ condition2 = (j<256)) (256-j); last by auto => /#.
-  by move => ?; auto => /> /#.
-wp; while true (hint_bytes - i); auto => />; smt(gt0_k).
+proc; wp.
+while (0 <= i <= kvec /\ condition_row = (i < kvec)) (kvec - i).
++ move=> z; wp.
+  while (condition_group = (offset < bound)) (bound - offset).
+  + move=> z'; wp.
+    while (condition_bit = (nonzero <> W64.zero)) (to_uint nonzero).
+    + by move=> z''; auto => /> &hr hnz; apply WE64.blsr_lt.
+    by auto => />; smt(W64.to_uint_eq W64.to_uint0 W64.to_uint_cmp).
+  by auto => /> /#.
+wp; while true (inc - k); 1: by move=> z; auto => /#.
+wp; while true (inc - k); 1: by move=> z; auto => /#.
+by auto => />; smt(gt0_k).
 qed.
 
 lemma signature____encode_ll : islossless M.signature____encode.

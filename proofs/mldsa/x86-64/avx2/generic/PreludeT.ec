@@ -258,4 +258,8 @@ qed.
 clone JArrayExtra.WAE as WAE_lpolys_bytes with
   op size <- lpolys_bytes, theory A <- WArray_lpolys_bytes.
 
+(* the same for a K-vector (the hint encoder loads eight coefficients at a time) *)
+clone JArrayExtra.WAE as WAE_kpolys_bytes with
+  op size <- kpolys_bytes, theory A <- WArray_kpolys_bytes.
+
 end PreludeT.

@@ -2,54 +2,82 @@ namespace signature {
     param int START_OF_GAMMA1 = COMMITMENT_HASH_SIZE;
     param int START_OF_HINT = START_OF_GAMMA1 + GAMMA1_ENCODED_SIZE;
 
+    // The hint is public here (declassified by the caller once the exiting
+    // iteration is chosen), so its encoding may take time that depends on it:
+    // eight coefficients are compared at a time and the positions of the
+    // non-zero ones are read off the resulting bit mask. The exiting
+    // iteration is encoded whether or not it passed the hint-weight test, so
+    // the positions beyond MAX_ONES_IN_HINT are dropped (they would otherwise
+    // overwrite the counts and run past the end of the signature; the result
+    // code tells the caller the iteration failed).
     inline
     fn __encode_hint(
         reg ptr u8[SIGNATURE_SIZE] signature,
         reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] hint
     ) -> reg ptr u8[SIGNATURE_SIZE]
     {
-        reg ui64 i j hints_written hint_offset;
-        reg u32 hint_coefficient;
-        reg bool condition1, condition2, condition_hint;
+        reg u256 coefficients zeros equal_to_zero;
+        reg ui64 i j hints_written offset bound;
+        reg u64 position nonzero zero;
+        reg u32 mask;
+        reg bool condition_row condition_group condition_bit condition_room;
         #[msf] reg u64 ms;
 
+        inline int k;
+
         // Clear the hints buffer
-        // TODO: Use avx2 to zero this.
-        i = 0;
-        while (i < MAX_ONES_IN_HINT + ROWS_IN_MATRIX_A) {
-            signature[START_OF_HINT + i] = 0;
-            i += 1;
+        zero = 0;
+        for k = 0 to HINT_ENCODED_SIZE / 8 {
+            signature.[:u64 START_OF_HINT + 8 * k] = zero;
+        }
+        for k = 8 * (HINT_ENCODED_SIZE / 8) to HINT_ENCODED_SIZE {
+            signature[START_OF_HINT + k] = 0;
         }
 
         ms = #init_msf();
+        zeros = #set0_256();
 
-        // Write out hints
         hints_written = 0;
         i = 0;
-        while {condition1 = i < ROWS_IN_MATRIX_A;} (condition1) {
-            ms = #update_msf(condition1, ms);
+        while { condition_row = i < ROWS_IN_MATRIX_A; } (condition_row) {
+            ms = #update_msf(condition_row, ms);
+            offset = i;
+            offset <<= LOG_2_COEFFICIENTS_IN_POLYNOMIAL + 2;
+            bound = offset;
+            bound += BYTES_PER_UNCOMPRESSED_POLYNOMIAL;
             j = 0;
-            while {condition2 = j < COEFFICIENTS_IN_POLYNOMIAL;} (condition2) {
-                ms = #update_msf(condition2, ms);
-                hint_offset = i;
-                hint_offset <<= LOG_2_COEFFICIENTS_IN_POLYNOMIAL;
-                hint_offset += j;
+            while { condition_group = offset < bound; } (condition_group) {
+                ms = #update_msf(condition_group, ms);
+                coefficients = hint.[:u256 offset];
+                equal_to_zero = #VPCMPEQ_8u32(coefficients, zeros);
+                mask = #MOVEMASK_8u32(equal_to_zero);
+                nonzero = (64u) mask;
+                nonzero ^= 0xFF;
+                nonzero = #protect(nonzero, ms);
 
-                hint_coefficient = hint[hint_offset];
-                hint_coefficient = #protect_32(hint_coefficient, ms);
-
-                condition_hint = hint_coefficient != 0;
-                if (condition_hint) {
-                    ms = #update_msf(condition_hint, ms);
-                    signature[START_OF_HINT + hints_written] = (8u)(64u)j;
-                    hints_written += 1;
-                } else {
-                    ms = #update_msf(!condition_hint, ms);
+                while { condition_bit = nonzero != 0; } (condition_bit) {
+                    ms = #update_msf(condition_bit, ms);
+                    _, _, _, _, _, position = #TZCNT_64(nonzero);
+                    position += (64u) j;
+                    condition_room = hints_written < MAX_ONES_IN_HINT;
+                    if (condition_room) {
+                        ms = #update_msf(condition_room, ms);
+                        signature[START_OF_HINT + hints_written] = (8u) position;
+                        hints_written += 1;
+                    } else {
+                        ms = #update_msf(!condition_room, ms);
+                    }
+                    // clear the lowest set bit
+                    position = nonzero;
+                    position -= 1;
+                    nonzero &= position;
                 }
+                ms = #update_msf(!condition_bit, ms);
 
-                j += 1;
+                j += 8;
+                offset += 32;
             }
-            ms = #update_msf(!condition2, ms);
+            ms = #update_msf(!condition_group, ms);
 
             signature[START_OF_HINT + MAX_ONES_IN_HINT + i] = (8u)(64u) hints_written;
             i += 1;

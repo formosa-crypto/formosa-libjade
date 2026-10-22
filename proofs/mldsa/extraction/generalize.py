@@ -105,6 +105,8 @@ ROLES = [
                                          lambda p: p["ROWS_IN_MATRIX_A"] * p["COLUMNS_IN_MATRIX_A"] * 256),
  ("lpolys_bytes", "4 * lpolys",         "bytes of an L-vector of u32 polynomials",
                                          lambda p: 4 * p["COLUMNS_IN_MATRIX_A"] * 256),
+ ("kpolys_bytes", "4 * kpolys",         "bytes of a K-vector of u32 polynomials",
+                                         lambda p: 4 * p["ROWS_IN_MATRIX_A"] * 256),
 ]
 ROLE = {r[0]: r for r in ROLES}
 

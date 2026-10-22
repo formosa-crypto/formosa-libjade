@@ -34,6 +34,7 @@ require Parameters.
      kpolys       (1024, 1536, 2048) ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL
      klpolys      (4096, 7680, 14336) ROWS * COLUMNS * COEFFICIENTS_IN_POLYNOMIAL
      lpolys_bytes (4096, 5120, 7168) bytes of an L-vector of u32 polynomials
+     kpolys_bytes (4096, 6144, 8192) bytes of a K-vector of u32 polynomials
 *)
 
 abstract theory LayoutT.
@@ -61,6 +62,7 @@ op lpolys : int = P.lvec * 256.
 op kpolys : int = P.kvec * 256.
 op klpolys : int = P.kvec * P.lvec * 256.
 op lpolys_bytes : int = 4 * lpolys.
+op kpolys_bytes : int = 4 * kpolys.
 
 lemma ge0_kvec : 0 <= P.kvec by smt(P.param_sets).
 lemma ge0_lvec : 0 <= P.lvec by smt(P.param_sets).
@@ -109,6 +111,8 @@ lemma ge0_klpolys : 0 <= klpolys.
 proof. by rewrite /klpolys; smt(P.param_sets). qed.
 lemma ge0_lpolys_bytes : 0 <= lpolys_bytes.
 proof. by rewrite /lpolys_bytes; smt(P.param_sets ge0_lpolys). qed.
+lemma ge0_kpolys_bytes : 0 <= kpolys_bytes.
+proof. by rewrite /kpolys_bytes; smt(P.param_sets ge0_kpolys). qed.
 
 (* the array theories whose size varies with the parameter set *)
 clone PolyArray as Array_ctilde with op size <- ctilde
@@ -129,6 +133,8 @@ clone PolyArray as Array_klpolys with op size <- klpolys
   proof ge0_size by exact ge0_klpolys.
 clone PolyArray as Array_kpolys with op size <- kpolys
   proof ge0_size by exact ge0_kpolys.
+clone WArray as WArray_kpolys_bytes with op size <- kpolys_bytes
+  proof ge0_size by exact ge0_kpolys_bytes.
 clone PolyArray as Array_lpolys with op size <- lpolys
   proof ge0_size by exact ge0_lpolys.
 clone WArray as WArray_lpolys_bytes with op size <- lpolys_bytes

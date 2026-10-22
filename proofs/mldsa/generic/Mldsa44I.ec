@@ -23,6 +23,7 @@ clone MldsaT.MldsaT as Mldsa44I with
   theory Array_hint_enc <= Array84,
   theory Array_klpolys <= Array4096,
   theory Array_kpolys <= Array1024,
+  theory WArray_kpolys_bytes <= WArray4096,
   theory Array_lpolys <= Array1024,
   theory WArray_lpolys_bytes <= WArray4096,
   theory Array_pk_enc <= Array1312,
