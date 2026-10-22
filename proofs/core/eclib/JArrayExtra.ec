@@ -2,7 +2,7 @@
 require import AllCore List Ring IntDiv Distr DList.
 require import StdRing StdOrder.
 
-from Jasmin require import JArray.
+from Jasmin require import JArray JWord JWord_array.
 
 (* -------------------------------------------------------------------- *)
 abstract theory PAE.
@@ -116,3 +116,68 @@ abstract theory PAE.
   by rewrite -(of_listK witness x) // -(of_listK witness y) // hxy.
   qed.
 end PAE.
+
+(* -------------------------------------------------------------------- *)
+(* The 32-bit and 256-bit views of a byte array written by init32.       *)
+abstract theory WAE.
+  op size : int.
+
+  clone import WArray as A with op size <- size.
+
+  lemma get32_init32 (f : int -> W32.t) (i : int) :
+    0 <= i => 4 * i + 4 <= size =>
+    get32 (init32 f) i = f i.
+  proof.
+  move => Hi0 Hi1.
+  rewrite /get32_direct /init32 /W4u8.pack4_t /=.
+  apply W32.wordP => k kb.
+  rewrite W32.initiE 1:/# /= W4u8.Pack.initiE 1:/# /=.
+  rewrite A.initiE 1:/# /=.
+  rewrite (_: (4 * i + k %/ 8) %/ 4 = i) 1:/#.
+  rewrite (_: (4 * i + k %/ 8) %% 4 = k %/ 8) 1:/#.
+  by rewrite W4u8.get_bits8 1:/# /#.
+  qed.
+
+  lemma get32_set256_direct_eq (t : A.t) (j i : int) (w : W256.t) :
+    0 <= j =>
+    j + 32 <= size =>
+    j %% 4 = 0 =>
+    0 <= i =>
+    4 * i + 4 <= size =>
+    get32 (set256_direct t j w) i =
+    if j %/ 4 <= i < j %/ 4 + 8
+    then w \bits32 (i - j %/ 4)
+    else get32 t i.
+  proof.
+  move => Hj_lo Hj_hi Hj_mod Hi0 Hi1.
+  rewrite /get32_direct /=.
+  apply W32.wordP => k kb.
+  rewrite /W4u8.pack4_t W32.initiE 1:/# /= W4u8.Pack.initiE 1:/# /=.
+  rewrite /set256_direct A.initiE 1:/# /=.
+  case (j %/ 4 <= i < j %/ 4 + 8) => Hi_region.
+  + rewrite (_: j <= 4 * i + k %/ 8 < j + 32) 1:/# /=.
+    rewrite /W8u32.(\bits32) /W32u8.(\bits8) W32.initiE 1:/# /= W8.initiE 1:/# /=.
+    congr; smt().
+  rewrite (_: !(j <= 4 * i + k %/ 8 < j + 32)) 1:/# /=.
+  rewrite /get32_direct /W4u8.pack4_t.
+  by rewrite W32.initiE 1:/# /= W4u8.Pack.initiE 1:/#.
+  qed.
+
+  lemma get256_direct_init32_bits32 (f : int -> W32.t) (j k : int) :
+    0 <= j =>
+    j + 32 <= size =>
+    j %% 4 = 0 =>
+    0 <= k < 8 =>
+    (get256_direct (init32 f) j) \bits32 k = f (j %/ 4 + k).
+  proof.
+  move => Hj_lo Hj_hi Hj_mod Hk.
+  rewrite /get256_direct /W8u32.(\bits32) /=.
+  apply W32.wordP => b bb.
+  rewrite W32.initiE 1:/# /= pack32wE 1:/# W32u8.Pack.initiE 1:/# /=.
+  rewrite /init32 A.initiE 1:/# /=.
+  rewrite (_: (j + (k * 32 + b) %/ 8) %/ 4 = j %/ 4 + k) 1:/#.
+  rewrite (_: (j + (k * 32 + b) %/ 8) %% 4 = b %/ 8) 1:/#.
+  rewrite (_: (k * 32 + b) %% 8 = b %% 8) 1:/#.
+  by rewrite W4u8.get_bits8 1:/# /#.
+  qed.
+end WAE.

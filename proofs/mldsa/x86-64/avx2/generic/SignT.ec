@@ -586,10 +586,10 @@ while (
      + move => _ z; auto => |> &hr Hj_lo Hj_hi Hj_mod Hcopied Hguard.
        do split; 1,2,3,5: smt().
        move => i Hi_lo Hi_hi; rewrite Array_lpolys.initiE 1:/# /=.
-       rewrite get32_set256_direct_eq 1,2,3,4:/#.
+       rewrite WAE_lpolys_bytes.get32_set256_direct_eq 1..5:/#.
        case (j{hr} %/ 4 <= i < j{hr} %/ 4 + 8) => Hi_region.
-       + rewrite get256_direct_init32_bits32 1,2,3,4:/# /= /#.
-       rewrite get32_init32 1:/# /=; apply Hcopied; smt().
+       + rewrite WAE_lpolys_bytes.get256_direct_init32_bits32 1..4:/# /= /#.
+       rewrite WAE_lpolys_bytes.get32_init32 1,2:/# /=; apply Hcopied; smt().
      skip; move => &1 &2 Hj0; split; 1: smt().
      move => j_R mask_as_ntt_R; split; 1: smt().
      move => Hguard_neg [# Hj_lo Hj_hi Hj_mod Hcopied].

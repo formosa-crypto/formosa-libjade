@@ -181,70 +181,8 @@ move => ?; move : HH.
 by smt(or64_ne0).
 qed.
 
-(* -------------------------------------------------------------------- *)
-(* Word packing in the byte view of an L-vector: the 256-bit loads of   *)
-(* the dot product, and the copy of the mask into mask_as_ntt (SignT).   *)
-(* -------------------------------------------------------------------- *)
-
-lemma get32_init32 (f : int -> W32.t) (i : int) :
-  0 <= i < lpolys =>
-  WArray_lpolys_bytes.get32 (WArray_lpolys_bytes.init32 f) i = f i.
-proof.
-move => Hi; have ? : lpolys_bytes = 4 * lpolys by done.
-rewrite /WArray_lpolys_bytes.get32_direct /WArray_lpolys_bytes.init32 /W4u8.pack4_t /=.
-apply W32.wordP => k kb.
-rewrite W32.initiE 1:/# /= W4u8.Pack.initiE 1:/# /=.
-rewrite WArray_lpolys_bytes.initiE 1:/# /=.
-rewrite (_: (4 * i + k %/ 8) %/ 4 = i) 1:/#.
-rewrite (_: (4 * i + k %/ 8) %% 4 = k %/ 8) 1:/#.
-by rewrite W4u8.get_bits8 1:/# /#.
-qed.
-
-lemma get32_set256_direct_eq (t : WArray_lpolys_bytes.t) (j i : int) (w : W256.t) :
-  0 <= j =>
-  j + 32 <= lpolys_bytes =>
-  j %% 4 = 0 =>
-  0 <= i < lpolys =>
-  WArray_lpolys_bytes.get32 (WArray_lpolys_bytes.set256_direct t j w) i =
-  if j %/ 4 <= i < j %/ 4 + 8
-  then w \bits32 (i - j %/ 4)
-  else WArray_lpolys_bytes.get32 t i.
-proof.
-move => Hj_lo Hj_hi Hj_mod Hi; have ? : lpolys_bytes = 4 * lpolys by done.
-rewrite /WArray_lpolys_bytes.get32_direct /=.
-apply W32.wordP => k kb.
-rewrite /W4u8.pack4_t W32.initiE 1:/# /= W4u8.Pack.initiE 1:/# /=.
-rewrite /WArray_lpolys_bytes.set256_direct WArray_lpolys_bytes.initiE 1:/# /=.
-case (j %/ 4 <= i < j %/ 4 + 8) => Hi_region.
-+ rewrite (_: j <= 4 * i + k %/ 8 < j + 32) 1:/# /=.
-  rewrite /W8u32.(\bits32) /W32u8.(\bits8) W32.initiE 1:/# /= W8.initiE 1:/# /=.
-  congr; smt().
-rewrite (_: !(j <= 4 * i + k %/ 8 < j + 32)) 1:/# /=.
-rewrite /WArray_lpolys_bytes.get32_direct /W4u8.pack4_t.
-by rewrite W32.initiE 1:/# /= W4u8.Pack.initiE 1:/#.
-qed.
-
-lemma get256_direct_init32_bits32 (f : int -> W32.t) (j k : int) :
-  0 <= j =>
-  j + 32 <= lpolys_bytes =>
-  j %% 4 = 0 =>
-  0 <= k < 8 =>
-  (WArray_lpolys_bytes.get256_direct (WArray_lpolys_bytes.init32 f) j) \bits32 k
-  = f (j %/ 4 + k).
-proof.
-move => Hj_lo Hj_hi Hj_mod Hk.
-rewrite /get256_direct /W8u32.(\bits32) /=.
-apply W32.wordP => b bb.
-rewrite W32.initiE 1:/# /= pack32wE 1:/# W32u8.Pack.initiE 1:/# /=.
-rewrite /init32 WArray_lpolys_bytes.initiE 1:/# /=.
-rewrite (_: (j + (k * 32 + b) %/ 8) %/ 4 = j %/ 4 + k) 1:/#.
-rewrite (_: (j + (k * 32 + b) %/ 8) %% 4 = b %/ 8) 1:/#.
-rewrite (_: (k * 32 + b) %% 8 = b %% 8) 1:/#.
-by rewrite W4u8.get_bits8 1:/# /#.
-qed.
-
-(* the same for a polynomial: the coefficient c after a 256-bit store at
-   the byte offset o *)
+(* the coefficient c of a polynomial after a 256-bit store at the byte
+   offset o of its byte view *)
 lemma wpoly_set256_lane (p : W32.t Array256.t) (o : int) (w : W256.t) (c : int) :
   0 <= o => o + 32 <= 1024 => o %% 4 = 0 => 0 <= c < 256 =>
   (Array256.init (fun i => WArray1024.get32
@@ -461,14 +399,14 @@ while (lhs = _lhs /\ rhs = _rhs /\ 0 <= offset <= 1024 /\ offset %% 32 = 0 /\
     have Hl : forall l, 0 <= l < 8 =>
       (WArray_lpolys_bytes.get256_direct (WArray_lpolys_bytes.init32 (fun i0 => _lhs.[i0]))
          (offset{hr} + i{hr} * 1024)) \bits32 l = _lhs.[256 * i{hr} + offset{hr} %/ 4 + l].
-    + move=> l hl; rewrite get256_direct_init32_bits32 // 1..3:/#.
+    + move=> l hl; rewrite WAE_lpolys_bytes.get256_direct_init32_bits32 // 1..3:/#.
       have -> : (offset{hr} + i{hr} * 1024) %/ 4 = offset{hr} %/ 4 + n * i{hr}.
       + by rewrite addzC (_ : i{hr} * 1024 = n * i{hr} * 4) 1:/# divzMDl //; ring.
       by rewrite /=; congr; ring.
     have Hr : forall l, 0 <= l < 8 =>
       (WArray_lpolys_bytes.get256_direct (WArray_lpolys_bytes.init32 (fun i0 => _rhs.[i0]))
          (offset{hr} + i{hr} * 1024)) \bits32 l = _rhs.[256 * i{hr} + offset{hr} %/ 4 + l].
-    + move=> l hl; rewrite get256_direct_init32_bits32 // 1..3:/#.
+    + move=> l hl; rewrite WAE_lpolys_bytes.get256_direct_init32_bits32 // 1..3:/#.
       have -> : (offset{hr} + i{hr} * 1024) %/ 4 = offset{hr} %/ 4 + n * i{hr}.
       + by rewrite addzC (_ : i{hr} * 1024 = n * i{hr} * 4) 1:/# divzMDl //; ring.
       by rewrite /=; congr; ring.
