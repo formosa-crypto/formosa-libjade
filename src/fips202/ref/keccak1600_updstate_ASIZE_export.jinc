@@ -1,5 +1,9 @@
 require "keccak1600_updstate_ASIZE.jinc"
 
+#[safety =
+   { requires = is_arr_init(st,0,208) && 0 <= len && len <= _ASIZE && len <= 0xFFFFFFFFFFFFFF00 && is_arr_init(buf,0,len)
+   , ensures = is_arr_init(st,0,208) }
+ ]
 export fn absorb_updstate
 ( reg mut ptr keccak_updstate st
 , reg const ptr u8[_ASIZE] buf
@@ -13,6 +17,11 @@ export fn absorb_updstate
   return st;
 }
 
+#[safety =
+   { requires = is_arr_init(st,0,208) && 0 <= len && len <= _ASIZE && len <= 0xFFFFFFFFFFFFFF00
+   , res = { final_st, final_buf }
+   , ensures = is_arr_init(final_st,0,208) && is_arr_init(final_buf,0,len) }
+ ]
 export fn squeeze_updstate
 ( reg mut ptr keccak_updstate st
 , reg mut ptr u8[_ASIZE] buf

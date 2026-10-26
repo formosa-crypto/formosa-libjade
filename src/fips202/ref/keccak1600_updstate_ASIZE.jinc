@@ -26,6 +26,12 @@ OBS: the generated code is independent of the parameter _ASIZE, but the
 
 from Keccak require "common/subreadwrite_ASIZE.jinc"
 
+#[safety =
+   { requires = is_arr_init(st,0,200) && 0 <= at && at <= upto && upto <= 200
+     && 0 <= off && off + (upto - at) <= _ASIZE && is_arr_init(buf, off, upto - at)
+   , res = { final_st, final_at, final_off }
+   , ensures = is_arr_init(final_st,0,200) && final_at == upto && final_off == off + (upto - at) }
+ ]
 fn _add_updstate
 ( reg mut ptr keccak_state st
 , reg ui64 at               // 0 <= at < 200
@@ -59,8 +65,9 @@ fn _add_updstate
     t64 <<= (sh & 63);
     st.[at] ^= t64;
     if (len >= 8) { // need to proccess more stwords...
-      off += 8;
-      off -= (64ui) at8; // off += (8-at8)
+      len = 8;
+      len -= (64ui) at8; // bytes consumed from buf (8-at8): adding them in one
+      off += len;        // step keeps every intermediate ui64 value in range
       at += 8;    // start of next stword
     } else { // this is the only affected stword
       off = off2; // 
@@ -121,6 +128,10 @@ fn _add_updstate
   return st, at, off;
 }
 
+#[safety =
+   { requires = is_arr_init(st,0,208) && 0 <= len && len <= _ASIZE && len <= 0xFFFFFFFFFFFFFF00 && is_arr_init(buf,0,len)
+   , ensures = is_arr_init(st,0,208) }
+ ]
 fn _absorb_updstate
 ( #[spill_to_mmx] reg mut ptr keccak_updstate st
 , #[spill_to_mmx] reg const ptr u8[_ASIZE] buf
@@ -166,6 +177,12 @@ fn _absorb_updstate
   return st;
 }
 
+#[safety =
+   { requires = is_arr_init(st,0,200) && 0 <= at && at <= upto && upto <= 200
+     && 0 <= off && off + (upto - at) <= _ASIZE && is_arr_init(buf,0,off)
+   , res = { final_buf, final_off, final_at }
+   , ensures = is_arr_init(final_buf,0,off + (upto - at)) && final_off == off + (upto - at) && final_at == upto }
+ ]
 fn _dump_updstate
 ( reg mut ptr u8[_ASIZE] buf
 , reg ui64 off    // off + upto - at <= _ASIZE
@@ -198,8 +215,9 @@ fn _dump_updstate
     buf, off2 = __a_rlen_write_upto8(buf, off, t64, len);
     len += (64ui) at8; // bytes from the start of word
     if (len >= 8) {  // need to proccess more stwords...
-      off += 8;
-      off -= (64ui) at8;
+      len = 8;
+      len -= (64ui) at8; // bytes written to buf (8-at8): adding them in one
+      off += len;        // step keeps every intermediate ui64 value in range
       at += 8;       // start of next stword
     } else {         // this is the only affected stword
       off = off2;
@@ -258,6 +276,11 @@ fn _dump_updstate
   return buf, off, at;
 }
 
+#[safety =
+   { requires = is_arr_init(st,0,208) && 0 <= len && len <= _ASIZE && len <= 0xFFFFFFFFFFFFFF00
+   , res = { final_st, final_buf }
+   , ensures = is_arr_init(final_st,0,208) && is_arr_init(final_buf,0,len) }
+ ]
 fn _squeeze_updstate
 ( #[spill_to_mmx] reg mut ptr keccak_updstate st
 , #[spill_to_mmx] reg mut ptr u8[_ASIZE] buf
@@ -319,6 +342,13 @@ fn _squeeze_updstate
   return st, buf;
 }
 
+#[safety =
+   { requires = is_arr_init(st,0,200) && 0 < r8 && r8 <= 200 && 0 <= at && at <= r8
+     && 0 <= len && len <= _ASIZE && len <= 0xFFFFFFFFFFFFFF00
+   , res = { final_st, final_buf, final_at }
+   , ensures = is_arr_init(final_st,0,200) && is_arr_init(final_buf,0,len)
+     && 0 <= final_at && final_at <= r8 }
+ ]
 fn _squeeze_state
 ( reg mut ptr keccak_state st
 , #[spill_to_mmx] reg ui64 r8  // 0 < r8 < 200; r8 |% 8

@@ -1,5 +1,9 @@
 require "keccak1600_updstate.jinc"
 
+#[safety =
+   { requires = is_arr_init(st,0,208)
+   , ensures = is_arr_init(status,0,3) }
+ ]
 export fn ststatus_updstate
 ( reg mut ptr u8[3] status
 , reg const ptr keccak_updstate st
@@ -15,6 +19,9 @@ export fn ststatus_updstate
   return status;
 }
 
+#[safety =
+   { ensures = is_arr_init(st,0,208) }
+ ]
 export fn init_updstate
 ( reg mut ptr keccak_updstate st
 , reg ui8 r64
@@ -37,6 +44,10 @@ export fn finish_updstate
   return st;
 }
 
+#[safety =
+   { requires = is_arr_init(st,0,208) && is_mem_init((64u) buf, len) && len <= 0xFFFFFFFFFFFFFF00
+   , ensures = is_arr_init(st,0,208) }
+ ]
 export fn absorb_m_updstate
 ( reg mut ptr keccak_updstate st
 , reg ui64 buf
@@ -49,6 +60,10 @@ export fn absorb_m_updstate
   return st;
 }
 
+#[safety =
+   { requires = is_arr_init(st,0,208) && is_mem_init((64u) buf, len) && len <= 0xFFFFFFFFFFFFFF00
+   , ensures = is_arr_init(st,0,208) }
+ ]
 export fn squeeze_m_updstate
 ( reg mut ptr keccak_updstate st
 , reg ui64 buf

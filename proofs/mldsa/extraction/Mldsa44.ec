@@ -7336,8 +7336,9 @@ module M = {
       (WArray200.set64_direct (WArray200.init64 (fun i => st.[i])) at
       ((get64_direct (WArray200.init64 (fun i => st.[i])) at) `^` t64))));
       if ((8 <= len)) {
-        buf <- (buf + 8);
-        buf <- (buf - (W64.to_uint at8));
+        len <- 8;
+        len <- (len - (W64.to_uint at8));
+        buf <- (buf + len);
         at <- (at + 8);
       } else {
         buf <- buf2;
@@ -9604,8 +9605,9 @@ module M = {
       (buf, off2) <@ a64____a_rlen_write_upto8 (buf, off, t64, len);
       len <- (len + (W64.to_uint at8));
       if ((8 <= len)) {
-        off <- (off + 8);
-        off <- (off - (W64.to_uint at8));
+        len <- 8;
+        len <- (len - (W64.to_uint at8));
+        off <- (off + len);
         at <- (at + 8);
       } else {
         off <- off2;
