@@ -1,0 +1,20 @@
+[general]
+timeout = 5
+
+provers = CVC5@1.3
+provers = Z3@4.13
+
+pragmas = -Warn:uninit
+pragmas = -Warn:unused_unfold
+
+# The `Jasmin` namespace must resolve to the eclib of Jasmin's safety-assert2
+# branch (JSafety.ec, and the safety additions to Jcheck/JMemory/JByte_array/
+# JWord), not to the eclib installed with the 2026.03.1 release. A project
+# `idirs` cannot do that (the installed eclib is searched first), so it is
+# given on the command line: `make -C proofs fips202-safety` sets EC_IDIRS
+# (see proofs/Makefile and README.md).
+idirs = extracted
+idirs = common
+idirs = ref
+idirs = avx2
+idirs = avx2x4
