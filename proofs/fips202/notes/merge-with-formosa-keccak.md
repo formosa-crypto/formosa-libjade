@@ -136,3 +136,101 @@ Landed as commit "fips202: sync src and proofs with formosa-keccak 13218ad" on b
 - Proof-status delta vs before: `ref/Keccakf1600.ec` 4→0 admits,
   `avx2/Keccakf1600_avx2x4.ec` 1→0 — every Keccak permutation (scalar and 4x,
   including the new unrolled/software-pipelined `alt`) is now proved admit-free.
+
+# Safety proofs (2026-10-26, branch `keccak-safety`)
+
+Merge of formosa-keccak `proof/amd64-barray/safety` (branch `proof`, `6eded33`,
+2026-10-23) into `proofs/fips202/safety`, together with the source changes it
+depends on. The "safety/ NOT ported" item above is superseded.
+
+## Baseline
+
+The two source trees share an exact base: formosa-keccak `09c2220` ("merge
+changes from jasmin-nist", 2026-10-07) is byte-identical to jasmin-nist
+`97a7c959` (`src/amd64` vs `src/fips202`). Since then:
+
+- formosa-keccak `7fe1a51`, `cac4567`, `16d8a25` (20 files): safety contracts
+  completed and fixed on every layer; the one code change, the streaming
+  add/dump steps advancing `buf`/`off` past a partial first word in one step
+  (`len = 8; len -= at8; buf += len`, was `buf += 8; buf -= at8`) in 8
+  functions; `len <= 0xFFFFFFFFFFFFFF00` on the array streaming contracts; the
+  two `*_test.jazz` fixed.
+- jasmin-nist `156dc6a3`, `fd96b511`, `999ca22f` (4 files, ref updstate only):
+  `#[spill_to_mmx]`, `#declassify`/`#init_msf`, `if (SPILL)` around the
+  permutation, export wrappers moved to `*_export.jinc`, and the bare-state
+  steps `_absorb_m_state`, `_finish_state`, `_squeeze_state` (ML-DSA hashing
+  boundary).
+
+## Procedure
+
+1. Sources: upstream `09c2220..6eded33` applied to the 18 files jasmin-nist
+   had not touched (`git apply -p3 --directory=src/fips202`; they are now
+   byte-identical to upstream); the two ref updstate files merged three-way
+   (base `97a7c959`): upstream's pointer-advance hunks and contracts, kept
+   jasmin-nist's code; the export wrappers' contracts put in the two
+   `*_export.jinc` files; new contracts for the three bare-state steps.
+2. Correctness side (jasmin 2026.03.1): models re-extracted
+   (`proofs/fips202/extracted`, `proofs/mldsa/extraction` and `generic`;
+   ML-KEM unchanged), upstream `16d8a25`'s proof adaptation applied
+   (`ref/Keccak1600_updstate_ref.ec`, `avx2/Keccak1600_updstate_avx2x4.ec`).
+3. Safety tree copied (the committed files of upstream's directory) with
+   `scripts/asize_transform.py`; harnesses, `extracted/Makefile` and
+   `easycrypt.project` adapted; models re-extracted from `src/fips202` with the
+   `safety-assert2` `jasmin2ec`; proofs regenerated with `gen/`.
+4. Scenario `fips202-safety` (`make -C proofs check-safety`), the flake's
+   `jasminSafety`, and two CI steps (proof check, model reproducibility).
+
+Toolchain facts that shaped this (checked locally):
+
+- jasmin 2026.03.1 accepts the contracts (they do not change code generation)
+  but has no `-m safety`; the `safety-assert2` snapshot (jasmin `1e7479a2`,
+  jasmin-compiler `c1cae60e`) has it, but its `jasminc` allocates registers
+  differently (mldsa65: 1944 lines of assembly differ), so it is used only for
+  the safety extraction and its eclib.
+- The snapshot eclib is the 2026.03.1 one plus `JSafety.ec`, lemmas added to
+  `Jcheck`/`JMemory`/`JByte_array`, and the whole-count `VPSLL`/`VPSRL`/`VPSRA`
+  of `JWord`. It is not vendored: `JASMIN_SAFETY_ECLIB` points at it, and
+  `proofs/Makefile` passes it in `EC_IDIRS`, which EasyCrypt searches before
+  the installed eclib (an `easycrypt.project` `idirs` comes after it).
+- The safety array harness requires the memory one (same permutation
+  selection, as upstream); jasmin-nist's correctness array harness selects
+  the AVX2 permutation and cannot be reused.
+
+## Adaptations found while checking
+
+- The ref array theory's `MM` block contains jasmin-nist's `init_msf`
+  (from `SLH64`), which the model imports but the generated proof header did
+  not: `gen/cfg_ref.py` adds `import SLH64.`.
+- `_squeeze_state`: the join of its `if (at == 0)` keeps only the loop
+  invariant, so the invariant carries `r8 = _r8` (the postcondition bounds
+  the final position by the rate argument).
+
+## Outcome (2026-10-26)
+
+Local checks (EasyCrypt `jasmin-nist` branch `df41d3ab`, CVC5 1.3.2, Z3
+4.13.4; jasmin 2026.03.1 for compilation and the correctness models; the
+`safety-assert2` snapshot for the safety models and eclib):
+
+- `make -C src` and `make -C src ct sct`: pass. Assembly diff against the
+  pre-merge build: only the pointer advance (two sites per ML-DSA set, modulo
+  register names); ML-KEM unchanged.
+- Correctness models: pre-merge models reproduced byte-for-byte; after the
+  merge, `Keccak1600_Jazz{,_ASIZE}.ec`, `Mldsa{44,65,87}.ec` and
+  `generic/MldsaT.ec` change only in the add/dump procedures, ML-KEM models
+  unchanged.
+- `fips202` 41/41; ML-DSA `HashingT.ec` (the `sim` bridges to
+  `Keccak1600_Jazz.M`) passes. The run of `fips202 mldsa mlkem-avx2-768
+  mlkem-avx2-1024` has 20 failures (ML-DSA `variants/*T.ec`, `instances*`,
+  `correctness*`; ML-KEM 768/1024 `instances`, `correctness`, `circuit_sem`,
+  `MLKEM_compress`), all "unknown symbol ...t" clone errors that reproduce
+  identically on a pristine checkout of `ca229a00` with the same EasyCrypt,
+  so they predate this merge (likely the local EasyCrypt lagging the pin).
+  CI is authoritative for them.
+- Safety models: every specification of a procedure shared with upstream is
+  identical; procedure bodies differ only in the SPILL conditional,
+  `init_msf` and the three bare-state steps. All layers but ref regenerate
+  byte-identically to upstream.
+- `make -C proofs check-safety`: 48/48, 19 min wall-clock with 10 jobs; no
+  admit in `proofs/fips202/safety`.
+- `flake.nix`: evaluates; the existing package keeps the same input
+  derivations; `packages.jasmin-safety` resolves (not built locally).
