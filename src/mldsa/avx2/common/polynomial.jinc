@@ -1,6 +1,12 @@
 require "arithmetic/modular.jinc"
 
 namespace polynomial {
+    #[safety =
+       { requires = is_arr_init(lhs_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                 && is_arr_init(rhs_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(sum_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     fn add(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] sum_pointer lhs_pointer rhs_pointer)
         -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
@@ -23,6 +29,12 @@ namespace polynomial {
         return sum_pointer;
     }
 
+    #[safety =
+       { requires = is_arr_init(lhs_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                 && is_arr_init(rhs_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(difference_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     fn subtract(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] difference_pointer lhs_pointer rhs_pointer
     )
@@ -138,6 +150,12 @@ namespace polynomial {
     // One pass instead of three (vpadd, reduce32, __check_infinity_norm);
     // the only output besides the polynomial is the boolean of the norm test,
     // as in __check_infinity_norm.
+    #[safety =
+       { requires = is_arr_init(lhs_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                 && is_arr_init(rhs_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(sum_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn __add_reduce32_check_infinity_norm(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] sum_pointer lhs_pointer rhs_pointer,
@@ -193,6 +211,12 @@ namespace polynomial {
     // One pass instead of three (vpsub, reduce32, __check_infinity_norm);
     // the only output besides the polynomial is the boolean of the norm test,
     // as in __check_infinity_norm.
+    #[safety =
+       { requires = is_arr_init(lhs_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                 && is_arr_init(rhs_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(difference_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn __subtract_reduce32_check_infinity_norm(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] difference_pointer lhs_pointer rhs_pointer,
@@ -249,6 +273,12 @@ namespace polynomial {
     // on rhs: the test on c*t0 cannot fail for ML-DSA-65 and ML-DSA-87). One
     // pass instead of three (reduce32, __check_infinity_norm, add); the
     // reduced rhs is not stored.
+    #[safety =
+       { requires = is_arr_init(lhs_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                 && is_arr_init(rhs_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(sum_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn __add_reduce32_check_infinity_norm_rhs(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] sum_pointer lhs_pointer rhs_pointer,

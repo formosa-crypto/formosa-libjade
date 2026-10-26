@@ -136,6 +136,19 @@ qed.
 
 
 (* -------------------------------------------------------------------- *)
+(* a 64-bit store at the padding offset leaves the first 840 bytes *)
+lemma sub840_set64_padE (b : W8.t Array848.t) (w : W64.t) :
+  Array848.sub
+    (Array848.init
+      (WArray848.get8 (WArray848.set64_direct (WArray848.init8 (Array848."_.[_]" b)) 840 w)))
+    0 840
+  = Array848.sub b 0 840.
+proof.
+rewrite /Array848.sub; apply eq_in_mkseq => k kb /=.
+rewrite initiE 1:/# /= ifF 1:/#.
+by rewrite /WArray848.get8 WArray848.initiE 1:/#.
+qed.
+
 lemma matrix_A____shake128_squeeze_multiple_blocks_4xP (data : W8.t list Array4.t)
 : hoare[
   M.matrix_A____shake128_squeeze_multiple_blocks_4x :
@@ -148,7 +161,7 @@ lemma matrix_A____shake128_squeeze_multiple_blocks_4xP (data : W8.t list Array4.
   ].
 proof.
 proc.
-sp.
+sp; wp.
 (* each iteration squeezes one block into every lane's next window *)
 while (0 <= i <= 5
     /\ state \sha3for Array4.map (mk_read (168 * i)) data
@@ -169,14 +182,16 @@ while (0 <= i <= 5
        (shake128_slice_cat_block data.[2] i{hr} r.`4 hi0 hb2).
   by rewrite sub_window_catE 1:/# hs3
      (shake128_slice_cat_block data.[3] i{hr} r.`5 hi0 hb3).
-(* entry: nothing is read yet; exit: the five windows cover 840 bytes *)
+(* entry: nothing is read yet; exit: the five windows cover 840 bytes, and
+   the padding word written after them is outside the windows *)
 skip => &hr |> hst; split.
 - by do! split; smt(size_shake128_slice size_eq0).
 move=> b00 b10 b20 b30 i0 state0 hge5 hi0 hi5 hrel h0 h1 h2 h3.
 have ->>: i0 = 5 by smt().
 split; first by exact hrel.
 move=> j hj0 hj4.
-by have [->|[->|[->|->]]] /=: j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt().
+(have [->|[->|[->|->]]] /=: j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt());
+  by rewrite sub840_set64_padE /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -995,7 +1010,7 @@ proof. by proc; islossless. qed.
 lemma matrix_A____shake128_squeeze_multiple_blocks_4x_ll :
   islossless M.matrix_A____shake128_squeeze_multiple_blocks_4x.
 proof.
-proc; while true (5 - i); last by auto=> /#.
+proc; wp; while true (5 - i); last by auto=> /#.
 by move=> z; wp; call shake128_squeezeblock4x_ll; auto=> /#.
 qed.
 

@@ -1,4 +1,11 @@
 namespace polynomial {
+    #[safety =
+       { requires = is_arr_init(low_coefficients,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                 && is_arr_init(high_coefficients,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(hints,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                && weight <= COEFFICIENTS_IN_POLYNOMIAL
+       }
+     ]
     inline
     fn __make_hint(
         #[spill_to_mmx] reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] hints,
@@ -61,6 +68,12 @@ namespace polynomial {
         return hints, weight;
     }
 
+    #[safety =
+       { requires = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(highbits,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                && is_arr_init(lowbits,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn __power2round(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] highbits,

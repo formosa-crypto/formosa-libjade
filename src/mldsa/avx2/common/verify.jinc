@@ -82,6 +82,15 @@ fn reconstruct_signer_commitment(
     return commitment_encoded;
 }
 
+#[safety =
+   { requires = is_arr_init(verification_key,0,VERIFICATION_KEY_SIZE)
+             && is_arr_init(signature_encoded,0,SIGNATURE_SIZE)
+             && 0 <= context_pointer && context_pointer <= 18446744073709551615
+             && 0 <= context_size && context_size <= 18446744073709551615
+             && 0 <= message_pointer && message_pointer <= 18446744073709551615
+             && 0 <= message_size && message_size <= 18446744073709551615
+   }
+ ]
 fn __verify_internal(
     reg ptr u8[VERIFICATION_KEY_SIZE] verification_key,
     reg ui64 context_pointer,

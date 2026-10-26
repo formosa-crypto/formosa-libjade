@@ -8,6 +8,12 @@ from Common require "mldsa.jinc"
 
 // See api.h for the sizes of the buffers expected by these functions.
 
+#[safety =
+   { requires = is_arr_init(randomness,0,32)
+   , ensures = is_arr_init(verification_key,0,VERIFICATION_KEY_SIZE)
+            && is_arr_init(signing_key,0,SIGNING_KEY_SIZE)
+   }
+ ]
 #[sct="{ptr: transient, val: transient} *
        {ptr: transient, val: secret} *
        {ptr: transient, val: secret} ->
@@ -27,6 +33,13 @@ export fn ml_dsa_87_keygen(
     return verification_key, signing_key;
 }
 
+#[safety =
+   { requires = is_arr_init(signing_key,0,SIGNING_KEY_SIZE)
+             && is_arr_init(context,0,8 * 2)
+             && is_arr_init(randomness,0,32)
+   , ensures = (result != 0 || is_arr_init(signature,0,SIGNATURE_SIZE))
+   }
+ ]
 #[sct="{ptr: transient, val: transient} *
        {ptr: transient, val: secret} *
        {ptr: transient, val: transient} *
@@ -59,6 +72,14 @@ export fn ml_dsa_87_sign(
     return signature, result;
 }
 
+#[safety =
+   { requires = is_arr_init(verification_key,0,VERIFICATION_KEY_SIZE)
+             && is_arr_init(context,0,8 * 2)
+             && is_arr_init(signature,0,SIGNATURE_SIZE)
+             && 0 <= message_pointer && message_pointer <= 18446744073709551615
+             && 0 <= message_size && message_size <= 18446744073709551615
+   }
+ ]
 #[sct="{ptr: transient, val: transient} *
        {ptr: transient, val: transient} *
        transient *

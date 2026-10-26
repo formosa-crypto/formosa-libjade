@@ -31,6 +31,11 @@ namespace gamma1 {
         return bytestream_lower, bytestream_upper;
     }
 
+    #[safety =
+       { requires = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(output,0,ENCODED_GAMMA1_POLYNOMIAL_SIZE)
+       }
+     ]
     inline
     fn __encode_polynomial_bits20(
         reg ptr u8[ENCODED_GAMMA1_POLYNOMIAL_SIZE] output,
@@ -90,6 +95,11 @@ namespace gamma1 {
                -1, 4, 3, 2, -1, 2, 1, 0],
         (8u32)[4, 0, 4, 0, 4, 0, 4, 0]
     };
+    #[safety =
+       { requires = is_arr_init(bytes,0,ENCODED_GAMMA1_POLYNOMIAL_SIZE)
+       , ensures = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn __decode_to_polynomial_bits20(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
@@ -173,6 +183,11 @@ namespace gamma1 {
         return bytestream_lower, bytestream_upper;
     }
 
+    #[safety =
+       { requires = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(output,0,ENCODED_GAMMA1_POLYNOMIAL_SIZE)
+       }
+     ]
     inline
     fn __encode_polynomial_bits18(
         reg ptr u8[ENCODED_GAMMA1_POLYNOMIAL_SIZE] output,
@@ -231,6 +246,11 @@ namespace gamma1 {
                -1, 8, 7, 6, -1, 6, 5, 4, -1, 4, 3, 2, -1, 2, 1, 0],
         (8u32)[6, 4, 2, 0, 6, 4, 2, 0]
     };
+    #[safety =
+       { requires = is_arr_init(bytes,0,ENCODED_GAMMA1_POLYNOMIAL_SIZE)
+       , ensures = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn __decode_to_polynomial_bits18(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
@@ -288,6 +308,11 @@ namespace gamma1 {
 
     // The encoding of a mask coefficient: 20 bits (gamma1 = 2^19) or 18 bits
     // (gamma1 = 2^17)
+    #[safety =
+       { requires = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(output,0,ENCODED_GAMMA1_POLYNOMIAL_SIZE)
+       }
+     ]
     inline
     fn __encode_polynomial(
         reg ptr u8[ENCODED_GAMMA1_POLYNOMIAL_SIZE] output,
@@ -302,6 +327,11 @@ namespace gamma1 {
         return output;
     }
 
+    #[safety =
+       { requires = is_arr_init(bytes,0,ENCODED_GAMMA1_POLYNOMIAL_SIZE)
+       , ensures = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn __decode_to_polynomial(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
@@ -316,6 +346,11 @@ namespace gamma1 {
         return polynomial;
     }
 
+    #[safety =
+       { requires = is_arr_init(decoded,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+       , ensures = is_arr_init(encoded,0,GAMMA1_ENCODED_SIZE)
+       }
+     ]
     inline
     fn __encode(
         reg ptr u8[GAMMA1_ENCODED_SIZE] encoded,
@@ -335,6 +370,11 @@ namespace gamma1 {
         return encoded;
     }
 
+    #[safety =
+       { requires = is_arr_init(encoded,0,GAMMA1_ENCODED_SIZE)
+       , ensures = is_arr_init(decoded,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+       }
+     ]
     inline
     fn __decode(
         reg ptr u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] decoded,

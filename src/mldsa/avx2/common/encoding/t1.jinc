@@ -38,6 +38,11 @@ namespace t1 {
 
         return bytestream;
     }
+    #[safety =
+       { requires = is_arr_init(t1,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(t1_encoded,0,T1_POLYNOMIAL_ENCODED_SIZE)
+       }
+     ]
     fn encode_polynomial(
         reg ptr u8[T1_POLYNOMIAL_ENCODED_SIZE] t1_encoded,
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] t1
@@ -77,6 +82,11 @@ namespace t1 {
         return t1_encoded;
     }
 
+    #[safety =
+       { requires = is_arr_init(t1,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+       , ensures = is_arr_init(encoded,0,T1_ENCODED_SIZE)
+       }
+     ]
     inline
     fn __encode(
         reg ptr u8[T1_ENCODED_SIZE] encoded,
@@ -114,6 +124,11 @@ namespace t1 {
                   BITS_IN_UPPER_PART_OF_T_MASK,
                   BITS_IN_UPPER_PART_OF_T_MASK];
 
+    #[safety =
+       { requires = is_arr_init(t1_encoded,0,T1_POLYNOMIAL_ENCODED_SIZE)
+       , ensures = is_arr_init(t1,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     fn decode_polynomial(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] t1,
         reg ptr u8[T1_POLYNOMIAL_ENCODED_SIZE] t1_encoded

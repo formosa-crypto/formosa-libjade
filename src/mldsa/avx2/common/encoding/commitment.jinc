@@ -6,6 +6,11 @@ namespace commitment {
         3, 2, 9, 8, 1, 0
     ];
 
+    #[safety =
+       { requires = is_arr_init(commitment,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(encoded,0,ENCODED_COMMITMENT_POLYNOMIAL_SIZE)
+       }
+     ]
     inline
     fn __encode_polynomial_bits4(
         reg ptr u8[ENCODED_COMMITMENT_POLYNOMIAL_SIZE] encoded,
@@ -113,6 +118,11 @@ namespace commitment {
         return bytestream_lower, bytestream_upper;
     }
 
+    #[safety =
+       { requires = is_arr_init(raw,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(encoded,0,ENCODED_COMMITMENT_POLYNOMIAL_SIZE)
+       }
+     ]
     inline
     fn __encode_polynomial_bits6(
         reg ptr u8[ENCODED_COMMITMENT_POLYNOMIAL_SIZE] encoded,
@@ -169,6 +179,11 @@ namespace commitment {
 
     // The encoding of a commitment coefficient: 4 bits (gamma2 = (q - 1) / 32)
     // or 6 bits (gamma2 = (q - 1) / 88)
+    #[safety =
+       { requires = is_arr_init(commitment,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(encoded,0,ENCODED_COMMITMENT_POLYNOMIAL_SIZE)
+       }
+     ]
     inline
     fn __encode_polynomial(
         reg ptr u8[ENCODED_COMMITMENT_POLYNOMIAL_SIZE] encoded,

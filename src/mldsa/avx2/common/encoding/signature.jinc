@@ -10,6 +10,12 @@ namespace signature {
     // the positions beyond MAX_ONES_IN_HINT are dropped (they would otherwise
     // overwrite the counts and run past the end of the signature; the result
     // code tells the caller the iteration failed).
+    #[safety =
+       { requires = is_arr_init(hint,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+                 && is_arr_init(signature,0,COMMITMENT_HASH_SIZE + GAMMA1_ENCODED_SIZE)
+       , ensures = is_arr_init(signature,0,SIGNATURE_SIZE)
+       }
+     ]
     inline
     fn __encode_hint(
         reg ptr u8[SIGNATURE_SIZE] signature,
@@ -87,6 +93,10 @@ namespace signature {
 
     // The fixed signature of a failed signing: every byte is 0. A byte loop:
     // this path is only taken when the iteration budget is exhausted.
+    #[safety =
+       { ensures = is_arr_init(signature,0,SIGNATURE_SIZE)
+       }
+     ]
     inline
     fn __zero(
         reg ptr u8[SIGNATURE_SIZE] signature
@@ -102,6 +112,13 @@ namespace signature {
         return signature;
     }
 
+    #[safety =
+       { requires = is_arr_init(commitment_hash,0,COMMITMENT_HASH_SIZE)
+                 && is_arr_init(signer_response,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+                 && is_arr_init(hint,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+       , ensures = is_arr_init(signature,0,SIGNATURE_SIZE)
+       }
+     ]
     inline
     fn __encode(
         reg ptr u8[SIGNATURE_SIZE] signature,
@@ -128,6 +145,11 @@ namespace signature {
         return signature;
     }
 
+    #[safety =
+       { requires = is_arr_init(hint_encoded,0,HINT_ENCODED_SIZE)
+       , ensures = (ill_formed_hint != 0 || is_arr_init(hints,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+       }
+     ]
     inline
     fn __decode_hint(
         reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] hints,
@@ -278,6 +300,12 @@ namespace signature {
         return hints, ill_formed_hint;
     }
 
+    #[safety =
+       { requires = is_arr_init(signature_encoded,0,SIGNATURE_SIZE)
+       , ensures = is_arr_init(signer_response,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+                && (result != 0 || is_arr_init(hints,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+       }
+     ]
     inline
     fn __decode(
         reg ptr u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] signer_response,

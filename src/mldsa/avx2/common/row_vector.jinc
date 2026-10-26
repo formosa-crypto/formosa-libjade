@@ -23,6 +23,12 @@ namespace row_vector {
     // addition pass per product. The sum of at most 7 products |a b| < q 2^31
     // stays below 2^63, and the reduction of a 64-bit T with |T| < 7 q 2^31
     // returns a value in (-4q, 4q), which the reduce32 that follows centres.
+    #[safety =
+       { requires = is_arr_init(lhs,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+                 && is_arr_init(rhs,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+       , ensures = is_arr_init(output,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn __dot_product(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] output,

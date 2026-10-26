@@ -5,6 +5,11 @@ namespace error_polynomial {
         14, 7, 6, 13, 12, 5, 4, 11, 10,
         3, 2, 9, 8, 1, 0
     ];
+    #[safety =
+       { requires = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(encoded,0,ENCODED_ERROR_POLYNOMIAL_SIZE)
+       }
+     ]
     fn encode_eta4(
         reg ptr u8[ENCODED_ERROR_POLYNOMIAL_SIZE] encoded,
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
@@ -96,6 +101,11 @@ namespace error_polynomial {
         -1, -1, -1, 0
     ];
     u256 SHIFTS = (8u32)[4, 0, 4, 0, 4, 0, 4, 0];
+    #[safety =
+       { requires = is_arr_init(encoded,0,ENCODED_ERROR_POLYNOMIAL_SIZE)
+       , ensures = is_arr_init(decoded,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     fn decode_eta4(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] decoded,
         reg ptr u8[ENCODED_ERROR_POLYNOMIAL_SIZE] encoded
@@ -180,6 +190,11 @@ namespace error_polynomial {
         ]
     };
 
+    #[safety =
+       { requires = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(encoded,0,ENCODED_ERROR_POLYNOMIAL_SIZE)
+       }
+     ]
     fn encode_eta2(
         reg ptr u8[ENCODED_ERROR_POLYNOMIAL_SIZE] encoded,
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial
@@ -330,14 +345,19 @@ namespace error_polynomial {
         input_offset = 0;
         while (input_offset < 12) {
             encoded.[output_offset] = final_encoded_bytes[input_offset];
-            input_offset += 1;
             output_offset += 1;
+            input_offset += 1;
         }
 
         return encoded;
     }
 
     // TODO: Is it worthwhile vectorizing this function?
+    #[safety =
+       { requires = is_arr_init(encoded,0,ENCODED_ERROR_POLYNOMIAL_SIZE)
+       , ensures = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     fn decode_eta2(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
         reg ptr u8[ENCODED_ERROR_POLYNOMIAL_SIZE] encoded
@@ -442,8 +462,8 @@ namespace error_polynomial {
 
             polynomial[out_offset + 7] = coefficient;
 
-            input_offset += 3;
             out_offset += 8;
+            input_offset += 3;
         }
 
         return polynomial;
@@ -451,6 +471,11 @@ namespace error_polynomial {
 
     // The encoding of an error polynomial: 3 bits per coefficient when
     // ETA = 2, 4 bits when ETA = 4.
+    #[safety =
+       { requires = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(encoded,0,ENCODED_ERROR_POLYNOMIAL_SIZE)
+       }
+     ]
     inline
     fn encode(
         reg ptr u8[ENCODED_ERROR_POLYNOMIAL_SIZE] encoded,
@@ -465,6 +490,11 @@ namespace error_polynomial {
         return encoded;
     }
 
+    #[safety =
+       { requires = is_arr_init(encoded,0,ENCODED_ERROR_POLYNOMIAL_SIZE)
+       , ensures = is_arr_init(decoded,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn decode(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] decoded,

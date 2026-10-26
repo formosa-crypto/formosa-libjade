@@ -35,6 +35,11 @@ fn __bytestream_to_potential_coefficients(reg u256 bytestream) -> reg u256 {
     return coefficients;
 }
 
+#[safety =
+   { requires = is_arr_init(randombytes,0,REJECTION_SAMPLE_INPUT_SIZE)
+   , ensures = is_arr_init(polynomial,0,4 * filled) && filled <= COEFFICIENTS_IN_POLYNOMIAL
+   }
+ ]
 fn rejection_sample_multiple_blocks(
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
     reg ptr u8[REJECTION_SAMPLE_INPUT_SIZE] randombytes
@@ -202,6 +207,13 @@ fn rejection_sample_multiple_blocks(
     return polynomial, filled;
 }
 
+#[safety =
+   { requires = is_arr_init(block,0,SHAKE128_RATE)
+             && is_arr_init(polynomial,0,4 * filled)
+             && filled <= COEFFICIENTS_IN_POLYNOMIAL
+   , ensures = is_arr_init(polynomial,0,4 * filled) && filled <= COEFFICIENTS_IN_POLYNOMIAL
+   }
+ ]
 fn rejection_sample_one_block(
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
     reg u64 filled,

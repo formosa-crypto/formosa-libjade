@@ -1,5 +1,10 @@
 type shakex4_state = u256[25];
 
+#[safety =
+   { requires = is_arr_init(rho,0,32) && is_arr_init(domain_separators,0,2 * 4)
+   , ensures = is_arr_init(state,0,32 * 25)
+   }
+ ]
 fn shake128_absorb_34_4x(
     reg mut ptr shakex4_state state,
     reg const ptr u8[32] rho,
@@ -21,6 +26,11 @@ fn shake128_absorb_34_4x(
     return state;
 }
 
+#[safety =
+   { requires = is_arr_init(rho_prime,0,64)
+   , ensures = is_arr_init(state,0,32 * 25)
+   }
+ ]
 fn shake256_absorb_66_4x(
     reg mut ptr shakex4_state state,
     reg const ptr u8[64] rho_prime,
@@ -44,6 +54,15 @@ fn shake256_absorb_66_4x(
     return state;
 }
 
+#[safety =
+   { requires = is_arr_init(state,0,32 * 25)
+   , ensures = is_arr_init(state,0,32 * 25)
+            && is_arr_init(h0,0,SHAKE128_RATE)
+            && is_arr_init(h1,0,SHAKE128_RATE)
+            && is_arr_init(h2,0,SHAKE128_RATE)
+            && is_arr_init(h3,0,SHAKE128_RATE)
+   }
+ ]
 fn shake128_squeezeblock4x(
     reg mut ptr shakex4_state state,
     reg mut ptr u8[SHAKE128_RATE] h0 h1 h2 h3
@@ -63,6 +82,15 @@ fn shake128_squeezeblock4x(
     return state, h0, h1, h2, h3;
 }
 
+#[safety =
+   { requires = is_arr_init(state,0,32 * 25)
+   , ensures = is_arr_init(state,0,32 * 25)
+            && is_arr_init(h0,0,SHAKE256_RATE)
+            && is_arr_init(h1,0,SHAKE256_RATE)
+            && is_arr_init(h2,0,SHAKE256_RATE)
+            && is_arr_init(h3,0,SHAKE256_RATE)
+   }
+ ]
 fn shake256_squeezeblock4x(
     reg mut ptr shakex4_state state,
     reg mut ptr u8[SHAKE256_RATE] h0 h1 h2 h3

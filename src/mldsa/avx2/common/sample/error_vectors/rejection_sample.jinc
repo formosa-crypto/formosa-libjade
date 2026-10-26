@@ -52,6 +52,15 @@ inline fn __reduce_coefficient(reg u32 coefficient) -> reg u32 {
     return coefficient;
 }
 
+#[safety =
+   { requires = is_arr_init(error,0,bytes_filled)
+             && bytes_filled <= 4 * COEFFICIENTS_IN_POLYNOMIAL - 32
+             && bytes_filled % 4 == 0
+   , ensures = is_arr_init(error,0,bytes_filled)
+            && bytes_filled <= 4 * COEFFICIENTS_IN_POLYNOMIAL
+            && bytes_filled % 4 == 0
+   }
+ ]
 inline fn
 __write_out_8_coefficients(
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] error,
@@ -95,6 +104,11 @@ __write_out_8_coefficients(
     return error, bytes_filled, good_overall;
 }
 
+#[safety =
+   { requires = is_arr_init(randombytes,0,REJECTION_SAMPLING_BYTES)
+   , ensures = is_arr_init(error,0,4 * filled) && filled <= COEFFICIENTS_IN_POLYNOMIAL
+   }
+ ]
 #[ct = "_ * secret -> _ * _"]
 fn rejection_sample_multiple_blocks(
     #[spill_to_mmx] reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] error,
@@ -294,6 +308,13 @@ fn rejection_sample_multiple_blocks(
     return error, filled;
 }
 
+#[safety =
+   { requires = is_arr_init(randombytes,0,SHAKE256_RATE)
+             && is_arr_init(error,0,4 * filled)
+             && filled < COEFFICIENTS_IN_POLYNOMIAL
+   , ensures = is_arr_init(error,0,4 * filled) && filled <= COEFFICIENTS_IN_POLYNOMIAL
+   }
+ ]
 fn rejection_sample_one_block(
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] error,
     reg u64 filled,

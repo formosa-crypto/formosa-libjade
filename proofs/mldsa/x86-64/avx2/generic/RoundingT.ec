@@ -276,10 +276,9 @@ qed.
 lemma polynomial__decompose_gamma2_88_ll : islossless M.polynomial__decompose_gamma2_88.
 proof.
 proc.
-wp; while (0 <= to_uint offset <= 1024 /\ to_uint offset %% 32 = 0) (1024 - to_uint offset).
-+ move=> z; auto => &hr [#] h0 h1 hm hlt hz; move: hlt; rewrite ultE /= => hlt.
-  by rewrite to_uintD_small /=; smt().
-by auto => /> o *; rewrite ultE /#.
+wp; while (true) (1024 - offset).
++ by move=> z; auto => /#.
+by auto => /#.
 qed.
 
 (* Decompose as rounding: with k = (r + gamma2 - 1) %/ (2 gamma2), the
@@ -496,10 +495,10 @@ module D88 = {
 lemma D88_decompose_eq :
   equiv [M.polynomial__decompose_gamma2_88 ~ D88.decompose : ={arg} ==> ={res}].
 proof.
-proc; while (={lows, highs, polynomial, modulus, modulus_halved, v, alpha, offs, shift, max, zeros}
-             /\ offset{2} = to_uint offset{1} /\ 0 <= offset{2} <= 1024 /\ offset{2} %% 32 = 0).
-+ auto => /> &1 h0 h1 hm _ hlt; rewrite !ultE to_uintD_small /= /#.
-by auto => /> o; rewrite ultE /=.
+proc; while (={lows, highs, polynomial, modulus, modulus_halved, v, alpha, offs, shift, max, zeros,
+                offset}).
++ by auto.
+by auto.
 qed.
 
 lemma D88_decompose_lanes (_a : W32.t Array256.t) :
@@ -870,19 +869,17 @@ qed.
 
 lemma polynomial__use_hints_gamma2_88_ll : islossless M.polynomial__use_hints_gamma2_88.
 proof.
-proc; while (0 <= to_uint offset <= 1024 /\ to_uint offset %% 32 = 0) (1024 - to_uint offset).
-+ move=> z; auto => &hr [#] h0 h1 hm hlt hz; move: hlt; rewrite ultE /= => hlt.
-  by rewrite to_uintD_small /=; smt().
+proc; while (true) (1024 - offset).
++ by move=> z; auto => /#.
 wp; call polynomial__decompose_gamma2_88_ll.
-by auto => /> o *; rewrite ultE /#.
+by auto => /#.
 qed.
 
 lemma D88_use_hints_eq :
   equiv [M.polynomial__use_hints_gamma2_88 ~ D88.use_hints : ={arg} ==> ={res}].
 proof.
-proc; while (={commitment, hint_polynomial, lows, highs, max, zeros}
-             /\ offset{2} = to_uint offset{1} /\ 0 <= offset{2} <= 1024 /\ offset{2} %% 32 = 0).
-+ auto => /> &1 h0 h1 hm _ hlt; rewrite !ultE to_uintD_small /= /#.
+proc; while (={commitment, hint_polynomial, lows, highs, max, zeros, offset}).
++ by auto.
 wp; call (: true); auto => />.
 by sim.
 qed.

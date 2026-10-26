@@ -111,6 +111,11 @@ namespace polynomial {
     }
 
     // Pass A: layers 0 to 4 on the block g (registers 8g .. 8g+7).
+    #[safety =
+       { requires = 0 <= g && g <= 3 && is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn __invert_ntt_layers_0_to_4(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,
@@ -196,6 +201,11 @@ namespace polynomial {
 
     // Pass B: layers 5, 6, 7 and the scaling on the column j
     // (registers j, j+4, ..., j+28).
+    #[safety =
+       { requires = 0 <= j && j <= 3 && is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn __invert_ntt_layers_5_6_7(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial,

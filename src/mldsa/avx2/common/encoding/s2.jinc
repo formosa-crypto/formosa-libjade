@@ -1,4 +1,9 @@
 namespace s2 {
+    #[safety =
+       { requires = is_arr_init(s2,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+       , ensures = is_arr_init(encoded,0,S2_ENCODED_SIZE)
+       }
+     ]
     inline
     fn __encode(
         reg ptr u8[S2_ENCODED_SIZE] encoded,
@@ -21,6 +26,11 @@ namespace s2 {
         return encoded;
     }
 
+    #[safety =
+       { requires = is_arr_init(encoded,0,S2_ENCODED_SIZE)
+       , ensures = is_arr_init(s2,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+       }
+     ]
     inline
     fn __decode(
         reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] s2,

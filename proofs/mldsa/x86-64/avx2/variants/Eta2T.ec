@@ -166,7 +166,7 @@ proc change ^while{2}.1 : {
 + by auto => /> &2; rewrite -set8_96E.
 (* the offsets are constants once the loops are unrolled *)
 unroll for ^while.
-swap ^while.2 1; unroll for ^while.
+unroll for ^while.
 cfold 5; cfold ^output_offset<-; wp -3; proc rewrite /=.
 proc rewrite get256_polyE; proc rewrite /=.
 conseq (: List.all (fun i => W32.of_int (-2) \sle _a.[i] /\ _a.[i] \sle W32.of_int 2)
@@ -237,7 +237,7 @@ lemma error_polynomial_decode_eta2_circuit _a :
    ].
 proof.
 proc.
-proc rewrite eta_encE; swap ^input_offset<- 1; swap ^while.^input_offset<- 1; unroll for ^while.
+proc rewrite eta_encE; swap ^input_offset<- 1; unroll for ^while.
 proc change 1 : { eTA_BITS_MASK <- 7; }; 1: by auto.
 cfold 1; cfold 1; wp -3; proc rewrite /=; proc rewrite zext8_32E.
 conseq (: encoded = _a /\
@@ -284,14 +284,14 @@ lemma error_polynomial_encode_ll : islossless M.error_polynomial__encode.
 proof.
 proc; rcondt 1; 1: by auto.
 inline *; wp.
-by unroll for ^while; swap ^while.2 1; unroll for ^while; auto.
+by unroll for ^while; unroll for ^while; auto.
 qed.
 
 lemma error_polynomial_decode_ll : islossless M.error_polynomial__decode.
 proof.
 proc; rcondt 1; 1: by auto.
 inline *; wp.
-by proc rewrite eta_encE; swap ^input_offset<- 1; swap ^while.^input_offset<- 1; unroll for ^while; auto.
+by proc rewrite eta_encE; swap ^input_offset<- 1; unroll for ^while; auto.
 qed.
 
 (* -------------------------------------------------------------------- *)

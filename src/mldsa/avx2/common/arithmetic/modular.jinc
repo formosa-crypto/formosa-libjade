@@ -53,6 +53,12 @@ inline fn montgomery_multiply_and_reduce(reg u256 lhs, reg u256 rhs) -> reg u256
 }
 
 namespace polynomial {
+    #[safety =
+       { requires = is_arr_init(lhs,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                 && is_arr_init(rhs,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(product,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     fn pointwise_montgomery_multiply_and_reduce(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] product lhs rhs
     ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]

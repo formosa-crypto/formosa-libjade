@@ -28,6 +28,13 @@
 //     the signature buffer is set to the fixed value 0^* and the failure
 //     code is returned (the model returns None).
 
+#[safety =
+   { requires = is_arr_init(k,0,32)
+             && is_arr_init(randomness,0,32)
+             && is_arr_init(message_representative,0,MESSAGE_REPRESENTATIVE_SIZE)
+   , ensures = is_arr_init(seed_for_mask,0,64)
+   }
+ ]
 fn derive_seed_for_mask(
     reg ptr u8[32] k,
     reg ptr u8[32] randomness,
@@ -56,6 +63,13 @@ fn derive_seed_for_mask(
     return seed_for_mask;
 }
 
+#[safety =
+   { requires = is_arr_init(s1_element,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+             && is_arr_init(verifier_challenge,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+             && is_arr_init(mask_element,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+   , ensures = is_arr_init(signer_response_element,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+   }
+ ]
 inline fn __compute_signer_response_element(
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] s1_element,
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] verifier_challenge,
@@ -80,6 +94,15 @@ inline fn __compute_signer_response_element(
 // Compute z = mask + c*s1 for each column element, check infinity norm.
 // Mirrors mld_compute_pack_z from mldsa-native.
 // Returns updated signer_response and norm check result (0 = pass, non-zero = fail).
+#[safety =
+   { args = { s1, verifier_challenge, mask, signer_response, norm_check_result_in }
+   , requires = is_arr_init(s1,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+             && is_arr_init(verifier_challenge,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+             && is_arr_init(mask,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+   , ensures = (infinity_norm_check_result != 0 || is_arr_init(signer_response,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+            && (norm_check_result_in == 0 || infinity_norm_check_result != 0)
+   }
+ ]
 inline fn __compute_z_and_check_norm(
     reg ptr u32[COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] s1,
     #[spill_to_mmx] reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] verifier_challenge,
@@ -112,6 +135,15 @@ inline fn __compute_z_and_check_norm(
 // For each row i: compute cs2_i = c * s2_i, write w0_minus_cs2[i] = w0[i] - cs2_i,
 // check infinity norm. Output and input are separate buffers (disjoint reg ptr args).
 // Passes through any prior norm failure unchanged.
+#[safety =
+   { args = { w0_minus_cs2, w0, s2, verifier_challenge, norm_check_result_in }
+   , requires = is_arr_init(w0,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+             && is_arr_init(s2,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+             && is_arr_init(verifier_challenge,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+   , ensures = (infinity_norm_check_result != 0 || is_arr_init(w0_minus_cs2,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+            && (norm_check_result_in == 0 || infinity_norm_check_result != 0)
+   }
+ ]
 inline fn __apply_cs2_and_check_norm(
     reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] w0_minus_cs2,
     reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] w0,
@@ -165,6 +197,13 @@ param int CT0_NORM_BOUND =
 // of the c*t0 test alone (0 when the function is skipped or not compiled).
 // c and t0 are public (declassified by __sign_internal), so this function
 // computes on public data only and declassifies nothing.
+#[safety =
+   { requires = is_arr_init(t0,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+             && is_arr_init(verifier_challenge,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+             && (infinity_norm_check_result != 0 || is_arr_init(w0_minus_cs2,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+   , ensures = (infinity_norm_check_result != 0 || is_arr_init(w0_minus_cs2_plus_ct0,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+   }
+ ]
 inline fn __apply_ct0_and_check_norm(
     reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] w0_minus_cs2_plus_ct0,
     reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] w0_minus_cs2,
@@ -216,6 +255,14 @@ inline fn __apply_ct0_and_check_norm(
 // accumulate total hint bits, and check the total against MAX_ONES_IN_HINT.
 // If the total exceeds MAX_ONES_IN_HINT, sets norm check result to failure.
 // Passes through any prior norm failure unchanged.
+#[safety =
+   { args = { w0_minus_cs2_plus_ct0, w1, hint, norm_check_result_in }
+   , requires = is_arr_init(w1,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
+             && (norm_check_result_in != 0 || is_arr_init(w0_minus_cs2_plus_ct0,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+   , ensures = (infinity_norm_check_result != 0 || is_arr_init(hint,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+            && (norm_check_result_in == 0 || infinity_norm_check_result != 0)
+   }
+ ]
 inline fn __make_hint_vector(
     reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] w0_minus_cs2_plus_ct0,
     reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] w1,
@@ -261,6 +308,11 @@ inline fn __make_hint_vector(
 param int MASK_DOMAIN_SEPARATOR_UB =
     (65535 - COLUMNS_IN_MATRIX_A) / COLUMNS_IN_MATRIX_A * COLUMNS_IN_MATRIX_A;
 
+#[safety =
+   { requires = is_arr_init(signing_key,0,SIGNING_KEY_SIZE) && is_arr_init(randomness,0,32)
+   , ensures = is_arr_init(signature,0,SIGNATURE_SIZE)
+   }
+ ]
 #[sct="{ptr: public, val: transient} *
        {ptr: public, val: secret} *
        public * public * public * public *

@@ -10,6 +10,15 @@ namespace matrix_A {
     param int REJECTION_SAMPLE_INPUT_SIZE = REJECTION_SAMPLING_BYTES + PADDING_BYTES;
     require "rejection_sample.jinc"
 
+    #[safety =
+       { requires = is_arr_init(state,0,32 * 25)
+       , ensures = is_arr_init(state,0,32 * 25)
+                && is_arr_init(b0,0,REJECTION_SAMPLE_INPUT_SIZE)
+                && is_arr_init(b1,0,REJECTION_SAMPLE_INPUT_SIZE)
+                && is_arr_init(b2,0,REJECTION_SAMPLE_INPUT_SIZE)
+                && is_arr_init(b3,0,REJECTION_SAMPLE_INPUT_SIZE)
+       }
+     ]
     inline
     fn __shake128_squeeze_multiple_blocks_4x(
       stack shakex4_state state,
@@ -22,6 +31,7 @@ namespace matrix_A {
       stack u8[REJECTION_SAMPLE_INPUT_SIZE]
     {
         inline int i;
+        reg u64 zero;
 
         for i = 0 to BLOCKS
         {
@@ -39,6 +49,15 @@ namespace matrix_A {
                 b3[i*SHAKE128_RATE:SHAKE128_RATE]
             );
         }
+
+        // The rejection sampler loads 32 bytes at a time and its last load
+        // reaches into the padding (one 64-bit word), which is never read as
+        // a coefficient.
+        zero = 0;
+        b0.[:u64 REJECTION_SAMPLING_BYTES] = zero;
+        b1.[:u64 REJECTION_SAMPLING_BYTES] = zero;
+        b2.[:u64 REJECTION_SAMPLING_BYTES] = zero;
+        b3.[:u64 REJECTION_SAMPLING_BYTES] = zero;
 
         return state, b0, b1, b2, b3;
     }

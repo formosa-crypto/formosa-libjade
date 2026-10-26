@@ -6,6 +6,15 @@ param int BLOCKS_TO_SQUEEZE =
 param int EXPAND_TO_BUFFER_SIZE =
     BLOCKS_TO_SQUEEZE * SHAKE256_RATE;
 
+#[safety =
+   { requires = is_arr_init(state,0,32 * 25)
+   , ensures = is_arr_init(state,0,32 * 25)
+            && is_arr_init(b0,0,EXPAND_TO_BUFFER_SIZE)
+            && is_arr_init(b1,0,EXPAND_TO_BUFFER_SIZE)
+            && is_arr_init(b2,0,EXPAND_TO_BUFFER_SIZE)
+            && is_arr_init(b3,0,EXPAND_TO_BUFFER_SIZE)
+   }
+ ]
 inline
 fn shake256_squeeze_multiple_blocks_4x(
     stack shakex4_state state,

@@ -22,6 +22,11 @@ fn __store_shake256_state(reg mut ptr shake256_state st, reg u256[7] state) -> r
 }
 
 // Absorbs 64 bytes of rho_prime followed by the 2-byte domain separator with SHAKE256 padding.
+#[safety =
+   { requires = is_arr_init(rho_prime,0,64)
+   , ensures = is_arr_init(st,0,8 * 28)
+   }
+ ]
 fn shake256_absorb_66(
     reg mut ptr shake256_state st,
     reg const ptr u8[64] rho_prime,
@@ -50,6 +55,11 @@ fn shake256_absorb_66(
     return st;
 }
 
+#[safety =
+   { requires = is_arr_init(commitment_hash,0,COMMITMENT_HASH_SIZE)
+   , ensures = is_arr_init(st,0,8 * 28)
+   }
+ ]
 fn shake256_absorb_commitment_hash(
     reg mut ptr shake256_state st,
     reg const ptr u8[COMMITMENT_HASH_SIZE] commitment_hash
@@ -74,6 +84,11 @@ fn shake256_absorb_commitment_hash(
 }
 
 // Permutes the state, then squeezes one SHAKE256 block.
+#[safety =
+   { requires = is_arr_init(st,0,8 * 28)
+   , ensures = is_arr_init(st,0,8 * 28) && is_arr_init(block,0,SHAKE256_RATE)
+   }
+ ]
 fn shake256_squeezeblock(
     #[spill_to_mmx] reg mut ptr shake256_state st,
     #[spill_to_mmx] reg mut ptr u8[SHAKE256_RATE] block
@@ -105,6 +120,11 @@ fn shake256_squeezeblock(
 
 // SHAKE256(seed || extra), 128 bytes.
 // Used by key generation to expand (randomness || rows || cols).
+#[safety =
+   { requires = is_arr_init(seed,0,32) && is_arr_init(extra,0,2)
+   , ensures = is_arr_init(out,0,128)
+   }
+ ]
 fn _shake256_A128__A32_A2(
     reg mut ptr u8[128] out,
     reg const ptr u8[32] seed,
@@ -134,6 +154,11 @@ fn _shake256_A128__A32_A2(
 }
 
 // SHAKE256(in), 64 bytes.
+#[safety =
+   { requires = is_arr_init(in,0,128)
+   , ensures = is_arr_init(out,0,64)
+   }
+ ]
 fn _shake256_A64__A128(
     reg mut ptr u8[64] out,
     reg const ptr u8[128] in
@@ -159,6 +184,11 @@ fn _shake256_A64__A128(
     return out;
 }
 
+#[safety =
+   { requires = is_arr_init(verification_key_hash,0,VERIFICATION_KEY_HASH_SIZE)
+   , ensures = is_arr_init(message_representative,0,MESSAGE_REPRESENTATIVE_SIZE)
+   }
+ ]
 fn __derive_message_representative(
     #[spill_to_mmx] reg mut ptr u8[MESSAGE_REPRESENTATIVE_SIZE] message_representative,
     reg const ptr u8[VERIFICATION_KEY_HASH_SIZE] verification_key_hash,
@@ -218,6 +248,11 @@ fn __derive_message_representative(
     return message_representative;
 }
 
+#[safety =
+   { requires = is_arr_init(verification_key,0,VERIFICATION_KEY_SIZE)
+   , ensures = is_arr_init(verification_key_hash,0,VERIFICATION_KEY_HASH_SIZE)
+   }
+ ]
 fn hash_verification_key(
     #[spill_to_mmx] reg mut ptr u8[VERIFICATION_KEY_HASH_SIZE] verification_key_hash,
     reg const ptr u8[VERIFICATION_KEY_SIZE] verification_key
@@ -245,6 +280,12 @@ fn hash_verification_key(
     return verification_key_hash;
 }
 
+#[safety =
+   { requires = is_arr_init(message_representative,0,64)
+             && is_arr_init(encoded_commitment,0,ENCODED_COMMITMENT_SIZE)
+   , ensures = is_arr_init(commitment_hash,0,COMMITMENT_HASH_SIZE)
+   }
+ ]
 fn __derive_commitment_hash(
     #[spill_to_mmx] reg mut ptr u8[COMMITMENT_HASH_SIZE] commitment_hash,
     reg const ptr u8[64] message_representative,

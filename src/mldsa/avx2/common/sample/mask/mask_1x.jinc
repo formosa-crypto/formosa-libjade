@@ -4,6 +4,11 @@
 param int MASK_1X_BLOCKS_TO_SQUEEZE =
     (ENCODED_GAMMA1_POLYNOMIAL_SIZE + SHAKE256_RATE - 1) / SHAKE256_RATE;
 
+#[safety =
+   { requires = is_arr_init(rho_prime,0,64)
+   , ensures = is_arr_init(mask,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+   }
+ ]
 inline
 fn __sample_mask_polynomial_1x(
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] mask,

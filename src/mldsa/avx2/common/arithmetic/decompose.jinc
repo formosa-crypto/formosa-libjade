@@ -12,6 +12,12 @@ namespace polynomial {
         (8u32)[127, 127, 127, 127, 127, 127, 127, 127],
         (8u32)[512, 512, 512, 512, 512, 512, 512, 512]
     };
+    #[safety =
+       { requires = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(lows,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                && is_arr_init(highs,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     fn decompose_gamma2_32 (
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] lows,
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] highs,
@@ -126,6 +132,12 @@ namespace polynomial {
         (8u32)[128, 128, 128, 128, 128, 128, 128, 128],
         (8u32)[43, 43, 43, 43, 43, 43, 43, 43]
     };
+    #[safety =
+       { requires = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(lows,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                && is_arr_init(highs,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     fn decompose_gamma2_88 (
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] lows,
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] highs,
@@ -140,7 +152,7 @@ namespace polynomial {
 
         reg u256 lower upper mask zeros;
 
-        reg u64 offset;
+        reg ui64 offset;
 
         modulus = MODULUS_VECTOR;
         modulus_halved = #VPSRL_8u32(modulus, 1);
@@ -205,7 +217,7 @@ namespace polynomial {
 
         stack u32[COEFFICIENTS_IN_POLYNOMIAL] highs lows;
 
-        reg u64 offset;
+        reg ui64 offset;
 
         max = CONSTANTS_TABLE_gamma2_88[4]; // 43
 
@@ -246,6 +258,12 @@ namespace polynomial {
 
     // Decompose a polynomial whose coefficients are representatives in
     // (-q, q): the pass first adds the modulus to the negative ones.
+    #[safety =
+       { requires = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       , ensures = is_arr_init(lows,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                && is_arr_init(highs,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn decompose(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] lows,

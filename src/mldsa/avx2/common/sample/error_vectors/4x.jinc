@@ -10,6 +10,15 @@ namespace error_4x {
     param int REJECTION_SAMPLE_INPUT_SIZE = REJECTION_SAMPLING_BYTES;
     require "rejection_sample.jinc"
 
+    #[safety =
+       { requires = is_arr_init(state,0,32 * 25)
+       , ensures = is_arr_init(state,0,32 * 25)
+                && is_arr_init(b0,0,REJECTION_SAMPLE_INPUT_SIZE)
+                && is_arr_init(b1,0,REJECTION_SAMPLE_INPUT_SIZE)
+                && is_arr_init(b2,0,REJECTION_SAMPLE_INPUT_SIZE)
+                && is_arr_init(b3,0,REJECTION_SAMPLE_INPUT_SIZE)
+       }
+     ]
     inline
     fn __shake256_squeeze_multiple_blocks_4x(
       stack shakex4_state state,

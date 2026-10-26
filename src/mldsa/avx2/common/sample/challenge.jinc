@@ -1,4 +1,9 @@
 namespace sample {
+    #[safety =
+       { requires = is_arr_init(seed,0,COMMITMENT_HASH_SIZE)
+       , ensures = is_arr_init(output_challenge,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+       }
+     ]
     inline
     fn __challenge(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] output_challenge,

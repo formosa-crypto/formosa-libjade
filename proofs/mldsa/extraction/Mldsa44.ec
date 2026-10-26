@@ -1373,8 +1373,8 @@ module M = {
       (WArray96.get8
       (WArray96.set8_direct (WArray96.init8 (fun i => encoded.[i]))
       output_offset final_encoded_bytes.[input_offset])));
-      input_offset <- (input_offset + 1);
       output_offset <- (output_offset + 1);
+      input_offset <- (input_offset + 1);
     }
     return encoded;
   }
@@ -1441,8 +1441,8 @@ module M = {
       coefficient <- (W32.of_int 2);
       coefficient <- (coefficient - temp);
       polynomial.[(out_offset + 7)] <- coefficient;
-      input_offset <- (input_offset + 3);
       out_offset <- (out_offset + 8);
+      input_offset <- (input_offset + 3);
     }
     return polynomial;
   }
@@ -1900,11 +1900,11 @@ module M = {
     var shift:W256.t;
     var max:W256.t;
     var zeros:W256.t;
-    var offset:W64.t;
     var coefficients:W256.t;
     var mask:W256.t;
     var upper:W256.t;
     var lower:W256.t;
+    var offset:int;
     modulus <- mODULUS_VECTOR;
     modulus_halved <- (VPSRL_8u32 modulus (W128.of_int 1));
     v <- polynomial__CONSTANTS_TABLE_gamma2_88.[0];
@@ -1913,11 +1913,10 @@ module M = {
     shift <- polynomial__CONSTANTS_TABLE_gamma2_88.[3];
     max <- polynomial__CONSTANTS_TABLE_gamma2_88.[4];
     zeros <- (set0_256);
-    offset <- (W64.of_int 0);
-    while ((offset \ult (W64.of_int ((256 * 32) %/ 8)))) {
+    offset <- 0;
+    while ((offset < ((256 * 32) %/ 8))) {
       coefficients <-
-      (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      (W64.to_uint offset));
+      (get256_direct (WArray1024.init32 (fun i => polynomial.[i])) offset);
       mask <- (VPCMPGT_8u32 zeros coefficients);
       mask <- (VPAND_256 mask modulus);
       coefficients <- (VPADD_8u32 coefficients mask);
@@ -1937,13 +1936,13 @@ module M = {
       (Array256.init
       (WArray1024.get32
       (WArray1024.set256_direct (WArray1024.init32 (fun i => lows.[i]))
-      (W64.to_uint offset) lower)));
+      offset lower)));
       highs <-
       (Array256.init
       (WArray1024.get32
       (WArray1024.set256_direct (WArray1024.init32 (fun i => highs.[i]))
-      (W64.to_uint offset) upper)));
-      offset <- (offset + (W64.of_int 32));
+      offset upper)));
+      offset <- (offset + 32);
     }
     return (lows, highs);
   }
@@ -1954,28 +1953,25 @@ module M = {
     var zeros:W256.t;
     var lows:W32.t Array256.t;
     var highs:W32.t Array256.t;
-    var offset:W64.t;
     var low:W256.t;
     var high:W256.t;
     var hints:W256.t;
     var t:W256.t;
+    var offset:int;
     highs <- witness;
     lows <- witness;
     max <- polynomial__CONSTANTS_TABLE_gamma2_88.[4];
     zeros <- (set0_256);
     (lows, highs) <@ polynomial__decompose_gamma2_88 (lows, highs,
     commitment);
-    offset <- (W64.of_int 0);
-    while ((offset \ult (W64.of_int ((256 * 32) %/ 8)))) {
-      low <-
-      (get256_direct (WArray1024.init32 (fun i => lows.[i]))
-      (W64.to_uint offset));
+    offset <- 0;
+    while ((offset < ((256 * 32) %/ 8))) {
+      low <- (get256_direct (WArray1024.init32 (fun i => lows.[i])) offset);
       high <-
-      (get256_direct (WArray1024.init32 (fun i => highs.[i]))
-      (W64.to_uint offset));
+      (get256_direct (WArray1024.init32 (fun i => highs.[i])) offset);
       hints <-
       (get256_direct (WArray1024.init32 (fun i => hint_polynomial.[i]))
-      (W64.to_uint offset));
+      offset);
       low <- (VPCMPGT_8u32 low zeros);
       t <- (BLENDV_8u32 hints zeros low);
       t <- (VPSLL_8u32 t (W128.of_int 1));
@@ -1988,8 +1984,8 @@ module M = {
       (Array256.init
       (WArray1024.get32
       (WArray1024.set256_direct (WArray1024.init32 (fun i => commitment.[i]))
-      (W64.to_uint offset) high)));
-      offset <- (offset + (W64.of_int 32));
+      offset high)));
+      offset <- (offset + 32);
     }
     return commitment;
   }
@@ -13918,6 +13914,7 @@ module M = {
     var aux_2:W8.t Array168.t;
     var aux_3:W8.t Array168.t;
     var i:int;
+    var zero:W64.t;
     i <- 0;
     while ((i < 5)) {
       (aux, aux_0, aux_1, aux_2, aux_3) <@ shake128_squeezeblock4x (state,
@@ -13956,6 +13953,27 @@ module M = {
       );
       i <- (i + 1);
     }
+    zero <- (W64.of_int 0);
+    b0 <-
+    (Array848.init
+    (WArray848.get8
+    (WArray848.set64_direct (WArray848.init8 (fun i_0 => b0.[i_0])) (5 * 168)
+    zero)));
+    b1 <-
+    (Array848.init
+    (WArray848.get8
+    (WArray848.set64_direct (WArray848.init8 (fun i_0 => b1.[i_0])) (5 * 168)
+    zero)));
+    b2 <-
+    (Array848.init
+    (WArray848.get8
+    (WArray848.set64_direct (WArray848.init8 (fun i_0 => b2.[i_0])) (5 * 168)
+    zero)));
+    b3 <-
+    (Array848.init
+    (WArray848.get8
+    (WArray848.set64_direct (WArray848.init8 (fun i_0 => b3.[i_0])) (5 * 168)
+    zero)));
     return (state, b0, b1, b2, b3);
   }
   proc matrix_A____sample_4_polynomials (rho:W8.t Array32.t,
