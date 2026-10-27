@@ -296,8 +296,8 @@ lemma ip1_load (h i : int) : 0 <= h < 2 => 0 <= i < 128 =>
   nth 0 pkidx (128 * h + nth 0 ip1 i) = 128 * h + i.
 proof.
 move=> rgh; have [] ->> : h = 0 \/ h = 1 by smt().
-- by move: i; apply/allP_range; rewrite /pkidx /ip1 -iotaredE.
-by move: i; apply/allP_range; rewrite /pkidx /ip1 -iotaredE.
+- by move: i; apply/allP_range; rewrite /pkidx /ip1 -iotaredE /=.
+by move: i; apply/allP_range; rewrite /pkidx /ip1 -iotaredE /=.
 qed.
 
 lemma ip3P : pshuf sh1 6 7 (pshuf sh1 4 5 (pshuf sh1 2 3 (pshuf sh1 0 1 ip1))) = ip3.

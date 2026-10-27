@@ -152,7 +152,8 @@ rewrite /nttpack; split;rewrite tP.
   move : (H (nttunpack_idx.[k]) _).  smt(nttunpack_bnd Array256.allP).
   pose a:= nttunpack_idx.[k].
   rewrite !initiE //=; 1,2: smt(nttunpack_bnd Array256.allP).
-  rewrite /a. move :nttpack_idxK. rewrite allP; smt( mem_iota).
+  have hidx := nttpack_idxK; rewrite -MLKEM_ntt_levels.allP_range in hidx.
+  by rewrite /a (hidx k kb).
 move => H. rewrite tP => k kb. 
   move : (H (nttunpack_idx.[k]) _).  smt(nttunpack_bnd Array256.allP).
   rewrite !initiE //=; 1: smt(nttpack_bnd Array256.allP).
@@ -165,7 +166,8 @@ rewrite /nttpack; split;rewrite tP.
   move : (H (nttpack_idx.[k]) _).  smt(nttpack_bnd Array256.allP).
   pose a:= nttpack_idx.[k].
   rewrite /nttunpack !initiE //=; 1,2: smt(nttpack_bnd Array256.allP).
-  rewrite /a. move :nttunpack_idxK. rewrite allP; smt( mem_iota).
+  have hidx := nttunpack_idxK; rewrite -MLKEM_ntt_levels.allP_range in hidx.
+  by rewrite /a (hidx k kb).
 move => H. rewrite tP => k kb. 
   move : (H (nttpack_idx.[k]) _).  smt(nttpack_bnd Array256.allP).
   rewrite /nttunpack !initiE //=; 1: smt(nttunpack_bnd Array256.allP).
@@ -221,8 +223,8 @@ proof.
       rewrite andabP => /(mem_iota 0 128 i).
       move : i.
       rewrite -(List.allP (fun i => l <= to_sint (nttpack p).[i] && to_sint (nttpack p).[i] < h)).
-      rewrite -iotaredE //=.
-      rewrite /nttpack initiE 1://= //=.
+      rewrite -iotaredE /=.
+      rewrite /nttpack initiE 1:// /=.
       by do (rewrite Hi 1://=).
     + apply pack_bounds.
 qed.
@@ -240,8 +242,8 @@ proof.
       rewrite andabP => /(mem_iota 0 128 i).
       move : i.
       rewrite -(List.allP (fun i => l <= to_sint (nttunpack p).[i] && to_sint (nttunpack p).[i] < h)).
-      rewrite -iotaredE //=.
-      rewrite /nttunpack initiE 1://= //=.
+      rewrite -iotaredE /=.
+      rewrite /nttunpack initiE 1:// /=.
       by do (rewrite Hi 1://=).
     + apply unpack_bounds.
 qed.
@@ -259,8 +261,8 @@ proof.
       rewrite andabP => /(mem_iota 0 128 i).
       move : i.
       rewrite -(List.allP (fun i => l <= (nttpack p).[i] && (nttpack p).[i] < h)).
-      rewrite -iotaredE //=.
-      rewrite /nttpack initiE 1://= //=.
+      rewrite -iotaredE /=.
+      rewrite /nttpack initiE 1:// /=.
       by do (rewrite Hi 1://=).
     + apply pack_boundsi.
 qed.
@@ -278,8 +280,8 @@ proof.
       rewrite andabP => /(mem_iota 0 128 i).
       move : i.
       rewrite -(List.allP (fun i => l <= (nttunpack p).[i] && (nttunpack p).[i] < h)).
-      rewrite -iotaredE //=.
-      rewrite /nttunpack initiE 1://= //=.
+      rewrite -iotaredE /=.
+      rewrite /nttunpack initiE 1:// /=.
       by do (rewrite Hi 1://=).
     + apply unpack_boundsi.
 qed.
@@ -349,7 +351,7 @@ proof. by proc; inline *; auto. qed.
 lemma bmiE (i : int) : 0 <= i < 256 =>
   nttunpack_idx.[i] = 2 * MLKEM_basemul_avx2.bmi (i %/ 32) (i %% 16) + i %% 32 %/ 16.
 proof.
-move=> rgi; rewrite Array256.get_of_list //; move: i rgi.
+move=> rgi; rewrite Array256.get_of_list 1://; move: i rgi.
 by apply/MLKEM_ntt_levels.allP_range; rewrite -iotaredE /MLKEM_basemul_avx2.bmi.
 qed.
 

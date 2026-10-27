@@ -1,7 +1,7 @@
 (* The generic theories of the AVX2 proof below the compression, at the
    ML-KEM-768 parameters and model. *)
 require import AllCore.
-require Base768.
+require Base768 Prelude768.
 require MLKEM_ntt_levelsT.
 require MLKEM_ntt_avx2T.
 require MLKEM_invntt_levelsT.
@@ -11,7 +11,6 @@ require NTT_avx2_polyT.
 require Fq_avx2T.
 require MLKEM_Poly_avx2T.
 require MLKEM_Poly_avx2_circuitT.
-require PreludeT.
 require NTT_avx2T.
 require MLKEM_PolyVec_avx2T.
 require MLKEM_PolyVec_avx2_circuitT.
@@ -75,8 +74,7 @@ clone export MLKEM_Poly_avx2_circuitT.MLKEM_Poly_avx2_circuitT as MLKEM_Poly_avx
   theory NTT_avx2_poly <- NTT_avx2_polyI,
   theory MLKEM_Poly_avx2 <- MLKEM_Poly_avx2I.
 
-clone export PreludeT.PreludeT as PreludeI with
-  theory B <- Base768.Base768.
+export Prelude768.
 
 clone export NTT_avx2T.NTT_avx2T as NTT_avx2I with
   theory B <- Base768.Base768,

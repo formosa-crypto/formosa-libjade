@@ -603,14 +603,16 @@ seq 1 0 : (#pre /\
     have hv : vecn = 512 by rewrite vecnE hk.
     do split.
     + move=> j j0 jk; have : j = 0 \/ j = 1 by smt().
-      case=> [->|->]; rewrite !subarray256_upd /=; try smt().
+      case=> [->|->]; rewrite !subarray256_upd ?hv ?hk //=;
+        rewrite ?(h11, h12, h13, h14) ?hk //.
     + move=> j j0 jk; have : j = 0 \/ j = 1 by smt().
-      case=> [->|->]; rewrite !subarray256_upd /=; try smt().
+      case=> [->|->]; rewrite !subarray256_upd ?hv ?hk //=;
+        rewrite ?(h11, h12, h13, h14) ?hk //.
     + apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 by smt().
-      case=> [->|->]; rewrite !subarray256_upd /=; try smt();
+      case=> [->|->]; rewrite !subarray256_upd ?hv ?hk //=;
         by move=> k kb; rewrite /b16 qE; smt().
     apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 by smt().
-    case=> [->|->]; rewrite !subarray256_upd /=; try smt();
+    case=> [->|->]; rewrite !subarray256_upd ?hv ?hk //=;
       by move=> k kb; rewrite /b16 qE; smt().
   if{1}.
   + wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 4)).
@@ -619,14 +621,16 @@ seq 1 0 : (#pre /\
     have hv : vecn = 768 by rewrite vecnE hk.
     do split.
     + move=> j j0 jk; have : j = 0 \/ j = 1 \/ j = 2 by smt().
-      case=> [->|[->|->]]; rewrite !subarray256_upd /=; try smt().
+      case=> [->|[->|->]]; rewrite !subarray256_upd ?hv ?hk //=;
+        rewrite ?(h11, h12, h13, h14, h21, h22, h23, h24) ?hk //.
     + move=> j j0 jk; have : j = 0 \/ j = 1 \/ j = 2 by smt().
-      case=> [->|[->|->]]; rewrite !subarray256_upd /=; try smt().
+      case=> [->|[->|->]]; rewrite !subarray256_upd ?hv ?hk //=;
+        rewrite ?(h11, h12, h13, h14, h21, h22, h23, h24) ?hk //.
     + apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 \/ j = 2 by smt().
-      case=> [->|[->|->]]; rewrite !subarray256_upd /=; try smt();
+      case=> [->|[->|->]]; rewrite !subarray256_upd ?hv ?hk //=;
         by move=> k kb; rewrite /b16 qE; smt().
     apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 \/ j = 2 by smt().
-    case=> [->|[->|->]]; rewrite !subarray256_upd /=; try smt();
+    case=> [->|[->|->]]; rewrite !subarray256_upd ?hv ?hk //=;
       by move=> k kb; rewrite /b16 qE; smt().
   wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 4)).
   wp; ecall {1} (jkem_getnoise_4x_ph noiseseed{1} (W8.of_int 0)).
@@ -636,14 +640,16 @@ seq 1 0 : (#pre /\
   have hv : vecn = 1024 by rewrite vecnE hk.
   do split.
   + move=> j j0 jk; have : j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt().
-    case=> [->|[->|[->|->]]]; rewrite !subarray256_upd /=; try smt().
+    case=> [->|[->|[->|->]]]; rewrite !subarray256_upd ?hv ?hk //=;
+      rewrite ?(h11, h12, h13, h14, h21, h22, h23, h24) ?hk //.
   + move=> j j0 jk; have : j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt().
-    case=> [->|[->|[->|->]]]; rewrite !subarray256_upd /=; try smt().
+    case=> [->|[->|[->|->]]]; rewrite !subarray256_upd ?hv ?hk //=;
+      rewrite ?(h11, h12, h13, h14, h21, h22, h23, h24) ?hk //.
   + apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt().
-    case=> [->|[->|[->|->]]]; rewrite !subarray256_upd /=; try smt();
+    case=> [->|[->|[->|->]]]; rewrite !subarray256_upd ?hv ?hk //=;
       by move=> k kb; rewrite /b16 qE; smt().
   apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt().
-  case=> [->|[->|[->|->]]]; rewrite !subarray256_upd /=; try smt();
+  case=> [->|[->|[->|->]]]; rewrite !subarray256_upd ?hv ?hk //=;
     by move=> k kb; rewrite /b16 qE; smt().
 seq 2 2 : (publicseed{1} = rho{2} /\ aa{1} = nttunpackm (unlift_matrix a{2}) /\
            a{2} = sampleA rho{2} /\ pos_boundmatn_cxq aa{1} 0 matn 2 /\
@@ -956,15 +962,17 @@ seq 1 0 : (#pre /\
     have hv : vecn = 512 by rewrite vecnE hk.
     do split.
     + move=> j j0 jk; have : j = 0 \/ j = 1 by smt().
-      case=> [->|->]; rewrite !subarray256_upd /=; try smt().
+      case=> [->|->]; rewrite !subarray256_upd ?hv ?hk //=;
+        rewrite ?(h11, h12, h13, h14, h3) ?hk //.
     + move=> j j0 jk; have : j = 0 \/ j = 1 by smt().
-      rewrite hk; case=> [->|->]; rewrite !subarray256_upd /=; try smt().
+      rewrite hk; case=> [->|->]; rewrite !subarray256_upd ?hv ?hk //=;
+        rewrite ?(h11, h12, h13, h14, h3) ?hk //.
     + by rewrite hk h3.
     + apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 by smt().
-      case=> [->|->]; rewrite !subarray256_upd /=; try smt();
+      case=> [->|->]; rewrite !subarray256_upd ?hv ?hk //=;
         by move=> k kb; rewrite /b16 qE; smt().
     + apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 by smt().
-      case=> [->|->]; rewrite !subarray256_upd /=; try smt();
+      case=> [->|->]; rewrite !subarray256_upd ?hv ?hk //=;
         by move=> k kb; rewrite /b16 qE; smt().
     by move=> k kb; rewrite /b16 qE; smt().
   if{1}.
@@ -975,15 +983,17 @@ seq 1 0 : (#pre /\
     have hv : vecn = 768 by rewrite vecnE hk.
     do split.
     + move=> j j0 jk; have : j = 0 \/ j = 1 \/ j = 2 by smt().
-      case=> [->|[->|->]]; rewrite !subarray256_upd /=; try smt().
+      case=> [->|[->|->]]; rewrite !subarray256_upd ?hv ?hk //=;
+        rewrite ?(h11, h12, h13, h14, h21, h22, h23, h24) ?hk //.
     + move=> j j0 jk; have : j = 0 \/ j = 1 \/ j = 2 by smt().
-      rewrite hk; case=> [->|[->|->]]; rewrite !subarray256_upd /=; try smt().
+      rewrite hk; case=> [->|[->|->]]; rewrite !subarray256_upd ?hv ?hk //=;
+        rewrite ?(h11, h12, h13, h14, h21, h22, h23, h24) ?hk //.
     + by rewrite hk h23.
     + apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 \/ j = 2 by smt().
-      case=> [->|[->|->]]; rewrite !subarray256_upd /=; try smt();
+      case=> [->|[->|->]]; rewrite !subarray256_upd ?hv ?hk //=;
         by move=> k kb; rewrite /b16 qE; smt().
     + apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 \/ j = 2 by smt().
-      case=> [->|[->|->]]; rewrite !subarray256_upd /=; try smt();
+      case=> [->|[->|->]]; rewrite !subarray256_upd ?hv ?hk //=;
         by move=> k kb; rewrite /b16 qE; smt().
     by move=> k kb; rewrite /b16 qE; smt().
   wp; ecall {1} (jkem_getnoise_eta2_ph noiseseed{1} (W8.of_int 8)).
@@ -996,15 +1006,17 @@ seq 1 0 : (#pre /\
   have hv : vecn = 1024 by rewrite vecnE hk.
   do split.
   + move=> j j0 jk; have : j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt().
-    case=> [->|[->|[->|->]]]; rewrite !subarray256_upd /=; try smt().
+    case=> [->|[->|[->|->]]]; rewrite !subarray256_upd ?hv ?hk //=;
+      rewrite ?(h11, h12, h13, h14, h21, h22, h23, h24, h3) ?hk //.
   + move=> j j0 jk; have : j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt().
-    rewrite hk; case=> [->|[->|[->|->]]]; rewrite !subarray256_upd /=; try smt().
+    rewrite hk; case=> [->|[->|[->|->]]]; rewrite !subarray256_upd ?hv ?hk //=;
+      rewrite ?(h11, h12, h13, h14, h21, h22, h23, h24, h3) ?hk //.
   + by rewrite hk h3 (: eta2 = eta1) 1:#smt:(param_sets).
   + apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt().
-    case=> [->|[->|[->|->]]]; rewrite !subarray256_upd /=; try smt();
+    case=> [->|[->|[->|->]]]; rewrite !subarray256_upd ?hv ?hk //=;
       by move=> k kb; rewrite /b16 qE; smt().
   + apply signed_boundvecnP => j jb; have : j = 0 \/ j = 1 \/ j = 2 \/ j = 3 by smt().
-    case=> [->|[->|[->|->]]]; rewrite !subarray256_upd /=; try smt();
+    case=> [->|[->|[->|->]]]; rewrite !subarray256_upd ?hv ?hk //=;
       by move=> k kb; rewrite /b16 qE; smt().
   by move=> k kb; rewrite /b16 qE; smt().
 

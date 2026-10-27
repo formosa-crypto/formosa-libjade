@@ -317,23 +317,10 @@ move => ???;split; 1: by  move : (H 13 _)  => //; rewrite mapiE //= => ->  /=.
 move => ???;split; 1: by  move : (H 14 _)  => //; rewrite mapiE //= => ->  /=. 
 move => ???;split; 1: by  move : (H 15 _)  => //; rewrite mapiE //= => ->  /=. 
 move => ???k??. 
-case (k = 0); 1: by move => *; do 15!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 1); 1: by move => *; do 14!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 2); 1: by move => *; do 13!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 3); 1: by move => *; do 12!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 4); 1: by move => *; do 11!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 5); 1: by move => *; do 10!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 6); 1: by move => *; do 9!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 7); 1: by move => *; do 8!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 8); 1: by move => *; do 7!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 9); 1: by move => *; do 6!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 10); 1: by move => *; do 5!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 11); 1: by move => *; do 4!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 12); 1: by move => *; do 3!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 13); 1: by move => *; do 2!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 14); 1: by move => *; do 1!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 15); 1: by move => *; rewrite Array16.set_eqiE /#.
-by smt().
+have : k = 0 \/ k = 1 \/ k = 2 \/ k = 3 \/ k = 4 \/ k = 5 \/ k = 6 \/ k = 7 \/ k = 8 \/ k = 9 \/
+       k = 10 \/ k = 11 \/ k = 12 \/ k = 13 \/ k = 14 \/ k = 15 by smt().
+by move=> [->|[->|[->|[->|[->|[->|[->|[->|[->|[->|[->|[->|[->|[->|[->|->]]]]]]]]]]]]]]];
+  rewrite !Array16.get_setE //=.
 qed.
 
 lemma barret_red16x_corr_hh _a:
@@ -684,23 +671,10 @@ move => ????;split; 1: by  move : (H 13 _) (H0 13 _) => //; rewrite mapiE //= =>
 move => ????;split; 1: by  move : (H 14 _) (H0 14 _) => //; rewrite mapiE //= => -> -> /=. 
 move => ????;split; 1: by  move : (H 15 _) (H0 15 _) => //; rewrite mapiE //= => -> -> /=. 
 move => ????k??. 
-case (k = 0); 1: by move => *; do 15!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 1); 1: by move => *; do 14!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 2); 1: by move => *; do 13!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 3); 1: by move => *; do 12!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 4); 1: by move => *; do 11!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 5); 1: by move => *; do 10!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 6); 1: by move => *; do 9!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 7); 1: by move => *; do 8!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 8); 1: by move => *; do 7!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 9); 1: by move => *; do 6!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 10); 1: by move => *; do 5!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 11); 1: by move => *; do 4!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 12); 1: by move => *; do 3!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 13); 1: by move => *; do 2!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 14); 1: by move => *; do 1!(rewrite Array16.set_neqiE 1,2:/#); rewrite Array16.set_eqiE /#.
-case (k = 15); 1: by move => *; rewrite Array16.set_eqiE /#.
-by smt().
+have : k = 0 \/ k = 1 \/ k = 2 \/ k = 3 \/ k = 4 \/ k = 5 \/ k = 6 \/ k = 7 \/ k = 8 \/ k = 9 \/
+       k = 10 \/ k = 11 \/ k = 12 \/ k = 13 \/ k = 14 \/ k = 15 by smt().
+by move=> [->|[->|[->|[->|[->|[->|[->|[->|[->|[->|[->|[->|[->|[->|[->|->]]]]]]]]]]]]]]];
+  rewrite !Array16.get_setE //=.
 qed.
 
 lemma fqmulx16_corr_hh _a _b:

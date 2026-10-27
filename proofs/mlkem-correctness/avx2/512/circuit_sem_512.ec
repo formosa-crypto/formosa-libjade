@@ -8,7 +8,7 @@ from JazzEC require import Array512 Array640 Array768 Array1024 Array1408 Array1
 from JazzEC require import Jkem_avx2.
 
 require import AVX2_Ops W16extra.
-require import Fq MLKEMFCLib Instances512.
+require import Fq MLKEMFCLib Prelude512.
 require import CircuitBindings XWord4 XWord5 XWord10 XWord11 XWord12.
 require import Circuit_semantics.
 from Spec require import Spec512 GFq Rq Serialization VecMat Sampling EncDecCorrectness Correctness.
