@@ -788,7 +788,19 @@ byequiv => //; proc; inline *.
 wp;call{1}(_: true ==> true); 1: by apply (A_ll ( (Sim(RO_H.LRO))));  apply (S_h_ll (RO_H.LRO)); apply RO_H.RO_get_ll; smt(duni_matrix_ll). 
 rcondt{1}6; 1: by move => *; auto => />;call(_: true);auto => />; smt(mem_empty).
 rnd{1};rnd;rnd{1}.
-auto => /> *; 1: by smt().
+auto => />.
+move=> &1 &2 [eq_cu _] m_L h sd sd_in.
+have dout_E : RO_H.dout sd = duni_matrix by done.
+have mu_E : forall (_AR : matrix),
+  _AR \in duni_matrix => mu1 duni_matrix _AR = mu1 (RO_H.dout sd) _AR.
++ by rewrite dout_E.
+rewrite !dout_E /= => rL rL_in; rewrite rL_in /= => rL0 rL0_in; rewrite rL0_in /= => sL sL_in.
+rewrite sL_in /= get_set_sameE /=.
+have rL_in' : rL \in RO_H.dout sd by rewrite dout_E.
+have [ll h2] := h sd sd_in mu_E rL rL_in' rL_in rL0 rL0_in sL sL_in.
+rewrite ll /= => e e_in e1L e1L_in; rewrite e1L_in /= => e2 e2_in.
+rewrite -eq_cu; have [hab hba] := h2 ll e e_in e1L e1L_in e2 e2_in.
+by split.
 call {1} (_: true ==> true); 1: by  apply (S_i_ll (RO_H.LRO)); apply RO_H.RO_get_ll; smt(duni_matrix_ll).  
 by auto => />;smt(dshort_R_ll dshort_ll get_set_sameE).
 qed.

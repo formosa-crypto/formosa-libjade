@@ -75,7 +75,10 @@ case(0<=k<i{hr}) => *.
                           then rr.[i_0 - i{hr} * gamma1_enc] else encoded{hr}.[i_0]))).[k] =
     ((z_unflatten encoded{hr})).[k]; last by smt().
   rewrite !initiE 1..2:/# /= /of_list /= tP => kk kkb.
-  have hg := gt0_gamma1_enc; rewrite !initiE 1,2:// !nth_sub 1,2:// initiE /=; 1: smt(mulzDl).
+  have hg := gt0_gamma1_enc; rewrite !initiE 1,2:// !nth_sub 1,2:// initiE /=.
+  + have : gamma1_enc * (k + 1) <= gamma1_enc * lvec.
+    + by apply StdOrder.IntOrder.ler_wpmul2l; smt().
+    rewrite /z_enc; smt().
   have : gamma1_enc * (k + 1) <= gamma1_enc * i{hr}.
   + by apply StdOrder.IntOrder.ler_wpmul2l; smt().
   by move=> h; rewrite ifF //; smt().
