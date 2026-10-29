@@ -41,7 +41,7 @@ lemma sign_correct _m :
     /\ valid_s2_bytes (Array768.init (fun i => signing_key{2}.[768 + i]))
     ==>
        Glob.mem{2} = _m
-    /\ (res{1}.`1 = None <=> res{2}.`2 = -W64.one)
+    /\ (res{1}.`1 = None <=> res{2}.`2 = -W64.one /\ res{2}.`1 = Array3309.create W8.zero)
     /\ (res{1}.`1 <> None =>
           BytesSig.to_list (oget res{1}.`1) = to_list res{2}.`1 /\
           res{2}.`2 = W64.zero) ].

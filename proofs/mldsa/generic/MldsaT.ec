@@ -14253,6 +14253,15 @@ module M = {
     }
     return signature;
   }
+  proc signature____zero (signature:W8.t Array_sig_enc.t) : W8.t Array_sig_enc.t = {
+    var i:int;
+    i <- 0;
+    while ((i < ((ctilde + (P.lvec * ((P.gamma1_bits * 256) %/ 8))) + (P.w_hint + P.kvec)))) {
+      signature.[i] <- (W8.of_int 0);
+      i <- (i + 1);
+    }
+    return signature;
+  }
   proc signature____encode (signature:W8.t Array_sig_enc.t,
                             commitment_hash:W8.t Array_ctilde.t,
                             signer_response:W32.t Array_lpolys.t,
@@ -16290,11 +16299,15 @@ module M = {
     (* Erased call to unspill *)
     ms <- (init_msf);
     signature <- (protect_ptr signature ms);
-    (* Erased call to declassify *)
-    (* Erased call to declassify *)
-    (* Erased call to declassify *)
-    signature <@ signature____encode (signature, commitment_hash,
-    signer_response, hint_0);
+    if ((last_norm_check_result = (W64.of_int 0))) {
+      (* Erased call to declassify *)
+      (* Erased call to declassify *)
+      (* Erased call to declassify *)
+      signature <@ signature____encode (signature, commitment_hash,
+      signer_response, hint_0);
+    } else {
+      signature <@ signature____zero (signature);
+    }
      _5 <- (init_msf);
     result <- last_norm_check_result;
     result <- (result `<<` (W8.of_int 63));

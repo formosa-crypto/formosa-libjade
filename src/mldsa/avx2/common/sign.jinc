@@ -24,10 +24,9 @@
 //     declassifies nothing: it is a function of c and t0 only. It is not
 //     even compiled when it cannot fail (ML-DSA-65 and ML-DSA-87, see
 //     CT0_NORM_BOUND).
-//   - the exiting iteration is encoded whether or not the budget is
-//     exhausted, as on main (the encoded bytes of a rejected iteration are
-//     then returned to the caller alongside the failure code; the model
-//     returns None, so this is more than it leaks).
+//   - on an exhausted budget the exiting (rejected) iteration is not encoded:
+//     the signature buffer is set to the fixed value 0^* and the failure
+//     code is returned (the model returns None).
 
 fn derive_seed_for_mask(
     reg ptr u8[32] k,
@@ -461,17 +460,21 @@ fn __sign_internal(
     () = #unspill(signature);
     ms = #init_msf();
     signature = #protect_ptr(signature, ms);
-    // The exiting iteration is encoded whether or not it passed the tests:
-    // the result code tells the caller. (The model returns None on an
-    // exhausted budget; see the header.)
-    () = #declassify(hint);
-    () = #declassify(commitment_hash);
-    () = #declassify(signer_response);
-    signature = signature::__encode(signature, commitment_hash, signer_response, hint);
-
     // last_norm_check_result is 0 iff the exiting iteration produced a valid
     // signature (reset to 0 each iteration); it is 1 only when the iteration
     // budget is exhausted. It is public (the outcome of every test is leaked).
+    // The exiting iteration is encoded only when it passed the tests; on an
+    // exhausted budget the signature buffer is set to the fixed value 0^*
+    // (the model returns None: the rejected iteration must not be output).
+    if (last_norm_check_result == 0) {
+        () = #declassify(hint);
+        () = #declassify(commitment_hash);
+        () = #declassify(signer_response);
+        signature = signature::__encode(signature, commitment_hash, signer_response, hint);
+    } else {
+        signature = signature::__zero(signature);
+    }
+
     _ = #init_msf();
     result = last_norm_check_result;
 

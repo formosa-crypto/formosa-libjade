@@ -223,7 +223,7 @@ lemma sign_internal_correct _m :
     /\ valid_s2_bytes (Array_s2_enc.init (fun i => signing_key{2}.[128 + lvec * eta_enc + i]))
        ==>
        Glob.mem{2} = _m
-    /\ (res{1}.`1 = None <=> res{2}.`2 = -W64.one)
+    /\ (res{1}.`1 = None <=> res{2}.`2 = -W64.one /\ res{2}.`1 = Array_sig_enc.create W8.zero)
     /\ (res{1}.`1 <> None =>
           BytesSig.to_list (oget res{1}.`1) = to_list res{2}.`1 /\
           res{2}.`2 = W64.zero)
@@ -255,7 +255,7 @@ transitivity {1} { r <@ MLDSA(MLDSA_XOFA, MLDSA_XOFS, MLDSA_XOF_SIB, SIB_RO).sig
     /\ valid_s2_bytes (Array_s2_enc.init (fun i => signing_key{2}.[128 + lvec * eta_enc + i]))
        ==>
        Glob.mem{2} = _m
-    /\ (r{1}.`1 = None <=> r{2}.`2 = -W64.one)
+    /\ (r{1}.`1 = None <=> r{2}.`2 = -W64.one /\ r{2}.`1 = Array_sig_enc.create W8.zero)
     /\ (r{1}.`1 <> None =>
           BytesSig.to_list (oget r{1}.`1) = to_list r{2}.`1 /\
           r{2}.`2 = W64.zero)
@@ -284,14 +284,14 @@ call(:  Glob.mem{2} = _m
     /\ valid_s2_bytes (Array_s2_enc.init (fun i => signing_key{2}.[128 + lvec * eta_enc + i]))
        ==>
        Glob.mem{2} = _m
-    /\ (res{1}.`1 = None <=> res{2}.`2 = -W64.one)
+    /\ (res{1}.`1 = None <=> res{2}.`2 = -W64.one /\ res{2}.`1 = Array_sig_enc.create W8.zero)
     /\ (res{1}.`1 <> None =>
           BytesSig.to_list (oget res{1}.`1) = to_list res{2}.`1 /\
           res{2}.`2 = W64.zero)
     ); last by auto.
 proc => /=.
 conseq (: _ ==>
-        (zh{1} = None <=> result{2} = - one) /\
+        (zh{1} = None <=> result{2} = - one /\ signature{2} = Array_sig_enc.create W8.zero) /\
   (zh{1} <> None =>
    BytesSig.to_list sigma{1} = to_list signature{2} /\ result{2} = zero)); 1: by smt().
    
@@ -503,18 +503,19 @@ liftu_wpolymat (mat_unflatten256 matrix_A{2}) = _A{1} /\
 (* ── Post-loop goal ─────────────────────────────────────────────────── *)
 + if {1}; last first.
   (* failure: zh = None /\ kappa_max <= kappa, so last_norm_check_result = W64.one *)
-  + wp; call {2} (: true ==> true).
-    + exact signature____encode_ll.
+  + rcondf {2} 3; 1: by move => &1; auto => />; smt(W64.to_uint1 W64.to_uint0).
+    wp; call {2} signature_zero_ph.
     auto => |> &1 &2 *.
     have -> : last_norm_check_result{2} = W64.one by smt().
     rewrite wordP => i ib.
     by rewrite minus_one /= /(`<<`) /(`|>>`) /= ib /= sarE initiE 1:/# /= nth_one /#.
   (* success: zh <> None, so last_norm_check_result = W64.zero *)
+  rcondt {2} 3; 1: by move => &1; auto => /> /#.
   wp; ecall (signature_encode commitment_hash{2} signer_response{2} hint_0{2}).
   auto => |> &1 &2 15?; do split; 1..6:smt().
   + move => 6? rr1 rr2 ?.
     have -> : last_norm_check_result{2} = W64.zero by smt().
-    split; 1: by rewrite wordP /= minus_one /= /(`<<`) /(`|>>`) /= sarE negb_forall; exists 0 => /=.
+    split; 1: by rewrite negb_and; left; rewrite wordP /= minus_one /= /(`<<`) /(`|>>`) /= sarE negb_forall; exists 0 => /=.
     rewrite wordP => i ib.
     by rewrite  /(`<<`) /(`|>>`) /= sarE initiE 1:/# /=. 
      

@@ -85,6 +85,23 @@ namespace signature {
         return signature;
     }
 
+    // The fixed signature of a failed signing: every byte is 0. A byte loop:
+    // this path is only taken when the iteration budget is exhausted.
+    inline
+    fn __zero(
+        reg ptr u8[SIGNATURE_SIZE] signature
+    ) -> reg ptr u8[SIGNATURE_SIZE]
+    {
+        reg ui64 i;
+
+        i = 0;
+        while (i < SIGNATURE_SIZE) {
+            signature[i] = 0;
+            i += 1;
+        }
+        return signature;
+    }
+
     inline
     fn __encode(
         reg ptr u8[SIGNATURE_SIZE] signature,

@@ -15274,6 +15274,15 @@ module M = {
     }
     return signature;
   }
+  proc signature____zero (signature:W8.t Array4627.t) : W8.t Array4627.t = {
+    var i:int;
+    i <- 0;
+    while ((i < ((64 + (7 * ((20 * 256) %/ 8))) + (75 + 8)))) {
+      signature.[i] <- (W8.of_int 0);
+      i <- (i + 1);
+    }
+    return signature;
+  }
   proc signature____encode (signature:W8.t Array4627.t,
                             commitment_hash:W8.t Array64.t,
                             signer_response:W32.t Array1792.t,
@@ -17311,11 +17320,15 @@ module M = {
     (* Erased call to unspill *)
     ms <- (init_msf);
     signature <- (protect_ptr signature ms);
-    (* Erased call to declassify *)
-    (* Erased call to declassify *)
-    (* Erased call to declassify *)
-    signature <@ signature____encode (signature, commitment_hash,
-    signer_response, hint_0);
+    if ((last_norm_check_result = (W64.of_int 0))) {
+      (* Erased call to declassify *)
+      (* Erased call to declassify *)
+      (* Erased call to declassify *)
+      signature <@ signature____encode (signature, commitment_hash,
+      signer_response, hint_0);
+    } else {
+      signature <@ signature____zero (signature);
+    }
      _5 <- (init_msf);
     result <- last_norm_check_result;
     result <- (result `<<` (W8.of_int 63));

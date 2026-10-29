@@ -705,6 +705,24 @@ call (: true ==> true); first by apply gamma1_encode_ll.
 by while true (ctilde - i); auto => /#.
 qed.
 
+lemma signature____zero_ll : islossless M.signature____zero.
+proof. by proc; while true (sig_enc - i); auto => /#. qed.
+
+lemma signature_zero :
+  hoare [ M.signature____zero : true ==> res = Array_sig_enc.create W8.zero ].
+proof.
+proc.
+while (0 <= i <= sig_enc /\ forall k, 0 <= k < i => signature.[k] = W8.zero).
++ by auto => /> &hr ?? Hk ?; split; 1: smt(); move => k ??; rewrite get_setE /#.
+auto => /> &hr; split; 1: smt(ge0_sig_enc).
+move => i sig; rewrite hint_offE -sig_encE => ??? Hk.
+by rewrite tP => k kb; rewrite createiE //= Hk /#.
+qed.
+
+lemma signature_zero_ph :
+  phoare [ M.signature____zero : true ==> res = Array_sig_enc.create W8.zero ] = 1%r.
+proof. by conseq signature____zero_ll signature_zero. qed.
+
 (* --------------------------------------------------------------- *)
 (*                  Full Signature Encode Lemma                      *)
 (* ---------------------------------------------------------------- *)
