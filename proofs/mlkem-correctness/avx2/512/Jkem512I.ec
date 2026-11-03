@@ -26,6 +26,7 @@ clone JkemT.JkemT as Jkem512I with
   theory Array_polyc_bytes <= Array128,
   theory WArray_polyc_bytes <= WArray128,
   theory Array_polyvec_bytes <= Array768,
+  theory WArray_polyvec_bytes <= WArray768,
   theory Array_polyvecc_pad <= Array640,
   theory WArray_polyvecc_pad <= WArray640,
   theory Array_sk_bytes <= Array1632,

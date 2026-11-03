@@ -29,4 +29,10 @@ int jade_kem_mlkem_mlkem512_amd64_avx2_dec(
     const uint8_t *ciphertext,
     const uint8_t *secret_key);
 
+int jade_kem_mlkem_mlkem512_amd64_avx2_check_pk(
+    const uint8_t *public_key);
+
+int jade_kem_mlkem_mlkem512_amd64_avx2_check_sk(
+    const uint8_t *secret_key);
+
 #endif /* MLKEM512_AVX2_H */

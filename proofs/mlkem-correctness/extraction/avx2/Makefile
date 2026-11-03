@@ -16,7 +16,11 @@ COMMON_DEPS := $(wildcard $(SRC)/common/*.jinc) \
 extract = env JASMINPATH="Keccak=$(KECCAK)" $(JASMIN2EC) $(1) --array-model=old \
             -f __crypto_kem_keypair_jazz \
             -f __crypto_kem_enc_jazz \
-            -f __crypto_kem_dec_jazz
+            -f __crypto_kem_dec_jazz \
+            -f __crypto_kem_check_pk_jazz \
+            -f __crypto_kem_check_sk_jazz \
+            -f __crypto_kem_encaps_derand_jazz \
+            -f __crypto_kem_decaps_jazz
 
 .PHONY: all generic clean
 all: 512/Jkem_avx2.ec 768/Jkem_avx2.ec 1024/Jkem_avx2.ec

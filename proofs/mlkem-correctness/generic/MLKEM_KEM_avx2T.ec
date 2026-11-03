@@ -133,18 +133,25 @@ split; last by case=> -> ->; rewrite or0w.
 by rewrite !wordP => h; split => i ib; have := h i ib; rewrite orwE zerowE /#.
 qed.
 
+(* two 256-bit words of bytes xor to zero iff their bytes agree *)
+lemma xor0_pack32 (f g : int -> W8.t) :
+  pack32_t (W32u8.Pack.init f) `^` pack32_t (W32u8.Pack.init g) = W256.zero <=>
+  forall j, 0 <= j < 32 => g j = f j.
+proof.
+rewrite W256.WRing.addr_eq0 /oppw /=; split => [h j jb | h].
++ have := congr1 W32u8.unpack8 _ _ h; rewrite !pack32K.
+  by move/(congr1 (fun (p : W32u8.Pack.pack_t) => p.[j])); rewrite /= !W32u8.Pack.initiE // => ->.
+by congr; apply W32u8.Pack.ext_eq => j jb; rewrite !W32u8.Pack.initiE // h.
+qed.
+
 lemma get256_ct_xor0 (a b : W8.t Array_ct_bytes.t) i : 0 <= 32 * i => 32 * i + 32 <= ct_bytes =>
   WArray_ct_bytes.get256 (WArray_ct_bytes.init8 ("_.[_]" a)) i `^`
   WArray_ct_bytes.get256 (WArray_ct_bytes.init8 ("_.[_]" b)) i = W256.zero <=>
   forall k, i * 32 <= k < i * 32 + 32 => b.[k] = a.[k].
 proof.
-move=> h0 h1; rewrite W256.WRing.addr_eq0 /oppw /=; split.
-+ rewrite /WArray_ct_bytes.get256_direct wordP => h k kb.
-  apply W8.wordP => j jb; have := h ((k - i * 32) * 8 + j) _; 1: smt().
-  rewrite !pack32wE 1,2:/# !initiE 1,2:/# /= !WArray_ct_bytes.initiE 1,2:/# /=; smt().
-move=> h; rewrite /WArray_ct_bytes.get256_direct; congr.
-apply W32u8.Pack.ext_eq => j jb; rewrite !initiE //= !WArray_ct_bytes.initiE 1,2:/# /=.
-by rewrite h /#.
+move=> h0 h1; rewrite /WArray_ct_bytes.get256_direct xor0_pack32; split => h k kb.
++ by have := h (k - 32 * i) _; rewrite /= ?WArray_ct_bytes.initiE /#.
+by rewrite /= !WArray_ct_bytes.initiE 1,2:/# /= h /#.
 qed.
 
 lemma verify_correct_h _ct _ct1 :
@@ -541,6 +548,215 @@ split => hneq r0 hr0 hr1.
     smt(ge0_polyvecc_bytes).
   by congr; ring.
 by rewrite (hr0 (hcq hneq)).
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* the modulus check of the public key: the re-encoding of its decoding *)
+lemma check_ek_reencode (_pk : W8.t Array_pk_bytes.t) :
+  check_ek (BytesPKVec.init (fun i => _pk.[i]),
+            Array32.init (fun i => _pk.[polyvec_bytes + i])) <=>
+  forall k, 0 <= k < polyvec_bytes =>
+    (Array_polyvec_bytes.of_list W8.zero (ByteEncode 12 (Array_vecn.to_list
+       (Array_vecn.map Zq.asint (Array_vecn.init (fun kk =>
+          Zq.incoeff (decode12_vec (BytesPKVec.init (fun i => _pk.[i]))).[kk])))))).[k] =
+    _pk.[k].
+proof.
+pose D := decode12_vec (BytesPKVec.init (fun i => _pk.[i])).
+rewrite /check_ek /=.
+have [hl _] := vector_unlift (ofipolyvec D).
+have hX := lift_arrayvecn_unlift_ofipolyvec D _.
++ rewrite IPVec.allP => k kb.
+  have := decode12_vec_bnd (BytesPKVec.init (fun i => _pk.[i])) k _; [by rewrite vecnE | smt()].
+have -> : decode12_vec (BytesPKVec.init ("_.[_]" _pk)) = D by done.
+rewrite -hl encode12_vec_tobytes_bridge hX.
+have hpb : polyvec_bytes = 384 * kvec by rewrite /polyvec_bytes.
+split => [heq k kb | h].
++ move/(congr1 (fun (x : W8.t BytesPKVec.t) => x.[k])): heq.
+  by rewrite /= !BytesPKVec.initiE 1,2:/#.
+by apply BytesPKVec.tP => k kb; rewrite !BytesPKVec.initiE //= h /#.
+qed.
+
+lemma get256_pk_xor0 (a : W8.t Array_polyvec_bytes.t) (b : W8.t Array_pk_bytes.t) i :
+  0 <= 32 * i => 32 * i + 32 <= polyvec_bytes =>
+  WArray_polyvec_bytes.get256_direct (WArray_polyvec_bytes.init8 ("_.[_]" a)) (32 * i) `^`
+  WArray_pk_bytes.get256_direct (WArray_pk_bytes.init8 ("_.[_]" b)) (32 * i) = W256.zero <=>
+  forall k, i * 32 <= k < i * 32 + 32 => b.[k] = a.[k].
+proof.
+move=> h0 h1; have hpk : pk_bytes = polyvec_bytes + 32 by done.
+rewrite /WArray_polyvec_bytes.get256_direct /WArray_pk_bytes.get256_direct xor0_pack32.
+split => h k kb.
++ have := h (k - 32 * i) _; 1: smt().
+  by rewrite /= WArray_polyvec_bytes.initiE 1:/# WArray_pk_bytes.initiE /#.
+by rewrite /= WArray_polyvec_bytes.initiE 1:/# WArray_pk_bytes.initiE 1:/# /= h /#.
+qed.
+
+lemma mlkem_kem_check_pk (_pk : W8.t Array_pk_bytes.t) :
+  phoare [M.__crypto_kem_check_pk_jazz : pk = _pk ==>
+    res = if check_ek (BytesPKVec.init (fun i => _pk.[i]),
+                       Array32.init (fun i => _pk.[polyvec_bytes + i]))
+          then W64.zero else -W64.one] = 1%r.
+proof.
+have hpb : kvec * 384 = polyvec_bytes by rewrite /polyvec_bytes mulzC.
+have hpb32 : polyvec_bytes %/ 32 = 12 * kvec.
++ by rewrite /polyvec_bytes (: 384 * kvec = 12 * kvec * 32) 1:#ring mulzK.
+have hz : forall (w : W256.t), to_uint w = 0 <=> w = W256.zero.
++ by move=> w; rewrite W256.to_uint_eq.
+pose E := Array_polyvec_bytes.of_list W8.zero (ByteEncode 12 (Array_vecn.to_list
+  (Array_vecn.map Zq.asint (Array_vecn.init (fun kk =>
+     Zq.incoeff (decode12_vec (BytesPKVec.init (fun i => _pk.[i]))).[kk]))))).
+proc => /=.
+wp; while (0 <= i <= inc /\ inc = polyvec_bytes %/ 32 /\ pk = _pk /\ pkb = E /\
+  (to_uint h = 0 <=> forall k, 0 <= k < i * 32 => pkb.[k] = pk.[k])) (inc - i).
++ move=> z; auto => /> &hr i0 _ hh ilt.
+  have [hb0 hb1] : 0 <= 32 * i{hr} /\ 32 * i{hr} + 32 <= polyvec_bytes by smt().
+  rewrite !hz !orw_eq0 !get256_pk_xor0 // -!hz !hh; smt().
+wp; ecall (polyvec_tobytes_corr pkpv);
+  ecall (polyvec_frombytes_corr (Array_polyvec_bytes.init (fun i_0 => pk.[0 + i_0])));
+  auto => /> rr hrr hrb.
+have hE : lift_arrayvecn (nttpackv rr) = Array_vecn.init (fun kk =>
+  Zq.incoeff (decode12_vec (BytesPKVec.init (fun i => _pk.[i]))).[kk]).
++ by rewrite -nttpackv_lift hrr unpackvK (frombytes12_decode_bridge ("_.[_]" _pk)).
+rewrite hE /= -/E.
+split; 1: by do split; [smt(gt0_k) | rewrite hpb | smt()].
+move=> h0 i0; split; 1: smt().
+move=> hni i0p i0le hinc _ hh.
+have hi : i0 * 32 = polyvec_bytes by smt().
+move: hh; rewrite hi => hh.
+have /= -> := check_ek_reencode _pk.
+rewrite -/E -hh /VPTEST_256 /ZF_of /= hz.
+by case: (h0 = W256.zero) => //= _; ring.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* the hash check of the secret key                                     *)
+lemma get256_sk_xor0 (a : W8.t Array32.t) (b : W8.t Array_sk_bytes.t) o :
+  0 <= o => o + 32 <= sk_bytes =>
+  WArray32.get256 (WArray32.init8 ("_.[_]" a)) 0 `^`
+  WArray_sk_bytes.get256_direct (WArray_sk_bytes.init8 ("_.[_]" b)) o = W256.zero <=>
+  forall k, 0 <= k < 32 => b.[o + k] = a.[k].
+proof.
+move=> h0 h1; rewrite /WArray32.get256_direct /WArray_sk_bytes.get256_direct xor0_pack32.
+by split => h k kb; have := h k kb; rewrite /= WArray32.initiE 1:/# WArray_sk_bytes.initiE 1:/#.
+qed.
+
+lemma mlkem_kem_check_sk (_sk : W8.t Array_sk_bytes.t) :
+  phoare [M.__crypto_kem_check_sk_jazz : sk = _sk ==>
+    res = if H_pk (BytesPKVec.init (fun i => _sk.[i + polyvec_bytes]),
+                   Array32.init (fun i => _sk.[i + 2 * polyvec_bytes]))
+             = Array32.init (fun i => _sk.[i + 2 * polyvec_bytes + 32])
+          then W64.zero else -W64.one] = 1%r.
+proof.
+have hpb : kvec * 384 = polyvec_bytes by rewrite /polyvec_bytes mulzC.
+have hpkb : pk_bytes = polyvec_bytes + 32 by done.
+proc => /=.
+wp; ecall (sha3_256A_MPK_ph (Array_pk_bytes.init (fun i => sk.[kvec * 384 + i]))).
+auto => />.
+have -> : BytesPKVec.init ("_.[_]" (Array_pk_bytes.init (fun i => _sk.[kvec * 384 + i]))) =
+          BytesPKVec.init (fun i => _sk.[i + polyvec_bytes]).
++ apply BytesPKVec.tP => k kb; rewrite !BytesPKVec.initiE //=.
+  by rewrite Array_pk_bytes.initiE 1:/# /= hpb addzC.
+have -> : Array32.init (fun i => (Array_pk_bytes.init (fun i0 => _sk.[kvec * 384 + i0])).[
+            polyvec_bytes + i]) =
+          Array32.init (fun i => _sk.[i + 2 * polyvec_bytes]).
++ apply Array32.tP => k kb; rewrite !Array32.initiE //=.
+  by rewrite Array_pk_bytes.initiE 1:#smt:(ge0_polyvec_bytes) /= hpb; congr; ring.
+pose hk := H_pk _.
+have := get256_sk_xor0 hk _sk (kvec * 384 + (kvec * 384 + 32)) _ _;
+  1,2: smt(ge0_polyvec_bytes).
+rewrite /= => heq; rewrite /VPTEST_256 /ZF_of /= heq hpb.
+case: (hk = Array32.init (fun i => _sk.[i + 2 * polyvec_bytes + 32])) => hc.
++ by rewrite ifF //= => k kb; rewrite hc Array32.initiE //=; congr; ring.
+rewrite ifT; 2: ring.
+move: hc; apply contra => h; apply Array32.tP => k kb.
+by rewrite -h 1:/# Array32.initiE 1:/# /=; congr; ring.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* encapsulation after the modulus check: the return code is the check  *)
+(* bit; the outputs are the all-zero ones when the check fails          *)
+lemma mlkem_kem_correct_encaps :
+  equiv [M.__crypto_kem_encaps_derand_jazz ~ MLKEM.encaps_derand :
+    randomnessp{1} = coins{2} /\
+    pk{2}.`1 = BytesPKVec.init (fun i => pk{1}.[i]) /\
+    pk{2}.`2 = Array32.init (fun i => pk{1}.[polyvec_bytes + i])
+    ==>
+    res{1}.`3 = (if res{2}.`1 then W64.zero else -W64.one) /\
+    res{2}.`2.`1 = BytesCtVec.init (fun i => res{1}.`1.[i]) /\
+    res{2}.`2.`2 = BytesPoly.init (fun i => res{1}.`1.[i + polyvecc_bytes]) /\
+    res{2}.`3 = res{1}.`2].
+proof.
+have hne : W64.zero <> -W64.one.
++ by rewrite W64.minus_one W64.to_uint_eq W64.to_uint0 W64.to_uint_onew.
+proc => /=.
+seq 1 1 : (#pre /\ r{1} = (if check_ek pk{2} then W64.zero else -W64.one) /\ b{2} = check_ek pk{2}).
++ ecall {1} (mlkem_kem_check_pk pk{1}); auto => /> &1 &2 hp1 hp2.
+  have -> : pk{2} = (pk{2}.`1, pk{2}.`2) by case: (pk{2}).
+  by rewrite hp1 hp2.
+sp 1 1; if {2}.
++ rcondt {1} 1; 1: by move=> &2; auto => />; smt().
+  by wp; call mlkem_kem_correct_enc; auto => /> &1 &2 hp1 hp2 hc [cl kl] [c k] /=; smt().
+rcondf {1} 1; 1: by move=> &2; auto => />; smt().
+wp; while {1} (inc{1} = ct_bytes %/ 32 /\ 0 <= i{1} <= inc{1} /\ z{1} = W256.zero /\
+  forall k, 0 <= k < 32 * i{1} => ct{1}.[k] = W8.zero) (inc{1} - i{1}).
++ move=> &m z0; auto => /> &hr i0 ilt hz ii.
+  split; 2: smt().
+  split; 1: smt().
+  move=> k k0 kn; rewrite Array_ct_bytes.initiE 1:#smt:(ct_bytes32 ge0_ct_bytes) /=.
+  rewrite WArray_ct_bytes.get8_set256_directE 1,2:#smt:(ct_bytes32 ge0_ct_bytes).
+  case: (32 * i{hr} <= k < 32 * i{hr} + 32) => hk.
+  + by apply W8.wordP => j jb; rewrite bits8iE //= zerowE.
+  rewrite /WArray_ct_bytes.get8 /WArray_ct_bytes.init8.
+  by rewrite WArray_ct_bytes.initiE 1:#smt:(ct_bytes32 ge0_ct_bytes) /= hz /#.
+auto => /> &1 &2 hp1 hp2 hc; rewrite ct_bytesE.
+split; 1: smt(ct_bytes32 ge0_ct_bytes).
+move=> ct0 i0; split; 1: smt().
+move=> hi _ i00 ile hz.
+have hpv : polyvecc_bytes = kvec * (32 * du) by done.
+have hct : ct_bytes = polyvecc_bytes + 32 * dv by rewrite -ct_bytesE hpv; smt().
+have hz' : forall k, 0 <= k < ct_bytes => ct0.[k] = W8.zero by smt(ct_bytes32).
+rewrite /ct_zero /ss_zero /=; do! split.
++ apply BytesCtVec.tP => k kb; rewrite BytesCtVec.createiE // BytesCtVec.initiE //= hz' //.
+  smt(gt0_k gt0_du gt0_dv).
++ apply BytesPoly.tP => k kb; rewrite BytesPoly.createiE // BytesPoly.initiE //= hz' //.
+  smt(gt0_k gt0_du gt0_dv).
+apply Array32.tP => k kb; rewrite Array32.initiE // Array32.createiE //.
+rewrite (WArray32.get8_set256_directE _ 0 k) // ifT 1:/#.
+by apply W8.wordP => j jb; rewrite bits8iE //= zerowE.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* decapsulation after the hash check: the return code is the check     *)
+(* bit; the shared secret is the all-zero one when the check fails      *)
+lemma mlkem_kem_correct_decaps :
+  equiv [M.__crypto_kem_decaps_jazz ~ MLKEM.decaps :
+    sk{2}.`1 = BytesPKVec.init (fun i => sk{1}.[i]) /\
+    sk{2}.`2.`1 = BytesPKVec.init (fun i => sk{1}.[i + polyvec_bytes]) /\
+    sk{2}.`2.`2 = Array32.init (fun i => sk{1}.[i + 2 * polyvec_bytes]) /\
+    sk{2}.`3 = Array32.init (fun i => sk{1}.[i + 2 * polyvec_bytes + 32]) /\
+    sk{2}.`4 = Array32.init (fun i => sk{1}.[i + 2 * polyvec_bytes + 64]) /\
+    let (c1,c2) = cph{2} in
+      c1 = BytesCtVec.init (fun i => ct{1}.[i]) /\
+      c2 = BytesPoly.init (fun i => ct{1}.[i + polyvecc_bytes])
+    ==>
+    res{1}.`2 = (if res{2}.`1 then W64.zero else -W64.one) /\
+    res{2}.`2 = res{1}.`1].
+proof.
+have hne : W64.zero <> -W64.one.
++ by rewrite W64.minus_one W64.to_uint_eq W64.to_uint0 W64.to_uint_onew.
+proc => /=.
+seq 1 1 : (#pre /\ r{1} = (if check_dk sk{2} then W64.zero else -W64.one) /\ b{2} = check_dk sk{2}).
++ ecall {1} (mlkem_kem_check_sk sk{1}); auto => /> &1 &2 h1 h2 h3 h4 h5 hc.
+  rewrite /check_dk.
+  have -> : sk{2}.`2 = (sk{2}.`2.`1, sk{2}.`2.`2) by case: (sk{2}.`2).
+  by rewrite h2 h3 h4.
+sp 1 1; if {2}.
++ rcondt {1} 1; 1: by move=> &2; auto => />; smt().
+  wp; call mlkem_kem_correct_dec; auto => /> &1 &2 h1 h2 h3 h4 h5 hc hck r; smt().
+rcondf {1} 1; 1: by move=> &2; auto => />; smt().
+auto => /> &1 &2 h1 h2 h3 h4 h5 hc hck; rewrite /ss_zero.
+apply Array32.tP => k kb; rewrite Array32.initiE // Array32.createiE //.
+rewrite (WArray32.get8_set256_directE _ 0 k) // ifT 1:/#.
+by apply W8.wordP => j jb; rewrite bits8iE //= zerowE.
 qed.
 
 end MLKEM_KEM_avx2T.

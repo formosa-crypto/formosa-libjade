@@ -155,3 +155,162 @@ fn __crypto_kem_dec_jazz(
   shk = __cmov(shk, kr[0:MLKEM_SYMBYTES], cnd);
   return shk;
 }
+
+/*
+__crypto_kem_check_pk_jazz: modulus check (FIPS-203 7.2)
+
+ensures:
+  - res = if ByteEncode12(ByteDecode12(pk[0:MLKEM_POLYVECBYTES])) = pk[0:MLKEM_POLYVECBYTES] then 0 else -1
+*/
+
+#[safety =
+   { requires = is_arr_init(pk,0,MLKEM_PUBLICKEYBYTES)
+   }
+ ]
+inline
+fn __crypto_kem_check_pk_jazz(reg ptr u8[MLKEM_PUBLICKEYBYTES] pk) -> reg u64
+{
+  stack u16[MLKEM_VECN] pkpv;
+  stack u8[MLKEM_POLYVECBYTES] pkb;
+  reg u256 f g h;
+  reg u64 r t64;
+  reg bool zf;
+  inline int i;
+  #[msf] reg u64 ms;
+
+  () = #spill(pk);
+  pkpv = __i_polyvec_frombytes(pk[0:MLKEM_POLYVECBYTES]);
+  pkb = __i_polyvec_tobytes(pkb, pkpv);
+  () = #unspill(pk);
+  ms = #init_msf();
+
+  h = #set0_256();
+  for i = 0 to MLKEM_POLYVECBYTES/32
+  {
+    f = pkb.[:u256 32*i];
+    g = pk.[:u256 32*i];
+    f = #VPXOR_256(f, g);
+    h = #VPOR_256(h, f);
+  }
+
+  _, _, _, _, zf = #VPTEST_256(h, h);
+
+  r = 0;
+  t64 = -1;
+  r = t64 if !zf;
+  // the outcome of a check on the public key
+  () = #declassify(r);
+  ms = #init_msf();
+  return r;
+}
+
+/*
+__crypto_kem_check_sk_jazz: hash check (FIPS-203 7.3)
+
+ensures:
+  - res = if H(sk[384k:768k+32]) = sk[768k+32:768k+64] then 0 else -1
+*/
+
+#[safety =
+   { requires = is_arr_init(sk,0,MLKEM_SECRETKEYBYTES)
+   }
+ ]
+inline
+fn __crypto_kem_check_sk_jazz(reg ptr u8[MLKEM_SECRETKEYBYTES] sk) -> reg u64
+{
+  stack u8[32] hpk;
+  reg u256 f g;
+  reg u64 r t64;
+  reg bool zf;
+  #[msf] reg u64 ms;
+
+  () = #spill(sk);
+  hpk = _sha3_256A_APK(hpk, sk[MLKEM_POLYVECBYTES:MLKEM_PUBLICKEYBYTES]);
+  () = #unspill(sk);
+  ms = #init_msf();
+
+  f = hpk[:u256 0];
+  g = sk.[:u256 MLKEM_POLYVECBYTES + MLKEM_PUBLICKEYBYTES];
+  f = #VPXOR_256(f, g);
+  _, _, _, _, zf = #VPTEST_256(f, f);
+
+  r = 0;
+  t64 = -1;
+  r = t64 if !zf;
+  // the hashed bytes and the stored hash are the public key and its hash
+  () = #declassify(r);
+  ms = #init_msf();
+  return r;
+}
+
+#[safety =
+   { requires = is_arr_init(randomnessp,0,MLKEM_SYMBYTES) && is_arr_init(pk,0,MLKEM_PUBLICKEYBYTES)
+   , ensures = is_arr_init(ct,0,MLKEM_CIPHERTEXTBYTES) && is_arr_init(shk,0,MLKEM_SYMBYTES)
+   }
+ ]
+inline
+fn __crypto_kem_encaps_derand_jazz(
+  reg ptr u8[MLKEM_CIPHERTEXTBYTES] ct,
+  reg ptr u8[MLKEM_SYMBYTES] shk,
+  reg ptr u8[MLKEM_PUBLICKEYBYTES] pk,
+  reg ptr u8[MLKEM_SYMBYTES] randomnessp)
+  -> reg ptr u8[MLKEM_CIPHERTEXTBYTES], reg ptr u8[MLKEM_SYMBYTES], reg u64
+{
+  reg u256 z;
+  reg u64 r;
+  inline int i;
+  #[msf] reg u64 ms;
+
+  () = #spill(ct, shk, pk, randomnessp);
+  r = __crypto_kem_check_pk_jazz(pk);
+  () = #unspill(ct, shk, pk, randomnessp);
+  ms = #init_msf();
+
+  #spill(r);
+  if (r == 0) {
+    ct, shk = __crypto_kem_enc_jazz(ct, shk, pk, randomnessp);
+  } else {
+    z = #set0_256();
+    for i = 0 to MLKEM_CIPHERTEXTBYTES/32
+    {
+      ct[#unaligned:u256 i] = z;
+    }
+    shk[#unaligned:u256 0] = z;
+  }
+  #unspill(r);
+  ms = #init_msf();
+  return ct, shk, r;
+}
+
+#[safety =
+   { requires = is_arr_init(ct,0,MLKEM_CIPHERTEXTBYTES) && is_arr_init(sk,0,MLKEM_SECRETKEYBYTES)
+   , ensures = is_arr_init(shk,0,MLKEM_SYMBYTES)
+   }
+ ]
+inline
+fn __crypto_kem_decaps_jazz(
+  reg ptr u8[MLKEM_SYMBYTES] shk,
+  reg ptr u8[MLKEM_CIPHERTEXTBYTES] ct,
+  reg ptr u8[MLKEM_SECRETKEYBYTES] sk)
+  -> reg ptr u8[MLKEM_SYMBYTES], reg u64
+{
+  reg u256 z;
+  reg u64 r;
+  #[msf] reg u64 ms;
+
+  () = #spill(shk, ct, sk);
+  r = __crypto_kem_check_sk_jazz(sk);
+  () = #unspill(shk, ct, sk);
+  ms = #init_msf();
+
+  #spill(r);
+  if (r == 0) {
+    shk = __crypto_kem_dec_jazz(shk, ct, sk);
+  } else {
+    z = #set0_256();
+    shk[#unaligned:u256 0] = z;
+  }
+  #unspill(r);
+  ms = #init_msf();
+  return shk, r;
+}

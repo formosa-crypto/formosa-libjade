@@ -8,7 +8,7 @@ from Jasmin require import JModel_x86.
 from JazzEC require import Jkem_avx2.
 from JazzEC require import Array32 Array128 Array768 Array960 Array1088 Array1120
  Array1152 Array1184 Array2304 Array2400 WArray32 WArray128 WArray960
- WArray1088 WArray1120 WArray1184 WArray1536 WArray2400.
+ WArray1088 WArray1120 WArray1152 WArray1184 WArray1536 WArray2400.
 from Spec require Spec768.
 require JkemT.
 
@@ -26,6 +26,7 @@ clone JkemT.JkemT as Jkem768I with
   theory Array_polyc_bytes <= Array128,
   theory WArray_polyc_bytes <= WArray128,
   theory Array_polyvec_bytes <= Array1152,
+  theory WArray_polyvec_bytes <= WArray1152,
   theory Array_polyvecc_pad <= Array960,
   theory WArray_polyvecc_pad <= WArray960,
   theory Array_sk_bytes <= Array2400,

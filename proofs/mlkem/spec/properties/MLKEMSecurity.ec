@@ -635,12 +635,15 @@ module (MLKEM_Op : Scheme) (O : POracle) = {
     var r : W8.t Array32.t;
     var c : ciphertext;
     var _K : W8.t Array32.t;
-    
-    m <- coins;
-    hpk <- H_pk pk;
-    (_K, r) <@ O.get(m,hpk);
-    c <@ InnerPKE_Op.enc_derand(pk, m, r);
-    
+
+    (c, _K) <- (ct_zero, ss_zero);
+    if (check_ek pk) {
+      m <- coins;
+      hpk <- H_pk pk;
+      (_K, r) <@ O.get(m,hpk);
+      c <@ InnerPKE_Op.enc_derand(pk, m, r);
+    }
+
     return (c, _K);
   }
 
@@ -648,10 +651,10 @@ module (MLKEM_Op : Scheme) (O : POracle) = {
     var coins;
     var c : ciphertext;
     var _K : W8.t Array32.t;
-    
+
     coins <$ srand;
     (c, _K) <@ enc_derand(pk,coins);
-    
+
     return (c,_K);
   }
 
@@ -666,15 +669,18 @@ module (MLKEM_Op : Scheme) (O : POracle) = {
     var z : W8.t Array32.t;
     var c : ciphertext;
     var _K : W8.t Array32.t;
-    
-    (skp, pk, hpk, z) <- sk;
-    m <@ InnerPKE_Op.dec(skp, cph);
-    (_K, r) <@ O.get(oget m,hpk);
-    _K' <- J z cph;
-    c <@ InnerPKE_Op.enc_derand(pk, oget m, r);
-    if (c <> cph) 
-      _K <- _K';
-    
+
+    _K <- ss_zero;
+    if (check_dk sk) {
+      (skp, pk, hpk, z) <- sk;
+      m <@ InnerPKE_Op.dec(skp, cph);
+      (_K, r) <@ O.get(oget m,hpk);
+      _K' <- J z cph;
+      c <@ InnerPKE_Op.enc_derand(pk, oget m, r);
+      if (c <> cph)
+        _K <- _K';
+    }
+
     return (Some _K);
   }
 
@@ -694,12 +700,19 @@ equiv kg_bridge :
   MLKEM_Op(DummyRO).kg_derand ~ MLKEM.keygen_internal : ={arg} ==> ={res} by proc;wp; call (kg_sampler_kg); auto => />.
 
 equiv enc_bridge :
-  MLKEM_Op(DummyRO).enc_derand ~ MLKEM.encaps_internal : ={arg} ==> ={res} by
-  proc;wp; call (enc_sampler_enc);inline *; auto => />.
+  MLKEM_Op(DummyRO).enc_derand ~ MLKEM.encaps_derand : ={arg} ==> res{1} = (res{2}.`2, res{2}.`3).
+proof.
+proc; sp; if; 1,3: by auto.
+by inline {2} 1; wp; call (enc_sampler_enc); inline *; auto => />.
+qed.
 
 equiv dec_bridge :
-  MLKEM_Op(DummyRO).dec ~ MLKEM.decaps_internal : arg{1}.`1 = arg{2}.`2 /\ arg{1}.`2 = arg{2}.`1 ==> res{1} = Some res{2}
-by proc;wp;call(enc_sampler_enc);inline {1} 3;wp;call(dec_sampler_dec);auto => />.
+  MLKEM_Op(DummyRO).dec ~ MLKEM.decaps : arg{1}.`1 = arg{2}.`2 /\ arg{1}.`2 = arg{2}.`1 ==> res{1} = Some res{2}.`2.
+proof.
+proc; sp; if; 1,3: by auto.
+inline {2} 1; wp; call (enc_sampler_enc); inline {1} 3; wp; call (dec_sampler_dec).
+by auto => />.
+qed.
 
 
 
@@ -725,19 +738,25 @@ op c_encode(c :  polyvec * poly) : ciphertext =
 op c_decode(c : ciphertext) =
       (decompress_polyvec du (decode_vec c.`1), decompress_poly dv (decode_poly c.`2)).
 
-lemma pk_encodeK : cancel pk_encode pk_decode.
-rewrite /pk_decode /pk_encode /cancel /= => x.
-rewrite -sem_encode12_vecK; last by rewrite toipolyvecK invnttvK /#.
+(* the decoding of an encoded vector of coefficients *)
+lemma encode12_toipolyvecK (t : polyvec) :
+  ofipolyvec (decode12_vec (encode12_vec (toipolyvec t))) = t.
+proof.
+rewrite -sem_encode12_vecK; last by rewrite toipolyvecK.
 move => i ib; rewrite /toipolyvec IPVec.initiE 1:ib /=.
 by smt(rg_asint qE).
 qed.
 
+lemma pk_encodeK : cancel pk_encode pk_decode.
+proof. by move=> x; rewrite /pk_decode /pk_encode /= encode12_toipolyvecK invnttvK; case: x. qed.
+
 lemma sk_encodeK: cancel sk_encode sk_decode.
-rewrite /sk_decode /sk_encode /cancel /= => x.
-rewrite -sem_encode12_vecK; last by rewrite toipolyvecK invnttvK /#.
-move => i ib; rewrite /toipolyvec IPVec.initiE 1:ib /=.
-by smt(rg_asint qE).
-qed.
+proof. by move=> x; rewrite /sk_decode /sk_encode encode12_toipolyvecK invnttvK. qed.
+
+(* the encoded public keys pass the modulus check *)
+lemma check_ek_encode (t : polyvec) (rho : W8.t Array32.t) :
+  check_ek (encode12_vec (toipolyvec t), rho).
+proof. by rewrite /check_ek /= encode12_toipolyvecK. qed.
 
 op rnd_err_v = compress_poly_err dv.
 op rnd_err_u = mapv (compress_poly_err du).
@@ -943,39 +962,40 @@ equiv keygen_eq :
                  res{1}.`2.`1.`1 = res{2}.`2.`2      /\ 
                  res{1}.`2.`1.`2 = res{2}.`2.`1      /\
                  H_pk res{1}.`2.`1.`1 = res{2}.`2.`3 /\
-                 res{1}.`2.`2 = res{2}.`2.`4.
+                 res{1}.`2.`2 = res{2}.`2.`4         /\
+                 check_ek res{2}.`1.
 proof.
 proc.
-inline {2} 3. 
+inline {2} 3.
 swap {1} 2 -1. swap {2} 2 -1. 
 seq 1 1 : (#pre /\ ={k});1: by auto.
-wp;sp;conseq (_: pk{1} = pk0{2} /\ sk{1} = sk0{2} /\ z{2} = k{1}); 1: by smt().
+wp;sp;conseq (_: pk{1} = pk0{2} /\ sk{1} = sk0{2} /\ z{2} = k{1} /\ check_ek pk0{2}); 1: by smt().
 inline {2} 5.
 swap{2} [6..9] -5; seq 0 4 : #pre; 1: by auto.
-swap {2} 4 9; wp 1 12;conseq />. 
+swap {2} 4 9; wp 1 12;conseq />.
 transitivity {2} { coins0 <- (witness,k); coins <$ srand;  (pk0,sk0) <- kg coins; }
-   ((glob FO_MLKEM.KEMROM.RO.RO){1}=(glob SPEC_MODEL.RO.RO){2}                            
-                                                     /\ 
+   ((glob FO_MLKEM.KEMROM.RO.RO){1}=(glob SPEC_MODEL.RO.RO){2}
+                                                     /\
       ={k} ==> pk{1} = pk0{2} /\ sk{1} = sk0{2} /\ coins0{2}.`2 = k{2})
-   (={k} ==> ={pk0,sk0} /\ coins0{2}.`2 = k{2}); 1,2:smt().
-+ by sp;conseq />; rndsem*{2} 0;rnd;auto => />. 
-swap {1} 1 1;auto => /> coins _; rewrite /kg /=. 
-have -> /= : (prg_kg_inner coins) = 
- ((prg_kg_inner coins).`1,(prg_kg_inner coins).`2,(prg_kg_inner coins).`3) by smt(). 
-rewrite /pk_encode /sk_encode /=.
+   (={k} ==> ={pk0,sk0} /\ coins0{2}.`2 = k{2} /\ check_ek pk0{1}); 1,2:smt().
++ by sp;conseq />; rndsem*{2} 0;rnd;auto => />.
+swap {1} 1 1;auto => /> coins _; rewrite /kg /=.
+have -> /= : (prg_kg_inner coins) =
+ ((prg_kg_inner coins).`1,(prg_kg_inner coins).`2,(prg_kg_inner coins).`3) by smt().
+rewrite /pk_encode /sk_encode /= check_ek_encode /=.
 by rewrite alg2poly_add !alg2polyK comm_nttv_add comm_nttv_mmul.
 qed.
 
 equiv enc_eq: 
   FO_MLKEM.FO_K(FO_MLKEM.KEMROM.RO.RO).enc ~ MLKEM_Op(SPEC_MODEL.RO.RO).enc :
-   (glob FO_MLKEM.KEMROM.RO.RO){1}=(glob SPEC_MODEL.RO.RO){2}   /\ ={arg} ==> 
+   (glob FO_MLKEM.KEMROM.RO.RO){1}=(glob SPEC_MODEL.RO.RO){2}   /\ ={arg} /\ check_ek arg{2} ==>
    (glob FO_MLKEM.KEMROM.RO.RO){1}=(glob SPEC_MODEL.RO.RO){2}  /\ ={res}.
 proof.
 proc.
-inline {2} 2. inline {2} 7.
+inline {2} 2. rcondt {2} 5; 1: by auto. inline {2} 8.
 wp;conseq  (: _ ==> (glob FO_MLKEM.KEMROM.RO.RO){1}=(glob SPEC_MODEL.RO.RO){2}   /\
              ={m,r,pk} /\ k{1} = _K0{2} /\ pk0{2} = pk{1}).
-+ auto => />; rewrite /enc /= /pk_decode /m_encode /c_encode => &2 m r.
++ auto => />; rewrite /enc /= /pk_decode /m_encode /c_encode => &2 _ m r.
   have -> /= : prg_enc_inner r = 
    ((prg_enc_inner r).`1,(prg_enc_inner r).`2,(prg_enc_inner r).`3) by smt().
   split; congr; congr.
@@ -996,7 +1016,10 @@ equiv dec_eq  :
   arg{1}.`1.`2 = arg{2}.`1.`4 
     ==> ={res} /\
    (glob FO_MLKEM.KEMROM.RO.RO){1}=(glob SPEC_MODEL.RO.RO){2}.
-proc. 
+proc.
+rcondt {2} 2.
++ by move=> &1; auto => /> &hr h1 _ h3 _; rewrite /check_dk -h1 h3.
+seq 0 1 : #pre; 1: by auto.
 inline {2} 5. inline {2} 2.
 sp 0 1;seq 1  14 : (#pre /\ m'{1} = Some m1{2} /\ m'{1} = m{2}).
 + by auto => />;rewrite /dec /m_encode /c_decode /m_decode /sk_decode/= => &1 &2;

@@ -31,6 +31,7 @@ import WArray_pk_bytes.
 import Array_polyc_bytes.
 import WArray_polyc_bytes.
 import Array_polyvec_bytes.
+import WArray_polyvec_bytes.
 import Array_polyvecc_pad.
 import WArray_polyvecc_pad.
 import Array_sk_bytes.
@@ -14037,6 +14038,140 @@ module M = {
     (* Erased call to unspill *)
     shk <@ __cmov (shk, (Array32.init (fun i => kr.[(0 + i)])), cnd);
     return shk;
+  }
+  proc __crypto_kem_check_pk_jazz (pk:W8.t Array_pk_bytes.t) : W64.t = {
+    var  _0:bool;
+    var  _1:bool;
+    var  _2:bool;
+    var  _3:bool;
+    var f:W256.t;
+    var g:W256.t;
+    var h:W256.t;
+    var i:int;
+    var inc:int;
+    var ms:W64.t;
+    var pkb:W8.t Array_polyvec_bytes.t;
+    var pkpv:W16.t Array_vecn.t;
+    var r:W64.t;
+    var t64:W64.t;
+    var zf:bool;
+    pkb <- witness;
+    pkpv <- witness;
+    (* Erased call to spill *)
+    pkpv <@ __i_polyvec_frombytes ((Array_polyvec_bytes.init (fun i_0 => pk.[(0 + i_0)])
+                                   ));
+    pkb <@ __i_polyvec_tobytes (pkb, pkpv);
+    (* Erased call to unspill *)
+    ms <- (init_msf);
+    h <- (set0_256);
+    inc <- ((P.kvec * 384) %/ 32);
+    i <- 0;
+    while ((i < inc)) {
+      f <- (get256_direct (WArray_polyvec_bytes.init8 (fun i_0 => pkb.[i_0])) (32 * i));
+      g <- (get256_direct (WArray_pk_bytes.init8 (fun i_0 => pk.[i_0])) (32 * i));
+      f <- (VPXOR_256 f g);
+      h <- (VPOR_256 h f);
+      i <- (i + 1);
+    }
+    ( _0,  _1,  _2,  _3, zf) <- (VPTEST_256 h h);
+    r <- (W64.of_int 0);
+    t64 <- (W64.of_int (- 1));
+    r <- ((! zf) ? t64 : r);
+    (* Erased call to declassify *)
+    ms <- (init_msf);
+    return r;
+  }
+  proc __crypto_kem_check_sk_jazz (sk:W8.t Array_sk_bytes.t) : W64.t = {
+    var  _0:bool;
+    var  _1:bool;
+    var  _2:bool;
+    var  _3:bool;
+    var f:W256.t;
+    var g:W256.t;
+    var hpk:W8.t Array32.t;
+    var ms:W64.t;
+    var r:W64.t;
+    var t64:W64.t;
+    var zf:bool;
+    hpk <- witness;
+    (* Erased call to spill *)
+    hpk <@ _sha3_256A_APK (hpk,
+    (Array_pk_bytes.init (fun i => sk.[((P.kvec * 384) + i)])));
+    (* Erased call to unspill *)
+    ms <- (init_msf);
+    f <- (get256 (WArray32.init8 (fun i => hpk.[i])) 0);
+    g <-
+    (get256_direct (WArray_sk_bytes.init8 (fun i => sk.[i]))
+    ((P.kvec * 384) + ((P.kvec * 384) + 32)));
+    f <- (VPXOR_256 f g);
+    ( _0,  _1,  _2,  _3, zf) <- (VPTEST_256 f f);
+    r <- (W64.of_int 0);
+    t64 <- (W64.of_int (- 1));
+    r <- ((! zf) ? t64 : r);
+    (* Erased call to declassify *)
+    ms <- (init_msf);
+    return r;
+  }
+  proc __crypto_kem_encaps_derand_jazz (ct:W8.t Array_ct_bytes.t,
+                                        shk:W8.t Array32.t,
+                                        pk:W8.t Array_pk_bytes.t,
+                                        randomnessp:W8.t Array32.t) : 
+  W8.t Array_ct_bytes.t * W8.t Array32.t * W64.t = {
+    var i:int;
+    var inc:int;
+    var ms:W64.t;
+    var r:W64.t;
+    var z:W256.t;
+    (* Erased call to spill *)
+    r <@ __crypto_kem_check_pk_jazz (pk);
+    (* Erased call to unspill *)
+    ms <- (init_msf);
+    (* Erased call to spill *)
+    if ((r = (W64.of_int 0))) {
+      (ct, shk) <@ __crypto_kem_enc_jazz (ct, shk, pk, randomnessp);
+    } else {
+      z <- (set0_256);
+      inc <- (((P.kvec * ((256 * P.du) %/ 8)) + ((256 * P.dv) %/ 8)) %/ 32);
+      i <- 0;
+      while ((i < inc)) {
+        ct <-
+        (Array_ct_bytes.init
+        (WArray_ct_bytes.get8
+        (WArray_ct_bytes.set256 (WArray_ct_bytes.init8 (fun i_0 => ct.[i_0])) i z)));
+        i <- (i + 1);
+      }
+      shk <-
+      (Array32.init
+      (WArray32.get8
+      (WArray32.set256 (WArray32.init8 (fun i_0 => shk.[i_0])) 0 z)));
+    }
+    (* Erased call to unspill *)
+    ms <- (init_msf);
+    return (ct, shk, r);
+  }
+  proc __crypto_kem_decaps_jazz (shk:W8.t Array32.t, ct:W8.t Array_ct_bytes.t,
+                                 sk:W8.t Array_sk_bytes.t) : W8.t Array32.t *
+                                                        W64.t = {
+    var ms:W64.t;
+    var r:W64.t;
+    var z:W256.t;
+    (* Erased call to spill *)
+    r <@ __crypto_kem_check_sk_jazz (sk);
+    (* Erased call to unspill *)
+    ms <- (init_msf);
+    (* Erased call to spill *)
+    if ((r = (W64.of_int 0))) {
+      shk <@ __crypto_kem_dec_jazz (shk, ct, sk);
+    } else {
+      z <- (set0_256);
+      shk <-
+      (Array32.init
+      (WArray32.get8
+      (WArray32.set256 (WArray32.init8 (fun i => shk.[i])) 0 z)));
+    }
+    (* Erased call to unspill *)
+    ms <- (init_msf);
+    return (shk, r);
   }
 }.
 

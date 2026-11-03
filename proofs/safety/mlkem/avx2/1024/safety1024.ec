@@ -1845,6 +1845,78 @@ auto; ecall (__indcpa_dec_proof param_1 b_param_9 param_0 ((BArray1568.init_arr 
 by auto => /> *.
 qed.
 
+lemma __crypto_kem_check_pk_jazz_proof _pk _b_pk :
+      (__crypto_kem_check_pk_jazz_spec _pk _b_pk).
+proof.
+hint +safety.
+rewrite /__crypto_kem_check_pk_jazz_spec; proc.
+conseq (_ :
+     b_pk = BArray1568.init_arr (W8.of_int 255)
+  ==> valid trace___crypto_kem_check_pk_jazz).
++ by move=> &hr />; rewrite -!(BI1568.is_init_full _ 1568) //.
+unroll for ^while.
+auto; ecall (__i_polyvec_tobytes_proof param_1 b_param param_0 ((BArray2048.init_arr (W8.of_int 255)))).
+auto; ecall (__i_polyvec_frombytes_proof param b_param_0).
+by auto => /> *.
+qed.
+
+lemma __crypto_kem_check_sk_jazz_proof _sk _b_sk :
+      (__crypto_kem_check_sk_jazz_spec _sk _b_sk).
+proof.
+hint +safety.
+rewrite /__crypto_kem_check_sk_jazz_spec; proc.
+conseq (_ :
+     b_sk = BArray3168.init_arr (W8.of_int 255)
+  ==> valid trace___crypto_kem_check_sk_jazz).
++ by move=> &hr />; rewrite -!(BI3168.is_init_full _ 3168) //.
+auto; ecall (_sha3_256A_APK_proof param_0 b_param_0 param b_param).
+by auto => /> *.
+qed.
+
+lemma __crypto_kem_encaps_derand_jazz_proof _ct _b_ct _shk _b_shk _pk _b_pk _randomnessp _b_randomnessp :
+      (__crypto_kem_encaps_derand_jazz_spec _ct _b_ct _shk _b_shk _pk _b_pk
+      _randomnessp _b_randomnessp).
+proof.
+hint +safety.
+rewrite /__crypto_kem_encaps_derand_jazz_spec; proc.
+conseq (_ :
+     b_randomnessp = BArray32.init_arr (W8.of_int 255)
+  /\ b_pk = BArray1568.init_arr (W8.of_int 255)
+  ==> BArray1568.is_init b_ct 0 ((4 * ((256 * 11) %/ 8)) + ((256 * 5) %/ 8))
+   /\ BArray32.is_init b_shk 0 32
+   /\ valid trace___crypto_kem_encaps_derand_jazz).
++ by move=> &hr />; rewrite -!(BI32.is_init_full _ 32) // -!(BI1568.is_init_full _ 1568) //.
++ by move=> />.
+seq < ^if : (valid trace___crypto_kem_encaps_derand_jazz).
++ auto; ecall (__crypto_kem_check_pk_jazz_proof param ((BArray1568.init_arr (W8.of_int 255)))).
+  by auto => /> *.
+wp; if.
++ auto; ecall (__crypto_kem_enc_jazz_proof param_3 b_param_0 param_2 b_param param_1 ((BArray1568.init_arr (W8.of_int 255))) param_0 ((BArray32.init_arr (W8.of_int 255)))).
+  by auto => /> *.
+unroll for ^while.
+by auto => /> *.
+qed.
+
+lemma __crypto_kem_decaps_jazz_proof _shk _b_shk _ct _b_ct _sk _b_sk :
+      (__crypto_kem_decaps_jazz_spec _shk _b_shk _ct _b_ct _sk _b_sk).
+proof.
+hint +safety.
+rewrite /__crypto_kem_decaps_jazz_spec; proc.
+conseq (_ :
+     b_ct = BArray1568.init_arr (W8.of_int 255)
+  /\ b_sk = BArray3168.init_arr (W8.of_int 255)
+  ==> BArray32.is_init b_shk 0 32
+   /\ valid trace___crypto_kem_decaps_jazz).
++ by move=> &hr />; rewrite -!(BI1568.is_init_full _ 1568) // -!(BI3168.is_init_full _ 3168) //.
+seq < ^if : (valid trace___crypto_kem_decaps_jazz).
++ auto; ecall (__crypto_kem_check_sk_jazz_proof param ((BArray3168.init_arr (W8.of_int 255)))).
+  by auto => /> *.
+wp; if.
++ auto; ecall (__crypto_kem_dec_jazz_proof param_2 b_param param_1 ((BArray1568.init_arr (W8.of_int 255))) param_0 ((BArray3168.init_arr (W8.of_int 255)))).
+  by auto => /> *.
+by auto => /> *.
+qed.
+
 lemma jade_kem_mlkem_mlkem1024_amd64_avx2_keypair_derand_proof _public_key _b_public_key _secret_key _b_secret_key _coins _b_coins :
       (jade_kem_mlkem_mlkem1024_amd64_avx2_keypair_derand_spec _public_key
       _b_public_key _secret_key _b_secret_key _coins _b_coins).
@@ -1877,7 +1949,7 @@ conseq (_ :
    /\ valid trace_jade_kem_mlkem_mlkem1024_amd64_avx2_enc_derand).
 + by move=> &hr />; rewrite -!(BI32.is_init_full _ 32) // -!(BI1568.is_init_full _ 1568) //.
 + by move=> />.
-auto; ecall (__crypto_kem_enc_jazz_proof param_2 b_param_0 param_1 b_param param_0 ((BArray1568.init_arr (W8.of_int 255))) param ((BArray32.init_arr (W8.of_int 255)))).
+auto; ecall (__crypto_kem_encaps_derand_jazz_proof param_2 b_param_0 param_1 b_param param_0 ((BArray1568.init_arr (W8.of_int 255))) param ((BArray32.init_arr (W8.of_int 255)))).
 by auto => /> *.
 qed.
 
@@ -1893,7 +1965,33 @@ conseq (_ :
   ==> BArray32.is_init b_shared_secret 0 32
    /\ valid trace_jade_kem_mlkem_mlkem1024_amd64_avx2_dec).
 + by move=> &hr />; rewrite -!(BI1568.is_init_full _ 1568) // -!(BI3168.is_init_full _ 3168) //.
-auto; ecall (__crypto_kem_dec_jazz_proof param_1 b_param param_0 ((BArray1568.init_arr (W8.of_int 255))) param ((BArray3168.init_arr (W8.of_int 255)))).
+auto; ecall (__crypto_kem_decaps_jazz_proof param_1 b_param param_0 ((BArray1568.init_arr (W8.of_int 255))) param ((BArray3168.init_arr (W8.of_int 255)))).
+by auto => /> *.
+qed.
+
+lemma jade_kem_mlkem_mlkem1024_amd64_avx2_check_pk_proof _public_key _b_public_key :
+      (jade_kem_mlkem_mlkem1024_amd64_avx2_check_pk_spec _public_key _b_public_key).
+proof.
+hint +safety.
+rewrite /jade_kem_mlkem_mlkem1024_amd64_avx2_check_pk_spec; proc.
+conseq (_ :
+     b_public_key = BArray1568.init_arr (W8.of_int 255)
+  ==> valid trace_jade_kem_mlkem_mlkem1024_amd64_avx2_check_pk).
++ by move=> &hr />; rewrite -!(BI1568.is_init_full _ 1568) //.
+auto; ecall (__crypto_kem_check_pk_jazz_proof param ((BArray1568.init_arr (W8.of_int 255)))).
+by auto => /> *.
+qed.
+
+lemma jade_kem_mlkem_mlkem1024_amd64_avx2_check_sk_proof _secret_key _b_secret_key :
+      (jade_kem_mlkem_mlkem1024_amd64_avx2_check_sk_spec _secret_key _b_secret_key).
+proof.
+hint +safety.
+rewrite /jade_kem_mlkem_mlkem1024_amd64_avx2_check_sk_spec; proc.
+conseq (_ :
+     b_secret_key = BArray3168.init_arr (W8.of_int 255)
+  ==> valid trace_jade_kem_mlkem_mlkem1024_amd64_avx2_check_sk).
++ by move=> &hr />; rewrite -!(BI3168.is_init_full _ 3168) //.
+auto; ecall (__crypto_kem_check_sk_jazz_proof param ((BArray3168.init_arr (W8.of_int 255)))).
 by auto => /> *.
 qed.
 

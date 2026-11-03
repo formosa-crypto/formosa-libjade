@@ -19,6 +19,18 @@ type secretkey = skey * pkey * W8.t Array32.t * W8.t Array32.t.
 type sharedsecret = W8.t Array32.t.
 (* ciphertext / plaintext are in scope from KPKE. *)
 
+(* FIPS-203 7.2, modulus check: ByteEncode12(ByteDecode12(ek[0:384k])) = ek[0:384k] *)
+op check_ek (pk : publickey) : bool =
+  encode12_vec (toipolyvec (ofipolyvec (decode12_vec pk.`1))) = pk.`1.
+
+(* FIPS-203 7.3, hash check: H(dk[384k:768k+32]) = dk[768k+32:768k+64] *)
+op check_dk (sk : secretkey) : bool =
+  H_pk sk.`2 = sk.`3.
+
+(* the outputs when a check fails *)
+op ct_zero : ciphertext = (BytesCtVec.create W8.zero, BytesPoly.create W8.zero).
+op ss_zero : sharedsecret = Array32.create W8.zero.
+
 module MLKEM = {
 
   proc keygen_internal(coins: W8.t Array32.t * W8.t Array32.t) : publickey * secretkey = {
@@ -50,6 +62,26 @@ module MLKEM = {
       _K <- _K';
     }
     return _K;
+  }
+
+  proc encaps_derand(pk : publickey, coins: W8.t Array32.t) : bool * ciphertext * sharedsecret = {
+    var b, c, _K;
+    b       <- check_ek pk;
+    (c, _K) <- (ct_zero, ss_zero);
+    if (b) {
+      (c, _K) <@ encaps_internal(pk, coins);
+    }
+    return (b, c, _K);
+  }
+
+  proc decaps(cph : ciphertext, sk : secretkey) : bool * sharedsecret = {
+    var b, _K;
+    b  <- check_dk sk;
+    _K <- ss_zero;
+    if (b) {
+      _K <@ decaps_internal(cph, sk);
+    }
+    return (b, _K);
   }
 }.
 

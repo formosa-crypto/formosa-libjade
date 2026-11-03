@@ -57,9 +57,8 @@ export fn jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand(
 
   public_key = public_key;
 
-  ciphertext, shared_secret =__crypto_kem_enc_jazz(ciphertext, shared_secret, public_key, coins);
+  ciphertext, shared_secret, r = __crypto_kem_encaps_derand_jazz(ciphertext, shared_secret, public_key, coins);
 
-  ?{}, r = #set0();
   return ciphertext, shared_secret, r;
 }
 
@@ -85,8 +84,49 @@ export fn jade_kem_mlkem_mlkem512_amd64_avx2_dec(
 
   _ = #init_msf();
 
-  shared_secret = __crypto_kem_dec_jazz(shared_secret, ciphertext, secret_key);
+  shared_secret, r = __crypto_kem_decaps_jazz(shared_secret, ciphertext, secret_key);
 
-  ?{}, r = #set0();
   return shared_secret, r;
+}
+
+#[safety =
+   { requires = is_arr_init(public_key,0,MLKEM_PUBLICKEYBYTES)
+   }
+ ]
+#[sct="
+{ ptr: transient, val: secret } →
+public
+"]
+export fn jade_kem_mlkem_mlkem512_amd64_avx2_check_pk(
+    reg ptr u8[MLKEM_PUBLICKEYBYTES] public_key)
+    -> reg u64
+{
+  reg u64 r;
+
+  _ = #init_msf();
+
+  r = __crypto_kem_check_pk_jazz(public_key);
+
+  return r;
+}
+
+#[safety =
+   { requires = is_arr_init(secret_key,0,MLKEM_SECRETKEYBYTES)
+   }
+ ]
+#[sct="
+{ ptr: transient, val: secret } →
+public
+"]
+export fn jade_kem_mlkem_mlkem512_amd64_avx2_check_sk(
+    reg ptr u8[MLKEM_SECRETKEYBYTES] secret_key)
+    -> reg u64
+{
+  reg u64 r;
+
+  _ = #init_msf();
+
+  r = __crypto_kem_check_sk_jazz(secret_key);
+
+  return r;
 }

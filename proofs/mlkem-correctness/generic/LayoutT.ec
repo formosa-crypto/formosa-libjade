@@ -101,6 +101,8 @@ clone WArray as WArray_polyc_bytes with op size <- polyc_bytes
   proof ge0_size by exact ge0_polyc_bytes.
 clone PolyArray as Array_polyvec_bytes with op size <- polyvec_bytes
   proof ge0_size by exact ge0_polyvec_bytes.
+clone WArray as WArray_polyvec_bytes with op size <- polyvec_bytes
+  proof ge0_size by exact ge0_polyvec_bytes.
 clone PolyArray as Array_polyvecc_pad with op size <- polyvecc_pad
   proof ge0_size by exact ge0_polyvecc_pad.
 clone WArray as WArray_polyvecc_pad with op size <- polyvecc_pad

@@ -29,7 +29,9 @@ define extract
 	  --model safety -o $(2)/Jkem$(1)_safety.ec \
 	  -f jade_kem_mlkem_mlkem$(1)_amd64_avx2_keypair_derand \
 	  -f jade_kem_mlkem_mlkem$(1)_amd64_avx2_enc_derand \
-	  -f jade_kem_mlkem_mlkem$(1)_amd64_avx2_dec
+	  -f jade_kem_mlkem_mlkem$(1)_amd64_avx2_dec \
+	  -f jade_kem_mlkem_mlkem$(1)_amd64_avx2_check_pk \
+	  -f jade_kem_mlkem_mlkem$(1)_amd64_avx2_check_sk
 endef
 
 SETS := 512 768 1024

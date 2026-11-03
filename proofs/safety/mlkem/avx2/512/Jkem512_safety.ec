@@ -47763,6 +47763,328 @@ module M = {
     b_shk <- (BArray32.init_arr (W8.of_int 255));
     return (shk, b_shk, trace___crypto_kem_dec_jazz);
   }
+  proc __crypto_kem_check_pk_jazz (pk:BArray800.t, b_pk:BArray800.t) : 
+  W64.t * trace = {
+    var aux:BArray1024.t;
+    var aux_0:BArray1024.t;
+    var r:W64.t;
+    var pkpv:BArray1024.t;
+    var pkb:BArray768.t;
+    var ms:W64.t;
+    var h:W256.t;
+    var i:int;
+    var f:W256.t;
+    var g:W256.t;
+    var zf:bool;
+    var t64:W64.t;
+    var param:BArray768.t;
+    var result:BArray1024.t;
+    var param_0:BArray1024.t;
+    var param_1:BArray768.t;
+    var result_0:BArray768.t;
+    var b_pkb:BArray768.t;
+    var b_result:BArray768.t;
+    var b_param:BArray768.t;
+    var b_result_0:BArray1024.t;
+    var b_param_0:BArray768.t;
+    var  _0:bool;
+    var  _1:bool;
+    var  _2:bool;
+    var  _3:bool;
+    var trace___crypto_kem_check_pk_jazz:trace;
+    b_param <- witness;
+    b_param_0 <- witness;
+    b_pkb <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    param <- witness;
+    param_0 <- witness;
+    param_1 <- witness;
+    pkb <- witness;
+    pkpv <- witness;
+    result <- witness;
+    result_0 <- witness;
+    trace___crypto_kem_check_pk_jazz <- [];
+    trace___crypto_kem_check_pk_jazz <-
+    (trace___crypto_kem_check_pk_jazz ++
+    [(Assert, (BArray800.is_init b_pk 0 800))]);
+    b_pkb <- (BArray768.init_arr (W8.of_int 0));
+    (* Erased call to spill *)
+    b_param_0 <- (SBArray800_768.get_sub8 b_pk 0);
+    param <- (SBArray800_768.get_sub8 pk 0);
+    (aux, aux_0, tmp__trace) <@ __i_polyvec_frombytes (param, b_param_0);
+    result <- aux;
+    b_result_0 <- aux_0;
+    trace___crypto_kem_check_pk_jazz <-
+    (trace___crypto_kem_check_pk_jazz ++ tmp__trace);
+    trace___crypto_kem_check_pk_jazz <-
+    (trace___crypto_kem_check_pk_jazz ++
+    [(Assert, (BArray1024.is_init b_result_0 0 1024))]);
+    pkpv <- result;
+    b_param <- b_pkb;
+    param_1 <- pkb;
+    param_0 <- pkpv;
+    (result_0, b_result, tmp__trace) <@ __i_polyvec_tobytes (param_1,
+    b_param, param_0, (BArray1024.init_arr (W8.of_int 255)));
+    trace___crypto_kem_check_pk_jazz <-
+    (trace___crypto_kem_check_pk_jazz ++ tmp__trace);
+    trace___crypto_kem_check_pk_jazz <-
+    (trace___crypto_kem_check_pk_jazz ++
+    [(Assert, (BArray768.is_init b_result 0 768))]);
+    pkb <- result_0;
+    (* Erased call to unspill *)
+    ms <- (init_msf);
+    h <- (set0_256);
+    i <- 0;
+    while ((i < 24)) {
+      trace___crypto_kem_check_pk_jazz <-
+      (trace___crypto_kem_check_pk_jazz ++
+      [(Assert, ((0 <= (32 * i)) /\ (((32 * i) + 32) <= 768)))]);
+      f <- (BArray768.get256d pkb (32 * i));
+      trace___crypto_kem_check_pk_jazz <-
+      (trace___crypto_kem_check_pk_jazz ++
+      [(Assert, ((0 <= (32 * i)) /\ (((32 * i) + 32) <= 800)))]);
+      g <- (BArray800.get256d pk (32 * i));
+      f <- (VPXOR_256 f g);
+      h <- (VPOR_256 h f);
+      i <- (i + 1);
+    }
+    ( _0,  _1,  _2,  _3, zf) <- (VPTEST_256 h h);
+    r <- (W64.of_int 0);
+    t64 <- (W64.of_int 18446744073709551615);
+    r <- ((! zf) ? t64 : r);
+    (* Erased call to declassify *)
+    ms <- (init_msf);
+    return (r, trace___crypto_kem_check_pk_jazz);
+  }
+  proc __crypto_kem_check_sk_jazz (sk:BArray1632.t, b_sk:BArray1632.t) : 
+  W64.t * trace = {
+    var r:W64.t;
+    var hpk:BArray32.t;
+    var ms:W64.t;
+    var f:W256.t;
+    var g:W256.t;
+    var zf:bool;
+    var t64:W64.t;
+    var param:BArray800.t;
+    var param_0:BArray32.t;
+    var result:BArray32.t;
+    var b_hpk:BArray32.t;
+    var b_result:BArray32.t;
+    var b_param:BArray800.t;
+    var b_param_0:BArray32.t;
+    var  _0:bool;
+    var  _1:bool;
+    var  _2:bool;
+    var  _3:bool;
+    var trace___crypto_kem_check_sk_jazz:trace;
+    b_hpk <- witness;
+    b_param <- witness;
+    b_param_0 <- witness;
+    b_result <- witness;
+    hpk <- witness;
+    param <- witness;
+    param_0 <- witness;
+    result <- witness;
+    trace___crypto_kem_check_sk_jazz <- [];
+    trace___crypto_kem_check_sk_jazz <-
+    (trace___crypto_kem_check_sk_jazz ++
+    [(Assert, (BArray1632.is_init b_sk 0 1632))]);
+    b_hpk <- (BArray32.init_arr (W8.of_int 0));
+    (* Erased call to spill *)
+    b_param_0 <- b_hpk;
+    param_0 <- hpk;
+    b_param <- (SBArray1632_800.get_sub8 b_sk 768);
+    param <- (SBArray1632_800.get_sub8 sk 768);
+    (result, b_result, tmp__trace) <@ _sha3_256A_APK (param_0, b_param_0,
+    param, b_param);
+    trace___crypto_kem_check_sk_jazz <-
+    (trace___crypto_kem_check_sk_jazz ++ tmp__trace);
+    trace___crypto_kem_check_sk_jazz <-
+    (trace___crypto_kem_check_sk_jazz ++
+    [(Assert, (BArray32.is_init b_result 0 32))]);
+    hpk <- result;
+    (* Erased call to unspill *)
+    ms <- (init_msf);
+    f <- (BArray32.get256 hpk 0);
+    g <- (BArray1632.get256d sk 1568);
+    f <- (VPXOR_256 f g);
+    ( _0,  _1,  _2,  _3, zf) <- (VPTEST_256 f f);
+    r <- (W64.of_int 0);
+    t64 <- (W64.of_int 18446744073709551615);
+    r <- ((! zf) ? t64 : r);
+    (* Erased call to declassify *)
+    ms <- (init_msf);
+    return (r, trace___crypto_kem_check_sk_jazz);
+  }
+  proc __crypto_kem_encaps_derand_jazz (ct:BArray768.t, b_ct:BArray768.t,
+                                        shk:BArray32.t, b_shk:BArray32.t,
+                                        pk:BArray800.t, b_pk:BArray800.t,
+                                        randomnessp:BArray32.t,
+                                        b_randomnessp:BArray32.t) : BArray768.t *
+                                                                    BArray768.t *
+                                                                    BArray32.t *
+                                                                    BArray32.t *
+                                                                    W64.t *
+                                                                    trace = {
+    var r:W64.t;
+    var ms:W64.t;
+    var z:W256.t;
+    var i:int;
+    var param:BArray800.t;
+    var result:W64.t;
+    var param_0:BArray32.t;
+    var param_1:BArray800.t;
+    var param_2:BArray32.t;
+    var param_3:BArray768.t;
+    var result_0:BArray32.t;
+    var result_1:BArray768.t;
+    var b_result:BArray32.t;
+    var b_result_0:BArray768.t;
+    var b_param:BArray32.t;
+    var b_param_0:BArray768.t;
+    var trace___crypto_kem_encaps_derand_jazz:trace;
+    b_param <- witness;
+    b_param_0 <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    param <- witness;
+    param_0 <- witness;
+    param_1 <- witness;
+    param_2 <- witness;
+    param_3 <- witness;
+    result_0 <- witness;
+    result_1 <- witness;
+    trace___crypto_kem_encaps_derand_jazz <- [];
+    trace___crypto_kem_encaps_derand_jazz <-
+    (trace___crypto_kem_encaps_derand_jazz ++
+    [(Assert,
+     ((BArray32.is_init b_randomnessp 0 32) /\
+     (BArray800.is_init b_pk 0 800)))]);
+    (* Erased call to spill *)
+    param <- pk;
+    (result, tmp__trace) <@ __crypto_kem_check_pk_jazz (param,
+    (BArray800.init_arr (W8.of_int 255)));
+    trace___crypto_kem_encaps_derand_jazz <-
+    (trace___crypto_kem_encaps_derand_jazz ++ tmp__trace);
+    r <- result;
+    (* Erased call to unspill *)
+    ms <- (init_msf);
+    (* Erased call to spill *)
+    if ((r = (W64.of_int 0))) {
+      b_param_0 <- b_ct;
+      param_3 <- ct;
+      b_param <- b_shk;
+      param_2 <- shk;
+      param_1 <- pk;
+      param_0 <- randomnessp;
+      (result_1, b_result_0, result_0, b_result, tmp__trace) <@ __crypto_kem_enc_jazz (
+      param_3, b_param_0, param_2, b_param, param_1,
+      (BArray800.init_arr (W8.of_int 255)), param_0,
+      (BArray32.init_arr (W8.of_int 255)));
+      trace___crypto_kem_encaps_derand_jazz <-
+      (trace___crypto_kem_encaps_derand_jazz ++ tmp__trace);
+      trace___crypto_kem_encaps_derand_jazz <-
+      (trace___crypto_kem_encaps_derand_jazz ++
+      [(Assert,
+       ((BArray768.is_init b_result_0 0 768) /\
+       (BArray32.is_init b_result 0 32)))]);
+      b_ct <- (BArray768.init_arr (W8.of_int 255));
+      ct <- result_1;
+      b_shk <- (BArray32.init_arr (W8.of_int 255));
+      shk <- result_0;
+    } else {
+      z <- (set0_256);
+      i <- 0;
+      while ((i < 24)) {
+        trace___crypto_kem_encaps_derand_jazz <-
+        (trace___crypto_kem_encaps_derand_jazz ++
+        [(Assert, ((0 <= (i * 32)) /\ (((i * 32) + 32) <= 768)))]);
+        b_ct <-
+        (BArray768.set256d b_ct (i * 32)
+        (W256.of_int
+        115792089237316195423570985008687907853269984665640564039457584007913129639935
+        ));
+        ct <- (BArray768.set256 ct i z);
+        i <- (i + 1);
+      }
+      b_shk <-
+      (BArray32.set256d b_shk 0
+      (W256.of_int
+      115792089237316195423570985008687907853269984665640564039457584007913129639935
+      ));
+      shk <- (BArray32.set256 shk 0 z);
+    }
+    (* Erased call to unspill *)
+    ms <- (init_msf);
+    return (ct, b_ct, shk, b_shk, r, trace___crypto_kem_encaps_derand_jazz);
+  }
+  proc __crypto_kem_decaps_jazz (shk:BArray32.t, b_shk:BArray32.t,
+                                 ct:BArray768.t, b_ct:BArray768.t,
+                                 sk:BArray1632.t, b_sk:BArray1632.t) : 
+  BArray32.t * BArray32.t * W64.t * trace = {
+    var r:W64.t;
+    var ms:W64.t;
+    var z:W256.t;
+    var param:BArray1632.t;
+    var result:W64.t;
+    var param_0:BArray1632.t;
+    var param_1:BArray768.t;
+    var param_2:BArray32.t;
+    var result_0:BArray32.t;
+    var b_result:BArray32.t;
+    var b_param:BArray32.t;
+    var trace___crypto_kem_decaps_jazz:trace;
+    b_param <- witness;
+    b_result <- witness;
+    param <- witness;
+    param_0 <- witness;
+    param_1 <- witness;
+    param_2 <- witness;
+    result_0 <- witness;
+    trace___crypto_kem_decaps_jazz <- [];
+    trace___crypto_kem_decaps_jazz <-
+    (trace___crypto_kem_decaps_jazz ++
+    [(Assert,
+     ((BArray768.is_init b_ct 0 768) /\ (BArray1632.is_init b_sk 0 1632)))]);
+    (* Erased call to spill *)
+    param <- sk;
+    (result, tmp__trace) <@ __crypto_kem_check_sk_jazz (param,
+    (BArray1632.init_arr (W8.of_int 255)));
+    trace___crypto_kem_decaps_jazz <-
+    (trace___crypto_kem_decaps_jazz ++ tmp__trace);
+    r <- result;
+    (* Erased call to unspill *)
+    ms <- (init_msf);
+    (* Erased call to spill *)
+    if ((r = (W64.of_int 0))) {
+      b_param <- b_shk;
+      param_2 <- shk;
+      param_1 <- ct;
+      param_0 <- sk;
+      (result_0, b_result, tmp__trace) <@ __crypto_kem_dec_jazz (param_2,
+      b_param, param_1, (BArray768.init_arr (W8.of_int 255)), param_0,
+      (BArray1632.init_arr (W8.of_int 255)));
+      trace___crypto_kem_decaps_jazz <-
+      (trace___crypto_kem_decaps_jazz ++ tmp__trace);
+      trace___crypto_kem_decaps_jazz <-
+      (trace___crypto_kem_decaps_jazz ++
+      [(Assert, (BArray32.is_init b_result 0 32))]);
+      b_shk <- (BArray32.init_arr (W8.of_int 255));
+      shk <- result_0;
+    } else {
+      z <- (set0_256);
+      b_shk <-
+      (BArray32.set256d b_shk 0
+      (W256.of_int
+      115792089237316195423570985008687907853269984665640564039457584007913129639935
+      ));
+      shk <- (BArray32.set256 shk 0 z);
+    }
+    (* Erased call to unspill *)
+    ms <- (init_msf);
+    return (shk, b_shk, r, trace___crypto_kem_decaps_jazz);
+  }
   proc jade_kem_mlkem_mlkem512_amd64_avx2_keypair_derand (public_key:BArray800.t,
                                                           b_public_key:BArray800.t,
                                                           secret_key:BArray1632.t,
@@ -47838,18 +48160,14 @@ module M = {
     var param_0:BArray800.t;
     var param_1:BArray32.t;
     var param_2:BArray768.t;
-    var result:BArray32.t;
-    var result_0:BArray768.t;
+    var result:W64.t;
+    var result_0:BArray32.t;
+    var result_1:BArray768.t;
     var b_result:BArray32.t;
     var b_result_0:BArray768.t;
     var b_param:BArray32.t;
     var b_param_0:BArray768.t;
     var  _0:W64.t;
-    var  _1:bool;
-    var  _2:bool;
-    var  _3:bool;
-    var  _4:bool;
-    var  _5:bool;
     var trace_jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand:trace;
     b_param <- witness;
     b_param_0 <- witness;
@@ -47859,8 +48177,8 @@ module M = {
     param_0 <- witness;
     param_1 <- witness;
     param_2 <- witness;
-    result <- witness;
     result_0 <- witness;
+    result_1 <- witness;
     trace_jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand <- [];
     trace_jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand <-
     (trace_jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand ++
@@ -47875,9 +48193,9 @@ module M = {
     param_1 <- shared_secret;
     param_0 <- public_key;
     param <- coins;
-    (result_0, b_result_0, result, b_result, tmp__trace) <@ __crypto_kem_enc_jazz (
-    param_2, b_param_0, param_1, b_param, param_0,
-    (BArray800.init_arr (W8.of_int 255)), param,
+    (result_1, b_result_0, result_0, b_result, result, tmp__trace) <@ 
+    __crypto_kem_encaps_derand_jazz (param_2, b_param_0, param_1, b_param,
+    param_0, (BArray800.init_arr (W8.of_int 255)), param,
     (BArray32.init_arr (W8.of_int 255)));
     trace_jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand <-
     (trace_jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand ++ tmp__trace);
@@ -47886,9 +48204,9 @@ module M = {
     [(Assert,
      ((BArray768.is_init b_result_0 0 768) /\
      (BArray32.is_init b_result 0 32)))]);
-    ciphertext <- result_0;
-    shared_secret <- result;
-    ( _1,  _2,  _3,  _4,  _5, r) <- (set0_64);
+    ciphertext <- result_1;
+    shared_secret <- result_0;
+    r <- result;
     b_shared_secret <- (BArray32.init_arr (W8.of_int 255));
     b_ciphertext <- (BArray768.init_arr (W8.of_int 255));
     return (ciphertext, b_ciphertext, shared_secret, b_shared_secret, 
@@ -47905,22 +48223,18 @@ module M = {
     var param:BArray1632.t;
     var param_0:BArray768.t;
     var param_1:BArray32.t;
-    var result:BArray32.t;
+    var result:W64.t;
+    var result_0:BArray32.t;
     var b_result:BArray32.t;
     var b_param:BArray32.t;
     var  _0:W64.t;
-    var  _1:bool;
-    var  _2:bool;
-    var  _3:bool;
-    var  _4:bool;
-    var  _5:bool;
     var trace_jade_kem_mlkem_mlkem512_amd64_avx2_dec:trace;
     b_param <- witness;
     b_result <- witness;
     param <- witness;
     param_0 <- witness;
     param_1 <- witness;
-    result <- witness;
+    result_0 <- witness;
     trace_jade_kem_mlkem_mlkem512_amd64_avx2_dec <- [];
     trace_jade_kem_mlkem_mlkem512_amd64_avx2_dec <-
     (trace_jade_kem_mlkem_mlkem512_amd64_avx2_dec ++
@@ -47932,19 +48246,63 @@ module M = {
     param_1 <- shared_secret;
     param_0 <- ciphertext;
     param <- secret_key;
-    (result, b_result, tmp__trace) <@ __crypto_kem_dec_jazz (param_1,
-    b_param, param_0, (BArray768.init_arr (W8.of_int 255)), param,
-    (BArray1632.init_arr (W8.of_int 255)));
+    (result_0, b_result, result, tmp__trace) <@ __crypto_kem_decaps_jazz (
+    param_1, b_param, param_0, (BArray768.init_arr (W8.of_int 255)), 
+    param, (BArray1632.init_arr (W8.of_int 255)));
     trace_jade_kem_mlkem_mlkem512_amd64_avx2_dec <-
     (trace_jade_kem_mlkem_mlkem512_amd64_avx2_dec ++ tmp__trace);
     trace_jade_kem_mlkem_mlkem512_amd64_avx2_dec <-
     (trace_jade_kem_mlkem_mlkem512_amd64_avx2_dec ++
     [(Assert, (BArray32.is_init b_result 0 32))]);
-    shared_secret <- result;
-    ( _1,  _2,  _3,  _4,  _5, r) <- (set0_64);
+    shared_secret <- result_0;
+    r <- result;
     b_shared_secret <- (BArray32.init_arr (W8.of_int 255));
     return (shared_secret, b_shared_secret, r,
            trace_jade_kem_mlkem_mlkem512_amd64_avx2_dec);
+  }
+  proc jade_kem_mlkem_mlkem512_amd64_avx2_check_pk (public_key:BArray800.t,
+                                                    b_public_key:BArray800.t) : 
+  W64.t * trace = {
+    var r:W64.t;
+    var param:BArray800.t;
+    var result:W64.t;
+    var  _0:W64.t;
+    var trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_pk:trace;
+    param <- witness;
+    trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_pk <- [];
+    trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_pk <-
+    (trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_pk ++
+    [(Assert, (BArray800.is_init b_public_key 0 800))]);
+     _0 <- (init_msf);
+    param <- public_key;
+    (result, tmp__trace) <@ __crypto_kem_check_pk_jazz (param,
+    (BArray800.init_arr (W8.of_int 255)));
+    trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_pk <-
+    (trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_pk ++ tmp__trace);
+    r <- result;
+    return (r, trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_pk);
+  }
+  proc jade_kem_mlkem_mlkem512_amd64_avx2_check_sk (secret_key:BArray1632.t,
+                                                    b_secret_key:BArray1632.t) : 
+  W64.t * trace = {
+    var r:W64.t;
+    var param:BArray1632.t;
+    var result:W64.t;
+    var  _0:W64.t;
+    var trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_sk:trace;
+    param <- witness;
+    trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_sk <- [];
+    trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_sk <-
+    (trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_sk ++
+    [(Assert, (BArray1632.is_init b_secret_key 0 1632))]);
+     _0 <- (init_msf);
+    param <- secret_key;
+    (result, tmp__trace) <@ __crypto_kem_check_sk_jazz (param,
+    (BArray1632.init_arr (W8.of_int 255)));
+    trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_sk <-
+    (trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_sk ++ tmp__trace);
+    r <- result;
+    return (r, trace_jade_kem_mlkem_mlkem512_amd64_avx2_check_sk);
   }
 }.
 
@@ -55532,6 +55890,40 @@ op __crypto_kem_dec_jazz_spec _shk _b_shk _ct _b_ct _sk _b_sk =
    (BArray1632.is_init _b_sk 0 (((2 * 384) + ((2 * 384) + 32)) + (2 * 32))))) ==>
    ((BArray32.is_init res.`2 0 32) /\ (valid res.`3))].
 
+op __crypto_kem_check_pk_jazz_spec _pk _b_pk =
+   hoare [M.__crypto_kem_check_pk_jazz :
+   (((_b_pk = b_pk) /\ (_pk = pk)) /\
+   (BArray800.is_init _b_pk 0 ((2 * 384) + 32))) ==> (true /\ (valid res.`2))].
+
+op __crypto_kem_check_sk_jazz_spec _sk _b_sk =
+   hoare [M.__crypto_kem_check_sk_jazz :
+   (((_b_sk = b_sk) /\ (_sk = sk)) /\
+   (BArray1632.is_init _b_sk 0 (((2 * 384) + ((2 * 384) + 32)) + (2 * 32)))) ==>
+   (true /\ (valid res.`2))].
+
+op __crypto_kem_encaps_derand_jazz_spec _ct _b_ct _shk _b_shk _pk _b_pk _randomnessp _b_randomnessp =
+   hoare [M.__crypto_kem_encaps_derand_jazz :
+   (((_b_randomnessp = b_randomnessp) /\
+    ((_randomnessp = randomnessp) /\
+    ((_b_pk = b_pk) /\
+    ((_pk = pk) /\
+    ((_b_shk = b_shk) /\ ((_shk = shk) /\ ((_b_ct = b_ct) /\ (_ct = ct)))))))) /\
+   ((BArray32.is_init _b_randomnessp 0 32) /\
+   (BArray800.is_init _b_pk 0 ((2 * 384) + 32)))) ==>
+   (((BArray768.is_init res.`2 0 ((2 * ((256 * 10) %/ 8)) + ((256 * 4) %/ 8))
+     ) /\
+    (BArray32.is_init res.`4 0 32)) /\
+   (valid res.`6))].
+
+op __crypto_kem_decaps_jazz_spec _shk _b_shk _ct _b_ct _sk _b_sk =
+   hoare [M.__crypto_kem_decaps_jazz :
+   (((_b_sk = b_sk) /\
+    ((_sk = sk) /\
+    ((_b_ct = b_ct) /\ ((_ct = ct) /\ ((_b_shk = b_shk) /\ (_shk = shk)))))) /\
+   ((BArray768.is_init _b_ct 0 ((2 * ((256 * 10) %/ 8)) + ((256 * 4) %/ 8))) /\
+   (BArray1632.is_init _b_sk 0 (((2 * 384) + ((2 * 384) + 32)) + (2 * 32))))) ==>
+   ((BArray32.is_init res.`2 0 32) /\ (valid res.`4))].
+
 op jade_kem_mlkem_mlkem512_amd64_avx2_keypair_derand_spec _public_key _b_public_key _secret_key _b_secret_key _coins _b_coins =
    hoare [M.jade_kem_mlkem_mlkem512_amd64_avx2_keypair_derand :
    (((_b_coins = b_coins) /\
@@ -55573,3 +55965,15 @@ op jade_kem_mlkem_mlkem512_amd64_avx2_dec_spec _shared_secret _b_shared_secret _
    (BArray1632.is_init _b_secret_key 0
    (((2 * 384) + ((2 * 384) + 32)) + (2 * 32))))) ==>
    ((BArray32.is_init res.`2 0 32) /\ (valid res.`4))].
+
+op jade_kem_mlkem_mlkem512_amd64_avx2_check_pk_spec _public_key _b_public_key =
+   hoare [M.jade_kem_mlkem_mlkem512_amd64_avx2_check_pk :
+   (((_b_public_key = b_public_key) /\ (_public_key = public_key)) /\
+   (BArray800.is_init _b_public_key 0 ((2 * 384) + 32))) ==>
+   (true /\ (valid res.`2))].
+
+op jade_kem_mlkem_mlkem512_amd64_avx2_check_sk_spec _secret_key _b_secret_key =
+   hoare [M.jade_kem_mlkem_mlkem512_amd64_avx2_check_sk :
+   (((_b_secret_key = b_secret_key) /\ (_secret_key = secret_key)) /\
+   (BArray1632.is_init _b_secret_key 0
+   (((2 * 384) + ((2 * 384) + 32)) + (2 * 32)))) ==> (true /\ (valid res.`2))].
