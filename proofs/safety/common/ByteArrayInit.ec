@@ -123,6 +123,8 @@ lemma is_init_cell_set8 t i j :
   is_init_cell t.[i <- W8.of_int 255] j = (i <= j < i + 1 \/ is_init_cell t j).
 proof. by rewrite /is_init_cell get_set_if /#. qed.
 
+hint simplify in safety : is_init_cell_set8.
+
 clone include WordInit with
   type B <- W8.t, op r <- 1, op m_one <- W8.of_int 255, op set <- A."_.[_<-_]",
   axiom gt0_r <- gt0_r1, axiom is_init_cell_w <- is_init_cell_set8

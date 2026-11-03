@@ -1,0 +1,4 @@
+// Memory variants (and everything that does not depend on the array size):
+// the same entry points, and the same KECCAK_FEATURES/KECCAK_PERMUTATION
+// selection, as the correctness extraction.
+require "../../../fips202/extracted/toEC_keccak1600.jazz"

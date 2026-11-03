@@ -8,6 +8,6 @@
 * Wrap the proof lines over 100 characters in `proofs/mldsa/x86-64/avx2/{generic,variants}`
 * Do ct + sct for mldsa
 * add ct + sct checks to CI
-* Safety proofs: add `proofs/timing-safety.yml` to the timing sunburst/dashboard (`scripts/timing-report-to-json.py` reads one report)
-* Safety proofs: upstream the jasmin-nist ref updstate variants (SPILL conditional, `*_export.jinc`, bare-state steps and their contracts, `gen/cfg_ref.py` annotations) to formosa-keccak
-* Safety proofs: drop `JASMIN_SAFETY_ECLIB`/`jasminSafety` once a Jasmin release ships `-m safety` and `JSafety.ec`
+* Safety proofs: upstream the jasmin-nist ref updstate variants (SPILL conditional, `*_export.jinc`, bare-state steps and their contracts, their safety proofs) to formosa-keccak
+* Safety proofs: drop `proofs/safety/eclib` and `JASMIN2EC_SAFETY` once a Jasmin release ships `-m safety` and `JSafety.ec`
+* Safety proofs: check in CI that the committed safety models are the extraction of the sources (needs the `safety-assert2` `jasmin2ec` on the runner; its opam-nix build fails on `mlgmpidl`)

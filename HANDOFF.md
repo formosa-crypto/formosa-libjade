@@ -113,7 +113,6 @@ ML-KEM = NIST ACVP v1.1.0.41). Regenerate with `bench/tools/import_kat.py`.
 - 2026-10-02: `src/fips202` and `proofs/fips202` synced with formosa-keccak
   `13218ad` (plus WIP `Keccak1600_fixedsizes_ref.ec` from `352b416`, the
   repaired `7204cd0`); the dependent mlkem/mldsa models re-extracted together.
-  Details and rationale: `proofs/fips202/notes/merge-with-formosa-keccak.md`.
 - 2026-10-07: `type keccak_updstate` and `fn _ststatus_data` moved into the
   new `src/fips202/common/keccak1600_updstate_generic.jinc`, required by the
   ref and AVX2 updstate files, so the ref updstate procedures are now
@@ -137,13 +136,10 @@ ML-KEM = NIST ACVP v1.1.0.41). Regenerate with `bench/tools/import_kat.py`.
   memory and array versions. Models re-extracted; the ML-DSA and ML-KEM
   models are unchanged.
 - 2026-10-26: safety proofs merged from formosa-keccak
-  (`proof/amd64-barray/safety` at `6eded33`) into `proofs/fips202/safety`,
+  (`proof/amd64-barray/safety` at `6eded33`) into `proofs/safety/fips202`,
   with the source changes they need (contracts, one-step pointer advance in
   the streaming add/dump) merged into `src/fips202`. jasmin-nist's ref
   updstate variants (SPILL, bare-state steps for ML-DSA) are covered too.
-  Checking needs the eclib of Jasmin's `safety-assert2` branch:
-  `make -C proofs check-safety JASMIN_SAFETY_ECLIB=<eclib>` (the nix dev
-  shell sets it); re-extracting the safety models needs that branch's
-  `jasmin2ec` (`JASMIN2EC_SAFETY`). Details:
-  `proofs/fips202/safety/README.md` and
-  `proofs/fips202/notes/merge-with-formosa-keccak.md`.
+  Checking uses the release eclib plus `JSafety.ec` (`proofs/safety/eclib`),
+  scenario `fips202-safety` of `make -C proofs check`; re-extracting the
+  safety models needs that branch's `jasmin2ec` (`JASMIN2EC_SAFETY`).

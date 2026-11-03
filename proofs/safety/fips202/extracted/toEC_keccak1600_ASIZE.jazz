@@ -1,0 +1,20 @@
+// Array variants, extracted under the dummy array size _ASIZE = 999 and then
+// abstracted over the size (module MM of the proof files). Reuse the
+// memory harness so that both extractions share KECCAK_FEATURES and
+// KECCAK_PERMUTATION: the abstract array theories take the size-independent
+// callees (e.g. _keccakf1600) from the memory model. (The correctness array
+// harness ../../../fips202/extracted/toEC_keccak1600_ASIZE.jazz selects a different
+// permutation, so it is not reused here.)
+require "toEC_keccak1600.jazz"
+
+param int _ASIZE=999;
+
+from Keccak require "common/subreadwrite_ASIZE.jinc"
+
+from Keccak require "ref/keccak1600_fixedsizes_ASIZE.jinc"
+from Keccak require "ref/keccak1600_updstate_ASIZE_export.jinc"
+
+from Keccak require "avx2/keccak1600_fixedsizes_ASIZE.jinc"
+
+from Keccak require "avx2/keccak1600x4_fixedsizes_ASIZE.jinc"
+from Keccak require "avx2/keccak1600x4_updstate_ASIZE.jinc"

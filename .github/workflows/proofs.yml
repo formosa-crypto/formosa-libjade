@@ -62,21 +62,6 @@ jobs:
       - name: Check proofs
         run: $ECDEV make -C proofs JOBS=$JOBS ECFLAGS='-report timing.yml'
 
-      # The safety proofs (proofs/fips202/safety) need the eclib of Jasmin's
-      # safety-assert2 branch; the dev shell provides it (JASMIN_SAFETY_ECLIB,
-      # see flake.nix). Their timing report is uploaded with the artifact but
-      # not yet part of the sunburst/dashboard.
-      - name: Check safety proofs
-        run: $ECDEV make -C proofs check-safety JOBS=$JOBS ECFLAGS='-report timing-safety.yml'
-
-      # The committed safety models must be what the safety-assert2 jasmin2ec
-      # extracts from src/fips202 (JASMIN2EC_SAFETY, from the dev shell).
-      # Whitespace is ignored, as in formosa-keccak's CI.
-      - name: Safety models match the sources
-        run: |
-          $ECDEV make -C proofs/fips202/safety/extracted re_extract
-          git diff -w --exit-code -- proofs/fips202/safety/extracted
-
       # Timing pipeline: runtest report -> timing JSON -> sunburst page,
       # published as a run artifact.
       - name: Timing sunburst
@@ -107,7 +92,6 @@ jobs:
           name: proofs-timing
           path: |
             proofs/timing.yml
-            proofs/timing-safety.yml
             proofs-timing.json
             proofs-timing.html
 

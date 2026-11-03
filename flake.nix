@@ -56,22 +56,18 @@
           runHook postBuild
         '';
 
-        # Fixups for opam's conf-* probe packages under opam-nix (shared by
-        # both scopes).
-        confFixups = final: prev: {
-          conf-git = prev.conf-git.overrideAttrs (a: {
-            nativeBuildInputs = (a.nativeBuildInputs or [ ]) ++ [ pkgs.git ];
-          });
-          conf-gmp-paths = prev.conf-gmp-paths.overrideAttrs (_: {
-            buildPhase = ezConfProbe "gmp" pkgs.gmp;
-          });
-          conf-mpfr-paths = prev.conf-mpfr-paths.overrideAttrs (_: {
-            buildPhase = ezConfProbe "mpfr" pkgs.mpfr;
-          });
-        };
-
-        scope = (scope'.overrideScope confFixups).overrideScope (
+        # Fixups for opam's conf-* probe packages under opam-nix.
+        scope = scope'.overrideScope (
           final: prev: {
+            conf-git = prev.conf-git.overrideAttrs (a: {
+              nativeBuildInputs = (a.nativeBuildInputs or [ ]) ++ [ pkgs.git ];
+            });
+            conf-gmp-paths = prev.conf-gmp-paths.overrideAttrs (_: {
+              buildPhase = ezConfProbe "gmp" pkgs.gmp;
+            });
+            conf-mpfr-paths = prev.conf-mpfr-paths.overrideAttrs (_: {
+              buildPhase = ezConfProbe "mpfr" pkgs.mpfr;
+            });
             # Same fixups as EasyCrypt's own flake: the codesign shim for
             # dune's macOS link step, and a lib/easycrypt symlink so the
             # binary finds its theories and the runtest command at the
@@ -86,27 +82,6 @@
             });
           }
         );
-        # Jasmin's safety-assert2 branch, for the safety proofs of
-        # proofs/fips202/safety only: its jasmin2ec has the safety extraction
-        # (-m safety) and its eclib has JSafety.ec, neither of which a release
-        # ships. Not on PATH (its jasminc compiles differently from 2026.03.1,
-        # the compiler of record): the dev shell exposes it as
-        # JASMIN2EC_SAFETY and JASMIN_SAFETY_ECLIB (see proofs/Makefile).
-        # jasmin-compiler c1cae60e is the generated compiler of jasmin
-        # 1e7479a2, the branch head the proofs were checked with (as in
-        # formosa-keccak's shell.nix).
-        jasminSafetySrc = pkgs.fetchFromGitLab {
-          owner = "jasmin-lang";
-          repo = "jasmin-compiler";
-          rev = "c1cae60e0d053c9e478d1e662b609242796202c4";
-          hash = "sha256-GuCTSQQ3CI+15ZzCqdQ0PmRt0913BxKtZSyZAfgoDTk=";
-        };
-        safetyScope =
-          (on.buildOpamProject' { repos = [ opam-repository ]; } jasminSafetySrc {
-            ocaml-base-compiler = ocamlVersion;
-          }).overrideScope confFixups;
-        jasminSafety = safetyScope.jasmin;
-
         # proofs/*/easycrypt.project pins Z3@4.13; nixpkgs dropped that
         # series, so build the current recipe at the 4.13.4 tag.
         z3 = pkgs.z3.overrideAttrs (_: {
@@ -130,7 +105,6 @@
       in
       {
         packages.default = scope.jasmin-nist;
-        packages.jasmin-safety = jasminSafety;
 
         # Toolchain for the cycle benchmarks: jasminc and a pinned C
         # toolchain (mkShell's stdenv cc), no EasyCrypt/provers — keeps the
@@ -150,9 +124,6 @@
           # branch, and a nix build embeds no git hash in the binary); read by
           # scripts/timing-report-to-json.py.
           EASYCRYPT_REV = scope.easycrypt.src.rev or "unknown";
-          # The safety toolchain (see jasminSafety above).
-          JASMIN2EC_SAFETY = "${jasminSafety}/bin/jasmin2ec";
-          JASMIN_SAFETY_ECLIB = "${jasminSafety}/lib/easycrypt/jasmin";
           shellHook = ''
             export XDG_CONFIG_DIRS="${ecJasminConf}''${XDG_CONFIG_DIRS:+:$XDG_CONFIG_DIRS}"
           '';
