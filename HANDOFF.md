@@ -69,8 +69,9 @@ make compare SCHEME=ML-KEM-768 BACKENDS='jasmin mlkem-native'
 make bench   SCHEME=ML-DSA-65                    # rdtsc median cycles
 ```
 
-KAT vectors in `bench/vectors/` are committed (ML-DSA = pqc hash-based KAT,
-ML-KEM = NIST ACVP v1.1.0.41). Regenerate with `bench/tools/import_kat.py`.
+KAT vectors in `bench/vectors/` are committed (ML-DSA = pqc hash-based KAT
+and the external, pure groups of NIST ACVP v1.1.0.43; ML-KEM = NIST ACVP
+v1.1.0.43, key checks included). Regenerate with `bench/tools/import_kat.py`.
 
 ## Done (this session, on an x86-64 + AVX2 host)
 

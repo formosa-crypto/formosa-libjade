@@ -70,7 +70,7 @@ def h(block, field):
 
 class Report:
     def __init__(self):
-        self.passed = self.failed = self.skipped = 0
+        self.passed = self.failed = self.skipped = self.unsupported = 0
         self.failures = []
 
     def check(self, label, ok, detail=""):
@@ -176,12 +176,14 @@ class MLDSA(Scheme):
                            in_buf(ctx), len(ctx),
                            in_buf(msg), len(msg),
                            in_buf(sig))
-        rep.check(self.label("verify") + ".result", r == b.get("result", 0), f"got {r}")
+        # verify only promises 0 or nonzero: compare acceptance, not the value
+        rep.check(self.label("verify") + ".result",
+                  (r == 0) == (b.get("result", 0) == 0), f"got {r}")
 
 
 @runner("mlkem")
 class MLKEM(Scheme):
-    OPS = ("keygen", "encaps", "decaps")
+    OPS = ("keygen", "encaps", "decaps", "check_pk", "check_sk")
     STATE = ("pk", "sk", "ct", "ss")
 
     def bind(self, lib):
@@ -191,6 +193,14 @@ class MLKEM(Scheme):
         self.enc_fn.restype, self.enc_fn.argtypes = c_int, [c_void_p] * 4
         self.dec_fn = lib.kem_dec
         self.dec_fn.restype, self.dec_fn.argtypes = c_int, [c_void_p] * 3
+        # The key checks are optional in the ABI: None for a backend that
+        # does not perform them.
+        self.check_fn = {}
+        for op in ("check_pk", "check_sk"):
+            f = getattr(lib, f"kem_{op}", None)
+            if f is not None:
+                f.restype, f.argtypes = c_int, [c_void_p]
+            self.check_fn[op] = f
 
     def keygen(self, b, rep):
         pkb, skb = out_buf(self.spec["public_key"]), out_buf(self.spec["secret_key"])
@@ -216,6 +226,32 @@ class MLKEM(Scheme):
         r = self.dec_fn(ssb, in_buf(ct), in_buf(sk))
         rep.check(self.label("decaps") + ".result", r == b.get("result", 0), f"got {r}")
         rep.check_output(self.label("decaps"), b, "shared_secret", ssb.raw)
+
+    # A key check runs the exported check, and on a rejected key also enc
+    # (zero coins) or dec (zero ciphertext), which must reject it the same way.
+    def check_pk(self, b, rep):
+        if self.check_fn["check_pk"] is None:
+            rep.unsupported += 1
+            return
+        pk, want = in_buf(h(b, "public_key")), b.get("result", 0)
+        r = self.check_fn["check_pk"](pk)
+        rep.check(self.label("check_pk") + ".result", r == want, f"got {r}")
+        if want != 0:
+            ctb, ssb = out_buf(self.spec["ciphertext"]), out_buf(self.spec["shared_secret"])
+            r = self.enc_fn(ctb, ssb, pk, in_buf(bytes(32)))
+            rep.check(self.label("check_pk") + ".encaps", r == want, f"got {r}")
+
+    def check_sk(self, b, rep):
+        if self.check_fn["check_sk"] is None:
+            rep.unsupported += 1
+            return
+        sk, want = in_buf(h(b, "secret_key")), b.get("result", 0)
+        r = self.check_fn["check_sk"](sk)
+        rep.check(self.label("check_sk") + ".result", r == want, f"got {r}")
+        if want != 0:
+            ssb = out_buf(self.spec["shared_secret"])
+            r = self.dec_fn(ssb, in_buf(bytes(self.spec["ciphertext"])), sk)
+            rep.check(self.label("check_sk") + ".decaps", r == want, f"got {r}")
 
 
 def load_backend(backend, scheme_base, lib_dir):
@@ -261,7 +297,9 @@ def main(argv=None):
     for path in args.vectors:
         run_file(path, args.backend, args.lib_dir, rep)
 
-    print(f"\n{rep.passed} passed, {rep.failed} failed, {rep.skipped} file(s) skipped")
+    print(f"\n{rep.passed} passed, {rep.failed} failed, {rep.skipped} file(s) skipped"
+          + (f", {rep.unsupported} key check(s) not supported by {args.backend}"
+             if rep.unsupported else ""))
     for f in rep.failures:
         print(f"  FAIL {f}")
     return 1 if rep.failed else 0

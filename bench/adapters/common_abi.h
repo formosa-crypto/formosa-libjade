@@ -19,6 +19,12 @@ int kem_enc_derand(uint8_t *ciphertext, uint8_t *shared_secret,
 int kem_dec(uint8_t *shared_secret, const uint8_t *ciphertext,
             const uint8_t *secret_key);
 
+/* FIPS 203 input checks: modulus check of the encapsulation key (7.2), hash
+ * check of the decapsulation key (7.3); 0 on success. Optional: only the
+ * backends whose kem_enc_derand / kem_dec perform these checks export them. */
+int kem_check_pk(const uint8_t *public_key);
+int kem_check_sk(const uint8_t *secret_key);
+
 /* ---- SIG (ML-DSA) -- deterministic API ----
  * context and message are plain pointer + length. (The jasmin backend's entry
  * points want the message/context as reg-u64 addresses; that conversion lives

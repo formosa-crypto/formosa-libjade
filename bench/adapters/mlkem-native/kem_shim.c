@@ -15,3 +15,5 @@ int kem_enc_derand(uint8_t *ct, uint8_t *ss, const uint8_t *pk,
 int kem_dec(uint8_t *ss, const uint8_t *ct, const uint8_t *sk) {
   return crypto_kem_dec(ss, ct, sk);
 }
+int kem_check_pk(const uint8_t *pk) { return crypto_kem_check_pk(pk); }
+int kem_check_sk(const uint8_t *sk) { return crypto_kem_check_sk(sk); }

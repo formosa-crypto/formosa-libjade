@@ -4,7 +4,8 @@
  * pass-through. Parameter set is selected by -DKYBER_K (2/3/4 ->
  * ML-KEM-512/768/1024); kem.h maps the crypto_kem_* names onto the
  * KYBER_NAMESPACE symbols. randombytes is referenced only by the unused
- * non-derand keypair/enc. */
+ * non-derand keypair/enc. Kyber performs neither FIPS 203 input check, so
+ * kem_check_pk / kem_check_sk are not exported. */
 #include "common_abi.h"
 #include "kem.h"
 

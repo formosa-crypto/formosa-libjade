@@ -15,18 +15,20 @@ JSON schema (one file per algorithm)
   "tests": [ { "count": <int>, <operation blocks...> } ]
 }
 
-Every value is a lowercase hex string. For each expected output FIELD you may
-instead give FIELD_sha3_256 (the SHA3-256 of the output, hex) to keep vectors
-small. Expected fields that are absent are simply not checked; later blocks
+Every value is a hex string, in either case. For each expected output FIELD
+you may instead give FIELD_sha3_256 (the SHA3-256 of the output, hex) to keep
+vectors small. Expected fields that are absent are simply not checked; later blocks
 reuse earlier outputs when their inputs are omitted.
 
 ML-DSA blocks:
   "keygen": { "seed": <32B>,  "verification_key"?, "signing_key"? }
   "sign":   { "context": <hex>, "message": <hex>, "randomness": <32B>,
+              "signing_key"?,                         -- default: from keygen
               "signature"? }
   "verify": { "context"?, "message"?, "signature"?,  -- default: from sign
               "verification_key"?,                    -- default: from keygen
-              "result"?: <int, default 0> }
+              "result"?: <int, default 0> }   -- 0 accepts; any nonzero
+                                                 value matches a rejection
 
 ML-KEM blocks:
   "keygen": { "coins": <64B>, "public_key"?, "secret_key"? }
@@ -34,6 +36,10 @@ ML-KEM blocks:
               "ciphertext"?, "shared_secret"? }
   "decaps": { "ciphertext"?, "secret_key"?,    -- default: from encaps/keygen
               "shared_secret"? }
+  "check_pk": { "public_key": <hex>, "result"?: <int, default 0> }
+  "check_sk": { "secret_key": <hex>, "result"?: <int, default 0> }
+              -- FIPS 203 7.2 / 7.3 input checks; a rejected key must also
+                 be rejected by encaps (zero coins) / decaps (zero ciphertext)
 """
 
 import argparse
@@ -123,12 +129,12 @@ class Report:
     def check_output(self, label, block, field, actual: bytes):
         """Check `actual` against block[field] (hex) or block[field+'_sha3_256']."""
         if field in block:
-            want, got = block[field], actual.hex()
+            want, got = block[field].lower(), actual.hex()
             self.check(f"{label}.{field}", got == want,
                        f"expected {want[:24]}..., got {got[:24]}...")
         key = field + "_sha3_256"
         if key in block:
-            want, got = block[key], hashlib.sha3_256(actual).hexdigest()
+            want, got = block[key].lower(), hashlib.sha3_256(actual).hexdigest()
             self.check(f"{label}.{key}", got == want,
                        f"expected {want}, got {got}")
 
@@ -225,18 +231,21 @@ class MLDSA(Scheme):
         ctx_arr = (c_uint64 * 2)(addr(ctxb), len(ctx))
         r = self.fn["verify"](addr(in_buf(vk)), ctypes.cast(ctx_arr, c_void_p),
                               addr(msgb), len(msg), addr(in_buf(sig)))
-        rep.check(self.label("verify") + ".result", r == b.get("result", 0), f"got {r}")
+        # verify only promises 0 or nonzero: compare acceptance, not the value
+        rep.check(self.label("verify") + ".result",
+                  (r == 0) == (b.get("result", 0) == 0), f"got {r}")
 
 
 @runner("mlkem")
 class MLKEM(Scheme):
-    OPS = ("keygen", "encaps", "decaps")
+    OPS = ("keygen", "encaps", "decaps", "check_pk", "check_sk")
     STATE = ("pk", "sk", "ct", "ss")
 
     def bind(self, lib):
         sym = self.spec["sym"]
         self.fn = {}
-        for name, argc in (("keypair_derand", 3), ("enc_derand", 4), ("dec", 3)):
+        for name, argc in (("keypair_derand", 3), ("enc_derand", 4), ("dec", 3),
+                           ("check_pk", 1), ("check_sk", 1)):
             f = getattr(lib, f"{sym}_{name}")
             f.restype, f.argtypes = c_int, [c_void_p] * argc
             self.fn[name] = f
@@ -265,6 +274,27 @@ class MLKEM(Scheme):
         ssb = out_buf(self.spec["shared_secret"])
         self.fn["dec"](addr(ssb), addr(in_buf(ct)), addr(in_buf(sk)))
         rep.check_output(self.label("decaps"), b, "shared_secret", ssb.raw)
+
+    def check_pk(self, b, rep):
+        pk, want = in_buf(h(b, "public_key")), b.get("result", 0)
+        r = self.fn["check_pk"](addr(pk))
+        rep.check(self.label("check_pk") + ".result", r == want, f"got {r}")
+        if want != 0:
+            ctb = out_buf(self.spec["ciphertext"])
+            ssb = out_buf(self.spec["shared_secret"])
+            r = self.fn["enc_derand"](addr(ctb), addr(ssb), addr(pk),
+                                      addr(in_buf(bytes(32))))
+            rep.check(self.label("check_pk") + ".encaps", r == want, f"got {r}")
+
+    def check_sk(self, b, rep):
+        sk, want = in_buf(h(b, "secret_key")), b.get("result", 0)
+        r = self.fn["check_sk"](addr(sk))
+        rep.check(self.label("check_sk") + ".result", r == want, f"got {r}")
+        if want != 0:
+            ssb = out_buf(self.spec["shared_secret"])
+            ct = in_buf(bytes(self.spec["ciphertext"]))
+            r = self.fn["dec"](addr(ssb), addr(ct), addr(sk))
+            rep.check(self.label("check_sk") + ".decaps", r == want, f"got {r}")
 
 
 # --------------------------------------------------------------------------
