@@ -9,7 +9,7 @@ name: proofs
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'ci-*']
+    branches: [main]
 
 permissions:
   contents: read
