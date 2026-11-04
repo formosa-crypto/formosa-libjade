@@ -89,6 +89,8 @@ fn reconstruct_signer_commitment(
              && 0 <= context_size && context_size <= 18446744073709551615
              && 0 <= message_pointer && message_pointer <= 18446744073709551615
              && 0 <= message_size && message_size <= 18446744073709551615
+             && is_mem_init((64u) context_pointer, context_size) && context_size <= 0xFFFFFFFFFFFFFF00
+             && is_mem_init((64u) message_pointer, message_size) && message_size <= 0xFFFFFFFFFFFFFF00
    }
  ]
 fn __verify_internal(

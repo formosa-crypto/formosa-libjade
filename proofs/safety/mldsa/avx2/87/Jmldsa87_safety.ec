@@ -46095,9 +46095,6 @@ module M = {
     trace___store_shake256_state <- [];
     trace___store_shake256_state <-
     (trace___store_shake256_state ++
-    [(Assert, (BArray224.is_init b_st 0 224))]);
-    trace___store_shake256_state <-
-    (trace___store_shake256_state ++
     [(Assert, (BArray224.is_init b_state 0 224))]);
     i <- 0;
     while ((i < 7)) {
@@ -46107,10 +46104,14 @@ module M = {
       trace___store_shake256_state <-
       (trace___store_shake256_state ++
       [(Assert, ((0 <= (i * 32)) /\ (((i * 32) + 32) <= 224)))]);
+      b_st <-
+      (BArray224.set256d b_st (32 * i)
+      (W256.of_int
+      115792089237316195423570985008687907853269984665640564039457584007913129639935
+      ));
       st <- (BArray224.set256d st (32 * i) (BArray224.get256 state i));
       i <- (i + 1);
     }
-    b_st <- (BArray224.init_arr (W8.of_int 255));
     return (st, b_st, trace___store_shake256_state);
   }
   proc shake256_absorb_commitment_hash (st:BArray224.t, b_st:BArray224.t,
@@ -46306,20 +46307,24 @@ module M = {
     var b_result:BArray136.t;
     var b_param:BArray136.t;
     var b_result_0:BArray224.t;
+    var b_param_0:BArray224.t;
     var b_result_1:BArray224.t;
     var b_result_2:BArray224.t;
+    var b_param_1:BArray224.t;
     var b_result_3:BArray136.t;
-    var b_param_0:BArray200.t;
-    var b_param_1:BArray136.t;
+    var b_param_2:BArray200.t;
+    var b_param_3:BArray136.t;
     var b_lanes:BArray200.t;
     var b_result_4:BArray200.t;
-    var b_param_2:BArray200.t;
+    var b_param_4:BArray200.t;
     var trace_shake256_squeezeblock:trace;
     b_lanes <- witness;
     b_param <- witness;
     b_param_0 <- witness;
     b_param_1 <- witness;
     b_param_2 <- witness;
+    b_param_3 <- witness;
+    b_param_4 <- witness;
     b_result <- witness;
     b_result_0 <- witness;
     b_result_1 <- witness;
@@ -46346,16 +46351,17 @@ module M = {
     trace_shake256_squeezeblock <- [];
     trace_shake256_squeezeblock <-
     (trace_shake256_squeezeblock ++
-    [(Assert, (BArray224.is_init b_st 0 224))]);
+    [(Assert, (BArray224.is_init b_st 0 200))]);
     param <- 514;
     (result, tmp__trace) <@ __KECCAK_F (param);
     trace_shake256_squeezeblock <-
     (trace_shake256_squeezeblock ++ tmp__trace);
     kECCAK_F <- result;
     if ((kECCAK_F = 3)) {
+      b_param_1 <- b_st;
       param_0 <- st;
       (aux_1, aux_2, tmp__trace) <@ __load_shake256_state (param_0,
-      (BArray224.init_arr (W8.of_int 255)));
+      b_param_1);
       result_0 <- aux_1;
       b_result_2 <- aux_2;
       trace_shake256_squeezeblock <-
@@ -46375,11 +46381,11 @@ module M = {
       (trace_shake256_squeezeblock ++
       [(Assert, (BArray224.is_init b_result_1 0 224))]);
       state <- result_1;
+      b_param_0 <- b_st;
       param_3 <- st;
       param_2 <- state;
       (aux_1, aux_2, tmp__trace) <@ __store_shake256_state (param_3,
-      (BArray224.init_arr (W8.of_int 255)), param_2,
-      (BArray224.init_arr (W8.of_int 255)));
+      b_param_0, param_2, (BArray224.init_arr (W8.of_int 255)));
       result_2 <- aux_1;
       b_result_0 <- aux_2;
       trace_shake256_squeezeblock <-
@@ -46423,9 +46429,9 @@ module M = {
       b_lanes <- (SBArray224_200.get_sub64 b_st 0);
       lanes <- (SBArray224_200.get_sub64 st 0);
       (* Erased call to spill *)
-      b_param_2 <- b_lanes;
+      b_param_4 <- b_lanes;
       param_8 <- lanes;
-      (aux, aux_0, tmp__trace) <@ _keccakf1600 (param_8, b_param_2);
+      (aux, aux_0, tmp__trace) <@ _keccakf1600 (param_8, b_param_4);
       result_5 <- aux;
       b_result_4 <- aux_0;
       trace_shake256_squeezeblock <-
@@ -46439,14 +46445,14 @@ module M = {
       (SBArray224_200.set_sub64 b_st 0 (BArray200.init_arr (W8.of_int 255)));
       st <- (SBArray224_200.set_sub64 st 0 lanes);
       offset <- 0;
-      b_param_1 <- b_block;
+      b_param_3 <- b_block;
       param_12 <- block;
       param_11 <- offset;
       param_10 <- 136;
-      b_param_0 <- (SBArray224_200.get_sub64 b_st 0);
+      b_param_2 <- (SBArray224_200.get_sub64 b_st 0);
       param_9 <- (SBArray224_200.get_sub64 st 0);
       (result_7, b_result_3, result_6, tmp__trace) <@ a136____dumpstate (
-      param_12, b_param_1, param_11, param_10, param_9, b_param_0);
+      param_12, b_param_3, param_11, param_10, param_9, b_param_2);
       trace_shake256_squeezeblock <-
       (trace_shake256_squeezeblock ++ tmp__trace);
       trace_shake256_squeezeblock <-
@@ -47082,7 +47088,14 @@ module M = {
     trace___derive_message_representative <- [];
     trace___derive_message_representative <-
     (trace___derive_message_representative ++
-    [(Assert, (BArray64.is_init b_verification_key_hash 0 64))]);
+    [(Assert,
+     (((0 <= context_pointer) /\ (context_pointer <= 18446744073709551615)) /\
+     (((0 <= message_pointer) /\ (message_pointer <= 18446744073709551615)) /\
+     (((((BArray64.is_init b_verification_key_hash 0 64) /\
+        (is_valid ptr_modulus Glob.mem_v context_pointer context_size)) /\
+       (context_size <= 18446744073709551360)) /\
+      (is_valid ptr_modulus Glob.mem_v message_pointer message_size)) /\
+     (message_size <= 18446744073709551360)))))]);
     trace___derive_message_representative <-
     (trace___derive_message_representative ++
     [(Assert,
@@ -49515,14 +49528,18 @@ module M = {
     var b_result:BArray136.t;
     var b_state:BArray224.t;
     var b_result_0:BArray224.t;
+    var b_param:BArray224.t;
     var b_result_1:BArray136.t;
     var b_result_2:BArray224.t;
-    var b_param:BArray136.t;
+    var b_param_0:BArray136.t;
+    var b_param_1:BArray224.t;
     var b_result_3:BArray224.t;
-    var b_param_0:BArray224.t;
+    var b_param_2:BArray224.t;
     var trace_sample____challenge:trace;
     b_param <- witness;
     b_param_0 <- witness;
+    b_param_1 <- witness;
+    b_param_2 <- witness;
     b_result <- witness;
     b_result_0 <- witness;
     b_result_1 <- witness;
@@ -49564,23 +49581,25 @@ module M = {
       i <- (i + (W64.of_int 32));
     }
     (* Erased call to spill *)
-    b_param_0 <- b_state;
+    b_param_2 <- b_state;
     param_0 <- state;
     param <- seed;
     (aux, aux_0, tmp__trace) <@ shake256_absorb_commitment_hash (param_0,
-    b_param_0, param, (BArray64.init_arr (W8.of_int 255)));
+    b_param_2, param, (BArray64.init_arr (W8.of_int 255)));
     result <- aux;
     b_result_3 <- aux_0;
     trace_sample____challenge <- (trace_sample____challenge ++ tmp__trace);
     trace_sample____challenge <-
     (trace_sample____challenge ++
-    [(Assert, (BArray224.is_init b_result_3 0 224))]);
+    [(Assert, (BArray224.is_init b_result_3 0 200))]);
+    b_state <- b_result_3;
     state <- result;
+    b_param_1 <- b_state;
     param_2 <- state;
-    b_param <- b_xof_block;
+    b_param_0 <- b_xof_block;
     param_1 <- xof_block;
     (aux, aux_0, aux_1, aux_2, tmp__trace) <@ shake256_squeezeblock (
-    param_2, (BArray224.init_arr (W8.of_int 255)), param_1, b_param);
+    param_2, b_param_1, param_1, b_param_0);
     result_1 <- aux;
     b_result_2 <- aux_0;
     result_0 <- aux_1;
@@ -49589,8 +49608,9 @@ module M = {
     trace_sample____challenge <-
     (trace_sample____challenge ++
     [(Assert,
-     ((BArray224.is_init b_result_2 0 224) /\
+     ((BArray224.is_init b_result_2 0 200) /\
      (BArray136.is_init b_result_1 0 136)))]);
+    b_state <- b_result_2;
     state <- result_1;
     xof_block <- result_0;
     (* Erased call to unspill *)
@@ -49604,11 +49624,11 @@ module M = {
       condition_refill <- ((W64.of_int 136) \ule xof_offset);
       if (condition_refill) {
         (* Erased call to spill *)
+        b_param <- b_state;
         param_4 <- state;
         param_3 <- xof_block;
         (aux, aux_0, aux_1, aux_2, tmp__trace) <@ shake256_squeezeblock (
-        param_4, (BArray224.init_arr (W8.of_int 255)), param_3,
-        (BArray136.init_arr (W8.of_int 255)));
+        param_4, b_param, param_3, (BArray136.init_arr (W8.of_int 255)));
         result_3 <- aux;
         b_result_0 <- aux_0;
         result_2 <- aux_1;
@@ -49618,8 +49638,9 @@ module M = {
         trace_sample____challenge <-
         (trace_sample____challenge ++
         [(Assert,
-         ((BArray224.is_init b_result_0 0 224) /\
+         ((BArray224.is_init b_result_0 0 200) /\
          (BArray136.is_init b_result 0 136)))]);
+        b_state <- b_result_0;
         state <- result_3;
         xof_block <- result_2;
         (* Erased call to unspill *)
@@ -49644,11 +49665,11 @@ module M = {
         condition_refill <- ((W64.of_int 136) \ule xof_offset);
         if (condition_refill) {
           (* Erased call to spill *)
+          b_param <- b_state;
           param_4 <- state;
           param_3 <- xof_block;
           (aux, aux_0, aux_1, aux_2, tmp__trace) <@ shake256_squeezeblock (
-          param_4, (BArray224.init_arr (W8.of_int 255)), param_3,
-          (BArray136.init_arr (W8.of_int 255)));
+          param_4, b_param, param_3, (BArray136.init_arr (W8.of_int 255)));
           result_3 <- aux;
           b_result_0 <- aux_0;
           result_2 <- aux_1;
@@ -49658,8 +49679,9 @@ module M = {
           trace_sample____challenge <-
           (trace_sample____challenge ++
           [(Assert,
-           ((BArray224.is_init b_result_0 0 224) /\
+           ((BArray224.is_init b_result_0 0 200) /\
            (BArray136.is_init b_result 0 136)))]);
+          b_state <- b_result_0;
           state <- result_3;
           xof_block <- result_2;
           (* Erased call to unspill *)
@@ -56469,8 +56491,14 @@ module M = {
     trace___sign_internal <-
     (trace___sign_internal ++
     [(Assert,
-     ((BArray4896.is_init b_signing_key 0 4896) /\
-     (BArray32.is_init b_randomness 0 32)))]);
+     (((0 <= context_pointer) /\ (context_pointer <= 18446744073709551615)) /\
+     (((0 <= message_pointer) /\ (message_pointer <= 18446744073709551615)) /\
+     ((((((BArray4896.is_init b_signing_key 0 4896) /\
+         (BArray32.is_init b_randomness 0 32)) /\
+        (is_valid ptr_modulus Glob.mem_v context_pointer context_size)) /\
+       (context_size <= 18446744073709551360)) /\
+      (is_valid ptr_modulus Glob.mem_v message_pointer message_size)) /\
+     (message_size <= 18446744073709551360)))))]);
     trace___sign_internal <-
     (trace___sign_internal ++
     [(Assert,
@@ -57558,16 +57586,22 @@ module M = {
     trace___verify_internal <-
     (trace___verify_internal ++
     [(Assert,
-     ((((((((((BArray2592.is_init b_verification_key 0 2592) /\
-             (BArray4627.is_init b_signature_encoded 0 4627)) /\
-            (0 <= context_pointer)) /\
-           (context_pointer <= 18446744073709551615)) /\
-          (0 <= context_size)) /\
-         (context_size <= 18446744073709551615)) /\
-        (0 <= message_pointer)) /\
-       (message_pointer <= 18446744073709551615)) /\
-      (0 <= message_size)) /\
-     (message_size <= 18446744073709551615)))]);
+     (((0 <= context_pointer) /\ (context_pointer <= 18446744073709551615)) /\
+     (((0 <= message_pointer) /\ (message_pointer <= 18446744073709551615)) /\
+     ((((((((((((((BArray2592.is_init b_verification_key 0 2592) /\
+                 (BArray4627.is_init b_signature_encoded 0 4627)) /\
+                (0 <= context_pointer)) /\
+               (context_pointer <= 18446744073709551615)) /\
+              (0 <= context_size)) /\
+             (context_size <= 18446744073709551615)) /\
+            (0 <= message_pointer)) /\
+           (message_pointer <= 18446744073709551615)) /\
+          (0 <= message_size)) /\
+         (message_size <= 18446744073709551615)) /\
+        (is_valid ptr_modulus Glob.mem_v context_pointer context_size)) /\
+       (context_size <= 18446744073709551360)) /\
+      (is_valid ptr_modulus Glob.mem_v message_pointer message_size)) /\
+     (message_size <= 18446744073709551360)))))]);
     trace___verify_internal <-
     (trace___verify_internal ++
     [(Assert,
@@ -57841,9 +57875,17 @@ module M = {
     trace_ml_dsa_87_sign <-
     (trace_ml_dsa_87_sign ++
     [(Assert,
-     (((BArray4896.is_init b_signing_key 0 4896) /\
-      (BArray16.is_init b_context 0 16)) /\
-     (BArray32.is_init b_randomness 0 32)))]);
+     ((BArray16.is_init b_context 0 8) /\
+     ((BArray16.is_init b_context 8 8) /\
+     (((0 <= message_pointer) /\ (message_pointer <= 18446744073709551615)) /\
+     ((((((BArray4896.is_init b_signing_key 0 4896) /\
+         (BArray16.is_init b_context 0 16)) /\
+        (BArray32.is_init b_randomness 0 32)) /\
+       (is_valid ptr_modulus Glob.mem_v
+       (W64.to_uint (BArray16.get64 context 0))
+       (W64.to_uint (BArray16.get64 context 1)))) /\
+      (is_valid ptr_modulus Glob.mem_v message_pointer message_size)) /\
+     (message_size <= 18446744073709551360))))))]);
     trace_ml_dsa_87_sign <-
     (trace_ml_dsa_87_sign ++
     [(Assert,
@@ -57905,13 +57947,21 @@ module M = {
     trace_ml_dsa_87_verify <-
     (trace_ml_dsa_87_verify ++
     [(Assert,
-     (((((((BArray2592.is_init b_verification_key 0 2592) /\
-          (BArray16.is_init b_context 0 16)) /\
-         (BArray4627.is_init b_signature 0 4627)) /\
-        (0 <= message_pointer)) /\
-       (message_pointer <= 18446744073709551615)) /\
-      (0 <= message_size)) /\
-     (message_size <= 18446744073709551615)))]);
+     ((BArray16.is_init b_context 0 8) /\
+     ((BArray16.is_init b_context 8 8) /\
+     (((0 <= message_pointer) /\ (message_pointer <= 18446744073709551615)) /\
+     ((((((((((BArray2592.is_init b_verification_key 0 2592) /\
+             (BArray16.is_init b_context 0 16)) /\
+            (BArray4627.is_init b_signature 0 4627)) /\
+           (0 <= message_pointer)) /\
+          (message_pointer <= 18446744073709551615)) /\
+         (0 <= message_size)) /\
+        (message_size <= 18446744073709551615)) /\
+       (is_valid ptr_modulus Glob.mem_v
+       (W64.to_uint (BArray16.get64 context 0))
+       (W64.to_uint (BArray16.get64 context 1)))) /\
+      (is_valid ptr_modulus Glob.mem_v message_pointer message_size)) /\
+     (message_size <= 18446744073709551360))))))]);
     trace_ml_dsa_87_verify <-
     (trace_ml_dsa_87_verify ++
     [(Assert,
@@ -66577,7 +66627,7 @@ op __store_shake256_state_spec _st _b_st _state _b_state =
    hoare [M.__store_shake256_state :
    (((_b_state = b_state) /\
     ((_state = state) /\ ((_b_st = b_st) /\ (_st = st)))) /\
-   ((BArray224.is_init _b_state 0 224) /\ (BArray224.is_init _b_st 0 224))) ==>
+   (BArray224.is_init _b_state 0 224)) ==>
    ((BArray224.is_init res.`2 0 224) /\ (valid res.`3))].
 
 op shake256_absorb_commitment_hash_spec _st _b_st _commitment_hash _b_commitment_hash =
@@ -66585,14 +66635,14 @@ op shake256_absorb_commitment_hash_spec _st _b_st _commitment_hash _b_commitment
    (((_b_commitment_hash = b_commitment_hash) /\
     ((_commitment_hash = commitment_hash) /\ ((_b_st = b_st) /\ (_st = st)))) /\
    (BArray64.is_init _b_commitment_hash 0 64)) ==>
-   ((BArray224.is_init res.`2 0 (8 * 28)) /\ (valid res.`3))].
+   ((BArray224.is_init res.`2 0 (8 * 25)) /\ (valid res.`3))].
 
 op shake256_squeezeblock_spec _st _b_st _block _b_block =
    hoare [M.shake256_squeezeblock :
    (((_b_block = b_block) /\
     ((_block = block) /\ ((_b_st = b_st) /\ (_st = st)))) /\
-   (BArray224.is_init _b_st 0 (8 * 28))) ==>
-   (((BArray224.is_init res.`2 0 (8 * 28)) /\
+   (BArray224.is_init _b_st 0 (8 * 25))) ==>
+   (((BArray224.is_init res.`2 0 (8 * 25)) /\
     (BArray136.is_init res.`4 0 136)) /\
    (valid res.`5))].
 
@@ -66633,7 +66683,23 @@ op __derive_message_representative_spec _message_representative _b_message_repre
    ((true /\
     (true /\
     ((0 <= _context_pointer) /\ (_context_pointer <= 18446744073709551615)))) /\
-   (BArray64.is_init _b_verification_key_hash 0 64)))))) ==>
+   (true /\
+   (((0 <= _context_pointer) /\ (_context_pointer <= 18446744073709551615)) /\
+   (true /\
+   (true /\
+   (true /\
+   (((0 <= _message_pointer) /\ (_message_pointer <= 18446744073709551615)) /\
+   (true /\
+   (true /\
+   (((0 <= 18446744073709551360) /\
+    (18446744073709551360 <= 18446744073709551615)) /\
+   (((0 <= 18446744073709551360) /\
+    (18446744073709551360 <= 18446744073709551615)) /\
+   (((((BArray64.is_init _b_verification_key_hash 0 64) /\
+      (is_valid ptr_modulus Glob.mem_v _context_pointer _context_size)) /\
+     (_context_size <= 18446744073709551360)) /\
+    (is_valid ptr_modulus Glob.mem_v _message_pointer _message_size)) /\
+   (_message_size <= 18446744073709551360))))))))))))))))) ==>
    ((BArray64.is_init res.`2 0 64) /\ (valid res.`3))].
 
 op hash_verification_key_spec _verification_key_hash _b_verification_key_hash _verification_key _b_verification_key =
@@ -67441,9 +67507,26 @@ op __sign_internal_spec _signature _b_signature _signing_key _b_signing_key _con
    ((true /\
     (true /\
     ((0 <= _context_pointer) /\ (_context_pointer <= 18446744073709551615)))) /\
-   ((BArray4896.is_init _b_signing_key 0
-    (((((32 + 32) + 64) + (7 * 96)) + (8 * 96)) + (8 * ((13 * 256) %/ 8)))) /\
-   (BArray32.is_init _b_randomness 0 32))))))) ==>
+   (true /\
+   (((0 <= _context_pointer) /\ (_context_pointer <= 18446744073709551615)) /\
+   (true /\
+   (true /\
+   (true /\
+   (((0 <= _message_pointer) /\ (_message_pointer <= 18446744073709551615)) /\
+   (true /\
+   (true /\
+   (((0 <= 18446744073709551360) /\
+    (18446744073709551360 <= 18446744073709551615)) /\
+   (((0 <= 18446744073709551360) /\
+    (18446744073709551360 <= 18446744073709551615)) /\
+   ((((((BArray4896.is_init _b_signing_key 0
+        (((((32 + 32) + 64) + (7 * 96)) + (8 * 96)) +
+        (8 * ((13 * 256) %/ 8)))) /\
+       (BArray32.is_init _b_randomness 0 32)) /\
+      (is_valid ptr_modulus Glob.mem_v _context_pointer _context_size)) /\
+     (_context_size <= 18446744073709551360)) /\
+    (is_valid ptr_modulus Glob.mem_v _message_pointer _message_size)) /\
+   (_message_size <= 18446744073709551360))))))))))))))))) ==>
    ((BArray4627.is_init res.`2 0 ((64 + (7 * ((20 * 256) %/ 8))) + (75 + 8))) /\
    (valid res.`4))].
 
@@ -67499,6 +67582,14 @@ op __verify_internal_spec _verification_key _b_verification_key _context_pointer
    (true /\
    (true /\
    (true /\
+   (true /\
+   (((0 <= _context_pointer) /\ (_context_pointer <= 18446744073709551615)) /\
+   (true /\
+   (true /\
+   (true /\
+   (((0 <= _message_pointer) /\ (_message_pointer <= 18446744073709551615)) /\
+   (true /\
+   (true /\
    (((0 <= 0) /\ (0 <= 18446744073709551615)) /\
    (((0 <= 18446744073709551615) /\
     (18446744073709551615 <= 18446744073709551615)) /\
@@ -67511,18 +67602,26 @@ op __verify_internal_spec _verification_key _b_verification_key _context_pointer
    (((0 <= 0) /\ (0 <= 18446744073709551615)) /\
    (((0 <= 18446744073709551615) /\
     (18446744073709551615 <= 18446744073709551615)) /\
-   ((((((((((BArray2592.is_init _b_verification_key 0
-            (32 + (8 * (((23 - 13) * 256) %/ 8)))) /\
-           (BArray4627.is_init _b_signature_encoded 0
-           ((64 + (7 * ((20 * 256) %/ 8))) + (75 + 8)))) /\
-          (0 <= _context_pointer)) /\
-         (_context_pointer <= 18446744073709551615)) /\
-        (0 <= _context_size)) /\
-       (_context_size <= 18446744073709551615)) /\
-      (0 <= _message_pointer)) /\
-     (_message_pointer <= 18446744073709551615)) /\
-    (0 <= _message_size)) /\
-   (_message_size <= 18446744073709551615))))))))))))))))))))))) ==>
+   (((0 <= 18446744073709551360) /\
+    (18446744073709551360 <= 18446744073709551615)) /\
+   (((0 <= 18446744073709551360) /\
+    (18446744073709551360 <= 18446744073709551615)) /\
+   ((((((((((((((BArray2592.is_init _b_verification_key 0
+                (32 + (8 * (((23 - 13) * 256) %/ 8)))) /\
+               (BArray4627.is_init _b_signature_encoded 0
+               ((64 + (7 * ((20 * 256) %/ 8))) + (75 + 8)))) /\
+              (0 <= _context_pointer)) /\
+             (_context_pointer <= 18446744073709551615)) /\
+            (0 <= _context_size)) /\
+           (_context_size <= 18446744073709551615)) /\
+          (0 <= _message_pointer)) /\
+         (_message_pointer <= 18446744073709551615)) /\
+        (0 <= _message_size)) /\
+       (_message_size <= 18446744073709551615)) /\
+      (is_valid ptr_modulus Glob.mem_v _context_pointer _context_size)) /\
+     (_context_size <= 18446744073709551360)) /\
+    (is_valid ptr_modulus Glob.mem_v _message_pointer _message_size)) /\
+   (_message_size <= 18446744073709551360))))))))))))))))))))))))))))))))) ==>
    (true /\ (valid res.`2))].
 
 op ml_dsa_87_keygen_spec _verification_key _b_verification_key _signing_key _b_signing_key _randomness _b_randomness =
@@ -67556,10 +67655,26 @@ op ml_dsa_87_sign_spec _signature _b_signature _signing_key _b_signing_key _cont
    ((true /\
     (true /\
     ((0 <= _message_pointer) /\ (_message_pointer <= 18446744073709551615)))) /\
-   (((BArray4896.is_init _b_signing_key 0
-     (((((32 + 32) + 64) + (7 * 96)) + (8 * 96)) + (8 * ((13 * 256) %/ 8)))) /\
-    (BArray16.is_init _b_context 0 (8 * 2))) /\
-   (BArray32.is_init _b_randomness 0 32))))) ==>
+   (((0 <= (0 * 8)) /\ (((0 * 8) + 8) <= 16)) /\
+   ((BArray16.is_init _b_context (0 * 8) 8) /\
+   (((0 <= (1 * 8)) /\ (((1 * 8) + 8) <= 16)) /\
+   ((BArray16.is_init _b_context (1 * 8) 8) /\
+   (true /\
+   (((0 <= _message_pointer) /\ (_message_pointer <= 18446744073709551615)) /\
+   (true /\
+   (true /\
+   (((0 <= 18446744073709551360) /\
+    (18446744073709551360 <= 18446744073709551615)) /\
+   ((((((BArray4896.is_init _b_signing_key 0
+        (((((32 + 32) + 64) + (7 * 96)) + (8 * 96)) +
+        (8 * ((13 * 256) %/ 8)))) /\
+       (BArray16.is_init _b_context 0 (8 * 2))) /\
+      (BArray32.is_init _b_randomness 0 32)) /\
+     (is_valid ptr_modulus Glob.mem_v
+     (W64.to_uint (BArray16.get64 _context 0))
+     (W64.to_uint (BArray16.get64 _context 1)))) /\
+    (is_valid ptr_modulus Glob.mem_v _message_pointer _message_size)) /\
+   (_message_size <= 18446744073709551360)))))))))))))) ==>
    ((true /\
     ((res.`3 <> (W64.of_int 0)) \/
     (BArray4627.is_init res.`2 0 ((64 + (7 * ((20 * 256) %/ 8))) + (75 + 8))))) /\
@@ -67585,19 +67700,34 @@ op ml_dsa_87_verify_spec _verification_key _b_verification_key _context _b_conte
    (true /\
    (true /\
    (true /\
+   (((0 <= (0 * 8)) /\ (((0 * 8) + 8) <= 16)) /\
+   ((BArray16.is_init _b_context (0 * 8) 8) /\
+   (((0 <= (1 * 8)) /\ (((1 * 8) + 8) <= 16)) /\
+   ((BArray16.is_init _b_context (1 * 8) 8) /\
+   (true /\
+   (((0 <= _message_pointer) /\ (_message_pointer <= 18446744073709551615)) /\
+   (true /\
+   (true /\
    (((0 <= 0) /\ (0 <= 18446744073709551615)) /\
    (((0 <= 18446744073709551615) /\
     (18446744073709551615 <= 18446744073709551615)) /\
    (((0 <= 0) /\ (0 <= 18446744073709551615)) /\
    (((0 <= 18446744073709551615) /\
     (18446744073709551615 <= 18446744073709551615)) /\
-   (((((((BArray2592.is_init _b_verification_key 0
-         (32 + (8 * (((23 - 13) * 256) %/ 8)))) /\
-        (BArray16.is_init _b_context 0 (8 * 2))) /\
-       (BArray4627.is_init _b_signature 0
-       ((64 + (7 * ((20 * 256) %/ 8))) + (75 + 8)))) /\
-      (0 <= _message_pointer)) /\
-     (_message_pointer <= 18446744073709551615)) /\
-    (0 <= _message_size)) /\
-   (_message_size <= 18446744073709551615))))))))))))) ==>
+   (((0 <= 18446744073709551360) /\
+    (18446744073709551360 <= 18446744073709551615)) /\
+   ((((((((((BArray2592.is_init _b_verification_key 0
+            (32 + (8 * (((23 - 13) * 256) %/ 8)))) /\
+           (BArray16.is_init _b_context 0 (8 * 2))) /\
+          (BArray4627.is_init _b_signature 0
+          ((64 + (7 * ((20 * 256) %/ 8))) + (75 + 8)))) /\
+         (0 <= _message_pointer)) /\
+        (_message_pointer <= 18446744073709551615)) /\
+       (0 <= _message_size)) /\
+      (_message_size <= 18446744073709551615)) /\
+     (is_valid ptr_modulus Glob.mem_v
+     (W64.to_uint (BArray16.get64 _context 0))
+     (W64.to_uint (BArray16.get64 _context 1)))) /\
+    (is_valid ptr_modulus Glob.mem_v _message_pointer _message_size)) /\
+   (_message_size <= 18446744073709551360)))))))))))))))))))))) ==>
    (true /\ (valid res.`2))].

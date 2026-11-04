@@ -11,8 +11,12 @@
    (cnz, pos_ok); __sign_internal establishes it from the count of non-zero
    coefficients of the sampled challenge (sample____challenge_cnz).
 
-   The Keccak wrappers called by ML-DSA are assumed (axioms below), to be
-   discharged by the safety proofs of the fips202 implementation.
+   The Keccak procedures called by ML-DSA are those of the fips202
+   implementation: each one meets its contract by the safety proof of that
+   implementation, transferred by an equivalence (sim) between the two
+   models; the wrappers are proved from them. KECCAK_PERMUTATION selects the
+   reference permutation, so the AVX2 branch of the wrappers is not compiled
+   and is discarded (__KECCAK_F_permutation).
 
    Most scripts are generated: after unrolling the constant-bound loops and
    discharging the callees by their lemmas, the initialisation witnesses are
@@ -99,18 +103,482 @@ clone SubByteArrayInit as SBI4096_1024 with theory SB <- SBArray4096_1024.
 clone SubByteArrayInit as SBI16384_1024 with theory SB <- SBArray16384_1024.
 clone SubByteArrayInit as SBI16384_4096 with theory SB <- SBArray16384_4096.
 
-(* ---- assumed: the Keccak wrappers ---- *)
-axiom __derive_commitment_hash_proof _commitment_hash _b_commitment_hash _message_representative _b_message_representative _encoded_commitment _b_encoded_commitment : (__derive_commitment_hash_spec _commitment_hash _b_commitment_hash _message_representative _b_message_representative _encoded_commitment _b_encoded_commitment).
-axiom __derive_message_representative_proof _message_representative _b_message_representative _verification_key_hash _b_verification_key_hash _context_pointer _context_size _message_pointer _message_size : (__derive_message_representative_spec _message_representative _b_message_representative _verification_key_hash _b_verification_key_hash _context_pointer _context_size _message_pointer _message_size).
-axiom _shake256_A128__A32_A2_proof _out _b_out _seed _b_seed _extra _b_extra : (_shake256_A128__A32_A2_spec _out _b_out _seed _b_seed _extra _b_extra).
-axiom _shake256_A64__A128_proof _out _b_out _in _b_in : (_shake256_A64__A128_spec _out _b_out _in _b_in).
-axiom hash_verification_key_proof _verification_key_hash _b_verification_key_hash _verification_key _b_verification_key : (hash_verification_key_spec _verification_key_hash _b_verification_key_hash _verification_key _b_verification_key).
-axiom shake128_absorb_34_4x_proof _state _b_state _rho _b_rho _domain_separators _b_domain_separators : (shake128_absorb_34_4x_spec _state _b_state _rho _b_rho _domain_separators _b_domain_separators).
-axiom shake128_squeezeblock4x_proof _state _b_state _h0 _b_h0 _h1 _b_h1 _h2 _b_h2 _h3 _b_h3 : (shake128_squeezeblock4x_spec _state _b_state _h0 _b_h0 _h1 _b_h1  _h2 _b_h2 _h3 _b_h3).
-axiom shake256_absorb_66_4x_proof _state _b_state _rho_prime _b_rho_prime _starting_domain_separator : (shake256_absorb_66_4x_spec _state _b_state _rho_prime _b_rho_prime _starting_domain_separator).
-axiom shake256_absorb_commitment_hash_proof _st _b_st _commitment_hash _b_commitment_hash : (shake256_absorb_commitment_hash_spec _st _b_st _commitment_hash _b_commitment_hash).
-axiom shake256_squeezeblock_proof _st _b_st _block _b_block : (shake256_squeezeblock_spec _st _b_st _block _b_block).
-axiom shake256_squeezeblock4x_proof _state _b_state _h0 _b_h0 _h1 _b_h1 _h2 _b_h2 _h3 _b_h3 : (shake256_squeezeblock4x_spec _state _b_state _h0 _b_h0 _h1 _b_h1  _h2 _b_h2 _h3 _b_h3).
+(* ---- the Keccak procedures, from the safety proofs of fips202 ---- *)
+require Keccak1600_Jazz_safety Keccak1600_common_safety Keccakf1600_safety Keccak1600_safety
+  Keccak1600_avx2_safety Keccakf1600x4_safety Keccak1600x4_safety.
+require import BArray2 BArray32 BArray64 BArray66 BArray128 BArray136 BArray168 BArray768
+  BArray1312.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR64
+  with op _ASIZE <- 64, theory A <- BArray64 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR768
+  with op _ASIZE <- 768, theory A <- BArray768 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR32
+  with op _ASIZE <- 32, theory A <- BArray32 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR66
+  with op _ASIZE <- 66, theory A <- BArray66 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakUpdstateRefSafety as KU64
+  with op _ASIZE <- 64, theory A <- BArray64 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR2
+  with op _ASIZE <- 2, theory A <- BArray2 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR128
+  with op _ASIZE <- 128, theory A <- BArray128 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR1312
+  with op _ASIZE <- 1312, theory A <- BArray1312 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600x4_safety.KeccakArrayAvx2x4Safety as KX432
+  with op _ASIZE <- 32, theory A <- BArray32 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600x4_safety.KeccakArrayAvx2x4Safety as KX42
+  with op _ASIZE <- 2, theory A <- BArray2 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600x4_safety.KeccakArrayAvx2x4Safety as KX4168
+  with op _ASIZE <- 168, theory A <- BArray168 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600x4_safety.KeccakArrayAvx2x4Safety as KX464
+  with op _ASIZE <- 64, theory A <- BArray64 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR136
+  with op _ASIZE <- 136, theory A <- BArray136 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600x4_safety.KeccakArrayAvx2x4Safety as KX4136
+  with op _ASIZE <- 136, theory A <- BArray136 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+
+lemma __KECCAK_F_proof _pERMUTATION :
+  __KECCAK_F_spec _pERMUTATION.
+proof.
+have h := Keccak1600_common_safety.__KECCAK_F_proof _pERMUTATION.
+have e : equiv [Jmldsa44_safety.M.__KECCAK_F ~ Keccak1600_Jazz_safety.M.__KECCAK_F :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /__KECCAK_F_spec; rewrite /Keccak1600_Jazz_safety.__KECCAK_F_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma __state_init_proof _st _b_st :
+  __state_init_spec _st _b_st.
+proof.
+have h := Keccak1600_safety.__state_init_proof _st _b_st.
+have e : equiv [Jmldsa44_safety.M.__state_init ~ Keccak1600_Jazz_safety.M.__state_init :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /__state_init_spec; rewrite /Keccak1600_Jazz_safety.__state_init_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a64____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a64____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR64.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jmldsa44_safety.M.a64____absorb ~ KR64.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a64____absorb_spec; rewrite /KR64.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a_ENCODED_COMMITMENT____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a_ENCODED_COMMITMENT____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR768.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jmldsa44_safety.M.a_ENCODED_COMMITMENT____absorb ~ KR768.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a_ENCODED_COMMITMENT____absorb_spec; rewrite /KR768.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a_COMMITMENT_HASH____squeeze_proof _st _b_st _buf _b_buf __RATE8 :
+  a_COMMITMENT_HASH____squeeze_spec _st _b_st _buf _b_buf __RATE8.
+proof.
+have h := KR32.__squeeze_proof _st _b_st _buf _b_buf __RATE8.
+have e : equiv [Jmldsa44_safety.M.a_COMMITMENT_HASH____squeeze ~ KR32.MM.__squeeze :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a_COMMITMENT_HASH____squeeze_spec; rewrite /KR32.__squeeze_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a66____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a66____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR66.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jmldsa44_safety.M.a66____absorb ~ KR66.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a66____absorb_spec; rewrite /KR66.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma _absorb_m_state_proof _st _b_st _r8 _at _buf _len :
+  _absorb_m_state_spec _st _b_st _r8 _at _buf _len.
+proof.
+have h := Keccak1600_safety._absorb_m_state_proof _st _b_st _r8 _at _buf _len.
+have e : equiv [Jmldsa44_safety.M._absorb_m_state ~ Keccak1600_Jazz_safety.M._absorb_m_state :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /_absorb_m_state_spec; rewrite /Keccak1600_Jazz_safety._absorb_m_state_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma _finish_state_proof _st _b_st _r8 _at _trailb :
+  _finish_state_spec _st _b_st _r8 _at _trailb.
+proof.
+have h := Keccak1600_safety._finish_state_proof _st _b_st _r8 _at _trailb.
+have e : equiv [Jmldsa44_safety.M._finish_state ~ Keccak1600_Jazz_safety.M._finish_state :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /_finish_state_spec; rewrite /Keccak1600_Jazz_safety._finish_state_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a64___squeeze_state_proof _st _b_st _r8 _at _buf _b_buf _len :
+  a64___squeeze_state_spec _st _b_st _r8 _at _buf _b_buf _len.
+proof.
+have h := KU64._squeeze_state_proof _st _b_st _r8 _at _buf _b_buf _len.
+have e : equiv [Jmldsa44_safety.M.a64___squeeze_state ~ KU64.MM._squeeze_state :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a64___squeeze_state_spec; rewrite /KU64._squeeze_state_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a32____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a32____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR32.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jmldsa44_safety.M.a32____absorb ~ KR32.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a32____absorb_spec; rewrite /KR32.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a2____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a2____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR2.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jmldsa44_safety.M.a2____absorb ~ KR2.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a2____absorb_spec; rewrite /KR2.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a128____squeeze_proof _st _b_st _buf _b_buf __RATE8 :
+  a128____squeeze_spec _st _b_st _buf _b_buf __RATE8.
+proof.
+have h := KR128.__squeeze_proof _st _b_st _buf _b_buf __RATE8.
+have e : equiv [Jmldsa44_safety.M.a128____squeeze ~ KR128.MM.__squeeze :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a128____squeeze_spec; rewrite /KR128.__squeeze_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a128____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a128____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR128.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jmldsa44_safety.M.a128____absorb ~ KR128.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a128____absorb_spec; rewrite /KR128.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a64____squeeze_proof _st _b_st _buf _b_buf __RATE8 :
+  a64____squeeze_spec _st _b_st _buf _b_buf __RATE8.
+proof.
+have h := KR64.__squeeze_proof _st _b_st _buf _b_buf __RATE8.
+have e : equiv [Jmldsa44_safety.M.a64____squeeze ~ KR64.MM.__squeeze :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a64____squeeze_spec; rewrite /KR64.__squeeze_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a_VERIFICATION_KEY____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a_VERIFICATION_KEY____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR1312.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jmldsa44_safety.M.a_VERIFICATION_KEY____absorb ~ KR1312.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a_VERIFICATION_KEY____absorb_spec; rewrite /KR1312.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma __state_init_avx2x4_proof _st _b_st :
+  __state_init_avx2x4_spec _st _b_st.
+proof.
+have h := Keccakf1600x4_safety.__state_init_avx2x4_proof _st _b_st.
+have e : equiv [Jmldsa44_safety.M.__state_init_avx2x4
+  ~ Keccak1600_Jazz_safety.M.__state_init_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /__state_init_avx2x4_spec; rewrite /Keccak1600_Jazz_safety.__state_init_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a32____absorb_bcast_avx2x4_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a32____absorb_bcast_avx2x4_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KX432.__absorb_bcast_avx2x4_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jmldsa44_safety.M.a32____absorb_bcast_avx2x4 ~ KX432.MM.__absorb_bcast_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a32____absorb_bcast_avx2x4_spec; rewrite /KX432.__absorb_bcast_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a2____absorb_avx2x4_proof _st _b_st _aT _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3
+    _b_buf3 __TRAILB __RATE8 :
+  a2____absorb_avx2x4_spec _st _b_st _aT _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3
+    __TRAILB __RATE8.
+proof.
+have h := KX42.__absorb_avx2x4_proof _st _b_st _aT _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3
+  _b_buf3 __TRAILB __RATE8.
+have e : equiv [Jmldsa44_safety.M.a2____absorb_avx2x4 ~ KX42.MM.__absorb_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a2____absorb_avx2x4_spec; rewrite /KX42.__absorb_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma _keccakf1600_avx2x4_proof _a _b_a :
+  _keccakf1600_avx2x4_spec _a _b_a.
+proof.
+have h := Keccakf1600x4_safety._keccakf1600_avx2x4_proof _a _b_a.
+have e : equiv [Jmldsa44_safety.M._keccakf1600_avx2x4
+  ~ Keccak1600_Jazz_safety.M._keccakf1600_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /_keccakf1600_avx2x4_spec; rewrite /Keccak1600_Jazz_safety._keccakf1600_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a168____dumpstate_avx2x4_proof _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3 _offset
+    __LEN _st _b_st :
+  a168____dumpstate_avx2x4_spec _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3 _offset
+    __LEN _st _b_st.
+proof.
+have h := KX4168.__dumpstate_avx2x4_proof _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3
+  _offset __LEN _st _b_st.
+have e : equiv [Jmldsa44_safety.M.a168____dumpstate_avx2x4 ~ KX4168.MM.__dumpstate_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a168____dumpstate_avx2x4_spec; rewrite /KX4168.__dumpstate_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a64____absorb_bcast_avx2x4_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a64____absorb_bcast_avx2x4_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KX464.__absorb_bcast_avx2x4_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jmldsa44_safety.M.a64____absorb_bcast_avx2x4 ~ KX464.MM.__absorb_bcast_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a64____absorb_bcast_avx2x4_spec; rewrite /KX464.__absorb_bcast_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a_COMMITMENT_HASH____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a_COMMITMENT_HASH____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR32.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jmldsa44_safety.M.a_COMMITMENT_HASH____absorb ~ KR32.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a_COMMITMENT_HASH____absorb_spec; rewrite /KR32.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma _keccakf1600_proof _a _b_a :
+  _keccakf1600_spec _a _b_a.
+proof.
+have h := Keccakf1600_safety._keccakf1600_proof _a _b_a.
+have e : equiv [Jmldsa44_safety.M._keccakf1600 ~ Keccak1600_Jazz_safety.M._keccakf1600 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /_keccakf1600_spec; rewrite /Keccak1600_Jazz_safety._keccakf1600_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a136____dumpstate_proof _buf _b_buf _offset __LEN _st _b_st :
+  a136____dumpstate_spec _buf _b_buf _offset __LEN _st _b_st.
+proof.
+have h := KR136.__dumpstate_proof _buf _b_buf _offset __LEN _st _b_st.
+have e : equiv [Jmldsa44_safety.M.a136____dumpstate ~ KR136.MM.__dumpstate :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a136____dumpstate_spec; rewrite /KR136.__dumpstate_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a136____dumpstate_avx2x4_proof _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3 _offset
+    __LEN _st _b_st :
+  a136____dumpstate_avx2x4_spec _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3 _offset
+    __LEN _st _b_st.
+proof.
+have h := KX4136.__dumpstate_avx2x4_proof _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3
+  _offset __LEN _st _b_st.
+have e : equiv [Jmldsa44_safety.M.a136____dumpstate_avx2x4 ~ KX4136.MM.__dumpstate_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a136____dumpstate_avx2x4_spec; rewrite /KX4136.__dumpstate_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+(* the permutation selected by KECCAK_PERMUTATION (514): the reference one *)
+lemma __KECCAK_F_permutation :
+  hoare [Jmldsa44_safety.M.__KECCAK_F : pERMUTATION = 514 ==> res.`1 = 2 /\ valid res.`2].
+proof.
+proc; auto => />.
+by rewrite (W256.to_uint_and_mod 8 (W256.of_int 514)) // W256.of_uintK.
+qed.
+
+lemma __derive_commitment_hash_proof _commitment_hash _b_commitment_hash _message_representative
+    _b_message_representative _encoded_commitment _b_encoded_commitment :
+  __derive_commitment_hash_spec _commitment_hash _b_commitment_hash _message_representative
+    _b_message_representative _encoded_commitment _b_encoded_commitment.
+proof.
+hint +safety.
+rewrite /__derive_commitment_hash_spec; proc.
+(* the AVX2 branch is not compiled: KECCAK_PERMUTATION selects the reference one *)
+rcondf ^if; 1: by wp; call __KECCAK_F_permutation; wp; skip => /> /#.
+auto; ecall (a_COMMITMENT_HASH____squeeze_proof param_28 (BArray200.init_arr (W8.of_int 255))
+                param_27 b_param_0 param_26).
+auto; ecall (a_ENCODED_COMMITMENT____absorb_proof param_25 (BArray200.init_arr (W8.of_int 255))
+                param_24 param_23 (BArray768.init_arr (W8.of_int 255)) param_22 param_21).
+auto; ecall (a64____absorb_proof param_20 (BArray200.init_arr (W8.of_int 255)) param_19 param_18
+                (BArray64.init_arr (W8.of_int 255)) param_17 param_16).
+auto; ecall (__state_init_proof param_15 b_param_1).
+auto; ecall (__KECCAK_F_proof param).
+by auto => /> /#.
+qed.
+
+lemma __derive_message_representative_proof _message_representative _b_message_representative
+    _verification_key_hash _b_verification_key_hash _context_pointer _context_size _message_pointer
+    _message_size :
+  __derive_message_representative_spec _message_representative _b_message_representative
+    _verification_key_hash _b_verification_key_hash _context_pointer _context_size _message_pointer
+    _message_size.
+proof.
+hint +safety.
+rewrite /__derive_message_representative_spec; proc.
+auto; ecall (a64___squeeze_state_proof param_23 (BArray200.init_arr (W8.of_int 255)) param_22
+                param_21 param_20 b_param param_19).
+auto; ecall (_finish_state_proof param_18 (BArray200.init_arr (W8.of_int 255)) param_17 param_16
+                param_15).
+auto; ecall (_absorb_m_state_proof param_14 (BArray200.init_arr (W8.of_int 255)) param_13 param_12
+                param_11 param_10).
+auto; ecall (_absorb_m_state_proof param_9 (BArray200.init_arr (W8.of_int 255)) param_8 param_7
+                param_6 param_5).
+auto; ecall (a66____absorb_proof param_4 (BArray200.init_arr (W8.of_int 255)) param_3 param_2
+                b_param_0 param_1 param_0).
+auto; ecall (__state_init_proof param b_param_1).
+by auto => /> /#.
+qed.
+
+lemma _shake256_A128__A32_A2_proof _out _b_out _seed _b_seed _extra _b_extra :
+  _shake256_A128__A32_A2_spec _out _b_out _seed _b_seed _extra _b_extra.
+proof.
+hint +safety.
+rewrite /_shake256_A128__A32_A2_spec; proc.
+(* the AVX2 branch is not compiled: KECCAK_PERMUTATION selects the reference one *)
+rcondf ^if; 1: by wp; call __KECCAK_F_permutation; wp; skip => /> /#.
+auto; ecall (a128____squeeze_proof param_28 (BArray200.init_arr (W8.of_int 255)) param_27
+                b_param_0 param_26).
+auto; ecall (a2____absorb_proof param_25 (BArray200.init_arr (W8.of_int 255)) param_24 param_23
+                (BArray2.init_arr (W8.of_int 255)) param_22 param_21).
+auto; ecall (a32____absorb_proof param_20 (BArray200.init_arr (W8.of_int 255)) param_19 param_18
+                (BArray32.init_arr (W8.of_int 255)) param_17 param_16).
+auto; ecall (__state_init_proof param_15 b_param_1).
+auto; ecall (__KECCAK_F_proof param).
+by auto => /> /#.
+qed.
+
+lemma _shake256_A64__A128_proof _out _b_out _in _b_in :
+  _shake256_A64__A128_spec _out _b_out _in _b_in.
+proof.
+hint +safety.
+rewrite /_shake256_A64__A128_spec; proc.
+(* the AVX2 branch is not compiled: KECCAK_PERMUTATION selects the reference one *)
+rcondf ^if; 1: by wp; call __KECCAK_F_permutation; wp; skip => /> /#.
+auto; ecall (a64____squeeze_proof param_18 (BArray200.init_arr (W8.of_int 255)) param_17 b_param_0
+                param_16).
+auto; ecall (a128____absorb_proof param_15 (BArray200.init_arr (W8.of_int 255)) param_14 param_13
+                (BArray128.init_arr (W8.of_int 255)) param_12 param_11).
+auto; ecall (__state_init_proof param_10 b_param_1).
+auto; ecall (__KECCAK_F_proof param).
+by auto => /> /#.
+qed.
+
+lemma hash_verification_key_proof _verification_key_hash _b_verification_key_hash _verification_key
+    _b_verification_key :
+  hash_verification_key_spec _verification_key_hash _b_verification_key_hash _verification_key
+    _b_verification_key.
+proof.
+hint +safety.
+rewrite /hash_verification_key_spec; proc.
+(* the AVX2 branch is not compiled: KECCAK_PERMUTATION selects the reference one *)
+rcondf ^if; 1: by wp; call __KECCAK_F_permutation; wp; skip => /> /#.
+auto; ecall (a64____squeeze_proof param_18 (BArray200.init_arr (W8.of_int 255)) param_17 b_param_0
+                param_16).
+auto; ecall (a_VERIFICATION_KEY____absorb_proof param_15 (BArray200.init_arr (W8.of_int 255))
+                param_14 param_13 (BArray1312.init_arr (W8.of_int 255)) param_12 param_11).
+auto; ecall (__state_init_proof param_10 b_param_1).
+auto; ecall (__KECCAK_F_proof param).
+by auto => /> /#.
+qed.
+
+lemma shake128_absorb_34_4x_proof _state _b_state _rho _b_rho _domain_separators
+    _b_domain_separators :
+  shake128_absorb_34_4x_spec _state _b_state _rho _b_rho _domain_separators _b_domain_separators.
+proof.
+hint +safety.
+rewrite /shake128_absorb_34_4x_spec; proc.
+auto; ecall (a2____absorb_avx2x4_proof param_12 (BArray800.init_arr (W8.of_int 255)) param_11
+                param_10 b_param_2 param_9 b_param_1 param_8 b_param_0 param_7 b_param param_6
+                param_5).
+auto; ecall (a32____absorb_bcast_avx2x4_proof param_4 (BArray800.init_arr (W8.of_int 255)) param_3
+                param_2 (BArray32.init_arr (W8.of_int 255)) param_1 param_0).
+auto; ecall (__state_init_avx2x4_proof param b_param_3).
+by auto => /> /#.
+qed.
+
+lemma shake128_squeezeblock4x_proof _state _b_state _h0 _b_h0 _h1 _b_h1 _h2 _b_h2 _h3 _b_h3 :
+  shake128_squeezeblock4x_spec _state _b_state _h0 _b_h0 _h1 _b_h1 _h2 _b_h2 _h3 _b_h3.
+proof.
+hint +safety.
+rewrite /shake128_squeezeblock4x_spec; proc.
+auto; ecall (a168____dumpstate_avx2x4_proof param_6 b_param_2 param_5 b_param_1 param_4 b_param_0
+                param_3 b_param param_2 param_1 param_0 (BArray800.init_arr (W8.of_int 255))).
+auto; ecall (_keccakf1600_avx2x4_proof param (BArray800.init_arr (W8.of_int 255))).
+by auto => /> /#.
+qed.
+
+lemma shake256_absorb_66_4x_proof _state _b_state _rho_prime _b_rho_prime _starting_domain_separator
+    :
+  shake256_absorb_66_4x_spec _state _b_state _rho_prime _b_rho_prime _starting_domain_separator.
+proof.
+hint +safety.
+rewrite /shake256_absorb_66_4x_spec; proc.
+auto; ecall (a2____absorb_avx2x4_proof param_12 (BArray800.init_arr (W8.of_int 255)) param_11
+                param_10 b_param_2 param_9 b_param_1 param_8 b_param_0 param_7 b_param param_6
+                param_5).
+auto; ecall (a64____absorb_bcast_avx2x4_proof param_4 (BArray800.init_arr (W8.of_int 255)) param_3
+                param_2 (BArray64.init_arr (W8.of_int 255)) param_1 param_0).
+auto; ecall (__state_init_avx2x4_proof param b_param_3).
+by auto => /> /#.
+qed.
+
+lemma shake256_absorb_commitment_hash_proof _st _b_st _commitment_hash _b_commitment_hash :
+  shake256_absorb_commitment_hash_spec _st _b_st _commitment_hash _b_commitment_hash.
+proof.
+hint +safety.
+rewrite /shake256_absorb_commitment_hash_spec; proc.
+(* the AVX2 branch is not compiled: KECCAK_PERMUTATION selects the reference one *)
+rcondf ^if; 1: by wp; call __KECCAK_F_permutation; wp; skip => /> /#.
+auto; ecall (a_COMMITMENT_HASH____absorb_proof param_12 (BArray200.init_arr (W8.of_int 255))
+                param_11 param_10 (BArray32.init_arr (W8.of_int 255)) param_9 param_8).
+auto; ecall (__state_init_proof param_7 b_param_0).
+auto; ecall (__KECCAK_F_proof param).
+by auto => /> /#.
+qed.
+
+lemma shake256_squeezeblock_proof _st _b_st _block _b_block :
+  shake256_squeezeblock_spec _st _b_st _block _b_block.
+proof.
+hint +safety.
+rewrite /shake256_squeezeblock_spec; proc.
+(* the AVX2 branch is not compiled: KECCAK_PERMUTATION selects the reference one *)
+rcondf ^if; 1: by wp; call __KECCAK_F_permutation; wp; skip => /> /#.
+auto; ecall (a136____dumpstate_proof param_12 b_param_3 param_11 param_10 param_9 b_param_2).
+auto; ecall (_keccakf1600_proof param_8 b_param_4).
+auto; ecall (__KECCAK_F_proof param).
+by auto => /> /#.
+qed.
+
+lemma shake256_squeezeblock4x_proof _state _b_state _h0 _b_h0 _h1 _b_h1 _h2 _b_h2 _h3 _b_h3 :
+  shake256_squeezeblock4x_spec _state _b_state _h0 _b_h0 _h1 _b_h1 _h2 _b_h2 _h3 _b_h3.
+proof.
+hint +safety.
+rewrite /shake256_squeezeblock4x_spec; proc.
+auto; ecall (a136____dumpstate_avx2x4_proof param_6 b_param_2 param_5 b_param_1 param_4 b_param_0
+                param_3 b_param param_2 param_1 param_0 (BArray800.init_arr (W8.of_int 255))).
+auto; ecall (_keccakf1600_avx2x4_proof param (BArray800.init_arr (W8.of_int 255))).
+by auto => /> /#.
+qed.
 
 lemma error_polynomial__encode_eta2_proof _encoded _b_encoded _polynomial _b_polynomial :
       (error_polynomial__encode_eta2_spec _encoded _b_encoded _polynomial
@@ -1131,23 +1599,27 @@ have hset : forall (b : BArray1024.t) (j : int), 0 <= j => j + 4 <= 1024 =>
    position; the polynomial is fully initialised from the start *)
 while (217 <= to_uint i /\ to_uint i <= 256 /\ condition_loop = (to_uint i < 256)
     /\ to_uint xof_offset <= 136
-    /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge).
+    /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge
+      /\ BArray224.is_init b_state 0 200).
 + (* refill the block when exhausted *)
   seq 3 : (217 <= to_uint i /\ to_uint i < 256 /\ to_uint xof_offset < 136
-      /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge).
+      /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge
+      /\ BArray224.is_init b_state 0 200).
   + seq 2 : (217 <= to_uint i /\ to_uint i < 256 /\ to_uint xof_offset <= 136
         /\ condition_refill = (W64.of_int 136 \ule xof_offset)
-        /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge).
+        /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge
+      /\ BArray224.is_init b_state 0 200).
     + by auto => /> /#.
     if.
-    + auto; ecall (shake256_squeezeblock_proof param_4 (BArray224.init_arr (W8.of_int 255))
+    + auto; ecall (shake256_squeezeblock_proof param_4 b_param
                      param_3 (BArray136.init_arr (W8.of_int 255))).
       by auto => /> *; smt().
     by auto => /> &hr hi1 hi2 hxo hinit hv; rewrite W64.uleE h136 /= => hlt /#.
   (* read one byte *)
   seq 5 : (217 <= to_uint i /\ to_uint i < 256 /\ to_uint xof_offset <= 136
       /\ to_uint sample_at < 256
-      /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge).
+      /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge
+      /\ BArray224.is_init b_state 0 200).
   + auto => /> &hr hi1 hi2 hxo hinit hv.
     have hx1 : to_uint (xof_offset{hr} + W64.one) = to_uint xof_offset{hr} + 1.
     + by rewrite W64.to_uintD_small /= /#.
@@ -1157,18 +1629,22 @@ while (217 <= to_uint i /\ to_uint i <= 256 /\ condition_loop = (to_uint i < 256
   (* resample while the position exceeds i *)
   seq 1 : (217 <= to_uint i /\ to_uint i < 256 /\ to_uint xof_offset <= 136
       /\ to_uint sample_at < 256
-      /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge).
+      /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge
+      /\ BArray224.is_init b_state 0 200).
   + while (217 <= to_uint i /\ to_uint i < 256 /\ to_uint xof_offset <= 136
         /\ to_uint sample_at < 256
-        /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge).
+        /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge
+      /\ BArray224.is_init b_state 0 200).
     + seq 3 : (217 <= to_uint i /\ to_uint i < 256 /\ to_uint xof_offset < 136
-          /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge).
+          /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge
+      /\ BArray224.is_init b_state 0 200).
       + seq 2 : (217 <= to_uint i /\ to_uint i < 256 /\ to_uint xof_offset <= 136
             /\ condition_refill = (W64.of_int 136 \ule xof_offset)
-            /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge).
+            /\ BArray1024.is_init b_output_challenge 0 1024 /\ valid trace_sample____challenge
+      /\ BArray224.is_init b_state 0 200).
         + by auto => /> /#.
         if.
-        + auto; ecall (shake256_squeezeblock_proof param_4 (BArray224.init_arr (W8.of_int 255))
+        + auto; ecall (shake256_squeezeblock_proof param_4 b_param
                          param_3 (BArray136.init_arr (W8.of_int 255))).
           by auto => /> *; smt().
         by auto => /> &hr hi1 hi2 hxo hinit hv; rewrite W64.uleE h136 /= => hlt /#.
@@ -1198,9 +1674,8 @@ while (217 <= to_uint i /\ to_uint i <= 256 /\ condition_loop = (to_uint i < 256
   rewrite W64.ultE hi /=.
   smt(W64.to_uint_cmp).
 (* absorb the seed, squeeze the first block *)
-auto; ecall (shake256_squeezeblock_proof param_2 (BArray224.init_arr (W8.of_int 255))
-          param_1 b_param).
-auto; ecall (shake256_absorb_commitment_hash_proof param_0 b_param_0 param
+auto; ecall (shake256_squeezeblock_proof param_2 b_param_1 param_1 b_param_0).
+auto; ecall (shake256_absorb_commitment_hash_proof param_0 b_param_2 param
                (BArray32.init_arr (W8.of_int 255))).
 (* the polynomial is zeroed 32 bytes at a time *)
 wp.
@@ -1230,30 +1705,34 @@ hint +safety.
 proc.
 while (217 <= to_uint i <= 256 /\ condition_loop = (to_uint i < 256)
     /\ (forall k, to_uint i <= k < 256 => BArray1024.get32 output_challenge k = W32.zero)
-    /\ cnz output_challenge = to_uint i - 217).
+    /\ cnz output_challenge = to_uint i - 217
+      /\ BArray224.is_init b_state 0 200).
 + (* refill and sample, until the position is at most i *)
   seq 8 : (217 <= to_uint i < 256
       /\ (forall k, to_uint i <= k < 256 => BArray1024.get32 output_challenge k = W32.zero)
-      /\ cnz output_challenge = to_uint i - 217 /\ condition_resample = (i \ult sample_at)).
+      /\ cnz output_challenge = to_uint i - 217 /\ condition_resample = (i \ult sample_at)
+      /\ BArray224.is_init b_state 0 200).
   + sp; wp; if.
-    + wp; ecall (shake256_squeezeblock_proof param_4 (BArray224.init_arr (W8.of_int 255))
+    + wp; ecall (shake256_squeezeblock_proof param_4 b_param
                    param_3 (BArray136.init_arr (W8.of_int 255))).
       by auto => /> /#.
     by auto => /> /#.
   seq 1 : (217 <= to_uint i < 256
       /\ (forall k, to_uint i <= k < 256 => BArray1024.get32 output_challenge k = W32.zero)
-      /\ cnz output_challenge = to_uint i - 217 /\ !(i \ult sample_at)).
+      /\ cnz output_challenge = to_uint i - 217 /\ !(i \ult sample_at)
+      /\ BArray224.is_init b_state 0 200).
   + while (217 <= to_uint i < 256
         /\ (forall k, to_uint i <= k < 256 => BArray1024.get32 output_challenge k = W32.zero)
-        /\ cnz output_challenge = to_uint i - 217 /\ condition_resample = (i \ult sample_at)).
+        /\ cnz output_challenge = to_uint i - 217 /\ condition_resample = (i \ult sample_at)
+      /\ BArray224.is_init b_state 0 200).
     + sp; wp; if.
-      + wp; ecall (shake256_squeezeblock_proof param_4 (BArray224.init_arr (W8.of_int 255))
+      + wp; ecall (shake256_squeezeblock_proof param_4 b_param
                      param_3 (BArray136.init_arr (W8.of_int 255))).
         by auto => /> /#.
       by auto => /> /#.
     by auto => /> /#.
   (* the swap: c[i] <- c[s], c[s] <- +-1, with c[i] = 0 and s <= i *)
-  auto => /> &hr hi0 hi1 hz hc; rewrite W64.ultE => /lezNgt hs.
+  auto => /> &hr hi0 hi1 hz hc; rewrite W64.ultE => /lezNgt hs _.
   have hs0 := W64.to_uint_cmp sample_at{hr}.
   have hi : to_uint (i{hr} + W64.one) = to_uint i{hr} + 1 by rewrite W64.to_uintD_small /= /#.
   pose c := BArray1024.get32 output_challenge{hr} (to_uint sample_at{hr}).
@@ -1278,9 +1757,8 @@ while (217 <= to_uint i <= 256 /\ condition_loop = (to_uint i < 256)
     else BArray1024.get32 output_challenge{hr} (to_uint sample_at{hr})) = c) 1:/#.
   by rewrite -/(cnz output_challenge{hr}) hc /b2i; ring.
 (* absorb the seed, squeeze the first block *)
-wp; ecall (shake256_squeezeblock_proof param_2 (BArray224.init_arr (W8.of_int 255))
-          param_1 b_param).
-wp; ecall (shake256_absorb_commitment_hash_proof param_0 b_param_0 param
+wp; ecall (shake256_squeezeblock_proof param_2 b_param_1 param_1 b_param_0).
+wp; ecall (shake256_absorb_commitment_hash_proof param_0 b_param_2 param
              (BArray32.init_arr (W8.of_int 255))).
 (* the polynomial is zeroed 32 bytes at a time *)
 wp; while (to_uint i <= 1024 /\ to_uint i %% 32 = 0 /\ zeros_256 = W256.zero
@@ -1299,7 +1777,7 @@ have hz32 : forall k, 0 <= k < 256 => BArray1024.get32 oc0 k = W32.zero.
 split.
 + split => [k hk1 hk2 | ]; 1: by apply hz32 => /#.
   by rewrite /cnz (ipos_none _ 0 256) // ipos0.
-by move=> c1 i1 oc1 _ hi1 hi2 hlt _ ->; smt().
+by move=> bs c1 i1 oc1 _ hi1 hi2 hlt _ -> _; smt().
 qed.
 
 (* the entries of the positions written so far, [0, np) and [nm, tau):
@@ -3376,6 +3854,10 @@ conseq (_ :
   /\ 0 <= context_size <= 18446744073709551615
   /\ 0 <= message_pointer <= 18446744073709551615
   /\ 0 <= message_size <= 18446744073709551615
+  /\ is_valid ptr_modulus Glob.mem_v context_pointer context_size
+  /\ context_size <= 18446744073709551360
+  /\ is_valid ptr_modulus Glob.mem_v message_pointer message_size
+  /\ message_size <= 18446744073709551360
   ==> _).
 + by move=> &hr />; rewrite -!(BI2560.is_init_full _ 2560) // -!(BI32.is_init_full _ 32) //.
 (* the rejection sampling loop runs until an attempt passes every norm check
@@ -3555,6 +4037,10 @@ seq 108 : (b_verification_key = BArray1312.init_arr (W8.of_int 255)
     /\ b_signature_encoded = BArray2420.init_arr (W8.of_int 255)
     /\ 0 <= context_pointer <= 18446744073709551615 /\ 0 <= context_size <= 18446744073709551615
     /\ 0 <= message_pointer <= 18446744073709551615 /\ 0 <= message_size <= 18446744073709551615
+    /\ is_valid ptr_modulus Glob.mem_v context_pointer context_size
+    /\ context_size <= 18446744073709551360
+    /\ is_valid ptr_modulus Glob.mem_v message_pointer message_size
+    /\ message_size <= 18446744073709551360
     /\ (result = W64.zero => BArray4096.is_init b_hints 0 4096)
     /\ valid trace___verify_internal).
 + auto; ecall (row_vector____check_infinity_norm_proof param_3 (BArray4096.init_arr (W8.of_int 255))

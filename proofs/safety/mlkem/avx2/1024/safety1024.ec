@@ -3,8 +3,12 @@
    safety checks of a run from initialised inputs is valid and the outputs
    are initialised.
 
-   The Keccak wrappers called by ML-KEM are assumed (axioms below), to be
-   discharged by the safety proofs of the fips202 implementation.
+   The Keccak procedures called by ML-KEM are those of the fips202
+   implementation: each one meets its contract by the safety proof of that
+   implementation, transferred by an equivalence (sim) between the two
+   models; the wrappers are proved from them. KECCAK_PERMUTATION selects the
+   reference permutation, so the AVX2 branch of the wrappers is not compiled
+   and is discarded (__KECCAK_F_permutation).
 
    Most scripts are generated: after unrolling the constant-bound loops and
    discharging the callees by their lemmas, the initialisation witnesses are
@@ -67,16 +71,392 @@ clone SubByteArrayInit as SBI3168_1568 with theory SB <- SBArray3168_1568.
 clone SubByteArrayInit as SBI8192_512 with theory SB <- SBArray8192_512.
 clone SubByteArrayInit as SBI8192_2048 with theory SB <- SBArray8192_2048.
 
-(* ---- assumed: the Keccak wrappers ---- *)
-axiom _sha3_256A_APK_proof _out _b_out _in _b_in : (_sha3_256A_APK_spec _out _b_out _in _b_in).
-axiom _sha3_512A_A33_proof _out _b_out _in _b_in : (_sha3_512A_A33_spec _out _b_out _in _b_in).
-axiom _sha3_512A_A64_proof _out _b_out _in _b_in : (_sha3_512A_A64_spec _out _b_out _in _b_in).
-axiom _shake128_next_state_proof _buf _b_buf : (_shake128_next_state_spec _buf _b_buf).
-axiom _shake128x4_absorb_A32_A2_proof _st _b_st _seed _b_seed _pos _b_pos : (_shake128x4_absorb_A32_A2_spec _st _b_st _seed _b_seed _pos _b_pos).
-axiom _shake128x4_squeeze3blocks_proof _st _b_st _buf _b_buf : (_shake128x4_squeeze3blocks_spec _st _b_st _buf _b_buf).
-axiom _shake256_A128__A32_A1_proof _out _b_out _seed _b_seed _nonce _b_nonce : (_shake256_A128__A32_A1_spec _out _b_out _seed _b_seed _nonce _b_nonce).
-axiom _shake256_A32__AZCT_proof _out _b_out _in _b_in : (_shake256_A32__AZCT_spec _out _b_out _in _b_in).
-axiom _shake256x4_AETA1__A32_A1_proof _out0 _b_out0 _out1 _b_out1 _out2 _b_out2 _out3 _b_out3 _seed _b_seed _nonces _b_nonces : (_shake256x4_AETA1__A32_A1_spec _out0 _b_out0 _out1 _b_out1 _out2 _b_out2 _out3 _b_out3 _seed _b_seed _nonces _b_nonces).
+(* ---- the Keccak procedures, from the safety proofs of fips202 ---- *)
+require Keccak1600_Jazz_safety Keccak1600_common_safety Keccakf1600_safety Keccak1600_safety
+  Keccak1600_avx2_safety Keccakf1600x4_safety Keccak1600x4_safety.
+require import BArray1 BArray2 BArray32 BArray33 BArray64 BArray128 BArray536 BArray1568 BArray1600.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR1568
+  with op _ASIZE <- 1568, theory A <- BArray1568 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR32
+  with op _ASIZE <- 32, theory A <- BArray32 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR33
+  with op _ASIZE <- 33, theory A <- BArray33 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR64
+  with op _ASIZE <- 64, theory A <- BArray64 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600x4_safety.KeccakArrayAvx2x4Safety as KX432
+  with op _ASIZE <- 32, theory A <- BArray32 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600x4_safety.KeccakArrayAvx2x4Safety as KX42
+  with op _ASIZE <- 2, theory A <- BArray2 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600x4_safety.KeccakArrayAvx2x4Safety as KX4536
+  with op _ASIZE <- 536, theory A <- BArray536 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR1
+  with op _ASIZE <- 1, theory A <- BArray1 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR128
+  with op _ASIZE <- 128, theory A <- BArray128 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600_safety.KeccakArrayRefSafety as KR1600
+  with op _ASIZE <- 1600, theory A <- BArray1600 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600x4_safety.KeccakArrayAvx2x4Safety as KX41
+  with op _ASIZE <- 1, theory A <- BArray1 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+clone Keccak1600x4_safety.KeccakArrayAvx2x4Safety as KX4128
+  with op _ASIZE <- 128, theory A <- BArray128 proof _ASIZE_ge0 by done, _ASIZE_u64 by done.
+
+lemma __KECCAK_F_proof _pERMUTATION :
+  __KECCAK_F_spec _pERMUTATION.
+proof.
+have h := Keccak1600_common_safety.__KECCAK_F_proof _pERMUTATION.
+have e : equiv [Jkem1024_safety.M.__KECCAK_F ~ Keccak1600_Jazz_safety.M.__KECCAK_F :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /__KECCAK_F_spec; rewrite /Keccak1600_Jazz_safety.__KECCAK_F_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma __state_init_proof _st _b_st :
+  __state_init_spec _st _b_st.
+proof.
+have h := Keccak1600_safety.__state_init_proof _st _b_st.
+have e : equiv [Jkem1024_safety.M.__state_init ~ Keccak1600_Jazz_safety.M.__state_init :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /__state_init_spec; rewrite /Keccak1600_Jazz_safety.__state_init_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma aPK____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  aPK____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR1568.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jkem1024_safety.M.aPK____absorb ~ KR1568.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /aPK____absorb_spec; rewrite /KR1568.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a32____squeeze_proof _st _b_st _buf _b_buf __RATE8 :
+  a32____squeeze_spec _st _b_st _buf _b_buf __RATE8.
+proof.
+have h := KR32.__squeeze_proof _st _b_st _buf _b_buf __RATE8.
+have e : equiv [Jkem1024_safety.M.a32____squeeze ~ KR32.MM.__squeeze :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a32____squeeze_spec; rewrite /KR32.__squeeze_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a33____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a33____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR33.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jkem1024_safety.M.a33____absorb ~ KR33.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a33____absorb_spec; rewrite /KR33.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a64____squeeze_proof _st _b_st _buf _b_buf __RATE8 :
+  a64____squeeze_spec _st _b_st _buf _b_buf __RATE8.
+proof.
+have h := KR64.__squeeze_proof _st _b_st _buf _b_buf __RATE8.
+have e : equiv [Jkem1024_safety.M.a64____squeeze ~ KR64.MM.__squeeze :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a64____squeeze_spec; rewrite /KR64.__squeeze_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a64____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a64____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR64.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jkem1024_safety.M.a64____absorb ~ KR64.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a64____absorb_spec; rewrite /KR64.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma _keccakf1600_proof _a _b_a :
+  _keccakf1600_spec _a _b_a.
+proof.
+have h := Keccakf1600_safety._keccakf1600_proof _a _b_a.
+have e : equiv [Jkem1024_safety.M._keccakf1600 ~ Keccak1600_Jazz_safety.M._keccakf1600 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /_keccakf1600_spec; rewrite /Keccak1600_Jazz_safety._keccakf1600_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma __state_init_avx2x4_proof _st _b_st :
+  __state_init_avx2x4_spec _st _b_st.
+proof.
+have h := Keccakf1600x4_safety.__state_init_avx2x4_proof _st _b_st.
+have e : equiv [Jkem1024_safety.M.__state_init_avx2x4
+  ~ Keccak1600_Jazz_safety.M.__state_init_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /__state_init_avx2x4_spec; rewrite /Keccak1600_Jazz_safety.__state_init_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a32____absorb_bcast_avx2x4_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a32____absorb_bcast_avx2x4_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KX432.__absorb_bcast_avx2x4_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jkem1024_safety.M.a32____absorb_bcast_avx2x4 ~ KX432.MM.__absorb_bcast_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a32____absorb_bcast_avx2x4_spec; rewrite /KX432.__absorb_bcast_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a2____absorb_avx2x4_proof _st _b_st _aT _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3
+    _b_buf3 __TRAILB __RATE8 :
+  a2____absorb_avx2x4_spec _st _b_st _aT _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3
+    __TRAILB __RATE8.
+proof.
+have h := KX42.__absorb_avx2x4_proof _st _b_st _aT _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3
+  _b_buf3 __TRAILB __RATE8.
+have e : equiv [Jkem1024_safety.M.a2____absorb_avx2x4 ~ KX42.MM.__absorb_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a2____absorb_avx2x4_spec; rewrite /KX42.__absorb_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma _keccakf1600_avx2x4_proof _a _b_a :
+  _keccakf1600_avx2x4_spec _a _b_a.
+proof.
+have h := Keccakf1600x4_safety._keccakf1600_avx2x4_proof _a _b_a.
+have e : equiv [Jkem1024_safety.M._keccakf1600_avx2x4
+  ~ Keccak1600_Jazz_safety.M._keccakf1600_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /_keccakf1600_avx2x4_spec; rewrite /Keccak1600_Jazz_safety._keccakf1600_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma aBUFLEN____dumpstate_avx2x4_proof _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3
+    _offset __LEN _st _b_st :
+  aBUFLEN____dumpstate_avx2x4_spec _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3 _offset
+    __LEN _st _b_st.
+proof.
+have h := KX4536.__dumpstate_avx2x4_proof _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3
+  _offset __LEN _st _b_st.
+have e : equiv [Jkem1024_safety.M.aBUFLEN____dumpstate_avx2x4 ~ KX4536.MM.__dumpstate_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /aBUFLEN____dumpstate_avx2x4_spec; rewrite /KX4536.__dumpstate_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a32____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a32____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR32.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jkem1024_safety.M.a32____absorb ~ KR32.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a32____absorb_spec; rewrite /KR32.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a1____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  a1____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR1.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jkem1024_safety.M.a1____absorb ~ KR1.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a1____absorb_spec; rewrite /KR1.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a128____squeeze_proof _st _b_st _buf _b_buf __RATE8 :
+  a128____squeeze_spec _st _b_st _buf _b_buf __RATE8.
+proof.
+have h := KR128.__squeeze_proof _st _b_st _buf _b_buf __RATE8.
+have e : equiv [Jkem1024_safety.M.a128____squeeze ~ KR128.MM.__squeeze :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a128____squeeze_spec; rewrite /KR128.__squeeze_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma aZCT____absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8 :
+  aZCT____absorb_spec _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+proof.
+have h := KR1600.__absorb_proof _st _b_st _aT _buf _b_buf __TRAILB __RATE8.
+have e : equiv [Jkem1024_safety.M.aZCT____absorb ~ KR1600.MM.__absorb :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /aZCT____absorb_spec; rewrite /KR1600.__absorb_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma a1____absorb_avx2x4_proof _st _b_st _aT _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3
+    _b_buf3 __TRAILB __RATE8 :
+  a1____absorb_avx2x4_spec _st _b_st _aT _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3
+    __TRAILB __RATE8.
+proof.
+have h := KX41.__absorb_avx2x4_proof _st _b_st _aT _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3
+  _b_buf3 __TRAILB __RATE8.
+have e : equiv [Jkem1024_safety.M.a1____absorb_avx2x4 ~ KX41.MM.__absorb_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a1____absorb_avx2x4_spec; rewrite /KX41.__absorb_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma aETA1____squeeze_avx2x4_proof _st _b_st _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3
+    _b_buf3 __RATE8 :
+  aETA1____squeeze_avx2x4_spec _st _b_st _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3
+    __RATE8.
+proof.
+have h := KX4128.__squeeze_avx2x4_proof _st _b_st _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3
+  _b_buf3 __RATE8.
+have e : equiv [Jkem1024_safety.M.aETA1____squeeze_avx2x4 ~ KX4128.MM.__squeeze_avx2x4 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /aETA1____squeeze_avx2x4_spec; rewrite /KX4128.__squeeze_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+(* the permutation selected by KECCAK_PERMUTATION (514): the reference one *)
+lemma __KECCAK_F_permutation :
+  hoare [Jkem1024_safety.M.__KECCAK_F : pERMUTATION = 514 ==> res.`1 = 2 /\ valid res.`2].
+proof.
+proc; auto => />.
+by rewrite (W256.to_uint_and_mod 8 (W256.of_int 514)) // W256.of_uintK.
+qed.
+
+lemma _sha3_256A_APK_proof _out _b_out _in _b_in :
+  _sha3_256A_APK_spec _out _b_out _in _b_in.
+proof.
+hint +safety.
+rewrite /_sha3_256A_APK_spec; proc.
+(* the AVX2 branch is not compiled: KECCAK_PERMUTATION selects the reference one *)
+rcondf ^if; 1: by wp; call __KECCAK_F_permutation; wp; skip => /> /#.
+auto; ecall (a32____squeeze_proof param_16 (BArray200.init_arr (W8.of_int 255)) param_15 b_param_0
+                param_14).
+auto; ecall (aPK____absorb_proof param_13 (BArray200.init_arr (W8.of_int 255)) param_12 param_11
+                (BArray1568.init_arr (W8.of_int 255)) param_10 param_9).
+auto; ecall (__state_init_proof param_8 b_param_1).
+auto; ecall (__KECCAK_F_proof param).
+by auto => /> /#.
+qed.
+
+lemma _sha3_512A_A33_proof _out _b_out _in _b_in :
+  _sha3_512A_A33_spec _out _b_out _in _b_in.
+proof.
+hint +safety.
+rewrite /_sha3_512A_A33_spec; proc.
+(* the AVX2 branch is not compiled: KECCAK_PERMUTATION selects the reference one *)
+rcondf ^if; 1: by wp; call __KECCAK_F_permutation; wp; skip => /> /#.
+auto; ecall (a64____squeeze_proof param_16 (BArray200.init_arr (W8.of_int 255)) param_15 b_param_0
+                param_14).
+auto; ecall (a33____absorb_proof param_13 (BArray200.init_arr (W8.of_int 255)) param_12 param_11
+                (BArray33.init_arr (W8.of_int 255)) param_10 param_9).
+auto; ecall (__state_init_proof param_8 b_param_1).
+auto; ecall (__KECCAK_F_proof param).
+by auto => /> /#.
+qed.
+
+lemma _sha3_512A_A64_proof _out _b_out _in _b_in :
+  _sha3_512A_A64_spec _out _b_out _in _b_in.
+proof.
+hint +safety.
+rewrite /_sha3_512A_A64_spec; proc.
+(* the AVX2 branch is not compiled: KECCAK_PERMUTATION selects the reference one *)
+rcondf ^if; 1: by wp; call __KECCAK_F_permutation; wp; skip => /> /#.
+auto; ecall (a64____squeeze_proof param_16 (BArray200.init_arr (W8.of_int 255)) param_15 b_param_0
+                param_14).
+auto; ecall (a64____absorb_proof param_13 (BArray200.init_arr (W8.of_int 255)) param_12 param_11
+                (BArray64.init_arr (W8.of_int 255)) param_10 param_9).
+auto; ecall (__state_init_proof param_8 b_param_1).
+auto; ecall (__KECCAK_F_proof param).
+by auto => /> /#.
+qed.
+
+lemma _shake128_next_state_proof _buf _b_buf :
+  _shake128_next_state_spec _buf _b_buf.
+proof.
+hint +safety.
+rewrite /_shake128_next_state_spec; proc.
+(* the AVX2 branch is not compiled: KECCAK_PERMUTATION selects the reference one *)
+rcondf ^if; 1: by wp; call __KECCAK_F_permutation; wp; skip => /> /#.
+auto; ecall (_keccakf1600_proof param_1 b_param_0).
+auto; ecall (__KECCAK_F_proof param).
+by auto => /> /#.
+qed.
+
+lemma _shake128x4_absorb_A32_A2_proof _st _b_st _seed _b_seed _pos _b_pos :
+  _shake128x4_absorb_A32_A2_spec _st _b_st _seed _b_seed _pos _b_pos.
+proof.
+hint +safety.
+rewrite /_shake128x4_absorb_A32_A2_spec; proc.
+auto; ecall (a2____absorb_avx2x4_proof param_12 (BArray800.init_arr (W8.of_int 255)) param_11
+                param_10 b_param_2 param_9 b_param_1 param_8 b_param_0 param_7 b_param param_6
+                param_5).
+auto; ecall (a32____absorb_bcast_avx2x4_proof param_4 (BArray800.init_arr (W8.of_int 255)) param_3
+                param_2 (BArray32.init_arr (W8.of_int 255)) param_1 param_0).
+auto; ecall (__state_init_avx2x4_proof param b_param_3).
+by auto => /> /#.
+qed.
+
+lemma _shake128x4_squeeze3blocks_proof _st _b_st _buf _b_buf :
+  _shake128x4_squeeze3blocks_spec _st _b_st _buf _b_buf.
+proof.
+hint +safety.
+rewrite /_shake128x4_squeeze3blocks_spec; proc.
+auto; ecall (aBUFLEN____dumpstate_avx2x4_proof param_22 b_param_2 param_21 b_param_1 param_20
+                b_param_0 param_19 b_param param_18 param_17 param_16
+                (BArray800.init_arr (W8.of_int 255))).
+auto; ecall (_keccakf1600_avx2x4_proof param_15 (BArray800.init_arr (W8.of_int 255))).
+auto; ecall (aBUFLEN____dumpstate_avx2x4_proof param_14 b_param_6 param_13 b_param_5 param_12
+                b_param_4 param_11 b_param_3 param_10 param_9 param_8
+                (BArray800.init_arr (W8.of_int 255))).
+auto; ecall (_keccakf1600_avx2x4_proof param_7 (BArray800.init_arr (W8.of_int 255))).
+auto; ecall (aBUFLEN____dumpstate_avx2x4_proof param_6 b_param_10 param_5 b_param_9 param_4
+                b_param_8 param_3 b_param_7 param_2 param_1 param_0
+                (BArray800.init_arr (W8.of_int 255))).
+auto; ecall (_keccakf1600_avx2x4_proof param (BArray800.init_arr (W8.of_int 255))).
+by auto => /> /#.
+qed.
+
+lemma _shake256_A128__A32_A1_proof _out _b_out _seed _b_seed _nonce _b_nonce :
+  _shake256_A128__A32_A1_spec _out _b_out _seed _b_seed _nonce _b_nonce.
+proof.
+hint +safety.
+rewrite /_shake256_A128__A32_A1_spec; proc.
+(* the AVX2 branch is not compiled: KECCAK_PERMUTATION selects the reference one *)
+rcondf ^if; 1: by wp; call __KECCAK_F_permutation; wp; skip => /> /#.
+auto; ecall (a128____squeeze_proof param_26 (BArray200.init_arr (W8.of_int 255)) param_25
+                b_param_0 param_24).
+auto; ecall (a1____absorb_proof param_23 (BArray200.init_arr (W8.of_int 255)) param_22 param_21
+                (BArray1.init_arr (W8.of_int 255)) param_20 param_19).
+auto; ecall (a32____absorb_proof param_18 (BArray200.init_arr (W8.of_int 255)) param_17 param_16
+                (BArray32.init_arr (W8.of_int 255)) param_15 param_14).
+auto; ecall (__state_init_proof param_13 b_param_1).
+auto; ecall (__KECCAK_F_proof param).
+by auto => /> /#.
+qed.
+
+lemma _shake256_A32__AZCT_proof _out _b_out _in _b_in :
+  _shake256_A32__AZCT_spec _out _b_out _in _b_in.
+proof.
+hint +safety.
+rewrite /_shake256_A32__AZCT_spec; proc.
+(* the AVX2 branch is not compiled: KECCAK_PERMUTATION selects the reference one *)
+rcondf ^if; 1: by wp; call __KECCAK_F_permutation; wp; skip => /> /#.
+auto; ecall (a32____squeeze_proof param_16 (BArray200.init_arr (W8.of_int 255)) param_15 b_param_0
+                param_14).
+auto; ecall (aZCT____absorb_proof param_13 (BArray200.init_arr (W8.of_int 255)) param_12 param_11
+                (BArray1600.init_arr (W8.of_int 255)) param_10 param_9).
+auto; ecall (__state_init_proof param_8 b_param_1).
+auto; ecall (__KECCAK_F_proof param).
+by auto => /> /#.
+qed.
+
+lemma _shake256x4_AETA1__A32_A1_proof _out0 _b_out0 _out1 _b_out1 _out2 _b_out2 _out3 _b_out3 _seed
+    _b_seed _nonces _b_nonces :
+  _shake256x4_AETA1__A32_A1_spec _out0 _b_out0 _out1 _b_out1 _out2 _b_out2 _out3 _b_out3 _seed
+    _b_seed _nonces _b_nonces.
+proof.
+hint +safety.
+rewrite /_shake256x4_AETA1__A32_A1_spec; proc.
+auto; ecall (aETA1____squeeze_avx2x4_proof param_18 (BArray800.init_arr (W8.of_int 255)) param_17
+                b_param_2 param_16 b_param_1 param_15 b_param_0 param_14 b_param param_13).
+auto; ecall (a1____absorb_avx2x4_proof param_12 (BArray800.init_arr (W8.of_int 255)) param_11
+                param_10 b_param_6 param_9 b_param_5 param_8 b_param_4 param_7 b_param_3 param_6
+                param_5).
+auto; ecall (a32____absorb_bcast_avx2x4_proof param_4 (BArray800.init_arr (W8.of_int 255)) param_3
+                param_2 (BArray32.init_arr (W8.of_int 255)) param_1 param_0).
+auto; ecall (__state_init_avx2x4_proof param b_param_7).
+by auto => /> /#.
+qed.
 
 lemma __shuffle8_proof _a _b : (__shuffle8_spec _a _b).
 proof.

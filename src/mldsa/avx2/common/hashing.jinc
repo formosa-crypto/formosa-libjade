@@ -11,6 +11,11 @@ fn __load_shake256_state(reg const ptr shake256_state st) -> reg u256[7]
     return state;
 }
 
+#[safety =
+   { requires = is_arr_init(state,0,224)
+   , ensures = is_arr_init(st,0,224)
+   }
+ ]
 inline
 fn __store_shake256_state(reg mut ptr shake256_state st, reg u256[7] state) -> reg ptr shake256_state
 {
@@ -24,7 +29,7 @@ fn __store_shake256_state(reg mut ptr shake256_state st, reg u256[7] state) -> r
 // Absorbs 64 bytes of rho_prime followed by the 2-byte domain separator with SHAKE256 padding.
 #[safety =
    { requires = is_arr_init(rho_prime,0,64)
-   , ensures = is_arr_init(st,0,8 * 28)
+   , ensures = is_arr_init(st,0,8 * 25)
    }
  ]
 fn shake256_absorb_66(
@@ -57,7 +62,7 @@ fn shake256_absorb_66(
 
 #[safety =
    { requires = is_arr_init(commitment_hash,0,COMMITMENT_HASH_SIZE)
-   , ensures = is_arr_init(st,0,8 * 28)
+   , ensures = is_arr_init(st,0,8 * 25)
    }
  ]
 fn shake256_absorb_commitment_hash(
@@ -85,8 +90,8 @@ fn shake256_absorb_commitment_hash(
 
 // Permutes the state, then squeezes one SHAKE256 block.
 #[safety =
-   { requires = is_arr_init(st,0,8 * 28)
-   , ensures = is_arr_init(st,0,8 * 28) && is_arr_init(block,0,SHAKE256_RATE)
+   { requires = is_arr_init(st,0,8 * 25)
+   , ensures = is_arr_init(st,0,8 * 25) && is_arr_init(block,0,SHAKE256_RATE)
    }
  ]
 fn shake256_squeezeblock(
@@ -186,6 +191,8 @@ fn _shake256_A64__A128(
 
 #[safety =
    { requires = is_arr_init(verification_key_hash,0,VERIFICATION_KEY_HASH_SIZE)
+             && is_mem_init((64u) context_pointer, context_size) && context_size <= 0xFFFFFFFFFFFFFF00
+             && is_mem_init((64u) message_pointer, message_size) && message_size <= 0xFFFFFFFFFFFFFF00
    , ensures = is_arr_init(message_representative,0,MESSAGE_REPRESENTATIVE_SIZE)
    }
  ]
