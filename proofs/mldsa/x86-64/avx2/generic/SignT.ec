@@ -295,7 +295,7 @@ conseq (: _ ==>
   (zh{1} <> None =>
    BytesSig.to_list sigma{1} = to_list signature{2} /\ result{2} = zero)); 1: by smt().
    
-seq 4 19 : #pre; 1: by auto.
+seq 5 19 : #pre; 1: by auto.
 
 (* ── Step 1: SkDecode (spec only) ────────────────────────────────────────
    Spec: (rho,_K,tr,s1,s2,t0) <@ SkEncDec.skDecode(sk)
@@ -736,8 +736,7 @@ while (
    rewrite (nth_map witness); 1: by rewrite size_mkseq; smt(gt0_k).
    by rewrite nth_mkseq //= Hw1eq /#.
 
-sp 6 0.
-seq 1 0 : #pre; 1: by auto.
+sp 1 0.
 
  (* the positions of the non-zero coefficients of c (time domain) *)
  seq 0 1 : (#pre /\
@@ -746,6 +745,11 @@ seq 1 0 : #pre; 1: by auto.
  + ecall{2} (polynomial____challenge_positions_ph verifier_challenge{2}).
    auto => |> &1 &2 *.
    by apply challenge_shape_of_l1 => /#.
+
+ (* the spec computes cs1, z and the index of the z cascade (the leakage is
+    not tracked) *)
+ seq 5 0 : (#pre /\ cs1{1} = invnttv (ntt_smul ch{1} s1h{1}) /\
+            z{1} = y{1} + cs1{1} /\ zf{1} = zfail_idx z{1}); 1: by auto.
 
  (* Jasmin pure: infinity_norm_check_result <- 0 *)
  sp 0 1.
@@ -845,33 +849,42 @@ seq 1 0 : #pre; 1: by auto.
       lifts_wpolylvec (lvec_unflatten256 mask{2}) +
       psmul (lifts_wpoly verifier_challenge{2}) (lifts_wpolylvec (lvec_unflatten256 s1{2})) /\
     wpolylvec_srng (lvec_unflatten256 signer_response{2}) (gamma1 - 1) gamma1 by smt().
+ (* the cascades of the spec pass exactly when the plain tests pass *)
+ rewrite !zfail_idx_None !r0fail_idx_None !hintfail_idx_None.
  split.
  + (* the test on c t0 is compiled: the flag joins the result *)
    move => Hgd; split.
-   + move => Hzok Hr0ok; split.
-     + (* accepted iteration *)
-       move => Hct0ok Hhok.
-       have HF0 : infinity_norm_check_result{2} = zero by smt().
+   + move => Hzok; split.
+     + move => Hr0ok; split.
+       + (* accepted iteration *)
+         move => Hct0ok Hhok.
+         have HF0 : infinity_norm_check_result{2} = zero by smt().
+         have HC0 : ct0_norm_check_result{2} = zero by smt().
+         rewrite HF0 HC0 /=.
+         do split.
+         + smt().
+         + smt().
+         + smt().
+         + smt(or64_ne0 W64.to_uint_eq W64.to_uint0 W64.to_uint1).
+         + smt().
+         + smt().
+         + smt().
+         + smt(hammw_count_nonzero).
+         + smt().
+         + smt(or64_ne0 W64.to_uint_eq W64.to_uint0 W64.to_uint1).
+       + (* z and w0 - c s2 passed, c t0 or the hint failed *)
+         move => Hn.
+         have HFC1 : infinity_norm_check_result{2} `|` ct0_norm_check_result{2} = one by smt(W64.or0w W64.orw0 W64.orwK).
+         rewrite HFC1 /=.
+         do split; smt(or64_ne0 W64.to_uint_eq W64.to_uint0 W64.to_uint1 W64.xorwK W64.xorw0 W64.xor0w W64.or0w W64.orw0 W64.orwK hammw_count_nonzero).
+     + (* z passed, w0 - c s2 failed *)
+       move => Hnr0.
+       have HF1 : infinity_norm_check_result{2} = one by smt().
        have HC0 : ct0_norm_check_result{2} = zero by smt().
-       rewrite HF0 HC0 /=.
-       do split.
-       + smt().
-       + smt().
-       + smt().
-       + smt(or64_ne0 W64.to_uint_eq W64.to_uint0 W64.to_uint1).
-       + smt().
-       + smt().
-       + smt().
-       + smt(hammw_count_nonzero).
-       + smt().
-       + smt(or64_ne0 W64.to_uint_eq W64.to_uint0 W64.to_uint1).
-     + (* z and w0 - c s2 passed, c t0 or the hint failed *)
-       move => Hn.
-       have HFC1 : infinity_norm_check_result{2} `|` ct0_norm_check_result{2} = one by smt(W64.or0w W64.orw0 W64.orwK).
-       rewrite HFC1 /=.
+       rewrite HF1 HC0 /=.
        do split; smt(or64_ne0 W64.to_uint_eq W64.to_uint0 W64.to_uint1 W64.xorwK W64.xorw0 W64.xor0w W64.or0w W64.orw0 W64.orwK hammw_count_nonzero).
-   + (* z or w0 - c s2 failed *)
-     move => Hnbz.
+   + (* z failed *)
+     move => Hnz.
      have HF1 : infinity_norm_check_result{2} = one by smt().
      have HC0 : ct0_norm_check_result{2} = zero by smt().
      rewrite HF1 HC0 /=.
@@ -880,16 +893,21 @@ seq 1 0 : #pre; 1: by auto.
    move => Hgd.
    have Hct0ok := Hbound _; 1: smt().
    split.
-   + move => Hzok Hr0ok; split.
-     + move => _ Hhok.
-       have HF0 : infinity_norm_check_result{2} = zero by smt().
-       rewrite HF0 /=.
-       do split; smt(or64_ne0 W64.to_uint_eq W64.to_uint0 W64.to_uint1 W64.xorwK W64.xorw0 W64.xor0w W64.or0w W64.orw0 W64.orwK hammw_count_nonzero).
-     + move => Hn.
+   + move => Hzok; split.
+     + move => Hr0ok; split.
+       + move => _ Hhok.
+         have HF0 : infinity_norm_check_result{2} = zero by smt().
+         rewrite HF0 /=.
+         do split; smt(or64_ne0 W64.to_uint_eq W64.to_uint0 W64.to_uint1 W64.xorwK W64.xorw0 W64.xor0w W64.or0w W64.orw0 W64.orwK hammw_count_nonzero).
+       + move => Hn.
+         have HF1 : infinity_norm_check_result{2} = one by smt().
+         rewrite HF1 /=.
+         do split; smt(or64_ne0 W64.to_uint_eq W64.to_uint0 W64.to_uint1 W64.xorwK W64.xorw0 W64.xor0w W64.or0w W64.orw0 W64.orwK hammw_count_nonzero).
+     + move => Hnr0.
        have HF1 : infinity_norm_check_result{2} = one by smt().
        rewrite HF1 /=.
        do split; smt(or64_ne0 W64.to_uint_eq W64.to_uint0 W64.to_uint1 W64.xorwK W64.xorw0 W64.xor0w W64.or0w W64.orw0 W64.orwK hammw_count_nonzero).
-   + move => Hnbz.
+   + move => Hnz.
      have HF1 : infinity_norm_check_result{2} = one by smt().
      rewrite HF1 /=.
      do split; smt(or64_ne0 W64.to_uint_eq W64.to_uint0 W64.to_uint1 W64.xorwK W64.xorw0 W64.xor0w W64.or0w W64.orw0 W64.orwK hammw_count_nonzero).

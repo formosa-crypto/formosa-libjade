@@ -1,0 +1,115 @@
+require import Int Real List FSet Distr RealExp FMap SDist StdOrder.
+import RealOrder.
+
+require DigitalSignaturesLeakageRO PROM.
+require FSabort.
+
+(* ID scheme types and definitions *)
+clone import FSabort as FSa.
+import FSa.ID.
+
+(* Generic FS+abort construction (i.e. Sig = W*Z option *)
+clone FSa.Generic as FSaG.
+
+(* Commitment Recoverable FS+abort construction (i.e. Sig = C*Z option *)
+clone FSa.CommRecov as FSaCR with
+  op qS <= FSaG.qS.
+
+
+module OCR (H : FSaG.DSS.Hash) (O : FSaG.DSS.DS.Stateless.SOracle_CMA) = {
+  proc sign(m : M) = {
+    var owz, l, cl, r;
+    (owz, l) <@ O.sign(m);
+    r <- None;
+    if (owz <> None) {
+      cl <@ H.get((oget owz).`1, m);
+      r <- Some (cl.`1, (oget owz).`2);
+    }
+    return (r, l);
+  }
+}.
+
+module (RedFSaG (A : FSaCR.DSS.Adv_EFCMA_RO) : FSaG.DSS.Adv_EFCMA_RO)
+  (H : FSaG.DSS.Hash)
+  (O : FSaG.DSS.DS.Stateless.SOracle_CMA) = {
+
+  proc forge(pk : PK) : M*FSaG.Sig = {
+    var w, c, z, m, sig, sig';
+    (m, sig) <@ A(H, OCR(H, O)).forge(pk);
+    (c, z) <- sig;
+    w <- FSaCR.recover pk c z;
+    sig' <- (w, z);
+    return (m, sig');
+  }
+}.
+
+section PROOF.
+
+declare module P <: ID.Prover{
+  -FSaG.DSS.DS.Stateless.O_CMA_Default,
+  -FSaCR.DSS.DS.Stateless.O_CMA_Default,
+  -FSaG.DSS.PRO.RO,
+  -FSaCR.DSS.PRO.RO
+}.
+
+declare module V <: ID.Verifier{-P,
+  -FSaG.DSS.DS.Stateless.O_CMA_Default,
+  -FSaCR.DSS.DS.Stateless.O_CMA_Default,
+  -FSaG.DSS.PRO.RO,
+  -FSaCR.DSS.PRO.RO
+}.
+
+declare axiom verify_ll : islossless V.verify.
+
+declare module A <: FSaCR.DSS.Adv_EFCMA_RO{
+  -P, -V,
+  -FSaG.DSS.DS.Stateless.O_CMA_Default,
+  -FSaCR.DSS.DS.Stateless.O_CMA_Default,
+  -FSaG.DSS.PRO.RO,
+  -FSaCR.DSS.PRO.RO
+}.
+
+module FSaCR_O_Default = FSaCR.DSS.DS.Stateless.O_CMA_Default.
+module FSaG_O_Default = FSaG.DSS.DS.Stateless.O_CMA_Default.
+
+lemma FSa_CommRecov_Generic &m :
+    Pr [ FSaCR.DSS.EF_CMA_RO(FSaCR.IDS_Sig(P, V), A, FSaCR.DSS.PRO.RO, FSaCR_O_Default).main() @ &m : res ]
+<=  Pr [ FSaG.DSS.EF_CMA_RO(FSaG.IDS_Sig(P, V), RedFSaG(A), FSaG.DSS.PRO.RO, FSaG_O_Default).main() @ &m : res ].
+proof.
+byequiv => //; proc.
+inline{1} 2; inline{2} 2; inline{2} 4.
+seq 4 5 : (={glob P, glob V, pk} /\ m{1} = m0{2} /\ sig{1} = sig0{2} /\ pk{1} = pk0{2}
+           /\ ={qs, sk}(FSaCR_O_Default, FSaG_O_Default)
+           /\ ={m}(FSaCR.DSS.PRO.RO, FSaG.DSS.PRO.RO)
+          ); last first.
+- inline*. wp. sp.
+  seq 1 1 : (#pre /\ ={r0}); first by auto.
+  seq 2 2 : (#pre /\ c'{1} = c0{2}); first by if; auto.
+  if{1}; first by call(: true); auto.
+  conseq (:_ ==> true); 1: smt().
+  by islossless; apply verify_ll.
+inline*. conseq />.
+call(: ={glob P}
+       /\ ={qs, sk}(FSaCR_O_Default, FSaG_O_Default)
+       /\ ={m}(FSaCR.DSS.PRO.RO, FSaG.DSS.PRO.RO)); first last.
+- by sim.
+- by auto; call(: true); auto => />.
+proc. inline sign.
+sp. seq 1 1 : (={sk, leak, w, c, oz, i, m, glob P} /\ m0{1} = m1{2} /\ (m = m0 /\ m = m1){2} /\
+  ={qs, sk}(FSaCR_O_Default, FSaG_O_Default) /\ ={m}(FSaCR.DSS.PRO.RO, FSaG.DSS.PRO.RO) /\
+  (oz <> None => Some (c, lc) = FSaG.DSS.PRO.RO.m.[w, m1]){2}).
+- while (#post); last by auto => />.
+  inline*; wp; call(: true); auto; call(: true); auto => />.
+  move=> &2 _ [w l] [c lc] _ /=; split => [_ _ _|]; first by rewrite get_set_sameE.
+  by move=> /domE; case: (FSaG.DSS.PRO.RO.m{2}.[w, m1{2}]) => // -[].
+(* After the loop: [OCR] queries [H] only if signing succeeded. *)
+inline*. sp; if{2}.
+- (* success: the challenge is already stored, [H.get] does not modify the map *)
+  rcondf{2} ^if.
+  + by auto => /> &1; case: (oz{1}) => //= h *; rewrite domE -h.
+  by auto => /> &1; case: (oz{1}) => //= h *; rewrite -h.
+(* failure: both sides return [None], nothing is queried *)
+by auto => /> &1; case: (oz{1}).
+qed.
+
+end section PROOF.

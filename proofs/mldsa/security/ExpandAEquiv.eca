@@ -1,0 +1,1023 @@
+require import AllCore List FMap FSet Int IntDiv StdOrder Real.
+require import Distr DBool DList DMap DProd Dexcepted DistrExtras.
+require import Byte Geometric FoldlO.
+require RejectionRO DParams DRing PROM.
+import IntOrder.
+
+(** Instance of the generic "rejection sampling over a random oracle"
+    argument ([RejectionRO.SingleStep]) for the entries of the public
+    matrix computed by [ExpandA] (see [MLDSATarget.ec]):
+    in the random oracle model, each entry [(rho, r, s)] of the matrix is a
+    uniformly random element of [Rq] and the XOF can be simulated from it. *)
+
+abstract theory ExpandAEquiv.
+
+(* n, q, k, l, eta, gamma1, gamma2, beta, tau, d *)
+clone import DParams as Params.
+
+clone import DRing as DR with
+  op n <= n,
+  op q <= q
+proof prime_q by exact prime_q
+proof gt0_n by exact gt0_n.
+
+type seed.
+
+(* Coefficient lists of length n with entries in [0, q) are in bijection with Rq
+   (same operators and axioms as in [MLDSATarget.ec]). *)
+op toRq : int list -> Rq.
+op ofRq : Rq -> int list.
+axiom toRqK r : toRq (ofRq r) = r.
+axiom ofRqK xs :
+  size xs = n => all (fun x => 0 <= x < q) xs => ofRq (toRq xs) = xs.
+
+(* [ofRq] returns a valid coefficient list. Without it, [Rq] could be larger
+   than the set of valid lists and [dRq] would not be the image of the
+   uniform distribution on lists. *)
+axiom ofRq_valid r : size (ofRq r) = n /\ all (fun x => 0 <= x < q) (ofRq r).
+
+(* Coefficients are encoded on 23 bits *)
+axiom q_le_2_23 : q <= 2^23.
+
+(* -------------------------------------------------------------------- *)
+(* Decoding of a chunk of three bytes *)
+op v_of (b0 b1 b2 : byte) =
+  to_int b0 + 256 * to_int b1 + 65536 * (to_int b2 %% 128).
+
+(* Encoding of a value [v] in [0, 2^23) with top bit [t] *)
+op enc0 (v : int) = from_int (v %% 256).
+op enc1 (v : int) = from_int (v %/ 256 %% 256).
+op enc2 (v t : int) = from_int (v %/ 65536 + 128 * t).
+
+(* acceptance probability of a chunk *)
+op pq = q%r / (2^23)%r.
+
+(* -------------------------------------------------------------------- *)
+(* Functional version of the sampling loop on a log of RO queries *)
+op rq_body (e : ((seed * int * int) * int) * byte) (st : int list * byte list) =
+  if size st.`1 < n then
+    let buf = rcons st.`2 e.`2 in
+    Some (if size buf = 3 then
+            let v = v_of (nth witness buf 0) (nth witness buf 1) (nth witness buf 2) in
+            ((if v < q then rcons st.`1 v else st.`1), [])
+          else (st.`1, buf))
+  else None.
+
+op op_sample (log : (((seed * int * int) * int) * byte) list) (x : seed * int * int) =
+  if all (fun (p : (_ * _) * _) => p.`1.`1 = x) log /\
+     unzip2 (unzip1 log) = iota_ 0 (size log) then
+    obind (fun (st : int list * byte list) =>
+             if size st.`1 = n /\ st.`2 = [] then Some (toRq st.`1) else None)
+          (foldl_o rq_body (Some ([], [])) log)
+  else None.
+
+clone RejectionRO.SingleStep as RS with
+  type ro_in_t <- (seed * int * int) * int,
+  type ro_out_t <- byte,
+  op dout <- fun _ => dB,
+  type s_in_t <- seed * int * int,
+  type s_out_t <- Rq,
+  op sampler_of <- fst,
+  op ideal_sampler <- fun _ => dRq,
+  op op_sample <- op_sample
+proof *.
+realize dout_ll by move=> _; apply dB_ll.
+realize ideal_sampler_ll by move=> _; apply dRq_ll.
+
+(* -------------------------------------------------------------------- *)
+(* Arithmetic facts *)
+lemma gt1_q : 1 < q.
+proof. by apply/gt1_prime/prime_q. qed.
+
+lemma q_lt_2_23 : q < 2^23.
+proof.
+have := q_le_2_23; rewrite ler_eqVlt => -[heq|//].
+have [_ /(_ 2 _)] := prime_q.
++ by rewrite heq; apply/dvdzP; exists (2^22); rewrite mulzC -exprS.
+by rewrite heq /=.
+qed.
+
+lemma gt0_2_23 : 0 < 2^23.
+proof. by apply expr_gt0. qed.
+
+lemma pq_gt0 : 0%r < pq.
+proof.
+rewrite /pq; apply RealOrder.divr_gt0; 1: smt(gt1_q).
+by rewrite lt_fromint gt0_2_23.
+qed.
+
+lemma pq_le1 : pq <= 1%r.
+proof.
+rewrite /pq RealOrder.ler_pdivr_mulr //=.
+by have /= := q_le_2_23; rewrite le_fromint.
+qed.
+
+lemma clamp_pq : Biased.clamp pq = pq.
+proof. by rewrite Biased.clamp_id // pq_le1 /= RealOrder.ltrW pq_gt0. qed.
+
+(* -------------------------------------------------------------------- *)
+(* Facts on bytes *)
+lemma mu_dB0 : mu dB (fun b => to_int b = 0) = 1%r / 256%r.
+proof.
+have -> : (fun b => to_int b = 0) = pred1 0 \o to_int by apply fun_ext.
+by rewrite -dmapE dB_to_int drange1E.
+qed.
+
+lemma v_of0 b0 b1 b2 :
+  to_int b0 = 0 => to_int b1 = 0 => to_int b2 = 0 => v_of b0 b1 b2 = 0.
+proof. by rewrite /v_of => -> -> ->. qed.
+
+(* A bound on the contexts of the entries of a map *)
+op maxctx (m : ((seed * int * int) * int, byte) fmap) =
+  foldr (fun (y : (seed * int * int) * int) acc => max acc (y.`2 + 1)) 0 (elems (fdom m)).
+
+lemma maxctxP (m : ((seed * int * int) * int, byte) fmap) y : y \in m => y.`2 < maxctx m.
+proof.
+rewrite -mem_fdom memE /maxctx.
+elim: (elems (fdom m)) => //= a l ih [->> | /ih]; smt().
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* The sampler: inner loop of [ExpandA] for one entry *)
+module (SampleRq : RS.Sampler)(X : RS.RO_t) = {
+  proc init() = {}
+  proc sample(x : seed * int * int) : Rq = {
+    var cs, ctx, b0, b1, b2, v;
+    cs <- [];
+    ctx <- 0;
+    while (size cs < n) {
+      b0 <@ X.get(x, ctx);
+      b1 <@ X.get(x, ctx + 1);
+      b2 <@ X.get(x, ctx + 2);
+      v <- v_of b0 b1 b2;
+      if (v < q) {
+        cs <- rcons cs v;
+      }
+      ctx <- ctx + 3;
+    }
+    return toRq cs;
+  }
+}.
+
+module SampleRqRaw : RS.Sampler_t = {
+  proc init() = {}
+  proc sample(x : seed * int * int) : Rq = {
+    var r;
+    r <$ dRq;
+    return r;
+  }
+}.
+
+(* The reprogrammer: writes a byte log consistent with [r].
+   Each chunk is accepted with probability [pq]; a rejected chunk encodes a
+   value uniform in [q, 2^23), the accepted chunk encodes the next
+   coefficient of [ofRq r]; the top bit of the third byte is uniform.
+   The loop is flat (one iteration per chunk, [i] is the index of the next
+   coefficient), as the one of [SampleRq]: for each coefficient, the number
+   of rejected chunks is geometric. *)
+module (ReprogRq : RS.Reprogrammer)(R : RS.RO_set) = {
+  proc reprogram(x : seed * int * int, r : Rq) : unit = {
+    var cs, i, ctx, b, v, t;
+    cs <- ofRq r;
+    i <- 0;
+    ctx <- 0;
+    while (i < n) {
+      b <$ Biased.dbiased pq;
+      if (b) {
+        v <- nth 0 cs i;
+      } else {
+        v <$ drange q (2^23);
+      }
+      t <$ drange 0 2;
+      R.set((x, ctx), enc0 v);
+      R.set((x, ctx + 1), enc1 v);
+      R.set((x, ctx + 2), enc2 v t);
+      ctx <- ctx + 3;
+      if (b) {
+        i <- i + 1;
+      }
+    }
+  }
+}.
+
+(* Encoding and decoding of a chunk *)
+lemma e2_23 : 2^23 = 8388608.
+proof. by rewrite (exprS 2 22) // (exprS 2 21) // (exprS 2 20) // (exprS 2 19) // (exprS 2 18) // (exprS 2 17) // (exprS 2 16) // (exprS 2 15) // (exprS 2 14) // (exprS 2 13) // (exprS 2 12) // (exprS 2 11) // (exprS 2 10) // (exprS 2 9) // (exprS 2 8) // (exprS 2 7) // (exprS 2 6) // (exprS 2 5) // (exprS 2 4) // (exprS 2 3) // (exprS 2 2) // (exprS 2 1) // (exprS 2 0) // expr0. qed.
+
+lemma enc_v_of b0 b1 b2 :
+  enc0 (v_of b0 b1 b2) = b0 /\ enc1 (v_of b0 b1 b2) = b1 /\
+  enc2 (v_of b0 b1 b2) (to_int b2 %/ 128) = b2.
+proof.
+rewrite /enc0 /enc1 /enc2 /v_of.
+have [h0 h0'] := to_int_bnd b0; have [h1 h1'] := to_int_bnd b1; have [h2 h2'] := to_int_bnd b2.
+pose a0 := to_int b0; pose a1 := to_int b1; pose a2 := to_int b2.
+have -> : (a0 + 256 * a1 + 65536 * (a2 %% 128)) %% 256 = a0 by smt().
+have -> : (a0 + 256 * a1 + 65536 * (a2 %% 128)) %/ 256 %% 256 = a1 by smt().
+have -> : (a0 + 256 * a1 + 65536 * (a2 %% 128)) %/ 65536 + 128 * (a2 %/ 128) = a2 by smt().
+by rewrite !tK.
+qed.
+
+lemma v_of_enc v t : 0 <= v < 2^23 => 0 <= t < 2 =>
+  v_of (enc0 v) (enc1 v) (enc2 v t) = v /\ to_int (enc2 v t) %/ 128 = t.
+proof.
+rewrite e2_23 /enc0 /enc1 /enc2 /v_of => hv ht.
+rewrite !tK' 1,2:/#; 1: smt().
+smt().
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Distribution facts used by [reprogram_correct]. *)
+
+(* Bridge between the abstract ring and coefficient lists, from
+   [toRqK], [ofRqK], [ofRq_valid], [dRq_fu], [dRq_uni], [dRq_ll]:
+   both sides are full, uniform and lossless. *)
+lemma dRq_dlist : dRq = dmap (dlist (drange 0 q) n) toRq.
+proof.
+have ge0n : 0 <= n by smt(gt0_n).
+have hall : forall xs, all (support (drange 0 q)) xs => all (fun x => 0 <= x < q) xs.
++ by move=> xs /allP h; apply/allP => y /h /supp_drange.
+apply eq_funi_ll; [exact dRq_funi | exact dRq_ll | apply is_full_funiform | ].
++ apply dmap_fu_in => r; exists (ofRq r); rewrite toRqK /=.
+  have [hs ha] := ofRq_valid r.
+  rewrite supp_dlist // hs /=.
+  by move/allP: ha => ha; apply/allP => y /ha /= hy; apply/supp_drange.
++ apply dmap_uni_in_inj; 2: by apply/dlist_uni/drange_uni.
+  move=> xs ys /(supp_dlist _ _ _ ge0n) [hsx hax] /(supp_dlist _ _ _ ge0n) [hsy hay] heq.
+  by rewrite -(ofRqK xs) // 1:hall // heq ofRqK // hall.
+by apply/dmap_ll/dlist_ll/drange_ll/gt0_prime/prime_q.
+qed.
+
+(* One chunk of three uniform bytes, read as in [ExpandA]: the low 23 bits
+   [v] and the top bit of the third byte are uniform and independent. *)
+lemma dchunk :
+  dmap (dB `*` dB `*` dB)
+    (fun (t : (byte * byte) * byte) =>
+       (v_of t.`1.`1 t.`1.`2 t.`2, to_int t.`2 %/ 128))
+  = drange 0 (2^23) `*` drange 0 2.
+proof.
+(* The statement mirrors crypto-specs: ml-kem/properties/DistrExtra.ec,
+   dbits_spreadbits (three bytes <-> dbits 24) and dbits_split (k1 = 23, k2 = 1).
+   Proof: both sides are uniform and lossless with the same support. *)
+pose f := fun (t : (byte * byte) * byte) => (v_of t.`1.`1 t.`1.`2 t.`2, to_int t.`2 %/ 128).
+have hs : support (dmap (dB `*` dB `*` dB) f) = support (drange 0 (2^23) `*` drange 0 2).
++ apply fun_ext => -[v t]; rewrite eq_iff supp_dmap supp_dprod /= !supp_drange; split.
+  + move=> [[[b0 b1] b2]] [_ /= [-> ->]].
+    have := to_int_bnd b0; have := to_int_bnd b1; have := to_int_bnd b2.
+    by rewrite /v_of; smt().
+  move=> [hv ht]; exists ((enc0 v, enc1 v), enc2 v t).
+  rewrite !supp_dprod /= !dB_full /= /f /=.
+  by have [-> ->] := v_of_enc v t hv ht.
+apply eq_distr => x; rewrite !mu1_uni_ll.
++ apply dmap_uni_in_inj; 2: by apply/dprod_uni; [apply/dprod_uni|]; apply dB_uni.
+  move=> [[a0 a1] a2] [[c0 c1] c2] _ _ heq.
+  have h1 : v_of a0 a1 a2 = v_of c0 c1 c2 by exact (congr1 fst _ _ heq).
+  have h2 : to_int a2 %/ 128 = to_int c2 %/ 128 by exact (congr1 snd _ _ heq).
+  have [# e0 e1 e2] := enc_v_of a0 a1 a2; have [# e0' e1' e2'] := enc_v_of c0 c1 c2.
+  by move: e0 e1 e2; rewrite h1 h2 e0' e1' e2' => <- <- <-.
++ by apply/dmap_ll/dprod_ll_auto; [apply/dprod_ll_auto|]; apply dB_ll.
++ by apply/dprod_uni; apply drange_uni.
++ by apply/dprod_ll_auto; apply/drange_ll; [apply gt0_2_23 | ].
+by rewrite hs.
+qed.
+
+
+section Proofs.
+
+lemma SampleRq_prog_ll : islossless SampleRq(RS.ProgRO).sample.
+proof.
+proc.
+sp; conseq (: true ==> true) => //.
+(* each chunk is accepted with probability at least [(1/256)^3]
+   (e.g. when its three bytes are 0) *)
+while true (n - size cs) n ((1%r/256%r) ^ 3); 1..3: smt(size_ge0 size_rcons).
++ by move=> H; seq 6 : true 1%r 1%r 0%r 0%r => //; islossless; apply dB_ll.
++ by islossless; apply dB_ll.
+split; 1: smt(RealOrder.expr_gt0).
+move=> z; inline *; wp.
+seq 4 : (to_int b0 = 0 /\ n - size cs = z) (1%r/256%r) ((1%r/256%r)^2) _ 0%r => //.
++ wp; rnd (fun b => to_int b = 0); auto => />.
+  by rewrite mu_dB0 /= => *; rewrite get_set_sameE.
++ seq 4 : (to_int b0 = 0 /\ to_int b1 = 0 /\ n - size cs = z)
+    (1%r/256%r) (1%r/256%r) _ 0%r => //.
+  + wp; rnd (fun b => to_int b = 0); auto => />.
+    by rewrite mu_dB0 /= => *; rewrite get_set_sameE.
+  + wp; rnd (fun b => to_int b = 0); auto => />.
+    rewrite mu_dB0 /= => &hr h0 h1 b hb hb2.
+    rewrite get_set_sameE /= v_of0 //; smt(size_rcons gt1_q).
+  by move=> _ _; rewrite RField.expr2.
+by move=> _ _; rewrite (RField.exprS _ 2) // RField.expr2.
+qed.
+
+lemma RO_get_bound x0 B : hoare [RS.RO.get :
+  (forall c, (x0, c) \in RS.RO.m => c < B) /\ (x.`1 = x0 => x.`2 < B) ==>
+  forall c, (x0, c) \in RS.RO.m => c < B].
+proof.
+proc; auto => /> &hr h1 h2 r _ _ c.
+by rewrite mem_set => -[/h1 // | heq]; move: h2; rewrite -heq.
+qed.
+
+lemma SampleRq_ll : islossless SampleRq(RS.RO).sample.
+proof.
+proc.
+(* first, the loop reads the entries already in the RO, then only fresh ones *)
+exlim (maxctx RS.RO.m) => mi.
+splitwhile 3 : (ctx < mi).
+seq 3 : true 1%r 1%r 0%r 0%r
+  (size cs < n => forall c, (x, c) \in RS.RO.m => c < ctx) => //.
++ while (forall c, (x, c) \in RS.RO.m => c < max mi ctx).
+  + exlim x, ctx => x0 c0; wp.
+    by do 3! (call (RO_get_bound x0 (max mi (c0 + 3)))); auto => /> /#.
+  by auto => /> &hr; smt(maxctxP).
++ while true (mi - ctx); 2: by auto => /#.
+  by move=> z; inline *; auto => />; smt(dB_ll).
+case (size cs < n); last by rcondf 1; auto.
+conseq (: forall c, (x, c) \in RS.RO.m => c < ctx ==> true); 1: smt().
+while (forall c, (x, c) \in RS.RO.m => c < ctx) (n - size cs) n ((1%r/256%r) ^ 3);
+  1..3: smt(size_ge0 size_rcons).
++ move=> H; seq 6 : (forall c, (x, c) \in RS.RO.m => c < ctx) 1%r 1%r 0%r 0%r => //.
+  + phoare split ! 1%r 0%r => //.
+    + by islossless; apply dB_ll.
+    hoare; exlim x, ctx => x0 c0; wp.
+    by do 3! (call (RO_get_bound x0 (c0 + 3))); auto => /> &hr h _; smt().
+  hoare; exlim x, ctx => x0 c0; wp.
+  by do 3! (call (RO_get_bound x0 (c0 + 3))); auto => /> &hr h _; smt().
++ phoare split ! 1%r 0%r => //.
+  + by islossless; apply dB_ll.
+  hoare; exlim x, ctx => x0 c0; wp.
+  by do 3! (call (RO_get_bound x0 (c0 + 3))); auto => /> &hr h _; smt().
+split; 1: smt(RealOrder.expr_gt0).
+move=> z; inline *.
+rcondt 3; 1: by auto => /> &hr h *; apply/negP => /h.
+rcondt 7; 1: by auto => /> &hr h *; smt(mem_set).
+rcondt 11; 1: by auto => /> &hr h *; smt(mem_set).
+wp.
+seq 4 : (to_int b0 = 0 /\ n - size cs = z) (1%r/256%r) ((1%r/256%r)^2) _ 0%r => //.
++ wp; rnd (fun b => to_int b = 0); auto => />.
+  by rewrite mu_dB0 /= => *; rewrite get_set_sameE.
++ seq 4 : (to_int b0 = 0 /\ to_int b1 = 0 /\ n - size cs = z)
+    (1%r/256%r) (1%r/256%r) _ 0%r => //.
+  + wp; rnd (fun b => to_int b = 0); auto => />.
+    by rewrite mu_dB0 /= => *; rewrite get_set_sameE.
+  + wp; rnd (fun b => to_int b = 0); auto => />.
+    rewrite mu_dB0 /= => &hr h0 h1 b hb hb2.
+    rewrite get_set_sameE /= v_of0 //; smt(size_rcons gt1_q).
+  by move=> _ _; rewrite RField.expr2.
+by move=> _ _; rewrite (RField.exprS _ 2) // RField.expr2.
+qed.
+
+lemma S_ll :
+  islossless SampleRq(RS.RO).init /\ islossless SampleRq(RS.RO).sample /\
+  islossless SampleRq(RS.ProgRO).sample.
+proof.
+split; 1: by proc.
+by split; [apply SampleRq_ll | apply SampleRq_prog_ll].
+qed.
+
+lemma ideal_sampler_correct :
+  equiv [SampleRqRaw.sample ~ RS.ISAsProc.get : ={arg} ==> ={res}].
+proof. by proc; auto. qed.
+
+lemma S_sampler_of_correct : hoare [ SampleRq(RS.SamplerOfCorrect).sample :
+  arg = RS.SamplerOfCorrect.sampler_input /\
+  (forall y, fst y = arg => y \notin RS.RO.m) /\
+  RS.SamplerOfCorrect.is_valid ==> RS.SamplerOfCorrect.is_valid ].
+proof.
+proc; inline *.
+while (RS.SamplerOfCorrect.is_valid /\ x = RS.SamplerOfCorrect.sampler_input /\
+  0 <= ctx /\ forall i, (x, i) \in RS.RO.m => i < ctx).
++ auto => /> &hr hv hctx hm _ r0 _.
+  have hf : forall k, 0 <= k =>
+    ! (RS.SamplerOfCorrect.sampler_input{hr}, ctx{hr} + k) \in RS.RO.m{hr}.
+  + by move=> k hk; apply/negP => /hm /#.
+  smt(mem_set).
+by auto => /> &hr hm hv; smt().
+qed.
+
+lemma log3_ok xa (log : (((seed * int * int) * int) * byte) list) cs b0 b1 b2 :
+  all (fun (p : (_ * _) * _) => p.`1.`1 = xa) log =>
+  unzip2 (unzip1 log) = iota_ 0 (size log) =>
+  foldl_o rq_body (Some ([], [])) log = Some (cs, []) =>
+  size cs < n =>
+  let log' = rcons (rcons (rcons log ((xa, size log), b0))
+                     ((xa, size log + 1), b1)) ((xa, size log + 2), b2) in
+  all (fun (p : (_ * _) * _) => p.`1.`1 = xa) log' /\
+  unzip2 (unzip1 log') = iota_ 0 (size log') /\
+  size log' = size log + 3 /\
+  foldl_o rq_body (Some ([], [])) log' =
+    Some ((if v_of b0 b1 b2 < q then rcons cs (v_of b0 b1 b2) else cs), []).
+proof.
+move=> hall hiota hfold hlt /=.
+have h3 : forall m, iota_ m 3 = [m; m+1; m+2].
++ move=> m; have -> : 3 = 2 + 1 by done.
+  by rewrite iotaS // (: 2 = 1 + 1) // iotaS // (: 1 = 0 + 1) // iotaS // iota0.
+rewrite -!cats1 !all_cat hall /= !size_cat /= !map_cat hiota /=.
+split; 1: by rewrite iota_add ?size_ge0 //= h3 -!catA.
+rewrite !cats1 !foldl_o_rcons hfold /=.
+by rewrite /rq_body /= hlt /= hlt /= hlt.
+qed.
+
+hoare Op_sample_game_ok xa :
+  RS.Op_sample_game(SampleRq).sample : x = xa ==> op_sample res.`1 xa = Some res.`2.
+proof.
+proc; inline SampleRq(RS.LogRO).sample RS.LogRO.get; wp.
+while (all (fun (p : (_ * _) * _) => p.`1.`1 = xa) RS.LogRO.log /\ x0 = xa /\
+       unzip2 (unzip1 RS.LogRO.log) = iota_ 0 (size RS.LogRO.log) /\
+       size RS.LogRO.log = ctx /\ size cs <= n /\
+       foldl_o rq_body (Some ([], [])) RS.LogRO.log = Some (cs, [])).
++ wp; call (: true); 1: by auto.
+  wp; call (: true); 1: by auto.
+  wp; call (: true); 1: by auto.
+  wp; skip => /> &hr hall hiota _ hfold hlt b0 b1 b2.
+  have /= := log3_ok xa _ _ b0 b1 b2 hall hiota hfold hlt.
+  by case: (v_of b0 b1 b2 < q) => hv [#] -> -> -> -> /=; smt(size_rcons).
+auto => />; split; 1: by rewrite iota0 //; smt(gt0_n).
+move=> log cs0 hn hall hiota hle hfold.
+by rewrite /op_sample hall hiota /= hfold /= /#.
+qed.
+
+lemma log_entry (log : (((seed * int * int) * int) * byte) list) xa c :
+  0 <= c < size log =>
+  all (fun (p : (_ * _) * _) => p.`1.`1 = xa) log =>
+  unzip2 (unzip1 log) = iota_ 0 (size log) =>
+  (nth witness log c).`1 = (xa, c).
+proof.
+move=> hc /all_nthP /(_ witness c hc) /= h1 hiota.
+have := congr1 (fun l => nth 0 l c) _ _ hiota => /=.
+rewrite (nth_map witness) 1:size_map // (nth_map witness) // nth_iota //= => h2.
+smt().
+qed.
+
+lemma rq_body1 e cs : size cs < n => rq_body e (cs, []) = Some (cs, [e.`2]).
+proof. by rewrite /rq_body => ->. qed.
+
+lemma rq_body2 e cs b0 : size cs < n => rq_body e (cs, [b0]) = Some (cs, [b0; e.`2]).
+proof. by rewrite /rq_body => ->. qed.
+
+lemma rq_body3 e cs b0 b1 : size cs < n =>
+  rq_body e (cs, [b0; b1]) =
+  Some ((if v_of b0 b1 e.`2 < q then rcons cs (v_of b0 b1 e.`2) else cs), []).
+proof. by rewrite /rq_body => ->. qed.
+
+lemma drop_step (log : (((seed * int * int) * int) * byte) list) xa c cs csf :
+  0 <= c =>
+  all (fun (p : (_ * _) * _) => p.`1.`1 = xa) log =>
+  unzip2 (unzip1 log) = iota_ 0 (size log) =>
+  foldl_o rq_body (Some (cs, [])) (drop c log) = Some (csf, []) =>
+  size csf = n =>
+  size cs < n =>
+  c + 3 <= size log /\
+  (nth witness log c).`1 = (xa, c) /\
+  (nth witness log (c + 1)).`1 = (xa, c + 1) /\
+  (nth witness log (c + 2)).`1 = (xa, c + 2) /\
+  foldl_o rq_body
+    (Some ((let v = v_of (nth witness log c).`2 (nth witness log (c + 1)).`2
+                          (nth witness log (c + 2)).`2 in
+            if v < q then rcons cs v else cs), []))
+    (drop (c + 3) log) = Some (csf, []).
+proof.
+move=> hc hall hiota hfold hsz hlt.
+have hsd := size_drop c log hc.
+have hnth : forall k, 0 <= k => nth witness (drop c log) k = nth witness log (c + k).
++ by move=> k hk; rewrite nth_drop.
+case _ : (drop c log) hfold hnth hsd => [ | e0 [ | e1 [ | e2 rest]]] hdrop hfold hnth hsd.
++ by move: hfold; rewrite /foldl_o /= => h; smt().
++ by move: hfold; rewrite /foldl_o /= /rq_body /= hlt.
++ by move: hfold; rewrite /foldl_o /= /rq_body /= hlt /= hlt.
+have -> : drop (c + 3) log = rest.
++ by rewrite addzC -drop_drop // hdrop /= drop0.
+have hsl : c + 3 <= size log by move: hsd => /=; smt(size_ge0).
+rewrite hsl /=.
+have := log_entry log xa c _ hall hiota; 1: smt().
+have := log_entry log xa (c + 1) _ hall hiota; 1: smt().
+have := log_entry log xa (c + 2) _ hall hiota; 1: smt().
+rewrite -(hnth 0) // -(hnth 1) // -(hnth 2) //= => -> -> -> /=.
+by move: hfold; rewrite !foldl_o_cons /= rq_body1 //= rq_body2 //= rq_body3.
+qed.
+
+lemma Op_sample_game_fun log y m :
+  phoare [RS.Op_sample_game(SampleRq).sample :
+    (forall a b, (a, b) \in log => RS.RO.m.[a] = Some b) /\
+    op_sample log x = Some y /\ RS.RO.m = m
+    ==>
+    res.`1 = log /\ RS.RO.m = m] = 1%r.
+proof.
+proc; inline SampleRq(RS.LogRO).sample; wp.
+rewrite /op_sample /=.
+conseq (: (forall a b, (a, b) \in log => RS.RO.m.[a] = Some b) /\ RS.RO.m = m /\
+   all (fun (p : (_ * _) * _) => p.`1.`1 = x) log /\
+   unzip2 (unzip1 log) = iota_ 0 (size log) /\
+   exists csf, size csf = n /\ foldl_o rq_body (Some ([], [])) log = Some (csf, []) ==> _).
++ move=> &hr [hin].
+  case: (all (fun (p : (_ * _) * _) => p.`1.`1 = x{hr}) log /\
+         unzip2 (unzip1 log) = iota_ 0 (size log)) => // -[hall hiota].
+  case _: (foldl_o rq_body (Some ([], [])) log) => //= -[csf buf] hf.
+  move=> /=; case: (size csf = n /\ buf = []) => // -[hs ->>] [_ hm] /=.
+  by rewrite -hm hall hiota /=; split; [exact hin | exists csf].
+elim* => csf.
+while (RS.LogRO.log = take ctx log /\ 0 <= ctx <= size log /\ RS.RO.m = m /\
+       (forall a b, (a, b) \in log => RS.RO.m.[a] = Some b) /\
+       all (fun (p : (_ * _) * _) => p.`1.`1 = x0) log /\
+       unzip2 (unzip1 log) = iota_ 0 (size log) /\ size csf = n /\
+       foldl_o rq_body (Some (cs, [])) (drop ctx log) = Some (csf, [])) (size log - ctx).
++ move=> z; exlim x0, ctx => x0_ c0; wp.
+  call (RS.LogRO_get_ll (x0_, c0 + 2) (take (c0 + 2) log) m).
+  call (RS.LogRO_get_ll (x0_, c0 + 1) (take (c0 + 1) log) m).
+  call (RS.LogRO_get_ll (x0_, c0) (take c0 log) m).
+  skip => /> &hr hc0 hc1 hin hall hiota hsz hfold hlt.
+  have := drop_step log x0_ c0 cs{hr} csf hc0 hall hiota hfold hsz hlt.
+  move=> /= [#] hsl he0 he1 he2 hrest.
+  have hm : forall k, 0 <= k < 3 =>
+    m.[(x0_, c0 + k)] = Some (nth witness log (c0 + k)).`2.
+  + move=> k hk; have := mem_nth witness log (c0 + k) _; 1: smt().
+    have : (nth witness log (c0 + k)).`1 = (x0_, c0 + k) by smt().
+    by case: (nth witness log (c0 + k)) => a b /= ->; apply hin.
+  have hm0 := hm 0 _ => //=; have hm1 := hm 1 _ => //; have hm2 := hm 2 _ => //.
+  rewrite !domE hm0 hm1 hm2 /=.
+  have ht : forall k, 0 <= k < 3 =>
+    take (c0 + k + 1) log =
+    rcons (take (c0 + k) log) ((x0_, c0 + k), (nth witness log (c0 + k)).`2).
+  + move=> k hk; rewrite (take_nth witness) 1:/#; congr.
+    have : (nth witness log (c0 + k)).`1 = (x0_, c0 + k) by smt().
+    smt().
+  have := ht 0 _ => //=; have := ht 1 _ => //=; have := ht 2 _ => //= h2 h1 h0.
+  move=> _ <-; rewrite h0 /=.
+  move=> _ <-; rewrite -h0 h1 /= => _ <-; rewrite h2 /=.
+  by rewrite -h1 /=; move: hrest; smt().
+auto => /> &hr hin hall hiota hsz hfold; split.
++ by rewrite take0 drop0 hfold /= size_ge0.
+move=> cs0 ctx0; split.
++ move=> hc0 hc1 _ hf hle; move: hf.
+  by rewrite drop_oversize 1:/# /foldl_o /= => h; smt().
+move=> hge hc0 hc1 _; case: (ctx0 = size log) => [-> | hne]; 1: by rewrite take_size.
+case _ : (drop ctx0 log) => [ | e l] hd.
++ by have := size_drop ctx0 log hc0; rewrite hd /=; smt().
+by rewrite foldl_o_cons /= /rq_body hge /= foldl_o_None.
+qed.
+
+lemma RP_ll (R <: RS.RO_set {-ReprogRq}) : islossless R.set => islossless ReprogRq(R).reprogram.
+proof.
+move=> set_ll; proc.
+sp; conseq (: 0 <= i ==> true) => //.
+(* each chunk is accepted with probability [pq] *)
+while (0 <= i) (n - i) n pq; 1..3: smt().
++ move=> H; seq 8 : (0 <= i) 1%r 1%r 0%r 0%r => //.
+  + conseq (: true ==> true) (: 0 <= i ==> 0 <= i) => //.
+    + wp; call (: true); call (: true); call (: true); wp; rnd.
+      by seq 1 : (0 <= i); [auto | if; auto => /#].
+    islossless; [by move=> _ _; apply drange_ll | by apply drange_ll |
+      by apply/drange_ll/q_lt_2_23 | by apply Biased.dbiased_ll].
+  hoare; wp; call (: true); call (: true); call (: true); wp; rnd.
+  by seq 1 : (0 <= i); [auto | if; auto => /#].
++ conseq (: true ==> true) (: 0 <= i ==> 0 <= i) => //.
+  + wp; call (: true); call (: true); call (: true); wp; rnd.
+    by seq 1 : (0 <= i); [auto | if; auto => /#].
+  islossless; [by move=> _ _; apply drange_ll | by apply drange_ll |
+    by apply/drange_ll/q_lt_2_23 | by apply Biased.dbiased_ll].
+split; 1: by move=> _ _; apply pq_gt0.
+move=> z0.
+seq 1 : (b /\ 0 <= i /\ i < n /\ n - i = z0) pq 1%r (1%r - pq) 0%r
+  (0 <= i /\ i < n /\ n - i = z0) => //.
++ by auto.
++ by rnd; auto => />; rewrite Biased.dbiasedE /= clamp_pq.
+rcondt 1; 1: by auto.
+rcondt 7; 1: by wp; call (: true); call (: true); call (: true); auto.
+wp; call (: true); call (: true); call (: true); auto => />.
+by move=> &hr *; rewrite drange_ll //= /#.
+qed.
+
+lemma RP_sampler_of_correct : hoare [ ReprogRq(RS.SamplerOfCorrect).reprogram :
+  arg.`1 = RS.SamplerOfCorrect.sampler_input /\ RS.SamplerOfCorrect.is_valid ==>
+  RS.SamplerOfCorrect.is_valid ].
+proof.
+proc; inline *.
+while (RS.SamplerOfCorrect.is_valid /\ x = RS.SamplerOfCorrect.sampler_input).
++ wp; rnd.
+  seq 1 : (RS.SamplerOfCorrect.is_valid /\ x = RS.SamplerOfCorrect.sampler_input).
+  + by auto.
+  by if; auto.
+by auto.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Proof of [reprogram_correct].
+   [SampleRq(ProgRO)] --(hop_real_G2: chunk-wise, [chunk_eq])--> [G2]
+   --(hop_G2_LRO)--> [D3] over a lazy RO giving the accepted coefficients
+   --(hop_LRO_RO: eager/lazy)--> [D3] over the eager RO
+   --(hop_RO_G4)--> [G4]: coefficients sampled upfront as a list
+   --(hop_G4_reprog: [dRq_dlist])--> [DelayReprog(SampleRqRaw, ReprogRq)].
+   [chunk_eq]: three uniform bytes = (biased coin [b], value [v] in [0,q) if
+   [b] and in [q,2^23) otherwise, top bit [t]) through the encoding, by
+   [dchunk] and [RejSampling.sample_test_biased]. *)
+
+local clone Geometric.ModuleBased.RejSampling as GRS with type out_t <- int.
+
+local module Chunk = {
+  proc bytes() : byte * byte * byte = {
+    var b0, b1, b2;
+    b0 <$ dB;
+    b1 <$ dB;
+    b2 <$ dB;
+    return (b0, b1, b2);
+  }
+
+  proc prod() : (byte * byte) * byte = {
+    var bb;
+    bb <$ dB `*` dB `*` dB;
+    return bb;
+  }
+
+  proc vt() : int * int = {
+    var vt;
+    vt <$ drange 0 (2^23) `*` drange 0 2;
+    return vt;
+  }
+
+  proc vt2() : int * int = {
+    var v, t;
+    v <$ drange 0 (2^23);
+    t <$ drange 0 2;
+    return (v, t);
+  }
+
+  proc test() : bool * int * int = {
+    var bv, t;
+    bv <@ GRS.Rej.sample_test(drange 0 (2^23), fun v => v < q);
+    t <$ drange 0 2;
+    return (bv.`1, bv.`2, t);
+  }
+
+  proc biased0() : bool * int * int = {
+    var bv, t;
+    bv <@ GRS.Rej.sample_biased(drange 0 (2^23), fun v => v < q);
+    t <$ drange 0 2;
+    return (bv.`1, bv.`2, t);
+  }
+
+  proc biased() : bool * int * int = {
+    var b, v, t;
+    b <$ Biased.dbiased pq;
+    if (b) {
+      v <$ drange 0 q;
+    } else {
+      v <$ drange q (2^23);
+    }
+    t <$ drange 0 2;
+    return (b, v, t);
+  }
+}.
+
+lemma bytes_dlet :
+  dlet dB (fun b0 => dlet dB (fun b1 => dmap dB (fun b2 => (b0, b1, b2)))) =
+  dmap (dB `*` dB `*` dB) (fun (bb : (byte * byte) * byte) => (bb.`1.`1, bb.`1.`2, bb.`2)).
+proof. by rewrite dmap_dprodE dlet_dprod. qed.
+
+local equiv bytes_prod : Chunk.bytes ~ Chunk.prod : true ==> res{1} = (res.`1.`1, res.`1.`2, res.`2){2}.
+proof.
+proc.
+rnd (fun (x : byte * byte * byte) => ((x.`1, x.`2), x.`3))
+    (fun (y : (byte * byte) * byte) => (y.`1.`1, y.`1.`2, y.`2)) : *0 *0.
+skip => /=; rewrite bytes_dlet dmap_id.
+split; 1: by move=> [[??]?].
+move=> _; split.
++ move=> [[b0 b1] b2] _; rewrite dmap1E /(\o) /pred1; apply mu_eq => -[[??]?] /#.
+by move=> _ [b0 b1 b2] /supp_dmap [[[a0 a1] a2]] /= [h [#] ->> ->> ->>].
+qed.
+
+op chunk_dec (bb : (byte * byte) * byte) = (v_of bb.`1.`1 bb.`1.`2 bb.`2, to_int bb.`2 %/ 128).
+op chunk_enc (vt : int * int) = ((enc0 vt.`1, enc1 vt.`1), enc2 vt.`1 vt.`2).
+
+lemma chunk_encK bb : chunk_enc (chunk_dec bb) = bb.
+proof.
+case: bb => -[b0 b1] b2; rewrite /chunk_enc /chunk_dec /=.
+by have [# -> -> ->] := enc_v_of b0 b1 b2.
+qed.
+
+lemma chunk_decK vt : vt \in drange 0 (2^23) `*` drange 0 2 => chunk_dec (chunk_enc vt) = vt.
+proof.
+case: vt => v t /supp_dprod /= [/supp_drange hv /supp_drange ht].
+by rewrite /chunk_enc /chunk_dec /=; have [-> ->] := v_of_enc v t hv ht.
+qed.
+
+local equiv prod_vt : Chunk.prod ~ Chunk.vt :
+  true ==> res{1} = chunk_enc res{2} /\ res{2} \in drange 0 (2^23) `*` drange 0 2.
+proof.
+proc; rnd chunk_dec chunk_enc; skip => />; split.
++ by move=> vt hvt; rewrite chunk_decK.
+move=> _; split.
++ move=> vt hvt; rewrite -dchunk dmap1E /(\o) /pred1; apply mu_eq => bb /=.
+  rewrite eq_iff -/(chunk_dec bb); split => [<- | ->]; 1: by rewrite chunk_encK.
+  by rewrite chunk_decK.
+move=> _ bb hbb; rewrite chunk_encK /= -dchunk.
+by apply/supp_dmap; exists bb.
+qed.
+
+(* uniform sampling in [0, 2^23) as a biased coin followed by a conditional sampling *)
+lemma mu_lt_q : mu (drange 0 (2^23)) (fun v => v < q) = pq.
+proof.
+have -> : (fun v => v < q) = (fun j => j <= q - 1) by apply fun_ext => /#.
+by rewrite mu_drange_le gt0_2_23 /= clamp_pq.
+qed.
+
+lemma dcond_lt_q : dcond (drange 0 (2^23)) (fun v => v < q) = drange 0 q.
+proof.
+apply eq_distr => v; rewrite dcond1E mu_lt_q !drange1E /pq.
+have h1 := gt1_q; have h2 := q_lt_2_23.
+case: (v < q) => hv //=; last by smt().
+rewrite hv /=; case: (0 <= v) => hv0 /=; 2: by smt().
+move: h2 => /= h2.
+by rewrite (: v < 8388608) 1:/# /=; field; smt().
+qed.
+
+lemma dexc_lt_q : drange 0 (2^23) \ (fun v => v < q) = drange q (2^23).
+proof.
+apply eq_distr => v; rewrite dexcepted1E mu_lt_q !drange1E drange_ll 1:gt0_2_23 /pq.
+have h1 := gt1_q; have /= h2 := q_lt_2_23.
+case: (v < q) => hv /=; 1: by smt().
+case: (v < 8388608) => hv1 /=; 2: by smt().
+rewrite (: 0 <= v) 1:/# (: q <= v) 1:/# /=.
+field; smt().
+qed.
+
+local equiv vt_vt2 : Chunk.vt ~ Chunk.vt2 : true ==> ={res}.
+proof.
+proc; rnd : 0 0; auto => />.
+by rewrite -dprod_dlet dmap_id => />; case.
+qed.
+
+local equiv vt2_biased : Chunk.vt2 ~ Chunk.biased : true ==>
+  res{1} = (res.`2, res.`3){2} /\ (res.`1 <=> res.`2 < q){2}.
+proof.
+transitivity Chunk.test (true ==> res{1} = (res.`2, res.`3){2} /\ (res.`1 <=> res.`2 < q){2})
+  (true ==> ={res}) => //.
++ by proc; inline *; auto.
+transitivity Chunk.biased0 (true ==> ={res}) (true ==> ={res}) => //.
++ by proc; rnd; call GRS.sample_test_biased; auto => />; apply/drange_ll/gt0_2_23.
+proc; inline *; sp.
+seq 1 1 : (={b} /\ d{1} = drange 0 (2^23) /\ test{1} = fun v => v < q).
++ by auto => />; rewrite mu_lt_q.
+if{2}.
++ by auto => />; rewrite dcond_lt_q.
+by auto => />; rewrite dexc_lt_q.
+qed.
+
+local equiv chunk_eq : Chunk.bytes ~ Chunk.biased : true ==>
+  res{1} = (enc0 res{2}.`2, enc1 res{2}.`2, enc2 res{2}.`2 res{2}.`3) /\
+  v_of res{1}.`1 res{1}.`2 res{1}.`3 = res{2}.`2 /\ (res{2}.`1 <=> res{2}.`2 < q).
+proof.
+transitivity Chunk.prod (true ==> res{1} = (res.`1.`1, res.`1.`2, res.`2){2})
+  (true ==> res{1} = chunk_enc (res{2}.`2, res{2}.`3) /\
+            (res{2}.`2, res{2}.`3) \in drange 0 (2^23) `*` drange 0 2 /\
+            (res{2}.`1 <=> res{2}.`2 < q)) => //.
++ move=> &1 &m &2 -> [-> [/supp_dprod /= [/supp_drange hv /supp_drange ht] ->]] /=.
+  by rewrite /chunk_enc /=; have [-> _] := v_of_enc res{2}.`2 res{2}.`3 hv ht.
++ exact bytes_prod.
+transitivity Chunk.vt (true ==> res{1} = chunk_enc res{2} /\ res{2} \in drange 0 (2^23) `*` drange 0 2)
+  (true ==> res{1} = (res.`2, res.`3){2} /\ (res.`1 <=> res.`2 < q){2}) => //.
++ exact prod_vt.
+transitivity Chunk.vt2 (true ==> ={res})
+  (true ==> res{1} = (res.`2, res.`3){2} /\ (res.`1 <=> res.`2 < q){2}) => //.
++ exact vt_vt2.
+exact vt2_biased.
+qed.
+
+(* First hop: the real sampler, one chunk at a time, as a biased coin
+   followed by the encoding of a value (accepted or rejected) *)
+local module G2 = {
+  proc sample(x : seed * int * int) : Rq = {
+    var cs, ctx, b, v, t;
+    cs <- [];
+    ctx <- 0;
+    while (size cs < n) {
+      b <$ Biased.dbiased pq;
+      if (b) {
+        v <$ drange 0 q;
+      } else {
+        v <$ drange q (2^23);
+      }
+      t <$ drange 0 2;
+      RS.RO.m.[(x, ctx)] <- enc0 v;
+      RS.RO.m.[(x, ctx + 1)] <- enc1 v;
+      RS.RO.m.[(x, ctx + 2)] <- enc2 v t;
+      if (b) {
+        cs <- rcons cs v;
+      }
+      ctx <- ctx + 3;
+    }
+    return toRq cs;
+  }
+}.
+
+local equiv hop_real_G2 :
+  SampleRq(RS.ProgRO).sample ~ G2.sample : ={x, RS.RO.m} ==> ={res, RS.RO.m}.
+proof.
+proc; while (={cs, ctx, x, RS.RO.m}); last by auto.
+inline *.
+swap{1} 6 -3; swap{1} 10 -6.
+outline {1} [2..4] by { (r, r0, r1) <@ Chunk.bytes(); }.
+outline {2} [1..3] by { (b, v, t) <@ Chunk.biased(); }.
+wp; call chunk_eq; auto => /> &2 hn [b v t] /= hv hb.
+by rewrite !get_set_sameE /= hv -hb; case: b.
+qed.
+
+(* Second hop: the accepted coefficients are read from a lazy random oracle
+   indexed by the position of the coefficient, which is then made eager *)
+local clone PROM.FullRO as CRO with
+  type in_t <- int,
+  type out_t <- int,
+  op dout <- fun _ => drange 0 q,
+  type d_in_t <- seed * int * int,
+  type d_out_t <- Rq.
+
+local clone CRO.FullEager as CE.
+
+local module D3 (R : CRO.RO) = {
+  proc distinguish(x : seed * int * int) : Rq = {
+    var i, cs, ctx, b, v, t;
+    i <- 0;
+    while (i < n) {
+      R.sample(i);
+      i <- i + 1;
+    }
+    cs <- [];
+    ctx <- 0;
+    while (size cs < n) {
+      b <$ Biased.dbiased pq;
+      if (b) {
+        v <@ R.get(size cs);
+      } else {
+        v <$ drange q (2^23);
+      }
+      t <$ drange 0 2;
+      RS.RO.m.[(x, ctx)] <- enc0 v;
+      RS.RO.m.[(x, ctx + 1)] <- enc1 v;
+      RS.RO.m.[(x, ctx + 2)] <- enc2 v t;
+      if (b) {
+        cs <- rcons cs v;
+      }
+      ctx <- ctx + 3;
+    }
+    return toRq cs;
+  }
+}.
+
+local lemma CRO_dout_ll (x : int) : is_lossless ((fun (_ : int) => drange 0 q) x).
+proof. by move=> /=; apply/drange_ll/gt0_prime/prime_q. qed.
+
+local equiv hop_G2_LRO :
+  G2.sample ~ CRO.MainD(D3, CRO.LRO).distinguish : ={x, RS.RO.m} ==> ={res, RS.RO.m}.
+proof.
+proc; inline *; wp.
+while (={cs, ctx, RS.RO.m} /\ x{1} = x0{2} /\
+       forall j, size cs{2} <= j => j \notin CRO.RO.m{2}).
++ seq 1 1 : (={b, cs, ctx, RS.RO.m} /\ x{1} = x0{2} /\
+             (forall j, size cs{2} <= j => j \notin CRO.RO.m{2})); 1: by auto.
+  if => //.
+  + rcondt{2} 3; 1: by auto => /> /#.
+    auto => /> &2 hj _ v _ t _; rewrite get_set_sameE /=.
+    by move=> j; rewrite size_rcons mem_set => hle; smt().
+  by auto => /> &2 hj _ v _ t _; smt(size_rcons).
+wp; while{2} true (n - i{2}); 1: by auto => /#.
+auto => />.
+by move=> i; split => [/# | _ j _]; rewrite mem_empty.
+qed.
+
+local equiv hop_LRO_RO :
+  CRO.MainD(D3, CRO.LRO).distinguish ~ CRO.MainD(D3, CRO.RO).distinguish :
+  ={x, RS.RO.m} ==> ={res, RS.RO.m}.
+proof.
+symmetry; conseq (CE.RO_LRO D3 CRO_dout_ll) => /#.
+qed.
+
+(* Third hop: the coefficients are sampled upfront *)
+local clone DList.Program as DLq with
+  type t <- int,
+  op d <- drange 0 q.
+
+local module G4 = {
+  proc sample(x : seed * int * int) : Rq = {
+    var l, cs, ctx, b, v, t;
+    l <@ DLq.LoopSnoc.sample(n);
+    cs <- [];
+    ctx <- 0;
+    while (size cs < n) {
+      b <$ Biased.dbiased pq;
+      if (b) {
+        v <- nth 0 l (size cs);
+      } else {
+        v <$ drange q (2^23);
+      }
+      t <$ drange 0 2;
+      RS.RO.m.[(x, ctx)] <- enc0 v;
+      RS.RO.m.[(x, ctx + 1)] <- enc1 v;
+      RS.RO.m.[(x, ctx + 2)] <- enc2 v t;
+      if (b) {
+        cs <- rcons cs v;
+      }
+      ctx <- ctx + 3;
+    }
+    return toRq cs;
+  }
+}.
+
+local equiv hop_RO_G4 :
+  CRO.MainD(D3, CRO.RO).distinguish ~ G4.sample : ={x, RS.RO.m} ==> ={res, RS.RO.m}.
+proof.
+proc; inline *; wp.
+while (={cs, ctx, RS.RO.m} /\ x0{1} = x{2} /\ size l{2} = Params.n /\
+       forall j, 0 <= j < Params.n => CRO.RO.m{1}.[j] = Some (nth 0 l{2} j)).
++ seq 1 1 : (={b, cs, ctx, RS.RO.m} /\ x0{1} = x{2} /\ size l{2} = Params.n /\
+             size cs{1} < Params.n /\
+             forall j, 0 <= j < Params.n => CRO.RO.m{1}.[j] = Some (nth 0 l{2} j)).
+  + by auto.
+  if => //.
+  + rcondf{1} 3; 1: by auto => /> &2 _ hlt hm; rewrite domE hm // size_ge0.
+    wp; rnd; wp; rnd{1}; auto => /> &1 &2 hs hlt hm _.
+    by rewrite hm 1:size_ge0 //= (CRO_dout_ll 0).
+  by auto => /> &1 &2 hs hlt hm _ v _ t _; smt(size_rcons).
+wp.
+while (i{1} = i{2} /\ n{2} = Params.n /\ 0 <= i{1} <= Params.n /\ size l0{2} = i{2} /\
+       forall j, CRO.RO.m{1}.[j] = if 0 <= j < i{1} then Some (nth 0 l0{2} j) else None).
++ rcondt{1} 4; 1: by auto => /> &2 *; rewrite domE /#.
+  auto => /> &1 &2 h0 hle hm hlt r _.
+  rewrite size_cat /=; split; 1: smt().
+  move=> j; rewrite get_setE nth_cat hm.
+  by case: (j = size l0{2}) => [-> /= | hne]; smt().
+auto => />; split; 1: by split => [|j]; [smt(gt0_n) | rewrite emptyE /#].
+by move=> m l _ hn _ hle hm; split => [/# | j h0 h1]; rewrite hm /#.
+qed.
+
+local equiv dlist_dRq :
+  DLq.Sample.sample ~ SampleRqRaw.sample : n{1} = Params.n ==> res{1} = ofRq res{2}.
+proof.
+have ge0n : 0 <= Params.n by smt(gt0_n).
+proc; rnd toRq ofRq; auto => />.
+split; 1: by move=> r _; rewrite toRqK.
+move=> _; split.
++ move=> r _; rewrite dRq_dlist dmap1E /(\o) /pred1.
+  apply mu_eq_support => l /(supp_dlist _ _ _ ge0n) [hs /allP ha].
+  rewrite eq_iff; split => [<- | -> /=]; 2: by rewrite toRqK.
+  by rewrite ofRqK // allP => y /ha /supp_drange.
+move=> _ l /(supp_dlist _ _ _ ge0n) [hs /allP ha].
+by rewrite ofRqK // allP => y /ha /supp_drange.
+qed.
+
+local equiv hop_G4_reprog :
+  G4.sample ~ RS.DelayReprog(SampleRqRaw, ReprogRq).sample : ={x, RS.RO.m} ==> ={res, RS.RO.m}.
+proof.
+proc; inline{2} RS.DelayReprog(SampleRqRaw, ReprogRq).sample.
+seq 1 1 : (={x, RS.RO.m} /\ l{1} = ofRq r{2}).
++ transitivity{1} { l <@ DLq.Sample.sample(n); }
+    (={x, RS.RO.m} ==> ={x, l, RS.RO.m})
+    (={x, RS.RO.m} ==> ={x, RS.RO.m} /\ l{1} = ofRq r{2}).
+  + by move=> &1 &2 h; exists RS.RO.m{2} x{2}.
+  + by move=> &1 &m &2 [#] -> -> -> [#] -> -> ->.
+  + by symmetry; call DLq.Sample_LoopSnoc_eq; auto.
+  by call dlist_dRq; auto.
+inline{2} *; wp.
+while (={ctx, RS.RO.m} /\ x{1} = x0{2} /\ l{1} = cs{2} /\ size l{1} = Params.n /\
+       size cs{1} = i{2} /\ i{2} <= Params.n /\ cs{1} = take i{2} l{1}).
++ seq 1 1 : (={b, ctx, RS.RO.m} /\ x{1} = x0{2} /\ l{1} = cs{2} /\ size l{1} = Params.n /\
+             size cs{1} = i{2} /\ i{2} < Params.n /\ cs{1} = take i{2} l{1}).
+  + by auto.
+  if => //.
+  + auto => /> &1 &2 hs hlt t _; move=> t0 _; have hge := size_ge0 cs{1}.
+    by rewrite size_rcons (take_nth 0) 1:/# -t /=; smt().
+  by auto => /> &1 &2 hs hlt hcs _ v _ t0 _ /#.
+auto => /> &2; have [hs _] := ofRq_valid r{2}.
+split; 1: by rewrite hs take0 /=; smt(gt0_n).
+by move=> cs _ hn _ hle ->; rewrite (: size cs = n) 1:/# -hs take_size toRqK.
+qed.
+
+lemma reprogram_correct :
+  equiv [ SampleRq(RS.ProgRO).sample ~ RS.DelayReprog(SampleRqRaw, ReprogRq).sample :
+          ={arg, RS.RO.m} ==> ={res, RS.RO.m} ].
+proof.
+transitivity G2.sample (={x, RS.RO.m} ==> ={res, RS.RO.m})
+  (={x, RS.RO.m} ==> ={res, RS.RO.m}) => //; 1: by move=> /> &2; exists RS.RO.m{2} x{2}.
++ exact hop_real_G2.
+transitivity CRO.MainD(D3, CRO.LRO).distinguish (={x, RS.RO.m} ==> ={res, RS.RO.m})
+  (={x, RS.RO.m} ==> ={res, RS.RO.m}) => //; 1: by move=> /> &2; exists RS.RO.m{2} x{2}.
++ exact hop_G2_LRO.
+transitivity CRO.MainD(D3, CRO.RO).distinguish (={x, RS.RO.m} ==> ={res, RS.RO.m})
+  (={x, RS.RO.m} ==> ={res, RS.RO.m}) => //; 1: by move=> /> &2; exists RS.RO.m{2} x{2}.
++ exact hop_LRO_RO.
+transitivity G4.sample (={x, RS.RO.m} ==> ={res, RS.RO.m})
+  (={x, RS.RO.m} ==> ={res, RS.RO.m}) => //; 1: by move=> /> &2; exists RS.RO.m{2} x{2}.
++ exact hop_RO_G4.
+exact hop_G4_reprog.
+qed.
+
+declare module D <: RS.Distinguisher {-RS.RO, -RS.ISR, -RS.Sim}.
+
+equiv ExpandA_sim :
+  RS.Main(D, RS.RO, SampleRq(RS.RO)).main ~ RS.Main(D, RS.Sim(ReprogRq, RS.ISR), RS.ISR).main :
+  ={glob D, arg} ==> ={glob D, res}.
+proof.
+exact (RS.equiv_rej_sim SampleRq SampleRqRaw S_ll _ _ ideal_sampler_correct
+  S_sampler_of_correct Op_sample_game_ok Op_sample_game_fun ReprogRq _ RP_ll
+  RP_sampler_of_correct reprogram_correct D).
+qed.
+
+end section Proofs.
+
+end ExpandAEquiv.

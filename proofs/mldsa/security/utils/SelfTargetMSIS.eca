@@ -1,0 +1,49 @@
+(* Formalization of the SelfTargetMSIS assumption, in the random oracle
+   model.  The adversary receives a uniform matrix [A] and an oracle [H]
+   returning ring elements; it wins if it outputs a short vector [y] and a
+   message [mu] such that the last entry of [y] is [H((I || A) * y, mu)].
+
+   The variant whose oracle returns a pre-image of the ring element together
+   with a leakage, and its reduction to this game, are in
+   [SelfTargetMSISLeakage.eca]. *)
+
+require import AllCore Distr.
+require (*--*) DynMatrix PROM.
+
+clone import DynMatrix as M.
+
+type M.
+
+(* Distribution of the entries of the matrix *)
+op dR : R distr.
+
+(* Distribution of the challenges returned by the random oracle *)
+op dC : R distr.
+
+clone import PROM.FullRO as PRO with
+  type in_t <- vector*M,
+  type out_t <- R,
+  op dout <- (fun _ => dC)
+proof*.
+
+op inf_norm : vector -> int.
+
+op m : { int | 0 < m } as gt0_m.
+op n : { int | 0 < n } as gt0_n.
+op gamma : int.
+
+module type Adversary (H : RO) = {
+  proc guess(mA : matrix) : vector * M { H.get }
+}.
+
+module Game (A : Adversary) (H : RO) = {
+  proc main() = {
+    var mA, y, mu, c, r;
+    H.init();
+    mA <$ dmatrix dR m n;
+    (y, mu) <@ A(H).guess(mA);
+    c <- y.[m + n - 1];
+    r <@ H.get((onem m || mA) *^ y, mu);
+    return inf_norm y <= gamma /\ c = r;
+  }
+}.

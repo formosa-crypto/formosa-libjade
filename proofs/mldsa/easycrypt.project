@@ -21,6 +21,7 @@ idirs = Spec:spec
 idirs = Spec:spec/properties
 rdirs = spec
 rdirs = security
+rdirs = security/utils
 
 rdirs = eclib
 

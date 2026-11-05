@@ -10,6 +10,7 @@ require import MLDSA_ROSep_Hop9 MLDSA_ROSep_Hop10 MLDSA_ROSep_Hop11 MLDSA_ROSep_
 require import ConcreteDRing MLDSATargetFIPS.
 require DS_ROM.
 
+require import Leakage.
 abstract theory MLDSA_ROSep_Hop13.
 
 clone include MLDSA_ROSep_Hop12.MLDSA_ROSep_Hop12.
@@ -113,29 +114,29 @@ qed.
 
 (*************** Vectors and matrices ****************)
 
-op vec_of_k (v : polykvec) : TF.DV.MatRq.Vectors.vector =
-  TF.DV.MatRq.Vectors.oflist (map poly2alg (KArray.to_list v)).
+op vec_of_k (v : polykvec) : DV.MatRq.Vectors.vector =
+  DV.MatRq.Vectors.oflist (map poly2alg (KArray.to_list v)).
 
-op mat_of (m : polymat) : TF.DV.MatRq.Matrices.matrix =
-  TF.DV.MatRq.Matrices.offunm (fun i j => poly2alg m.[i * lvec + j], kvec, lvec).
+op mat_of (m : polymat) : DV.MatRq.Matrices.matrix =
+  DV.MatRq.Matrices.offunm (fun i j => poly2alg m.[i * lvec + j], kvec, lvec).
 
-lemma size_vec_of_l (v : polylvec) : TF.DV.MatRq.Vectors.size (vec_of_l v) = lvec.
-proof. by rewrite /vec_of_l TF.DV.MatRq.Vectors.size_oflist size_map LArray.size_to_list. qed.
+lemma size_vec_of_l (v : polylvec) : DV.MatRq.Vectors.size (vec_of_l v) = lvec.
+proof. by rewrite /vec_of_l DV.MatRq.Vectors.size_oflist size_map LArray.size_to_list. qed.
 
-lemma size_vec_of_k (v : polykvec) : TF.DV.MatRq.Vectors.size (vec_of_k v) = kvec.
-proof. by rewrite /vec_of_k TF.DV.MatRq.Vectors.size_oflist size_map KArray.size_to_list. qed.
+lemma size_vec_of_k (v : polykvec) : DV.MatRq.Vectors.size (vec_of_k v) = kvec.
+proof. by rewrite /vec_of_k DV.MatRq.Vectors.size_oflist size_map KArray.size_to_list. qed.
 
-lemma vec_of_lE (v : polylvec) i : 0 <= i < lvec => TF.DV.MatRq.Vectors.get (vec_of_l v) i = poly2alg v.[i].
+lemma vec_of_lE (v : polylvec) i : 0 <= i < lvec => DV.MatRq.Vectors.get (vec_of_l v) i = poly2alg v.[i].
 proof.
-move=> hi; rewrite /vec_of_l (TF.DV.MatRq.Vectors.get_oflist witness) ?size_map ?LArray.size_to_list //;
+move=> hi; rewrite /vec_of_l (DV.MatRq.Vectors.get_oflist witness) ?size_map ?LArray.size_to_list //;
   1: smt(size_iota).
 rewrite (nth_map witness witness poly2alg); 1: smt(LArray.size_to_list).
 by rewrite LArray.get_to_list.
 qed.
 
-lemma vec_of_kE (v : polykvec) i : 0 <= i < kvec => TF.DV.MatRq.Vectors.get (vec_of_k v) i = poly2alg v.[i].
+lemma vec_of_kE (v : polykvec) i : 0 <= i < kvec => DV.MatRq.Vectors.get (vec_of_k v) i = poly2alg v.[i].
 proof.
-move=> hi; rewrite /vec_of_k (TF.DV.MatRq.Vectors.get_oflist witness) ?size_map ?KArray.size_to_list //;
+move=> hi; rewrite /vec_of_k (DV.MatRq.Vectors.get_oflist witness) ?size_map ?KArray.size_to_list //;
   1: smt(size_iota).
 rewrite (nth_map witness witness poly2alg); 1: smt(KArray.size_to_list).
 by rewrite KArray.get_to_list.
@@ -148,61 +149,61 @@ by apply (ComRingDflInv.addrI (poly2alg poly_zero)); rewrite h ComRingDflInv.add
 qed.
 
 lemma poly2alg_dotp (v1 v2 : polylvec) :
-  poly2alg (dotp v1 v2) = TF.DV.MatRq.Big.BAdd.bigi predT (fun j => poly2alg v1.[j] * poly2alg v2.[j]) 0 lvec.
+  poly2alg (dotp v1 v2) = DV.MatRq.Big.BAdd.bigi predT (fun j => poly2alg v1.[j] * poly2alg v2.[j]) 0 lvec.
 proof.
-rewrite /dotp /= /range /=; elim: (iota_ 0 lvec) => [|x l ih] /=; 1: by rewrite TF.DV.MatRq.Big.BAdd.big_nil poly2alg0.
-by rewrite TF.DV.MatRq.Big.BAdd.big_cons /predT /= -ih /(&+) /(&*) !poly2algK.
+rewrite /dotp /= /range /=; elim: (iota_ 0 lvec) => [|x l ih] /=; 1: by rewrite DV.MatRq.Big.BAdd.big_nil poly2alg0.
+by rewrite DV.MatRq.Big.BAdd.big_cons /predT /= -ih /(&+) /(&*) !poly2algK.
 qed.
 
 lemma vec_of_k_mulmxv (m : polymat) (v : polylvec) :
-  vec_of_k (mulmxv m v) = TF.DV.MatRq.Matrices.mulmxv (mat_of m) (vec_of_l v).
+  vec_of_k (mulmxv m v) = DV.MatRq.Matrices.mulmxv (mat_of m) (vec_of_l v).
 proof.
-apply TF.DV.MatRq.Vectors.eq_vectorP; rewrite size_vec_of_k TF.DV.MatRq.Matrices.size_mulmxv /mat_of /=.
+apply DV.MatRq.Vectors.eq_vectorP; rewrite size_vec_of_k DV.MatRq.Matrices.size_mulmxv /mat_of /=.
 split; 1: smt(gt0_k).
-move=> i hi; rewrite vec_of_kE // TF.DV.MatRq.Matrices.get_mulmxv TF.DV.MatRq.Vectors.dotpE /mulmxv KArray.initiE //=
+move=> i hi; rewrite vec_of_kE // DV.MatRq.Matrices.get_mulmxv DV.MatRq.Vectors.dotpE /mulmxv KArray.initiE //=
         poly2alg_dotp size_vec_of_l /=.
 rewrite (_ : max (max 0 lvec) lvec = lvec); 1: smt(gt0_l).
-apply TF.DV.MatRq.Big.BAdd.eq_big_int => j hj /=.
-rewrite TF.DV.MatRq.Matrices.get_offunm /=; 1: smt(gt0_l gt0_k).
+apply DV.MatRq.Big.BAdd.eq_big_int => j hj /=.
+rewrite DV.MatRq.Matrices.get_offunm /=; 1: smt(gt0_l gt0_k).
 by rewrite vec_of_lE // /row LArray.initiE.
 qed.
 
-lemma vec_of_l_add (u v : polylvec) : vec_of_l (u + v) = TF.DV.MatRq.Vectors.( + ) (vec_of_l u) (vec_of_l v).
+lemma vec_of_l_add (u v : polylvec) : vec_of_l (u + v) = DV.MatRq.Vectors.( + ) (vec_of_l u) (vec_of_l v).
 proof.
-apply TF.DV.MatRq.Vectors.eq_vectorP; rewrite TF.DV.MatRq.Vectors.size_addv !size_vec_of_l /=; split => // i hi.
-by rewrite TF.DV.MatRq.Vectors.get_addv !vec_of_lE // polylvec_add_iE // /(&+) poly2algK.
+apply DV.MatRq.Vectors.eq_vectorP; rewrite DV.MatRq.Vectors.size_addv !size_vec_of_l /=; split => // i hi.
+by rewrite DV.MatRq.Vectors.get_addv !vec_of_lE // polylvec_add_iE // /(&+) poly2algK.
 qed.
 
 lemma vec_of_l_psmul (c : Rq.poly) (v : polylvec) :
-  vec_of_l (psmul c v) = TF.DV.MatRq.Vectors.( ** ) (poly2alg c) (vec_of_l v).
+  vec_of_l (psmul c v) = DV.MatRq.Vectors.( ** ) (poly2alg c) (vec_of_l v).
 proof.
-apply TF.DV.MatRq.Vectors.eq_vectorP; rewrite TF.DV.MatRq.Vectors.size_scalarv !size_vec_of_l /= => i hi.
-by rewrite TF.DV.MatRq.Vectors.get_scalarv !vec_of_lE // /psmul LArray.mapiE //= /(&*) poly2algK ComRingDflInv.mulrC.
+apply DV.MatRq.Vectors.eq_vectorP; rewrite DV.MatRq.Vectors.size_scalarv !size_vec_of_l /= => i hi.
+by rewrite DV.MatRq.Vectors.get_scalarv !vec_of_lE // /psmul LArray.mapiE //= /(&*) poly2algK ComRingDflInv.mulrC.
 qed.
 
-lemma vec_of_k_add (u v : polykvec) : vec_of_k (u + v) = TF.DV.MatRq.Vectors.( + ) (vec_of_k u) (vec_of_k v).
+lemma vec_of_k_add (u v : polykvec) : vec_of_k (u + v) = DV.MatRq.Vectors.( + ) (vec_of_k u) (vec_of_k v).
 proof.
-apply TF.DV.MatRq.Vectors.eq_vectorP; rewrite TF.DV.MatRq.Vectors.size_addv !size_vec_of_k /=; split => // i hi.
-by rewrite TF.DV.MatRq.Vectors.get_addv !vec_of_kE // polykvec_add_iE // /(&+) poly2algK.
+apply DV.MatRq.Vectors.eq_vectorP; rewrite DV.MatRq.Vectors.size_addv !size_vec_of_k /=; split => // i hi.
+by rewrite DV.MatRq.Vectors.get_addv !vec_of_kE // polykvec_add_iE // /(&+) poly2algK.
 qed.
 
-lemma vec_of_k_sub (u v : polykvec) : vec_of_k (u - v) = TF.DV.MatRq.Vectors.( - ) (vec_of_k u) (vec_of_k v).
+lemma vec_of_k_sub (u v : polykvec) : vec_of_k (u - v) = DV.MatRq.Vectors.( - ) (vec_of_k u) (vec_of_k v).
 proof.
-apply TF.DV.MatRq.Vectors.eq_vectorP.
-rewrite TF.DV.MatRq.Vectors.size_addv TF.DV.MatRq.Vectors.size_oppv !size_vec_of_k /=; split => // i hi.
-by rewrite TF.DV.MatRq.Vectors.get_addv TF.DV.MatRq.Vectors.getvN !vec_of_kE // polykvec_sub_iE // /(&+) /(&-) !poly2algK.
+apply DV.MatRq.Vectors.eq_vectorP.
+rewrite DV.MatRq.Vectors.size_addv DV.MatRq.Vectors.size_oppv !size_vec_of_k /=; split => // i hi.
+by rewrite DV.MatRq.Vectors.get_addv DV.MatRq.Vectors.getvN !vec_of_kE // polykvec_sub_iE // /(&+) /(&-) !poly2algK.
 qed.
 
 lemma vec_of_k_psmul (c : Rq.poly) (v : polykvec) :
-  vec_of_k (psmul c v) = TF.DV.MatRq.Vectors.( ** ) (poly2alg c) (vec_of_k v).
+  vec_of_k (psmul c v) = DV.MatRq.Vectors.( ** ) (poly2alg c) (vec_of_k v).
 proof.
-apply TF.DV.MatRq.Vectors.eq_vectorP; rewrite TF.DV.MatRq.Vectors.size_scalarv !size_vec_of_k /= => i hi.
-by rewrite TF.DV.MatRq.Vectors.get_scalarv !vec_of_kE // /psmul KArray.mapiE //= /(&*) poly2algK ComRingDflInv.mulrC.
+apply DV.MatRq.Vectors.eq_vectorP; rewrite DV.MatRq.Vectors.size_scalarv !size_vec_of_k /= => i hi.
+by rewrite DV.MatRq.Vectors.get_scalarv !vec_of_kE // /psmul KArray.mapiE //= /(&*) poly2algK ComRingDflInv.mulrC.
 qed.
 
-lemma vec_of_k_neg (v : polykvec) : vec_of_k (PolyKVec.zerov - v) = TF.DV.MatRq.Vectors.([-]) (vec_of_k v).
+lemma vec_of_k_neg (v : polykvec) : vec_of_k (PolyKVec.zerov - v) = DV.MatRq.Vectors.([-]) (vec_of_k v).
 proof.
-apply TF.DV.MatRq.Vectors.eq_vectorP; rewrite TF.DV.MatRq.Vectors.size_oppv !size_vec_of_k /= => i hi.
+apply DV.MatRq.Vectors.eq_vectorP; rewrite DV.MatRq.Vectors.size_oppv !size_vec_of_k /= => i hi.
 rewrite !vec_of_kE // polykvec_sub_iE //.
 by rewrite /PolyKVec.zerov KArray.createiE // /(&+) /(&-) !poly2algK poly2alg0 ComRingDflInv.add0r.
 qed.
@@ -213,9 +214,9 @@ move=> ha; split => [h i hi | h]; 2: exact inf_norm_lt.
 by have := inf_normXE p (a - 1) i _ _ hi; smt().
 qed.
 
-lemma infnorm_l (v : polylvec) b : 0 < b => (PolyLVec.infnorm_lt v b <=> TF.DV.inf_normv (vec_of_l v) < b).
+lemma infnorm_l (v : polylvec) b : 0 < b => (PolyLVec.infnorm_lt v b <=> DV.inf_normv (vec_of_l v) < b).
 proof.
-move=> hb; rewrite TF.DV.inf_normv_ltr // size_vec_of_l /PolyLVec.infnorm_lt allP; split.
+move=> hb; rewrite DV.inf_normv_ltr // size_vec_of_l /PolyLVec.infnorm_lt allP; split.
 + move=> h i hi; rewrite vec_of_lE // poly_norm_lt // => j hj; rewrite poly2algiE //.
   by have := h i _; [rewrite mem_iota /# | rewrite /= allP => /(_ j _); [rewrite mem_iota /# | done]].
 move=> h i /mem_iota hi /=; rewrite allP => j /mem_iota hj /=.
@@ -224,9 +225,9 @@ rewrite vec_of_lE 1:/# poly_norm_lt // => /(_ j _); 1: smt().
 by rewrite poly2algiE 1:/#.
 qed.
 
-lemma infnorm_k (v : polykvec) b : 0 < b => (PolyKVec.infnorm_lt v b <=> TF.DV.inf_normv (vec_of_k v) < b).
+lemma infnorm_k (v : polykvec) b : 0 < b => (PolyKVec.infnorm_lt v b <=> DV.inf_normv (vec_of_k v) < b).
 proof.
-move=> hb; rewrite TF.DV.inf_normv_ltr // size_vec_of_k /PolyKVec.infnorm_lt allP; split.
+move=> hb; rewrite DV.inf_normv_ltr // size_vec_of_k /PolyKVec.infnorm_lt allP; split.
 + move=> h i hi; rewrite vec_of_kE // poly_norm_lt // => j hj; rewrite poly2algiE //.
   by have := h i _; [rewrite mem_iota /# | rewrite /= allP => /(_ j _); [rewrite mem_iota /# | done]].
 move=> h i /mem_iota hi /=; rewrite allP => j /mem_iota hj /=.
@@ -237,23 +238,23 @@ qed.
 
 (*************** Rounding on vectors ****************)
 
-lemma vec_of_k_LowBits (w : polykvec) : vec_of_k (polykvec_LowBits w) = TF.DV.lowBitsV (vec_of_k w).
+lemma vec_of_k_LowBits (w : polykvec) : vec_of_k (polykvec_LowBits w) = DV.lowBitsV (vec_of_k w).
 proof.
-apply TF.DV.MatRq.Vectors.eq_vectorP; rewrite TF.DV.MatRq.Vectors.size_mapv !size_vec_of_k /= => i hi.
-rewrite TF.DV.MatRq.Vectors.get_mapv ?size_vec_of_k // !vec_of_kE // /polykvec_LowBits KArray.mapiE //=
-        /TF.DV.HL.lowBits /=.
+apply DV.MatRq.Vectors.eq_vectorP; rewrite DV.MatRq.Vectors.size_mapv !size_vec_of_k /= => i hi.
+rewrite DV.MatRq.Vectors.get_mapv ?size_vec_of_k // !vec_of_kE // /polykvec_LowBits KArray.mapiE //=
+        /DV.HL.lowBits /=.
 apply polyXnD1_eqP => j hj; rewrite poly2algiE // /poly_LowBits Array256.initiE //= poly_lowbits_correct //; 1: smt(ge2_gamma2).
 by rewrite LowBits_E poly2algiE // creprK.
 qed.
 
-lemma w1_key_HighBits (w : polykvec) : w1_key (polykvec_HighBits w) = TF.DV.highBitsV (vec_of_k w).
+lemma w1_key_HighBits (w : polykvec) : w1_key (polykvec_HighBits w) = DV.highBitsV (vec_of_k w).
 proof.
 apply (eq_from_nth witness).
-+ by rewrite /w1_key TF.DV.size_highBitsV size_vec_of_k size_map KArray.size_to_list.
++ by rewrite /w1_key DV.size_highBitsV size_vec_of_k size_map KArray.size_to_list.
 move=> i; rewrite /w1_key size_map KArray.size_to_list => hi.
-rewrite -/(w1_key _) w1_key_nth // /TF.DV.highBitsV (nth_map witness witness TF.DV.HL.highBits)
-        ?TF.DV.MatRq.Vectors.size_tolist ?size_vec_of_k // TF.DV.MatRq.Vectors.nth_tolist ?size_vec_of_k //
-        vec_of_kE // /TF.DV.HL.highBits.
+rewrite -/(w1_key _) w1_key_nth // /DV.highBitsV (nth_map witness witness DV.HL.highBits)
+        ?DV.MatRq.Vectors.size_tolist ?size_vec_of_k // DV.MatRq.Vectors.nth_tolist ?size_vec_of_k //
+        vec_of_kE // /DV.HL.highBits.
 congr; apply (eq_from_nth 0); 1: by rewrite size_map Array256.size_to_list /poly_highbits size_mkseq.
 move=> j; rewrite size_map Array256.size_to_list => hj.
 rewrite (nth_map witness 0 asint) ?Array256.size_to_list // Array256.get_to_list /polykvec_HighBits KArray.mapiE //=
@@ -261,17 +262,17 @@ rewrite (nth_map witness 0 asint) ?Array256.size_to_list // Array256.get_to_list
 by rewrite /poly_highbits nth_mkseq //= HighBits_E poly2algiE.
 qed.
 
-lemma hints_of_MakeHint (u v : polykvec) : hints_of (MakeHint u v) = TF.DV.makeHintV (vec_of_k u) (vec_of_k v).
+lemma hints_of_MakeHint (u v : polykvec) : hints_of (MakeHint u v) = DV.makeHintV (vec_of_k u) (vec_of_k v).
 proof.
 apply (eq_from_nth witness).
-+ by rewrite /hints_of TF.DV.size_makeHintV !size_vec_of_k size_map KArray.size_to_list.
++ by rewrite /hints_of DV.size_makeHintV !size_vec_of_k size_map KArray.size_to_list.
 move=> i; rewrite /hints_of size_map KArray.size_to_list => hi.
 rewrite (nth_map witness witness (fun (p : Rq.poly) => map (fun c => c <> Zq.zero) (Array256.to_list p)))
         ?KArray.size_to_list // KArray.get_to_list /=.
-rewrite /TF.DV.makeHintV (nth_map (witness, witness) witness (TF.DV.uncurry TF.DV.HL.makeHint));
-  1: by rewrite size_zip !TF.DV.MatRq.Vectors.size_tolist !size_vec_of_k /#.
-rewrite nth_zip ?TF.DV.MatRq.Vectors.size_tolist ?size_vec_of_k // /TF.DV.uncurry /=
-        !TF.DV.MatRq.Vectors.nth_tolist ?size_vec_of_k // !vec_of_kE // /TF.DV.HL.makeHint.
+rewrite /DV.makeHintV (nth_map (witness, witness) witness (DV.uncurry DV.HL.makeHint));
+  1: by rewrite size_zip !DV.MatRq.Vectors.size_tolist !size_vec_of_k /#.
+rewrite nth_zip ?DV.MatRq.Vectors.size_tolist ?size_vec_of_k // /DV.uncurry /=
+        !DV.MatRq.Vectors.nth_tolist ?size_vec_of_k // !vec_of_kE // /DV.HL.makeHint.
 apply (eq_from_nth witness); 1: by rewrite size_map Array256.size_to_list /poly_makehint size_mkseq.
 move=> j; rewrite size_map Array256.size_to_list => hj.
 rewrite (nth_map witness witness (fun (c : coeff) => c <> Zq.zero)) ?Array256.size_to_list // Array256.get_to_list
@@ -280,13 +281,25 @@ rewrite (nth_map witness witness (fun (c : coeff) => c <> Zq.zero)) ?Array256.si
 by case: (makehint (2 * gamma2) u.[i].[j] v.[i].[j]) => /=; smt(incoeffK zeroE).
 qed.
 
-lemma hammw_E (h : polykvec) : hammw h w_hint = check_hw (hints_of h).
+lemma hint_weight_hints (h : polykvec) i : 0 <= i <= kvec =>
+  Spec.hint_weight h i = hint_weight (hints_of h) i.
 proof.
-rewrite /hammw /check_hw /hints_of count_flatten -map_comp StdBigop.Bigint.sumzE StdBigop.Bigint.BIA.big_mapT /(\o) /=.
-congr; rewrite /KArray.to_list /mkseq StdBigop.Bigint.BIA.big_mapT /(\o) /=.
-apply StdBigop.Bigint.BIA.eq_big_seq => ii _ /=.
+move=> hi; rewrite /Spec.hint_weight /hint_weight.
+apply StdBigop.Bigint.BIA.eq_big_seq => j /mem_range hj /=.
+rewrite /hints_of (nth_map witness []) ?KArray.size_to_list 1:/# KArray.get_to_list.
 by rewrite count_map /Array256.to_list /mkseq count_map.
 qed.
+
+lemma hintfail_idx_E (h : polykvec) : hintfail_idx h = hint_fail_idx (hints_of h).
+proof.
+rewrite /hintfail_idx /hint_fail_idx /=.
+rewrite (find_eq_in (fun i => w_hint < Spec.hint_weight h (i + 1))
+                    (fun i => w_hint < hint_weight (hints_of h) (i + 1))) //.
+by move=> i /mem_range hi /=; rewrite hint_weight_hints /#.
+qed.
+
+lemma hammw_E (h : polykvec) : hammw h w_hint = MP.T.check_hw (hints_of h).
+proof. by rewrite /MP.T.check_hw -hintfail_idx_E; apply eq_iff; rewrite hintfail_idx_None. qed.
 
 lemma usehint_rng_hb (b : bool) (x : coeff) : 0 <= usehint (2 * gamma2) b x < hb_range.
 proof.
@@ -294,17 +307,17 @@ have [[h0 hM] _] := Decompose_cases x.
 rewrite /usehint /= -HighBits_E hb_range_pred; smt(gt1_hb_range).
 qed.
 
-lemma w1_key_UseHint (h r : polykvec) : w1_key (UseHint h r) = TF.DV.useHintV (hints_of h) (vec_of_k r).
+lemma w1_key_UseHint (h r : polykvec) : w1_key (UseHint h r) = DV.useHintV (hints_of h) (vec_of_k r).
 proof.
 apply (eq_from_nth witness).
-+ rewrite TF.DV.size_useHintV size_vec_of_k /w1_key /hints_of !size_map; smt(size_iota gt0_k).
++ rewrite DV.size_useHintV size_vec_of_k /w1_key /hints_of !size_map; smt(size_iota gt0_k).
 move=> i hi; have {hi} hi : 0 <= i < kvec
   by move: hi; rewrite /w1_key size_map; smt(size_iota gt0_k KArray.size_to_list).
 have hsh : size (hints_of h) = kvec by rewrite /hints_of size_map; smt(size_iota gt0_k KArray.size_to_list).
-rewrite w1_key_nth // /TF.DV.useHintV (nth_map (witness, witness) witness (TF.DV.uncurry TF.DV.HL.useHint));
-  1: by rewrite size_zip TF.DV.MatRq.Vectors.size_tolist size_vec_of_k hsh /#.
-rewrite nth_zip ?TF.DV.MatRq.Vectors.size_tolist ?size_vec_of_k ?hsh // /TF.DV.uncurry /=
-        TF.DV.MatRq.Vectors.nth_tolist ?size_vec_of_k // vec_of_kE // /TF.DV.HL.useHint.
+rewrite w1_key_nth // /DV.useHintV (nth_map (witness, witness) witness (DV.uncurry DV.HL.useHint));
+  1: by rewrite size_zip DV.MatRq.Vectors.size_tolist size_vec_of_k hsh /#.
+rewrite nth_zip ?DV.MatRq.Vectors.size_tolist ?size_vec_of_k ?hsh // /DV.uncurry /=
+        DV.MatRq.Vectors.nth_tolist ?size_vec_of_k // vec_of_kE // /DV.HL.useHint.
 congr.
 rewrite /hints_of (nth_map witness witness (fun (p : Rq.poly) => map (fun c => c <> Zq.zero) (Array256.to_list p)));
   1: smt(KArray.size_to_list).
@@ -330,17 +343,17 @@ case: (asint x %% 8192 <= 4096) => hc /=.
 by rewrite (_ : asint x - (asint x %% 8192 - 8192) = 8192 * (asint x %/ 8192 + 1)) 1:/# mulKz //; smt().
 qed.
 
-lemma t1_of_Power2Round (t : polykvec) : t1_of (Power2Round t).`1 = TF.DV.base2highbitsV (vec_of_k t).
+lemma t1_of_Power2Round (t : polykvec) : t1_of (Power2Round t).`1 = DV.base2highbitsV (vec_of_k t).
 proof.
 apply (eq_from_nth witness).
-+ rewrite TF.DV.size_base2highbitsV size_vec_of_k /t1_of size_map; smt(size_iota gt0_k KArray.size_to_list).
++ rewrite DV.size_base2highbitsV size_vec_of_k /t1_of size_map; smt(size_iota gt0_k KArray.size_to_list).
 move=> i hi; have {hi} hi : 0 <= i < kvec
   by move: hi; rewrite /t1_of size_map; smt(size_iota gt0_k KArray.size_to_list).
 rewrite /t1_of (nth_map witness witness (fun (p : Rq.poly) => map asint (Array256.to_list p)));
   1: smt(KArray.size_to_list).
-rewrite KArray.get_to_list /TF.DV.base2highbitsV (nth_map witness witness TF.DV.HL.base2highbits)
-        ?TF.DV.MatRq.Vectors.size_tolist ?size_vec_of_k // TF.DV.MatRq.Vectors.nth_tolist ?size_vec_of_k //
-        vec_of_kE // /TF.DV.HL.base2highbits /=.
+rewrite KArray.get_to_list /DV.base2highbitsV (nth_map witness witness DV.HL.base2highbits)
+        ?DV.MatRq.Vectors.size_tolist ?size_vec_of_k // DV.MatRq.Vectors.nth_tolist ?size_vec_of_k //
+        vec_of_kE // /DV.HL.base2highbits /=.
 apply (eq_from_nth 0); 1: by rewrite size_map Array256.size_to_list /poly_highbits2 size_mkseq.
 move=> j; rewrite size_map Array256.size_to_list => hj.
 rewrite (nth_map witness 0 asint) ?Array256.size_to_list // Array256.get_to_list /PolyKVec.Power2Round /=
@@ -349,11 +362,11 @@ rewrite (nth_map witness 0 asint) ?Array256.size_to_list // Array256.get_to_list
 by rewrite poly_highbits2_correct // poly2algiE.
 qed.
 
-lemma vec_of_k_Power2Round (t : polykvec) : vec_of_k (Power2Round t).`2 = TF.DV.base2lowbitsV (vec_of_k t).
+lemma vec_of_k_Power2Round (t : polykvec) : vec_of_k (Power2Round t).`2 = DV.base2lowbitsV (vec_of_k t).
 proof.
-apply TF.DV.MatRq.Vectors.eq_vectorP; rewrite TF.DV.MatRq.Vectors.size_mapv !size_vec_of_k /= => i hi.
-rewrite TF.DV.MatRq.Vectors.get_mapv ?size_vec_of_k // !vec_of_kE //
-        /TF.DV.HL.base2lowbits /TF.DV.HL.base2shift /TF.DV.HL.base2highbits /=.
+apply DV.MatRq.Vectors.eq_vectorP; rewrite DV.MatRq.Vectors.size_mapv !size_vec_of_k /= => i hi.
+rewrite DV.MatRq.Vectors.get_mapv ?size_vec_of_k // !vec_of_kE //
+        /DV.HL.base2lowbits /DV.HL.base2shift /DV.HL.base2highbits /=.
 apply polyXnD1_eqP => j hj; rewrite poly2algiE // rcoeffD -rcoeffN poly_leftshift2_correct // poly_highbits2_correct //
   /PolyKVec.Power2Round /= KArray.mapiE //= /poly_Power2Round /= Array256.initiE //= Power2Round_E /= poly2algiE //.
 have h2d : 2 ^ d = 8192 by rewrite expr_pred.
@@ -361,15 +374,15 @@ have H := high2_low2P d t.[i].[j] _ _; 1,2: by rewrite ?h2d.
 have -> // : t.[i].[j] - leftshift2 d (highbits2 d t.[i].[j]) = lowbits2 d t.[i].[j] by rewrite -{1}H; ring.
 qed.
 
-lemma vec_of_k_smul (t1 : polykvec) : vec_of_k (smul t1 (incoeff (2 ^ d))) = TF.DV.base2shiftV (t1_of t1).
+lemma vec_of_k_smul (t1 : polykvec) : vec_of_k (smul t1 (incoeff (2 ^ d))) = DV.base2shiftV (t1_of t1).
 proof.
 have hs : size (t1_of t1) = kvec by rewrite /t1_of size_map; smt(size_iota gt0_k KArray.size_to_list).
-apply TF.DV.MatRq.Vectors.eq_vectorP; rewrite TF.DV.size_base2shiftV size_vec_of_k hs /= => i hi.
-rewrite vec_of_kE // /TF.DV.base2shiftV (TF.DV.MatRq.Vectors.get_oflist witness); 1: by rewrite size_map hs.
-rewrite (nth_map witness witness TF.DV.HL.base2shift) 1:/#.
+apply DV.MatRq.Vectors.eq_vectorP; rewrite DV.size_base2shiftV size_vec_of_k hs /= => i hi.
+rewrite vec_of_kE // /DV.base2shiftV (DV.MatRq.Vectors.get_oflist witness); 1: by rewrite size_map hs.
+rewrite (nth_map witness witness DV.HL.base2shift) 1:/#.
 rewrite /t1_of (nth_map witness witness (fun (p : Rq.poly) => map asint (Array256.to_list p)));
   1: smt(KArray.size_to_list).
-rewrite KArray.get_to_list /TF.DV.HL.base2shift /=.
+rewrite KArray.get_to_list /DV.HL.base2shift /=.
 apply polyXnD1_eqP => j hj; rewrite poly2algiE // poly_leftshift2_correct // (nth_map witness 0 asint)
   ?Array256.size_to_list // Array256.get_to_list /smul KArray.mapiE //= Array256.mapiE //= /leftshift2 incoeffM asintK.
 by rewrite expr_pred.
@@ -388,8 +401,8 @@ qed.
 
 (*************** Distributions ****************)
 
-op k_of_vec (v : TF.DV.MatRq.Vectors.vector) : polykvec =
-  KArray.init (fun i => alg2poly (TF.DV.MatRq.Vectors.get v i)).
+op k_of_vec (v : DV.MatRq.Vectors.vector) : polykvec =
+  KArray.init (fun i => alg2poly (DV.MatRq.Vectors.get v i)).
 
 lemma vec_of_lK : cancel vec_of_l l_of_vec.
 proof. move=> v; apply LArray.ext_eq => i hi; by rewrite /l_of_vec LArray.initiE //= vec_of_lE // alg2polyK. qed.
@@ -397,25 +410,25 @@ proof. move=> v; apply LArray.ext_eq => i hi; by rewrite /l_of_vec LArray.initiE
 lemma vec_of_kK : cancel vec_of_k k_of_vec.
 proof. move=> v; apply KArray.ext_eq => i hi; by rewrite /k_of_vec KArray.initiE //= vec_of_kE // alg2polyK. qed.
 
-lemma dpolyl_vec : dmap (dpolyl (dpoly (-Eta) Eta)) vec_of_l = TF.DV.MatRq.Vectors.dvector (DR.dRq_ Eta) lvec.
+lemma dpolyl_vec : dmap (dpolyl (dpoly (-Eta) Eta)) vec_of_l = DV.MatRq.Vectors.dvector (DR.dRq_ Eta) lvec.
 proof.
 have /= H := param_sets.
-rewrite /dpolyl /LArrayE.darray /TF.DV.MatRq.Vectors.dvector /DR.dRq_ /dpoly_ball ifT 1:/# (_ : max 0 lvec = lvec) 1:/#.
+rewrite /dpolyl /LArrayE.darray /DV.MatRq.Vectors.dvector /DR.dRq_ /dpoly_ball ifT 1:/# (_ : max 0 lvec = lvec) 1:/#.
 rewrite (dlist_dmap (dpoly (-Eta) Eta) poly2alg lvec) !dmap_comp.
 apply eq_dmap_in => x hx; rewrite /(\o) /vec_of_l LArray.of_listK //.
 by move: hx; rewrite supp_dlist; smt(gt0_l).
 qed.
 
-lemma dpolyk_vec : dmap (dpolyk (dpoly (-Eta) Eta)) vec_of_k = TF.DV.MatRq.Vectors.dvector (DR.dRq_ Eta) kvec.
+lemma dpolyk_vec : dmap (dpolyk (dpoly (-Eta) Eta)) vec_of_k = DV.MatRq.Vectors.dvector (DR.dRq_ Eta) kvec.
 proof.
 have /= H := param_sets.
-rewrite /dpolyk /KArrayE.darray /TF.DV.MatRq.Vectors.dvector /DR.dRq_ /dpoly_ball ifT 1:/# (_ : max 0 kvec = kvec) 1:/#.
+rewrite /dpolyk /KArrayE.darray /DV.MatRq.Vectors.dvector /DR.dRq_ /dpoly_ball ifT 1:/# (_ : max 0 kvec = kvec) 1:/#.
 rewrite (dlist_dmap (dpoly (-Eta) Eta) poly2alg kvec) !dmap_comp.
 apply eq_dmap_in => x hx; rewrite /(\o) /vec_of_k KArray.of_listK //.
 by move: hx; rewrite supp_dlist; smt(gt0_k).
 qed.
 
-import TF.DV TF.DV.MatRq.Vectors TF.DV.MatRq.Matrices.
+import DV DV.MatRq.Vectors DV.MatRq.Matrices.
 
 lemma l_of_vecK (v : vector) : size v = lvec => vec_of_l (l_of_vec v) = v.
 proof.
@@ -441,11 +454,53 @@ proof.
 move=> hs; rewrite -dpolyk_vec dmap1E; apply mu_eq => x; rewrite /pred1 /(\o) /=; smt(vec_of_kK k_of_vecK).
 qed.
 
+(*************** The rejection tests and the leakage ****************)
+
+lemma infnorm_p (p : Rq.poly) b : 0 < b => (Rq.infnorm_lt p b <=> DR.cnorm (poly2alg p) < b).
+proof.
+move=> hb; rewrite /DR.cnorm poly_norm_lt // /Rq.infnorm_lt allP; split.
++ by move=> h j hj; rewrite poly2algiE //; apply h; rewrite mem_iota /#.
+by move=> h j /mem_iota hj /=; have := h j _; [smt() | rewrite poly2algiE 1:/#].
+qed.
+
+lemma zfail_idx_E (z : polylvec) : zfail_idx z = check_z (vec_of_l z).
+proof.
+have /= H := param_sets; have hg1 : 0 < gamma1 - Beta by smt(beta_gamma1_lt).
+rewrite /zfail_idx /check_z /first_fail /=.
+rewrite (find_eq_in (fun i => ! Rq.infnorm_lt z.[i] (gamma1 - Beta)) (fun i => ! z_ok (vec_of_l z).[i])) //.
+by move=> i /mem_range hi /=; rewrite vec_of_lE 1:/# /z_ok infnorm_p.
+qed.
+
+lemma r0fail_idx_E (r : polykvec) : r0fail_idx r = first_fail r0_ok kvec (vec_of_k r).
+proof.
+have /= H := param_sets; have hg2 : 0 < gamma2 - Beta by smt(beta_gamma2_lt).
+rewrite /r0fail_idx /first_fail /=.
+rewrite (find_eq_in (fun i => ! Rq.infnorm_lt r.[i] (gamma2 - Beta)) (fun i => ! r0_ok (vec_of_k r).[i])) //.
+by move=> i /mem_range hi /=; rewrite vec_of_kE 1:/# /r0_ok infnorm_p.
+qed.
+
+lemma r0fail_idx_LowBits (w : polykvec) : r0fail_idx (polykvec_LowBits w) = check_r0 (vec_of_k w).
+proof. by rewrite r0fail_idx_E vec_of_k_LowBits. qed.
+
+lemma c_leak_E (c : Rq.poly) : poly_leak (ntt c) = MP.T.c_leak (poly2alg c).
+proof.
+rewrite /poly_leak /MP.T.c_leak /poly_decl /= /ofRq alg2polyK.
+by elim: (to_list (ntt c)) => //= x l ->.
+qed.
+
+lemma t0_leak_E (t0 : polykvec) : kvec_leak (nttv t0) = MP.T.t0_leak (vec_of_k t0).
+proof.
+rewrite /kvec_leak /MP.T.t0_leak /vec_of_k oflistK /nttv /=.
+rewrite /KArray.to_list -map_comp !map_mkseq; apply eq_in_mkseq => i hi.
+rewrite /(\o) /= KArray.mapiE // /poly_decl /ofRq alg2polyK.
+by congr; elim: (to_list (ntt t0.[i])) => //= x l ->.
+qed.
+
 (*************** G13: the arithmetic of the target ****************)
 
 module MLDSA_RO_DS13(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DST.POracle3, Hmu : DST.POracle4,
                      Hct : DST.POracle5) = {
-  proc keygen() : BytesPK.t * TF.SK = {
+  proc keygen() : BytesPK.t * MP.T.SK = {
     var rho, _A, mA, s1, s2, t, pk, tr;
     RO_y.RO.init();
     rho <$ dxi;
@@ -459,15 +514,16 @@ module MLDSA_RO_DS13(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DST.POracle3,
     return (pk, (rho, tr, s1, s2, base2lowbitsV t));
   }
 
-  proc sign(sk : TF.SK, m : W8.t list) : BytesSig.t option * Leakage list = {
-    var coins, rho, tr, s1, s2, t0, _A, mA, mu, kappa, y, w, w1, ctl, ct, c, cr, z, h, leakage, sigma, bz, bh, sl;
+  proc sign(sk : MP.T.SK, m : W8.t list) : BytesSig.t option * leakage = {
+    var coins, rho, tr, s1, s2, t0, _A, mA, mu, kappa, y, w, w1, ctl, ct, c, cr, z, h, leakage, sigma, w0, ct0_ok, sl;
+    var z_fail, r0_fail, hint_fail : int option;
     var zh : (vector * bool list list) option;
     coins <$ drnd;
     ct <- witness;
     ctl <- witness;
     sigma <- witness;
-    leakage <- [];
     (rho, tr, s1, s2, t0) <- sk;
+    leakage <- MP.T.t0_leak t0;
     _A <@ ExpandA(XOFA_O(XA)).sample(rho);
     mA <- mat_of (invnttm _A);
     mu <@ Hmu.get(tr, m);
@@ -480,16 +536,24 @@ module MLDSA_RO_DS13(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DST.POracle3,
       ct <@ Hct.get(w1, mu);
       (c, sl) <@ SampleInBall_B(XC).sample(ct);
       ctl <- ((ct, c), sl);
-      leakage <- leakage ++ [RO ctl.`2];
+      leakage <- lcat leakage ctl.`2;
       cr <- poly2alg c;
+      leakage <- lcat leakage (MP.T.c_leak cr);
       z <- vec_of_l y + cr ** s1;
-      bz <- inf_normv z < gamma1 - Beta && inf_normv (lowBitsV (w - cr ** s2)) < gamma2 - Beta;
-      leakage <- leakage ++ [CheckZ bz];
-      if (bz) {
-        h <- makeHintV (- (cr ** t0)) (w - cr ** s2 + cr ** t0);
-        bh <- inf_normv (cr ** t0) < gamma2 && check_hw h;
-        leakage <- leakage ++ [CheckH bh];
-        if (bh) { zh <- Some (z, h); }
+      z_fail <- check_z z;
+      leakage <- lcat leakage (oileak z_fail);
+      if (z_fail = None) {
+        w0 <- w - cr ** s2;
+        r0_fail <- check_r0 w0;
+        leakage <- lcat leakage (oileak r0_fail);
+        if (r0_fail = None) {
+          h <- makeHintV (- (cr ** t0)) (w0 + cr ** t0);
+          hint_fail <- hint_fail_idx h;
+          leakage <- lcat leakage (oileak hint_fail);
+          (* test on c t0: a public computation of the leaked (c, t0) *)
+          ct0_ok <- check_ct0 (cr ** t0);
+          if (ct0_ok /\ hint_fail = None) { zh <- Some (z, h); }
+        }
       }
       kappa <- kappa + 1;
     }
@@ -522,7 +586,7 @@ module MLDSA_RO_DS13(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DST.POracle3,
 
 (*************** G12 and G13 ****************)
 
-op sk_rel (sk12 : Bytes32.t * Bytes64.t * polylvec * polykvec * polykvec) (sk13 : TF.SK) =
+op sk_rel (sk12 : Bytes32.t * Bytes64.t * polylvec * polykvec * polykvec) (sk13 : MP.T.SK) =
   sk13 = (sk12.`1, sk12.`2, vec_of_l sk12.`3, vec_of_k sk12.`4, vec_of_k sk12.`5).
 
 equiv keygen_13 :
@@ -553,23 +617,20 @@ by rewrite vec_of_k_Power2Round.
 qed.
 
 lemma sign_alg (A : polymat) (y s1 : polylvec) (c : Rq.poly) (s2 t0 : polykvec) :
-     (PolyLVec.infnorm_lt (y + psmul c s1) (gamma1 - Beta) <=>
-      inf_normv (vec_of_l y + poly2alg c ** vec_of_l s1) < gamma1 - Beta)
-  /\ (PolyKVec.infnorm_lt (polykvec_LowBits (mulmxv (invnttm A) y - psmul c s2)) (gamma2 - Beta) <=>
-      inf_normv (lowBitsV (mat_of (invnttm A) *^ vec_of_l y - poly2alg c ** vec_of_k s2)) < gamma2 - Beta)
-  /\ (PolyKVec.infnorm_lt (psmul c t0) gamma2 <=> inf_normv (poly2alg c ** vec_of_k t0) < gamma2)
+     zfail_idx (y + psmul c s1) = check_z (vec_of_l y + poly2alg c ** vec_of_l s1)
+  /\ r0fail_idx (polykvec_LowBits (mulmxv (invnttm A) y - psmul c s2)) =
+     check_r0 (mat_of (invnttm A) *^ vec_of_l y - poly2alg c ** vec_of_k s2)
+  /\ (PolyKVec.infnorm_lt (psmul c t0) gamma2 <=> check_ct0 (poly2alg c ** vec_of_k t0))
   /\ hints_of (MakeHint (PolyKVec.zerov - psmul c t0) (mulmxv (invnttm A) y - psmul c s2 + psmul c t0)) =
      makeHintV (- (poly2alg c ** vec_of_k t0))
        (mat_of (invnttm A) *^ vec_of_l y - poly2alg c ** vec_of_k s2 + poly2alg c ** vec_of_k t0)
   /\ vec_of_l (y + psmul c s1) = vec_of_l y + poly2alg c ** vec_of_l s1.
 proof.
 have /= H := param_sets.
-have hg1 : 0 < gamma1 - Beta by smt(beta_gamma1_lt).
-have hg2 : 0 < gamma2 - Beta by smt(beta_gamma2_lt).
 have hg : 0 < gamma2 by smt().
-split; 1: by rewrite -vec_of_l_psmul -vec_of_l_add; apply infnorm_l.
-split; 1: by rewrite -vec_of_k_mulmxv -vec_of_k_psmul -vec_of_k_sub -vec_of_k_LowBits; apply infnorm_k.
-split; 1: by rewrite -vec_of_k_psmul; apply infnorm_k.
+split; 1: by rewrite zfail_idx_E vec_of_l_add vec_of_l_psmul.
+split; 1: by rewrite r0fail_idx_LowBits vec_of_k_sub vec_of_k_mulmxv vec_of_k_psmul.
+split; 1: by rewrite /check_ct0 -vec_of_k_psmul; apply infnorm_k.
 split; 2: by rewrite vec_of_l_add vec_of_l_psmul.
 rewrite hints_of_MakeHint vec_of_k_neg vec_of_k_add vec_of_k_sub vec_of_k_mulmxv !vec_of_k_psmul.
 congr.
@@ -584,13 +645,13 @@ equiv sign_13 :
         RO_y.RO.m}.
 proof.
 proc.
-seq 10 11 : (={coins, ct, ctl, sigma, leakage, rho, tr, mu, kappa, glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO,
+seq 12 11 : (={coins, ct, ctl, sigma, leakage, rho, tr, mu, kappa, glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO,
                glob DST.RO4.RO, glob DST.RO5.RO, glob XOFA_O, RO_y.RO.m} /\
              s1{2} = vec_of_l s1{1} /\ s2{2} = vec_of_k s2{1} /\ t0{2} = vec_of_k t0{1} /\
              mA{2} = mat_of (invnttm _A{1}) /\ zh{1} = None /\ zh{2} = None).
 + wp; call (: ={glob DST.RO4.RO}); 1: by sim.
   wp; call (: ={glob DST.RO1.RO, glob RO_xr.RO, glob XOFA_O}); 1: by sim.
-  by auto => />; rewrite /sk_rel => &1 &2 -> /=.
+  by auto => />; rewrite /sk_rel => &1 &2 -> /=; rewrite t0_leak_E.
 seq 1 1 : (={ct, sigma, leakage, glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO, glob DST.RO4.RO, glob DST.RO5.RO,
              glob XOFA_O, RO_y.RO.m} /\
            zh{2} = omap (fun (p : polylvec * polykvec) => (vec_of_l p.`1, hints_of p.`2)) zh{1} /\
@@ -609,7 +670,7 @@ seq 1 1 : (={ct, sigma, leakage, glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO
   split; 1: (rewrite w1_key_HighBits vec_of_k_mulmxv; congr).
   move=> _ c.
   have [h1 [h2 [h3 [h4 h5]]]] := sign_alg _A{1} y s1{1} c.`1 s2{1} t0{1}.
-  rewrite hints_ofK h1 h2 h3 hammw_E h4 h5.
+  rewrite hints_ofK h1 h2 h3 hintfail_idx_E h4 h5 c_leak_E.
   smt().
 if; 1: smt().
 + wp; call (: true); 1: by sim.
@@ -645,11 +706,11 @@ by rewrite (infnorm_l _ _ hg1).
 qed.
 
 module G13(A : DS2.Adversary) = {
-  var sk : TF.SK
+  var sk : MP.T.SK
   var qs : W8.t list list
 
   module O = {
-    proc sign(m : W8.t list) : BytesSig.t option * Leakage list = {
+    proc sign(m : W8.t list) : BytesSig.t option * leakage = {
       var r;
       qs <- m :: qs;
       r <@ MLDSA_RO_DS13(XAw(DST.RO1.RO), XCw(DST.RO2.RO), DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign(sk, m);

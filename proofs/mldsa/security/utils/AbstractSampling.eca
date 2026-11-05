@@ -54,10 +54,12 @@ module Main (D : Distinguisher, RO : ROPair) = {
   }
 }.
 
+(* A module without any global variable. *)
 module Empty = { }.
 
 section.
-(* [S] is stateless: its globals are included in those of [Empty]. *)
+(* [S] is stateless: its globals are included in those of [Empty].
+   This is what allows commuting two calls to [S] with [eager]. *)
 declare module S <: Sampler {+Empty}.
 declare axiom S_ll : islossless S(RO).sample.
 declare axiom glob_S_tt (s1 s2 : glob S) : s1 = s2. 

@@ -1,4 +1,4 @@
-require import Int Xreal Real PROM Leakage Distr DistrExtras DBool FMap FSet.
+require import Int Xreal Real PROM Leakage Distr DBool FMap FSet.
 require AbstractSampling.
 
 (* require Geometric SplitRO. *)
@@ -72,16 +72,6 @@ module ProgRO : RO = {
     r <$ dout y;
     RO.m.[y] <- r;
     return oget RO.m.[y];
-  }
-}.
-
-(* "Forgetful" RO *)
-module ForgetRO : RO = {
-  include RO [-get]
-  proc get(y) = {
-    var r;
-    r <$ dout y;
-    return r;
   }
 }.
 
@@ -161,6 +151,9 @@ module Sim(RP : Reprogrammer, S : Sampler_t) : RO_t = {
   }
 }.
 
+(* A module without any global variable. *)
+module Empty = { }.
+
 section.
 (* Describes corrects queries that can be made by the sampler.
    These queries must all be fresh (i.e. no query on the same
@@ -214,10 +207,19 @@ module LogRO = {
   }
 }.
 
-(* A module without any global variable. *)
-module Empty = { }.
+(* A query on an input already in the RO is answered from the RO and logged. *)
+lemma LogRO_get_ll xa log0 m0 : phoare [ LogRO.get :
+  LogRO.log = log0 /\ x = xa /\ RO.m = m0 /\ x \in RO.m
+  ==>
+  LogRO.log = rcons log0 (xa, res) /\ RO.m = m0 /\ RO.m.[xa] = Some res
+] = 1%r.
+proof.
+proc; inline *; wp; rnd; wp; skip => /> /domE hin.
+by rewrite -(Core.some_oget _ hin) /=; apply dout_ll.
+qed.
 
-(* [S] is stateless: its globals are included in those of [Empty]. *)
+(* [S] is stateless: its globals are included in those of [Empty]
+   (required by [AbstractSampling.lazy_eager]). *)
 declare module S <: Sampler {+Empty}.
 declare module SRaw <: Sampler_t {-RO, -IS.RO, -Sim}.
 declare axiom S_ll :
@@ -708,6 +710,7 @@ by sim.
 qed.
 
 local module MI(S : Sampler_t) = D(Sim(RP, S), ThenReprog(S)).
+
 local equiv hop6 : Game5.main ~ Game6.main : ={glob D, arg} ==> ={glob D, res}.  
 proof.
 proc. call (dist_ideal MI). inline. auto; smt(glob_RP_tt).

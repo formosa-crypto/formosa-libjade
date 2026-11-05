@@ -20,8 +20,10 @@ op tau : { int | 1 <= tau <= n /\ tau <= 64 } as tau_bound. (* challenge weight 
 op d : { int | 0 < d } as gt0_d.        (* bits dropped from public key *)
 
 axiom eta_tau_leq_b : eta_ * tau <= beta_.
-(* No bound [tau * 2^(d-1) <= gamma2] is assumed: it fails for ML-DSA-44, and
-   the signing procedure checks [||c t0||_inf < gamma2] explicitly instead. *)
+(* No bound [tau * 2^(d-1) <= gamma2] is assumed: it fails for ML-DSA-44
+   (39 * 2^12 > 95232), and the signing procedure checks [||c t0||_inf < gamma2]
+   explicitly instead ([check_ct0] in MLDSATarget). *)
+axiom pow2_d_lt_q : 2 ^ d < q.
 
 axiom gamma2_bound  : 2 <= gamma2 <= q %/ 4.
 axiom gamma2_div : 2 * gamma2 %| (q - 1).

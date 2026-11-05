@@ -10,6 +10,7 @@ require import MLDSA_ROSep_Hop9 MLDSA_ROSep_Hop10 MLDSA_ROSep_Hop11 MLDSA_ROSep_
 require import ConcreteDRing MLDSATargetFIPS.
 require DS_ROM.
 
+require import Leakage.
 abstract theory MLDSA_ROSep_Hop14.
 
 clone include MLDSA_ROSep_Hop13.MLDSA_ROSep_Hop13.
@@ -18,7 +19,7 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 import PolyReduce.
-import TF.DV TF.DV.MatRq.Vectors TF.DV.MatRq.Matrices.
+import DV DV.MatRq.Vectors DV.MatRq.Matrices.
 
 (*************** RejNTTPoly and the ExpandA of the target ****************)
 
@@ -84,7 +85,7 @@ rewrite /invnttm KLMatrix.mapiE; 1: smt().
 apply hf; smt().
 qed.
 
-equiv expandA_14 : ExpandA(XOFA_O(XAw(DST.RO1.RO))).sample ~ TF.ExpandA(DST.RO1.RO).get :
+equiv expandA_14 : ExpandA(XOFA_O(XAw(DST.RO1.RO))).sample ~ MP.T.ExpandA(DST.RO1.RO).get :
   ={rho, DST.RO1.RO.m, RO_xr.RO.m} ==> res{2} = mat_of (invnttm res{1}) /\ ={DST.RO1.RO.m, RO_xr.RO.m}.
 proof.
 proc.
@@ -140,11 +141,11 @@ qed.
 
 module MLDSA_RO_DS14(XA : DST.POracle1, XC : DS11.POracle2, Htr : DST.POracle3, Hmu : DST.POracle4,
                      Hct : DST.POracle5) = {
-  proc keygen() : BytesPK.t * TF.SK = {
+  proc keygen() : BytesPK.t * MP.T.SK = {
     var rho, mA, s1, s2, t, pk, tr;
     RO_y.RO.init();
     rho <$ dxi;
-    mA <@ TF.ExpandA(XA).get(rho);
+    mA <@ MP.T.ExpandA(XA).get(rho);
     s1 <$ dvector (DR.dRq_ Eta) lvec;
     s2 <$ dvector (DR.dRq_ Eta) kvec;
     t <- mA *^ s1 + s2;
@@ -153,16 +154,17 @@ module MLDSA_RO_DS14(XA : DST.POracle1, XC : DS11.POracle2, Htr : DST.POracle3, 
     return (pk, (rho, tr, s1, s2, base2lowbitsV t));
   }
 
-  proc sign(sk : TF.SK, m : W8.t list) : BytesSig.t option * Leakage list = {
-    var coins, rho, tr, s1, s2, t0, mA, mu, kappa, y, w, w1, ctl, ct, c, cr, z, h, leakage, sigma, bz, bh, sl;
+  proc sign(sk : MP.T.SK, m : W8.t list) : BytesSig.t option * leakage = {
+    var coins, rho, tr, s1, s2, t0, mA, mu, kappa, y, w, w1, ctl, ct, c, cr, z, h, leakage, sigma, w0, ct0_ok, sl;
+    var z_fail, r0_fail, hint_fail : int option;
     var zh : (vector * bool list list) option;
     coins <$ drnd;
     ct <- witness;
     ctl <- witness;
     sigma <- witness;
-    leakage <- [];
     (rho, tr, s1, s2, t0) <- sk;
-    mA <@ TF.ExpandA(XA).get(rho);
+    leakage <- MP.T.t0_leak t0;
+    mA <@ MP.T.ExpandA(XA).get(rho);
     mu <@ Hmu.get(tr, m);
     kappa <- 0;
     zh <- None;
@@ -173,16 +175,24 @@ module MLDSA_RO_DS14(XA : DST.POracle1, XC : DS11.POracle2, Htr : DST.POracle3, 
       ct <@ Hct.get(w1, mu);
       (c, sl) <@ SampleInBall_B(XC).sample(ct);
       ctl <- ((ct, c), sl);
-      leakage <- leakage ++ [RO ctl.`2];
+      leakage <- lcat leakage ctl.`2;
       cr <- poly2alg c;
+      leakage <- lcat leakage (MP.T.c_leak cr);
       z <- vec_of_l y + cr ** s1;
-      bz <- inf_normv z < gamma1 - Beta && inf_normv (lowBitsV (w - cr ** s2)) < gamma2 - Beta;
-      leakage <- leakage ++ [CheckZ bz];
-      if (bz) {
-        h <- makeHintV (- (cr ** t0)) (w - cr ** s2 + cr ** t0);
-        bh <- inf_normv (cr ** t0) < gamma2 && check_hw h;
-        leakage <- leakage ++ [CheckH bh];
-        if (bh) { zh <- Some (z, h); }
+      z_fail <- check_z z;
+      leakage <- lcat leakage (oileak z_fail);
+      if (z_fail = None) {
+        w0 <- w - cr ** s2;
+        r0_fail <- check_r0 w0;
+        leakage <- lcat leakage (oileak r0_fail);
+        if (r0_fail = None) {
+          h <- makeHintV (- (cr ** t0)) (w0 + cr ** t0);
+          hint_fail <- hint_fail_idx h;
+          leakage <- lcat leakage (oileak hint_fail);
+          (* test on c t0: a public computation of the leaked (c, t0) *)
+          ct0_ok <- check_ct0 (cr ** t0);
+          if (ct0_ok /\ hint_fail = None) { zh <- Some (z, h); }
+        }
       }
       kappa <- kappa + 1;
     }
@@ -199,7 +209,7 @@ module MLDSA_RO_DS14(XA : DST.POracle1, XC : DS11.POracle2, Htr : DST.POracle3, 
     (rho, t1) <@ PkEncDec.pkDecode(pk);
     (ct, z, h) <@ SigEncDec.sigDecode(sigma);
     if (h <> None) {
-      mA <@ TF.ExpandA(XA).get(rho);
+      mA <@ MP.T.ExpandA(XA).get(rho);
       tr <@ Htrw(Htr).get(pk);
       mu <@ Hmu.get(tr, m);
       (c, l) <@ SampleInBall_B(XC).sample(ct);
@@ -257,7 +267,7 @@ qed.
 
 module G14(A : DS2.Adversary) = {
   module O = {
-    proc sign(m : W8.t list) : BytesSig.t option * Leakage list = {
+    proc sign(m : W8.t list) : BytesSig.t option * leakage = {
       var r;
       G13.qs <- m :: G13.qs;
       r <@ MLDSA_RO_DS14(DST.RO1.RO, XCw(DST.RO2.RO), DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign(G13.sk, m);

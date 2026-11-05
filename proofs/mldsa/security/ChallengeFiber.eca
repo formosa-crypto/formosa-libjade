@@ -1,0 +1,989 @@
+(* Efficient sampling of a uniform pre-image of a challenge under the
+   partial Fisher-Yates shuffle of FIPS 204 SampleInBall.
+
+   [SampleInBallDefs] encodes a challenge by [x : challenge_ir =
+   byte list * byte list]: 8 sign bytes (64 sign bits, of which only the
+   first [tau] are used) and [tau] index bytes [b_k] with
+   [to_int b_k <= i0 + k], where [i0 = 256 - tau].  The challenge is
+   computed by [to_challenge x]: starting from [nseq 256 0], for
+   [i = i0, .., 255], with [j = to_int b_(i - i0)] and the sign bit
+   [s_i = nth (to_bool_list x.`1) (i - i0)]:
+     c[i] <- c[j];  c[j] <- if s_i then -1 else 1.
+
+   Mathematical analysis (see the report for details).
+   - Before step [i], all positions [>= i] are zero and exactly [i - i0]
+     positions are nonzero; after step [i], positions [> i] are zero and
+     exactly [i - i0 + 1] positions are nonzero (whatever [j] is, one more
+     coefficient becomes nonzero).
+   - Label the coefficient placed at step [i] by [i].  The labelled
+     coefficient [i] is always at a position [<= i] after step [i] and
+     the step only moves it ([c[i] <- c[j]]) at a later step [i'] such
+     that it sits at [j_(i')]; the labelled final configuration determines
+     the indices: backwards, [j_i] is the position of label [i], and
+     undoing step [i] moves the content of [i] back to [j_i].  So
+     index sequences ([prod_(i) (i + 1) = 256! / i0!] of them) are in
+     bijection with injective labellings {i0..255} -> [0, 256) (also
+     [256! / i0!] of them).
+   - Forgetting the labels, a challenge [r] (exactly [tau] nonzero
+     coefficients in {-1, 1}) has exactly [tau!] labellings, each one
+     determining the index bytes and the [tau] used sign bits
+     ([s_i = (r[pos(label i)] = -1)]); the [64 - tau] unused sign bits are
+     free.  Hence every fibre has [tau! * 2^(64 - tau)] elements: the
+     distribution [dmap dI to_c] is uniform on its support (this is the
+     uniformity statement [dC_uni]).
+   - Backward sampler: for [i = 255] down to [i0], pick [j] UNIFORMLY
+     among ALL the nonzero positions of the current vector (they are all
+     [<= i]; there are exactly [i - i0 + 1] of them), record [(i, j, s)]
+     with [s = (c[j] = -1)], and undo the step: [c[j] <- c[i]; c[i] <- 0].
+     Every choice leads to a vector with [i - i0] nonzero positions, all
+     [< i], i.e. to a reachable state with the same number [(i - i0)!] of
+     completions: the uniform choice is the right one, each element of
+     the fibre has probability [1 / tau!] (times [2^-(64 - tau)] for the
+     free sign bits).  Note that [j] must be chosen among all nonzero
+     positions, not first a sign and then a position with that sign
+     (that would weight the signs wrongly).
+   - Cost: [tau] iterations, each one O(256) (scan for nonzero positions)
+     plus [64 - tau] random bits: polynomial (in fact O(256 * tau)).
+
+   This file formalises the sampler, as a program ([FiberSampler]) and
+   as a distribution ([dfiber], equivalence [FiberSampler_dfiber]), and
+   proves (no admit) the two facts needed by the generic reduction of
+   [SelfTargetMSIS] ([dfiber_supp], [dfiber_marginal]), the
+   characterisation [dfiber_dcond] (for [r] in the support,
+   [dfiber r = dcond dI (fun x => to_c x = r)]) and the uniformity of the
+   challenge distribution [dCR_uni]. *)
+
+require import AllCore IntDiv List Distr DList DBool DMap DJoin StdOrder.
+require import RealSeries StdBigop Byte BitEncoding DistrExtras.
+require (*--*) DParams DRing SampleInBallDefs.
+import BS2Int BitChunking Bigreal.BRA.
+
+clone import DParams as Params.
+
+clone import DRing as DR with
+  op q <= q,
+  op n <= n
+proof prime_q by exact prime_q
+proof gt0_n by exact gt0_n.
+import RqRing.
+
+op to_concrete : int list -> Rq.
+axiom to_concrete_inj_in (x y : int list) :
+  size x = 256 => all (fun c => c = -1 \/ c = 0 \/ c = 1) x =>
+  size y = 256 => all (fun c => c = -1 \/ c = 0 \/ c = 1) y =>
+  to_concrete x = to_concrete y => x = y.
+
+type in_t.
+
+clone SampleInBallDefs as SIB with
+  type in_t <- in_t,
+  type challenge <- Rq,
+  op to_concrete <- to_concrete,
+  theory Params <- Params
+proof*.
+realize to_concrete_inj_in.
+move=> x y _ _ eq_xy.
+have [szx hx] := SIB.to_challenge_valid x.
+have [szy hy] := SIB.to_challenge_valid y.
+exact (to_concrete_inj_in _ _ szx hx szy hy eq_xy).
+qed.
+
+type challenge_ir = SIB.challenge_ir.
+
+op to_c (x : challenge_ir) : Rq = to_concrete (SIB.to_challenge x).
+
+(* The distribution of challenges (= [SIB.dC]). *)
+op dCR : Rq distr = dmap SIB.dI to_c.
+
+(* -------------------------------------------------------------------- *)
+(* Reading the coefficients of a challenge.  The sampler needs the
+   coefficient list of [r]; in an implementation this is the coefficient
+   extraction of [Rq].  Here it is defined by choice; only
+   [of_concreteK] is used. *)
+op of_concrete (r : Rq) : int list =
+  choiceb (fun l => SIB.is_challenge_list l /\ to_concrete l = r) (nseq 256 0).
+
+lemma of_concreteK l :
+  SIB.is_challenge_list l => of_concrete (to_concrete l) = l.
+proof.
+move=> hl; have := choicebP (fun l' => SIB.is_challenge_list l' /\
+                                       to_concrete l' = to_concrete l)
+                            (nseq 256 0) _; 1: by exists l.
+move=> /= [[sz1 h1] eq1]; have [sz2 h2] := hl.
+exact (to_concrete_inj_in _ _ sz1 h1 sz2 h2 eq1).
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Forward and backward Fisher-Yates steps on coefficient lists.         *)
+
+op i0 = 256 - tau.
+
+lemma i0_bound : 192 <= i0 < 256 by smt(tau_bound).
+
+(* A trace entry [(i, j, s)]: step [i], index [j], sign bit [s]. *)
+type entry = int * int * bool.
+
+(* Forward step (= [SIB.to_challenge_body] on valid inputs). *)
+op fwd (c : int list) (t : entry) : int list =
+  put (put c t.`1 (nth 0 c t.`2)) t.`2 (if t.`3 then -1 else 1).
+
+op fwd_list (c : int list) (tr : entry list) : int list = foldl fwd c tr.
+
+(* Nonzero positions [<= i]. *)
+op nzpos (c : int list) (i : int) : int list =
+  filter (fun p => nth 0 c p <> 0) (range 0 (i + 1)).
+
+(* Undoing step [i] when the coefficient placed at step [i] is at [j]. *)
+op unstep (c : int list) (i j : int) : int list =
+  put (put c j (nth 0 c i)) i 0.
+
+(* State of the backward sampler: current vector and trace built so far. *)
+type state = int list * entry list.
+
+op bstep (i : int) (st : state) : state distr =
+  dmap (duniform (nzpos st.`1 i))
+       (fun j => (unstep st.`1 i j, (i, j, nth 0 st.`1 j = -1) :: st.`2)).
+
+op dback (l : int list) (st : state) : state distr =
+  with l = [] => dunit st
+  with l = i :: l' => dlet (bstep i st) (dback l').
+
+(* The steps, backwards: [255; 254; ..; i0]. *)
+op bsteps (i : int) : int list = rev (range i0 (i + 1)).
+
+(* Encoding of a trace and of the free sign bits as a [challenge_ir]. *)
+op bits2bytes (bs : bool list) : byte list =
+  map (fun b => from_int (bs2int b)) (chunk 8 bs).
+
+op encode (tr : entry list) (free : bool list) : challenge_ir =
+  (bits2bytes (map (fun (t : entry) => t.`3) tr ++ free),
+   map (fun (t : entry) => from_int t.`2) tr).
+
+(* The fibre sampler, as a distribution. *)
+op dfiber (r : Rq) : challenge_ir distr =
+  dlet (dback (bsteps 255) (of_concrete r, []))
+       (fun (st : state) => dmap (dlist {0,1} (64 - tau)) (encode st.`2)).
+
+(* The fibre sampler, as a program: [tau] iterations of a uniform choice
+   in a list of at most 256 positions, plus [64 - tau] coins. *)
+module FiberSampler = {
+  proc sample(r : Rq) : challenge_ir = {
+    var c, tr, i, j, free;
+    c <- of_concrete r;
+    tr <- [];
+    i <- 255;
+    while (i0 <= i) {
+      j <$ duniform (nzpos c i);
+      tr <- (i, j, nth 0 c j = -1) :: tr;
+      c <- unstep c i j;
+      i <- i - 1;
+    }
+    free <$ dlist {0,1} (64 - tau);
+    return encode tr free;
+  }
+}.
+
+module FiberSamplerD = {
+  proc sample(r : Rq) : challenge_ir = {
+    var x;
+    x <$ dfiber r;
+    return x;
+  }
+}.
+
+(* [FiberSampler] samples [dfiber]: see [FiberSampler_dfiber] at the end. *)
+
+(* -------------------------------------------------------------------- *)
+(* Each backward step undoes one forward step.                          *)
+
+abbrev valid = SIB.is_challenge_list.
+
+lemma fwd_unstep c i j :
+  valid c => 0 <= i < 256 => j \in nzpos c i =>
+  fwd (unstep c i j) (i, j, nth 0 c j = -1) = c.
+proof.
+move=> [sz hc] hi /mem_filter [/= nz /mem_range hj].
+have hcj : nth 0 c j = -1 \/ nth 0 c j = 1.
+- by move/(all_nthP _ _ 0): hc => /(_ j _); [smt() | smt()].
+apply (eq_from_nth 0); rewrite /fwd /unstep !size_put //= => k hk.
+by rewrite !nth_put ?size_put ?sz; smt().
+qed.
+
+lemma unstep_valid c i j : valid c => valid (unstep c i j).
+proof.
+move=> [sz hc]; rewrite /unstep /SIB.is_challenge_list !size_put sz /=.
+apply SIB.all_put => //; apply SIB.all_put => //.
+case: (0 <= i < size c) => hi; 2: by rewrite nth_out.
+by move/(all_nthP _ _ 0): hc => /(_ i hi).
+qed.
+
+(* The invariant of the backward loop: the vector stays valid, replaying
+   the trace forwards gives back the initial vector, and the trace
+   records the steps [rev l] with indices [0 <= j <= i]. *)
+lemma dback_supp (l : int list) (st st' : state) :
+  all (fun i => 0 <= i < 256) l =>
+  valid st.`1 => st' \in dback l st =>
+     valid st'.`1
+  /\ fwd_list st'.`1 st'.`2 = fwd_list st.`1 st.`2
+  /\ exists tr', st'.`2 = tr' ++ st.`2
+     /\ map (fun (t : entry) => t.`1) tr' = rev l
+     /\ all (fun (t : entry) => 0 <= t.`2 <= t.`1) tr'.
+proof.
+elim: l st => [|i l ih] st hl hv /=.
+- by move=> /supp_dunit ->; split => //; split => //; exists [].
+move: hl => /= [hi hl].
+move=> /supp_dlet [st1 [/supp_dmap [j [/supp_duniform hj ->]] /= hst]].
+have [hv1 [hf [tr1 [htr [hm ha]]]]] := ih (unstep st.`1 i j, (i, j, nth 0 st.`1 j = -1) :: st.`2) hl
+   (unstep_valid _ i j hv) hst.
+split => //; split.
+- by rewrite hf /= /fwd_list /= fwd_unstep.
+exists (rcons tr1 (i, j, nth 0 st.`1 j = -1)); rewrite htr cat_rcons /=.
+rewrite map_rcons hm rev_cons /= -cats1 all_cat ha /=.
+by move: hj; rewrite mem_filter mem_range /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Counting nonzero coefficients.                                       *)
+
+lemma count_put_in (c : int list) p v a b :
+  0 <= p < size c => a <= p < b =>
+  count (fun q => nth 0 (put c p v) q <> 0) (range a b) =
+  count (fun q => nth 0 c q <> 0) (range a b)
+  - b2i (nth 0 c p <> 0) + b2i (v <> 0).
+proof.
+move=> hp hab.
+rewrite (range_cat p a b) 1,2:/# (range_ltn p b) 1:/# !count_cat /=.
+rewrite nth_put //= (eq_in_count _ (fun q => nth 0 c q <> 0) (range a p)).
+- by move=> q /mem_range hq /=; rewrite nth_put // /#.
+rewrite (eq_in_count _ (fun q => nth 0 c q <> 0) (range (p + 1) b)).
+- by move=> q /mem_range hq /=; rewrite nth_put // /#.
+by ring.
+qed.
+
+lemma count_put_out (c : int list) p v a b :
+  !(a <= p < b) =>
+  count (fun q => nth 0 (put c p v) q <> 0) (range a b) =
+  count (fun q => nth 0 c q <> 0) (range a b).
+proof.
+move=> hp; apply eq_in_count => q /mem_range hq /=.
+case: (0 <= p < size c) => hs; 2: by rewrite put_out // /#.
+by rewrite nth_put // /#.
+qed.
+
+lemma count_rangeSr (c : int list) a i : a <= i =>
+  count (fun q => nth 0 c q <> 0) (range a (i + 1)) =
+  count (fun q => nth 0 c q <> 0) (range a i) + b2i (nth 0 c i <> 0).
+proof. by move=> hi; rewrite rangeSr // -cats1 count_cat. qed.
+
+(* State of the forward (or backward) algorithm right after step [i]:
+   positions [> i] are zero and exactly [i - i0 + 1] positions are
+   nonzero. *)
+op Zinv (c : int list) (i : int) =
+     valid c
+  /\ (forall p, i < p < 256 => nth 0 c p = 0)
+  /\ size (nzpos c i) = i - i0 + 1.
+
+lemma unstep_Zinv c i j :
+  i0 <= i < 256 => Zinv c i => j \in nzpos c i => Zinv (unstep c i j) (i - 1).
+proof.
+move=> hi [hv [hz hn]] hj; have [sz _] := hv.
+move: hj; rewrite mem_filter mem_range /= => -[hcj hj].
+split; 1: by apply unstep_valid.
+split.
+- move=> p hp; rewrite /unstep nth_put ?size_put 1:/#.
+  case: (i = p) => // hip; rewrite nth_put 1:/#.
+  by rewrite (_ : j <> p) 1:/# /= hz /#.
+move: hn; rewrite /nzpos !size_filter (_ : i - 1 + 1 = i) 1:/# count_rangeSr 1:/#.
+rewrite /unstep count_put_out 1:/#.
+case: (j = i) => [->> | hji].
+- by rewrite count_put_out 1:/# hcj /b2i /=; smt().
+rewrite count_put_in 1,2:/# hcj /b2i /=; smt().
+qed.
+
+lemma Zinv_zero c : Zinv c (i0 - 1) => c = nseq 256 0.
+proof.
+move=> [[sz _] [hz hn]]; apply (eq_from_nth 0); 1: by rewrite size_nseq sz.
+move=> p; rewrite sz => hp; rewrite nth_nseq //.
+case: (i0 - 1 < p) => hp'; 1: by apply hz => /#.
+move: hn; rewrite (_ : i0 - 1 - i0 + 1 = 0) 1:/# size_eq0 => hn.
+have := mem_filter (fun q => nth 0 c q <> 0) p (range 0 (i0 - 1 + 1)).
+by rewrite -/(nzpos c (i0 - 1)) hn /= mem_range /#.
+qed.
+
+lemma bstepsS i : i0 <= i => bsteps i = i :: bsteps (i - 1).
+proof.
+by move=> hi; rewrite /bsteps {1}(_ : i = i - 1 + 1) 1:// rangeSr 1:/# rev_rcons.
+qed.
+
+lemma bsteps0 i : i < i0 => bsteps i = [].
+proof. by move=> hi; rewrite /bsteps range_geq 1:/#. qed.
+
+lemma dback_Zinv_ll k c (tr : entry list) :
+  0 <= k <= tau => Zinv c (i0 - 1 + k) =>
+     is_lossless (dback (bsteps (i0 - 1 + k)) (c, tr))
+  /\ forall st', st' \in dback (bsteps (i0 - 1 + k)) (c, tr) =>
+                 Zinv st'.`1 (i0 - 1).
+proof.
+elim/natind: k c tr => [k hk0|k hk0 ih] c tr hk hZ.
+- have ->> : k = 0 by smt().
+  rewrite bsteps0 1:/# /=; split; 1: exact dunit_ll.
+  by move=> st' /supp_dunit ->.
+rewrite bstepsS 1:/# /= (_ : i0 - 1 + (k + 1) - 1 = i0 - 1 + k) 1:/#.
+have hne : nzpos c (i0 - 1 + (k + 1)) <> [].
+- by case: (hZ) => _ [_ hn]; rewrite -size_eq0 hn /#.
+split.
+- apply dlet_ll; 1: by apply/dmap_ll/duniform_ll.
+  move=> st1 /supp_dmap [j [/supp_duniform hj ->]] /=.
+  have := ih (unstep c (i0 - 1 + (k + 1)) j) ((i0 - 1 + (k + 1),
+                j, nth 0 c j = -1) :: tr) _ _; 1: smt().
+  + by rewrite (_ : i0 - 1 + k = i0 - 1 + (k + 1) - 1) 1:/#;
+       apply unstep_Zinv => //; smt(i0_bound).
+  by move=> [].
+move=> st' /supp_dlet [st1 [/supp_dmap [j [/supp_duniform hj ->]] /= hst]].
+have := ih (unstep c (i0 - 1 + (k + 1)) j) ((i0 - 1 + (k + 1),
+              j, nth 0 c j = -1) :: tr) _ _; 1: smt().
++ by rewrite (_ : i0 - 1 + k = i0 - 1 + (k + 1) - 1) 1:/#;
+     apply unstep_Zinv => //; smt(i0_bound).
+by move=> [_ /(_ st' hst)].
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* [to_challenge] as a forward replay of a trace.                        *)
+
+lemma dI_supp (x : challenge_ir) :
+  x \in SIB.dI <=>
+     size x.`1 = 8 /\ size x.`2 = tau
+  /\ forall k, 0 <= k < tau => to_int (nth witness x.`2 k) <= i0 + k.
+proof. by rewrite SIB.supp_dI /i0. qed.
+
+lemma body_fwd sg idx k c :
+  size c = 256 =>
+  SIB.to_challenge_body sg idx k c =
+  fwd c (i0 + k, to_int (nth witness idx k), nth witness sg k).
+proof.
+move=> sz; rewrite /SIB.to_challenge_body /fwd /=.
+have hj : 0 <= to_int (nth witness idx k) < 256.
+- by apply to_int_in_surj; exists (nth witness idx k).
+rewrite (nth_change_dfl 0 witness) 1:/#.
+by rewrite (_ : 256 - tau + k + tau - 256 = k) 1:/# /i0.
+qed.
+
+op trace_of (x : challenge_ir) : entry list =
+  map (fun k => (i0 + k, to_int (nth witness x.`2 k),
+                 nth witness (SIB.to_bool_list x.`1) k))
+      (range 0 tau).
+
+lemma to_challenge_aux_fwd x k :
+  0 <= k =>
+  SIB.to_challenge_aux x k =
+  fwd_list (nseq 256 0)
+    (map (fun k => (i0 + k, to_int (nth witness x.`2 k),
+                    nth witness (SIB.to_bool_list x.`1) k)) (range 0 k)).
+proof.
+elim: k => [|k hk ih]; 1: by rewrite SIB.to_challenge_aux0 // range_geq.
+rewrite SIB.to_challenge_auxS // rangeSr // map_rcons /fwd_list foldl_rcons.
+rewrite -/(fwd_list _ _) -ih body_fwd //.
+by have [] := SIB.to_challenge_aux_valid x k.
+qed.
+
+lemma to_challenge_fwd x :
+  SIB.to_challenge x = fwd_list (nseq 256 0) (trace_of x).
+proof. by rewrite /SIB.to_challenge to_challenge_aux_fwd; smt(tau_bound). qed.
+
+lemma fwd_Zinv c i j s :
+  i0 <= i < 256 => 0 <= j <= i => Zinv c (i - 1) => Zinv (fwd c (i, j, s)) i.
+proof.
+move=> hi hj [[sz hc] [hz hn]].
+have hci : nth 0 c i = 0 by apply hz => /#.
+have hcj : nth 0 c j = -1 \/ nth 0 c j = 0 \/ nth 0 c j = 1.
+- by move/(all_nthP _ _ 0): hc => /(_ j _) /#.
+rewrite /Zinv /fwd /=; split.
+- rewrite /SIB.is_challenge_list !size_put sz /=.
+  apply SIB.all_put; 2: smt().
+  by apply SIB.all_put.
+split.
+- move=> p hp; rewrite nth_put ?size_put 1:/# (_ : j <> p) 1:/# /=.
+  by rewrite nth_put 1:/# (_ : i <> p) 1:/# /= hz /#.
+rewrite /nzpos size_filter count_put_in ?size_put 1,2:/#.
+rewrite count_put_in 1,2:/# nth_put 1:/# hci.
+move: hn; rewrite /nzpos size_filter (_ : i - 1 + 1 = i) 1:/# => hn.
+rewrite count_rangeSr 1:/# hn hci /b2i /=; smt().
+qed.
+
+lemma to_challenge_Zinv_aux x k : x \in SIB.dI => 0 <= k <= tau =>
+  Zinv (SIB.to_challenge_aux x k) (i0 - 1 + k).
+proof.
+move=> /dI_supp [_ [_ hidx]]; move: k.
+elim/natind => [k hk0 hk | k hk0 ih hk].
+- rewrite SIB.to_challenge_aux0 // (_ : k = 0) 1:/# /=.
+  rewrite /Zinv /SIB.is_challenge_list size_nseq all_nseq /=.
+  split; 1: done.
+  split => [p hp|]; 1: by rewrite nth_nseq_if.
+  rewrite (_ : i0 - 1 - i0 + 1 = 0) 1:/# /nzpos size_eq0 -(filter_pred0 (range 0 (i0 - 1 + 1))).
+  by apply eq_in_filter => p _ /=; rewrite nth_nseq_if.
+rewrite SIB.to_challenge_auxS // body_fwd.
+- by have [] := SIB.to_challenge_aux_valid x k.
+rewrite (_ : i0 - 1 + (k + 1) = i0 + k) 1:/#; apply fwd_Zinv.
+- smt(i0_bound).
+- have := hidx k _; 1: smt().
+  have : 0 <= to_int (nth witness x.`2 k) < 256.
+  + by apply/to_int_in_surj; exists (nth witness x.`2 k).
+  smt().
+by rewrite (_ : i0 + k - 1 = i0 - 1 + k) 1:/#; apply ih => /#.
+qed.
+
+lemma to_challenge_Zinv x : x \in SIB.dI => Zinv (SIB.to_challenge x) 255.
+proof.
+move=> hx; have := to_challenge_Zinv_aux x tau hx _; 1: smt(tau_bound).
+by rewrite /i0 /SIB.to_challenge (_ : 256 - tau - 1 + tau = 255) 1:/#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Encoding of a trace.                                                  *)
+
+lemma bits2bytesK bs : 8 %| size bs =>
+  SIB.to_bool_list (bits2bytes bs) = bs.
+proof.
+move=> h8; rewrite /SIB.to_bool_list /bits2bytes /(\o) -map_comp.
+rewrite -{2}(chunkK 8 bs) // -{2}(map_id (chunk 8 bs)); congr.
+apply eq_in_map => b hb0; have hb := in_chunk_size 8 bs b _ hb0 => //.
+rewrite /(\o) /=.
+have := bs2int_le2Xs b; have := bs2int_ge0 b; rewrite hb /= => h0 h1.
+have e : 2 ^ 8 = 256.
+- by rewrite (_ : 8 = 0 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1) // !exprS // expr0.
+by rewrite tK' 1:/# -hb bs2intK.
+qed.
+
+lemma trace_of_encode tr free :
+     map (fun (t : entry) => t.`1) tr = range i0 256
+  => all (fun (t : entry) => 0 <= t.`2 <= t.`1) tr
+  => size free = 64 - tau
+  => trace_of (encode tr free) = tr.
+proof.
+move=> hm ha hf.
+have hs : size tr = tau.
+- by rewrite -(size_map (fun (t : entry) => t.`1)) hm size_range; smt(tau_bound).
+apply (eq_from_nth witness); 1: by rewrite size_map size_range hs; smt(tau_bound).
+rewrite size_map size_range => k hk; have {hk} hk : 0 <= k < tau by smt().
+rewrite (nth_map 0) 1:size_range 1:/# /= nth_range 1:/# /=.
+rewrite /encode /= bits2bytesK.
+- by rewrite size_cat size_map hs hf (_ : tau + (64 - tau) = 8 * 8) 1:/# dvdz_mull.
+rewrite (nth_map witness) 1:/# nth_cat size_map hs.
+rewrite (_ : k < tau) 1:/# /= (nth_map witness) 1:/# /=.
+have /(all_nthP _ _ witness) /(_ k _) /= := ha; 1: by rewrite hs.
+have := congr1 (fun s => nth 0 s k) _ _ hm; rewrite /= (nth_map witness) 1:/#.
+rewrite nth_range 1:/# /= => h1 h2.
+rewrite tK'; 1: smt(i0_bound).
+by rewrite -h1; case: (nth witness tr k).
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Soundness of [dfiber]: it returns pre-images, in [dI].                *)
+
+lemma dCR_of_concrete r : r \in dCR =>
+  exists x0, x0 \in SIB.dI /\ r = to_c x0
+          /\ of_concrete r = SIB.to_challenge x0
+          /\ Zinv (of_concrete r) 255.
+proof.
+move=> /supp_dmap [x0 [hx0 ->]]; exists x0 => /=.
+rewrite hx0 /to_c of_concreteK 1:SIB.to_challenge_valid /=.
+exact (to_challenge_Zinv _ hx0).
+qed.
+
+lemma bsteps255 : bsteps 255 = bsteps (i0 - 1 + tau) by rewrite /i0 /#.
+
+(* A complete run of the backward sampler from a challenge. *)
+lemma dfiber_run r st' :
+  r \in dCR => st' \in dback (bsteps 255) (of_concrete r, []) =>
+     st'.`1 = nseq 256 0
+  /\ map (fun (t : entry) => t.`1) st'.`2 = range i0 256
+  /\ all (fun (t : entry) => 0 <= t.`2 <= t.`1) st'.`2
+  /\ fwd_list (nseq 256 0) st'.`2 = of_concrete r.
+proof.
+move=> /dCR_of_concrete [x0 [hx0 [_ [_ hZ]]]] hst.
+have hZ' : Zinv st'.`1 (i0 - 1).
+- have [_ h] := dback_Zinv_ll tau (of_concrete r) [] _ _; 1: smt(tau_bound).
+  + by rewrite (_ : i0 - 1 + tau = 255) 1:/#.
+  by apply h; rewrite -bsteps255.
+have h0 := Zinv_zero _ hZ'.
+have [_ [hf [tr' [htr [hm ha]]]]] := dback_supp _ _ _ _ _ hst.
+- by apply/allP => i; rewrite /bsteps mem_rev mem_range; smt(i0_bound).
+- by case: hZ.
+move: htr hm ha; rewrite cats0 /bsteps revK /= => <- hm ha.
+by rewrite h0 /= hm ha /= -h0 hf.
+qed.
+
+lemma dfiber_supp r x : r \in dCR => x \in dfiber r => to_c x = r.
+proof.
+move=> hr /supp_dlet [st' [hst /supp_dmap [fr [hfr ->]]]] /=.
+have hfr' := supp_dlist_size _ _ _ _ hfr; 1: smt(tau_bound).
+have [h0 [hm [ha hf]]] := dfiber_run _ _ hr hst.
+rewrite /to_c to_challenge_fwd trace_of_encode // hf.
+by have [x0 [_ [-> [-> _]]]] := dCR_of_concrete _ hr.
+qed.
+
+lemma dfiber_ll r : r \in dCR => is_lossless (dfiber r).
+proof.
+move=> /dCR_of_concrete [x0 [_ [_ [_ hZ]]]].
+apply dlet_ll; 2: by move=> st _ /=; apply/dmap_ll/dlist_ll/dbool_ll.
+have [h _] := dback_Zinv_ll tau (of_concrete r) [] _ _; 1: smt(tau_bound).
+- by rewrite (_ : i0 - 1 + tau = 255) 1:/#.
+by rewrite bsteps255.
+qed.
+
+lemma dfiber_in_dI r x : r \in dCR => x \in dfiber r => x \in SIB.dI.
+proof.
+move=> hr /supp_dlet [st' [hst /supp_dmap [fr [hfr ->]]]] /=.
+have hfr' := supp_dlist_size _ _ _ _ hfr; 1: smt(tau_bound).
+have [h0 [hm [ha hf]]] := dfiber_run _ _ hr hst.
+have hs : size st'.`2 = tau.
+- by rewrite -(size_map (fun (t : entry) => t.`1)) hm size_range; smt(tau_bound).
+rewrite dI_supp /encode /= /bits2bytes size_map size_chunk //.
+rewrite size_cat size_map hs hfr' (_ : tau + (64 - tau) = 64) 1:/# /=.
+rewrite size_map hs /= => k hk.
+rewrite (nth_map witness) 1:/# /=.
+have /(all_nthP _ _ witness) /(_ k _) /= := ha; 1: by rewrite hs.
+have := congr1 (fun s => nth 0 s k) _ _ hm; rewrite /= (nth_map witness) 1:/#.
+rewrite nth_range 1:/# /= => h1 h2.
+by rewrite tK'; smt(i0_bound).
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Surjectivity: every list satisfying [Zinv _ 255] (a valid encoding
+   with exactly [tau] nonzero coefficients) is the [to_challenge] of some
+   element of [dI] (a run of the backward sampler on it gives one).      *)
+
+lemma dback_run (l : int list) st' :
+  Zinv l 255 => st' \in dback (bsteps 255) (l, []) =>
+     st'.`1 = nseq 256 0
+  /\ map (fun (t : entry) => t.`1) st'.`2 = range i0 256
+  /\ all (fun (t : entry) => 0 <= t.`2 <= t.`1) st'.`2
+  /\ fwd_list (nseq 256 0) st'.`2 = l.
+proof.
+move=> hZ hst.
+have hZ' : Zinv st'.`1 (i0 - 1).
+- have [_ h] := dback_Zinv_ll tau l [] _ _; 1: smt(tau_bound).
+  + by rewrite (_ : i0 - 1 + tau = 255) 1:/#.
+  by apply h; rewrite -bsteps255.
+have h0 := Zinv_zero _ hZ'.
+have [_ [hf [tr' [htr [hm ha]]]]] := dback_supp _ _ _ _ _ hst.
+- by apply/allP => i; rewrite /bsteps mem_rev mem_range; smt(i0_bound).
+- by case: hZ.
+move: htr hm ha; rewrite cats0 /bsteps revK /= => <- hm ha.
+by rewrite h0 /= hm ha /= -h0 hf.
+qed.
+
+lemma encode_in_dI (tr : entry list) fr :
+     map (fun (t : entry) => t.`1) tr = range i0 256
+  => all (fun (t : entry) => 0 <= t.`2 <= t.`1) tr
+  => size fr = 64 - tau
+  => encode tr fr \in SIB.dI.
+proof.
+move=> hm ha hfr'.
+have hs : size tr = tau.
+- by rewrite -(size_map (fun (t : entry) => t.`1)) hm size_range; smt(tau_bound).
+rewrite dI_supp /encode /= /bits2bytes size_map size_chunk //.
+rewrite size_cat size_map hs hfr' (_ : tau + (64 - tau) = 64) 1:/# /=.
+rewrite size_map hs /= => k hk.
+rewrite (nth_map witness) 1:/# /=.
+have /(all_nthP _ _ witness) /(_ k _) /= := ha; 1: by rewrite hs.
+have := congr1 (fun s => nth 0 s k) _ _ hm; rewrite /= (nth_map witness) 1:/#.
+rewrite nth_range 1:/# /= => h1 h2.
+by rewrite tK'; smt(i0_bound).
+qed.
+
+lemma Zinv_preimage (l : int list) :
+  Zinv l 255 => exists x, x \in SIB.dI /\ SIB.to_challenge x = l.
+proof.
+move=> hZ.
+have [hll _] := dback_Zinv_ll tau l [] _ _; 1: smt(tau_bound).
+- by rewrite (_ : i0 - 1 + tau = 255) 1:/#.
+move: hll; rewrite -bsteps255 => hll.
+have [st' [_ hst]] : exists st', predT st' /\ st' \in dback (bsteps 255) (l, []).
+- by apply witness_support; rewrite hll.
+have [_ [hm [ha hf]]] := dback_run _ _ hZ hst.
+exists (encode st'.`2 (nseq (64 - tau) false)); split.
+- by apply encode_in_dI => //; rewrite size_nseq; smt(tau_bound).
+rewrite to_challenge_fwd trace_of_encode // 1:size_nseq; 1: smt(tau_bound).
+qed.
+
+(* The challenges are the ring elements of the valid encodings with
+   exactly [tau] nonzero coefficients. *)
+lemma dCR_supp r :
+  r \in dCR <=> exists l, Zinv l 255 /\ r = to_concrete l.
+proof.
+split.
+- move=> /supp_dmap [x [hx ->]]; exists (SIB.to_challenge x).
+  by rewrite /to_c /=; exact (to_challenge_Zinv _ hx).
+move=> [l [hZ ->]]; have [x [hx hxl]] := Zinv_preimage _ hZ.
+by apply/supp_dmap; exists x; rewrite hx /to_c hxl.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Completeness of [dfiber]: every pre-image is produced (replaying the
+   forward trace of [x] backwards is a run of the backward sampler).    *)
+
+(* Undoing a forward step (from a reachable state). *)
+lemma unstep_fwd c i j s :
+  i0 <= i < 256 => 0 <= j <= i => Zinv c (i - 1) =>
+     j \in nzpos (fwd c (i, j, s)) i
+  /\ unstep (fwd c (i, j, s)) i j = c
+  /\ (nth 0 (fwd c (i, j, s)) j = -1) = s.
+proof.
+move=> hi hj [[sz hc] [hz hn]].
+have hci : nth 0 c i = 0 by apply hz => /#.
+have hj' : nth 0 (fwd c (i, j, s)) j = if s then -1 else 1.
+- by rewrite /fwd /= nth_put ?size_put /#.
+split; 1: by rewrite /nzpos mem_filter mem_range /= hj' /#.
+split; 2: by rewrite hj' /#.
+apply (eq_from_nth 0); 1: by rewrite /unstep /fwd /= !size_put.
+rewrite /unstep /fwd /= !size_put sz => p hp.
+by rewrite !nth_put ?size_put ?sz; smt().
+qed.
+
+lemma bytes2bitsK sb : size sb = 8 => bits2bytes (SIB.to_bool_list sb) = sb.
+proof.
+move=> hs; rewrite /bits2bytes /SIB.to_bool_list /(\o) flattenK //.
+- by move=> b /mapP [y [_ ->]]; rewrite size_int2bs.
+rewrite -map_comp -{2}(map_id sb); apply eq_in_map => b _ /=.
+have e : 2 ^ 8 = 256.
+- by rewrite (_ : 8 = 0 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1) // !exprS // expr0.
+have hb : 0 <= to_int b < 256 by apply to_int_in_surj; exists b.
+by rewrite /(\o) int2bsK.
+qed.
+
+lemma size_to_bool_list sb : size sb = 8 => size (SIB.to_bool_list sb) = 64.
+proof.
+move=> hs; rewrite /SIB.to_bool_list /(\o) (size_flatten_ctt 8).
+- by move=> b /mapP [y [_ ->]]; rewrite size_int2bs.
+by rewrite size_map hs.
+qed.
+
+lemma dfiber_complete x : x \in SIB.dI => x \in dfiber (to_c x).
+proof.
+move=> hx; have := hx; rewrite dI_supp => -[hs1 [hs2 hidx]].
+pose T := trace_of x.
+have hT : forall k, 0 <= k <= tau => forall tr0,
+  (nseq 256 0, take k T ++ tr0) \in
+    dback (bsteps (i0 - 1 + k)) (SIB.to_challenge_aux x k, tr0).
+- elim/natind => [k hk0 hk | k hk0 ih hk] tr0.
+  + rewrite (_ : k = 0) 1:/# take0 /= bsteps0 1:/# /= SIB.to_challenge_aux0 //.
+    exact supp_dunit.
+  rewrite bstepsS 1:/# /= (_ : i0 - 1 + (k + 1) - 1 = i0 - 1 + k) 1:/#.
+  have hjk : 0 <= to_int (nth witness x.`2 k) <= i0 + k.
+  + have := hidx k _; 1: smt().
+    have : 0 <= to_int (nth witness x.`2 k) < 256.
+    * by apply/to_int_in_surj; exists (nth witness x.`2 k).
+    smt().
+  have hZk : Zinv (SIB.to_challenge_aux x k) (i0 + k - 1).
+  + have h := to_challenge_Zinv_aux x k hx _; 1: smt().
+    by rewrite (_ : i0 + k - 1 = i0 - 1 + k) 1:/#.
+  rewrite SIB.to_challenge_auxS // body_fwd.
+  + by have [] := SIB.to_challenge_aux_valid x k.
+  have [hnz [hun hsg]] := unstep_fwd (SIB.to_challenge_aux x k) (i0 + k)
+     (to_int (nth witness x.`2 k)) (nth witness (SIB.to_bool_list x.`1) k)
+     _ hjk hZk; 1: smt(i0_bound).
+  rewrite (_ : i0 - 1 + (k + 1) = i0 + k) 1:/#.
+  apply supp_dlet; exists (SIB.to_challenge_aux x k,
+     (i0 + k, to_int (nth witness x.`2 k),
+      nth witness (SIB.to_bool_list x.`1) k) :: tr0).
+  split.
+  + apply supp_dmap; exists (to_int (nth witness x.`2 k)).
+    by rewrite supp_duniform hnz /= hun hsg.
+  rewrite (take_nth witness) 1:size_map 1:size_range; 1: smt(tau_bound).
+  rewrite cat_rcons (nth_map 0) 1:size_range 1:/# nth_range 1:/# /=.
+  by apply ih; smt().
+have := hT tau _ []; 1: smt(tau_bound).
+rewrite cats0 take_oversize.
+- by rewrite /T /trace_of size_map size_range; smt(tau_bound).
+rewrite (_ : i0 - 1 + tau = 255) 1:/# => hback.
+rewrite /dfiber supp_dlet; exists (nseq 256 0, T); split.
+- rewrite /to_c of_concreteK 1:SIB.to_challenge_valid.
+  exact hback.
+apply supp_dmap; exists (drop tau (SIB.to_bool_list x.`1)) => /=.
+have hb := size_to_bool_list _ hs1.
+split.
+- rewrite supp_dlist; 1: smt(tau_bound).
+  rewrite size_drop; 1: smt(tau_bound).
+  rewrite hb; split; 1: smt(tau_bound).
+  by apply/allP => b _; apply dbool_fu.
+rewrite /T; clear hT hback T.
+case: x hx hs1 hs2 hidx hb => sb idx /= hx hs1 hs2 hidx hb.
+rewrite /encode /=; split.
+- rewrite -{1}(bytes2bitsK sb hs1) -{1}(cat_take_drop tau (SIB.to_bool_list sb)).
+  congr; congr; rewrite /trace_of -map_comp /(\o) /=.
+  apply (eq_from_nth witness).
+  + rewrite size_map size_range size_take; 1: smt(tau_bound).
+    by rewrite hb; smt(tau_bound).
+  rewrite size_take; 1: smt(tau_bound).
+  move=> k hk; have {hk} hk : 0 <= k < tau by move: hk; rewrite hb; smt(tau_bound).
+  by rewrite (nth_map 0) 1:size_range 1:/# nth_range 1:/# /= nth_take; smt(tau_bound).
+rewrite /trace_of -map_comp /(\o) /=.
+apply (eq_from_nth witness); 1: by rewrite size_map size_range; smt(tau_bound).
+rewrite hs2 => k hk.
+by rewrite (nth_map 0) 1:size_range 1:/# nth_range 1:/# /= tK.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Probabilities: every run of the backward sampler has probability
+   [wback tau = 1 / tau!], since at step [i] there are exactly
+   [i - i0 + 1] choices ([Zinv]); the output determines the run and the
+   free bits.                                                           *)
+
+(* [wback k = 1 / k!] *)
+op wback (k : int) : real = iteri k (fun j (w : real) => w / (j + 1)%r) 1%r.
+
+lemma dback_tr (l : int list) (st st' : state) :
+  st' \in dback l st => exists tr', st'.`2 = tr' ++ st.`2 /\ size tr' = size l.
+proof.
+elim: l st => [|i l ih] st /=; 1: by move=> /supp_dunit ->; exists [].
+move=> /supp_dlet [st1 [/supp_dmap [j [_ ->]] /= /ih [tr1 [-> hs]]]].
+by exists (rcons tr1 (i, j, nth 0 st.`1 j = -1)); rewrite cat_rcons size_rcons hs /= addrC.
+qed.
+
+lemma wbackS k : 0 <= k => wback (k + 1) = wback k / (k + 1)%r.
+proof. by move=> hk; rewrite /wback iteriS. qed.
+
+lemma dback_mu1 k c (tr : entry list) st' :
+  0 <= k <= tau => Zinv c (i0 - 1 + k) =>
+  st' \in dback (bsteps (i0 - 1 + k)) (c, tr) =>
+  mu1 (dback (bsteps (i0 - 1 + k)) (c, tr)) st' = wback k.
+proof.
+elim/natind: k c tr st' => [k hk0|k hk0 ih] c tr st' hk hZ.
+- have ->> : k = 0 by smt().
+  rewrite bsteps0 1:/# /= => /supp_dunit ->.
+  by rewrite dunit1E /wback iteri0.
+rewrite bstepsS 1:/# /= (_ : i0 - 1 + (k + 1) - 1 = i0 - 1 + k) 1:/#.
+pose i := i0 - 1 + (k + 1).
+pose g := fun j => (unstep c i j, (i, j, nth 0 c j = -1) :: tr).
+move=> hst; have := hst.
+move=> /supp_dlet [st1 [/supp_dmap [j1 [hj1 ->>]] /= hst1]].
+rewrite /bstep /= dlet_dmap /= -/i dlet1E /=.
+rewrite (RealSeries.sumE_fin _ [j1]) // ?big_seq1 /=.
+- move=> j; rewrite RField.mulf_eq0 negb_or => -[hj hm].
+  have /supp_duniform hj' : j \in duniform (nzpos c i) by rewrite supportP.
+  have hst2 : st' \in dback (bsteps (i0 - 1 + k)) (g j) by rewrite supportP.
+  have [tr1 [e1 s1]] := dback_tr _ _ _ hst1.
+  have [tr2 [e2 s2]] := dback_tr _ _ _ hst2.
+  move: e2; rewrite e1 => e2.
+  have := congr1 (fun s => nth witness s (size tr1)) _ _ e2.
+  by rewrite /= !nth_cat s1 s2 /= /g /= => [#] ->.
+rewrite duniform1E_uniq; 1: by apply/filter_uniq/range_uniq.
+rewrite -supp_duniform hj1 /= ih // 1:/#.
+- rewrite (_ : i0 - 1 + k = i - 1) 1:/#; apply unstep_Zinv => //.
+  + smt(i0_bound).
+  by rewrite -supp_duniform.
+case: (hZ) => _ [_ ->]; rewrite wbackS //.
+by rewrite (_ : i0 - 1 + (k + 1) - i0 + 1 = k + 1) 1:/#.
+qed.
+
+op wfree : real = mu1 (dlist {0,1} (64 - tau)) (nseq (64 - tau) false).
+
+lemma dfiber_mu1 r x :
+  r \in dCR => x \in dfiber r => mu1 (dfiber r) x = wback tau * wfree.
+proof.
+move=> hr hx; have := hx.
+move=> /supp_dlet [st0 [hst0 /supp_dmap [fr0 [hfr0 ->>]]]] /=.
+have hfr0' := supp_dlist_size _ _ _ _ hfr0; 1: smt(tau_bound).
+have [h00 [hm0 [ha0 _]]] := dfiber_run _ _ hr hst0.
+have hs0 : size st0.`2 = tau.
+- by rewrite -(size_map (fun (t : entry) => t.`1)) hm0 size_range; smt(tau_bound).
+(* the output determines the run and the free bits *)
+have hdec : forall (st : state) fr, st \in dback (bsteps 255) (of_concrete r, []) =>
+   fr \in dlist {0,1} (64 - tau) =>
+   ((nseq 256 0, trace_of (encode st.`2 fr)),
+    drop tau (SIB.to_bool_list (encode st.`2 fr).`1)) = (st, fr).
+- move=> st fr hst hfr; have hfr' := supp_dlist_size _ _ _ _ hfr; 1: smt(tau_bound).
+  have [h0 [hm [ha _]]] := dfiber_run _ _ hr hst.
+  have hs : size st.`2 = tau.
+  + by rewrite -(size_map (fun (t : entry) => t.`1)) hm size_range; smt(tau_bound).
+  rewrite trace_of_encode // /encode /= bits2bytesK.
+  + by rewrite size_cat size_map hs hfr' (_ : tau + (64 - tau) = 8 * 8) 1:/# dvdz_mull.
+  rewrite drop_size_cat 1:size_map 1:hs // -h0.
+  by case: st hst h0 hm ha hs.
+have -> : dfiber r =
+  dmap (dback (bsteps 255) (of_concrete r, []) `*` dlist {0,1} (64 - tau))
+       (fun (p : state * bool list) => encode p.`1.`2 p.`2).
+- by rewrite dmap_dprodE.
+rewrite (in_dmap1E_can _ _ (fun x => ((nseq 256 0, trace_of x),
+                         drop tau (SIB.to_bool_list x.`1)))) /=.
+- have := hdec _ _ hst0 hfr0
+    => /(congr1 (fun (p : state * bool list) => (p.`1.`2, p.`2))) /= [-> ->] //.
+- move=> [st fr] /supp_dprod /= [hst hfr] <-.
+  by have := hdec _ _ hst hfr; case: st hst => ? ? hst /= [[-> ->] ->].
+rewrite (hdec _ _ hst0 hfr0) dprod1E.
+have [x0 [_ [_ [_ hZ]]]] := dCR_of_concrete _ hr.
+rewrite bsteps255 dback_mu1; 1: smt(tau_bound).
+- by rewrite (_ : i0 - 1 + tau = 255) 1:/#.
+- by rewrite -bsteps255.
+congr; rewrite /wfree; apply (dlist_uni _ _ dbool_uni) => //.
+rewrite supp_dlist; 1: smt(tau_bound).
+rewrite size_nseq; split; 1: smt(tau_bound).
+by apply/allP => b _; apply dbool_fu.
+qed.
+
+lemma dfiber_uni r : r \in dCR => is_uniform (dfiber r).
+proof. by move=> hr x y hx hy; rewrite !(dfiber_mu1 r). qed.
+
+lemma dfiber_dcond r :
+  r \in dCR => dfiber r = dcond SIB.dI (fun x => to_c x = r).
+proof.
+move=> hr; apply distr_eq_supp.
+- exact (dfiber_uni _ hr).
+- by apply dcond_uni; exact SIB.dI_uni.
+- exact (dfiber_ll _ hr).
+- apply dcond_ll; apply witness_support.
+  by have [x0 [hx0 [-> _]]] := dCR_of_concrete _ hr; exists x0.
+move=> x; rewrite dcond_supp /=; split => [hx | [hx <-]].
+- by rewrite (dfiber_in_dI _ _ hr hx) (dfiber_supp _ _ hr hx).
+exact dfiber_complete.
+qed.
+
+lemma dfiber_marginal : dlet dCR dfiber = SIB.dI.
+proof.
+rewrite {1}(marginal_sampling SIB.dI to_c) -/dCR.
+by apply in_eq_dlet => r hr; apply dfiber_dcond.
+qed.
+
+(* Corollary: the uniformity of the challenge distribution ([dC_uni]):
+   every fibre has [1 / (wback tau * wfree) = tau! * 2^(64 - tau)]
+   elements, i.e. every challenge has the same probability. *)
+lemma dCR_mu1 r x : r \in dCR => x \in SIB.dI =>
+  mu1 dCR r = mu1 SIB.dI x / (wback tau * wfree).
+proof.
+move=> hr hx; have [x0 [hx0 [hr0 _]]] := dCR_of_concrete _ hr.
+have := dfiber_mu1 r x0 hr _; 1: by rewrite hr0; apply dfiber_complete.
+rewrite dfiber_dcond // dcond1E /= -hr0 /= => <-.
+have -> : mu1 dCR r = mu SIB.dI (fun x => to_c x = r).
+- by rewrite dmap1E; apply mu_eq => y.
+have hp : 0%r < mu SIB.dI (fun x => to_c x = r).
+- by apply witness_support; exists x0; rewrite hx0 hr0.
+rewrite (SIB.dI_uni x0 x) //.
+have hxp : 0%r < mu1 SIB.dI x by exact hx.
+by field; smt().
+qed.
+
+lemma dCR_uni : is_uniform dCR.
+proof.
+move=> r1 r2 h1 h2; have [x0 [hx0 _]] := dCR_of_concrete _ h1.
+by rewrite (dCR_mu1 _ x0 h1 hx0) (dCR_mu1 _ x0 h2 hx0).
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* The program [FiberSampler] samples [dfiber r].                       *)
+
+module Loop = {
+  proc run(c : int list, tr : entry list, i : int) : state = {
+    var j;
+    while (i0 <= i) {
+      j <$ duniform (nzpos c i);
+      tr <- (i, j, nth 0 c j = -1) :: tr;
+      c <- unstep c i j;
+      i <- i - 1;
+    }
+    return (c, tr);
+  }
+}.
+
+module Back = {
+  proc run(c : int list, tr : entry list, i : int) : state = {
+    var st;
+    st <$ dback (bsteps i) (c, tr);
+    return st;
+  }
+}.
+
+module Back1 = {
+  proc run(c : int list, tr : entry list, i : int) : state = {
+    var j, st;
+    j <$ duniform (nzpos c i);
+    st <@ Back.run(unstep c i j, (i, j, nth 0 c j = -1) :: tr, i - 1);
+    return st;
+  }
+}.
+
+equiv Back1_Back : Back1.run ~ Back.run : ={c, tr, i} /\ i0 <= i{1} ==> ={res}.
+proof.
+bypr (res{1}) (res{2}) => // &1 &2 x [#] <- <- <- hi.
+have -> : Pr[Back.run(c{1}, tr{1}, i{1}) @ &2 : res = x] =
+          mu1 (dback (bsteps i{1}) (c{1}, tr{1})) x.
+- by byphoare (_ : c = c{1} /\ tr = tr{1} /\ i = i{1} ==> res = x) => //; proc; rnd; skip.
+byphoare (_ : c = c{1} /\ tr = tr{1} /\ i = i{1} ==> res = x) => //.
+proc; inline *; wp; rndsem 0.
+rnd (fun (t : int * int list * entry list * int * state) => t.`5 = x); skip => />.
+rewrite (_ : (fun (t : int * int list * entry list * int * state) => t.`5 = x) =
+             pred1 x \o (fun (t : int * int list * entry list * int * state) => t.`5)) //.
+rewrite -dmapE dmap_dlet (bstepsS i{1}) // /= /bstep dlet_dmap /=.
+congr; apply eq_dlet => // j /=.
+by rewrite dmap_comp /(\o) /= dmap_id.
+qed.
+
+module Loop1 = {
+  proc run(c : int list, tr : entry list, i : int) : state = {
+    var j, st;
+    j <$ duniform (nzpos c i);
+    st <@ Loop.run(unstep c i j, (i, j, nth 0 c j = -1) :: tr, i - 1);
+    return st;
+  }
+}.
+
+equiv Loop_Loop1 : Loop.run ~ Loop1.run : ={c, tr, i} /\ i0 <= i{1} ==> ={res}.
+proof.
+proc; inline *; unroll{1} 1; rcondt{1} 1; 1: by auto.
+wp; while (c{1} = c0{2} /\ tr{1} = tr0{2} /\ i{1} = i0{2}); 1: by auto.
+by auto.
+qed.
+
+lemma Loop_Back k : 0 <= k =>
+  equiv [Loop.run ~ Back.run : ={c, tr, i} /\ i{1} = i0 - 1 + k ==> ={res}].
+proof.
+elim/natind: k => [k hk0 hk | k hk ih hk1].
+- proc; rcondf{1} 1; 1: by auto => /#.
+  rnd{2}; auto => /> &2; rewrite bsteps0 1:/# /=.
+  by split => [|_ st /supp_dunit ->]; 1: exact dunit_ll.
+transitivity Loop1.run
+  (={c, tr, i} /\ i{1} = i0 - 1 + (k + 1) ==> ={res})
+  (={c, tr, i} /\ i{1} = i0 - 1 + (k + 1) ==> ={res}); 1,2: smt().
+- by conseq Loop_Loop1 => /#.
+transitivity Back1.run
+  (={c, tr, i} /\ i{1} = i0 - 1 + (k + 1) ==> ={res})
+  (={c, tr, i} /\ i{1} = i0 - 1 + (k + 1) ==> ={res}); 1,2: smt().
+- proc; call (ih hk); auto => /#.
+by conseq Back1_Back => /#.
+qed.
+
+module FiberSamplerB = {
+  proc sample(r : Rq) : challenge_ir = {
+    var st, free;
+    st <@ Back.run(of_concrete r, [], 255);
+    free <$ dlist {0,1} (64 - tau);
+    return encode st.`2 free;
+  }
+}.
+
+equiv FiberSampler_dfiber :
+  FiberSampler.sample ~ FiberSamplerD.sample : ={r} ==> ={res}.
+proof.
+transitivity FiberSamplerB.sample (={r} ==> ={res}) (={r} ==> ={res}); 1,2: smt().
+- proc; rnd.
+  transitivity{2} { st <@ Loop.run(of_concrete r, [], 255); }
+    (={r} ==> c{1} = st{2}.`1 /\ tr{1} = st{2}.`2)
+    (={r} ==> ={st}); 1,2: smt().
+  + inline{2} Loop.run; wp; while (={c, tr, i}); 1: by auto.
+    by auto.
+  call (Loop_Back tau _); 1: smt(tau_bound).
+  by auto => />; rewrite /i0 /#.
+bypr (res{1}) (res{2}) => // &1 &2 x <-.
+have -> : Pr[FiberSamplerD.sample(r{1}) @ &2 : res = x] = mu1 (dfiber r{1}) x.
+- by byphoare (_ : r = r{1} ==> res = x) => //; proc; rnd; skip.
+byphoare (_ : r = r{1} ==> res = x) => //.
+proc; inline *; wp; rndsem 0.
+rnd (fun (t : int list * entry list * int * state * state * bool list) =>
+       encode t.`5.`2 t.`6 = x); skip => />.
+rewrite (_ : (fun (t : int list * entry list * int * state * state * bool list) =>
+               encode t.`5.`2 t.`6 = x) =
+             pred1 x \o (fun (t : int list * entry list * int * state * state * bool list) =>
+               encode t.`5.`2 t.`6)) //.
+rewrite -dmapE dmap_dlet /dfiber; congr; apply eq_dlet => // st /=.
+by rewrite dmap_comp.
+qed.

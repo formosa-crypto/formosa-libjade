@@ -1,0 +1,163 @@
+(* -------------------------------------------------------------------- *)
+(* Generic bound: a fresh sample drawn from dT hits a known value.      *)
+(* The adversary can add values to the known set (put), and ask for     *)
+(* fresh samples (sample); each sample is also added to the known set.  *)
+(* bad is set when a fresh sample is already known.                     *)
+(* -------------------------------------------------------------------- *)
+require import AllCore FSet Distr Mu_mem StdBigop Xreal.
+(*---*) import StdOrder.RealOrder StdBigop.Bigreal.BRA.
+
+type t.
+
+op [lossless] dT : t distr.
+
+op eps : real.
+
+axiom dT_max (x : t) : mu1 dT x <= eps.
+
+module type Oracle = {
+  proc put (x : t) : unit
+  proc sample () : t
+}.
+
+module type OracleI = {
+  proc init () : unit
+  include Oracle
+}.
+
+module Count (O : Oracle) = {
+  var cp, cs : int
+
+  proc init () : unit = { cp <- 0; cs <- 0; }
+
+  proc put (x : t) : unit = {
+    cp <- cp + 1;
+    O.put(x);
+  }
+
+  proc sample () : t = {
+    var r;
+    cs <- cs + 1;
+    r <@ O.sample();
+    return r;
+  }
+}.
+
+module O : OracleI = {
+  var s   : t fset
+  var bad : bool
+
+  proc init () : unit = {
+    bad <- false;
+    s   <- fset0;
+  }
+
+  proc put (x : t) : unit = {
+    s <- s `|` fset1 x;
+  }
+
+  proc sample () : t = {
+    var y;
+    y <$ dT;
+    bad <- bad \/ y \in s;
+    s <- s `|` fset1 y;
+    return y;
+  }
+}.
+
+module type Adversary (O : Oracle) = {
+  proc main () : unit { O.put, O.sample }
+}.
+
+module Game (A : Adversary) = {
+  proc main () : unit = {
+    O.init();
+    Count(O).init();
+    A(Count(O)).main();
+  }
+}.
+
+lemma eps_ge0 : 0%r <= eps.
+proof. have := dT_max witness; smt(mu_bounded). qed.
+
+section PROOF.
+
+declare module A <: Adversary {-O, -Count}.
+
+declare op qP : int.
+declare op qS : int.
+
+declare axiom qP_ge0 : 0 <= qP.
+declare axiom qS_ge0 : 0 <= qS.
+
+local op pot (bad : bool) (cp cs : int) : real =
+  if bad /\ cp <= qP /\ cs <= qS then 1%r
+  else if !bad /\ cp <= qP /\ cs < qS then (qS - cs)%r * (qP + qS)%r * eps
+  else 0%r.
+
+lemma fresh_collision_count &m :
+  Pr [ Game(A).main() @ &m : O.bad /\ Count.cp <= qP /\ Count.cs <= qS ] <=
+  ((qP + qS) * qS)%r * eps.
+proof.
+byehoare (: (((qP + qS) * qS)%r * eps)%xr ==>
+            (O.bad /\ Count.cp <= qP /\ Count.cs <= qS)%xr) => //.
+proc.
+call /(fun x => x) (: (card O.s <= Count.cp + Count.cs) `|`
+                      (pot O.bad Count.cp Count.cs)%xr).
+- move=> &hr; apply xle_cxr_r => _ /=.
+  rewrite /pot; smt(eps_ge0).
+- proc; inline *; auto => &hr /=; apply xle_cxr => hinv.
+  split; 1: smt(fcardU1).
+  rewrite /pot; smt(eps_ge0).
+- proc; inline *; auto => &hr /=; apply xle_cxr_r => hinv.
+  case: (!O.bad{hr} /\ Count.cp{hr} <= qP /\ Count.cs{hr} < qS) => hc.
+  + have hk : 0%r <= (qS - (Count.cs{hr} + 1))%r * (qP + qS)%r * eps.
+    * apply mulr_ge0; 2: exact eps_ge0.
+      apply mulr_ge0; smt(qP_ge0 qS_ge0).
+    apply (xle_trans (Ep dT (fun y => (y \in O.s{hr})%xr +
+            ((qS - (Count.cs{hr} + 1))%r * (qP + qS)%r * eps)%xr))).
+    * apply le_Ep => y _ /=.
+      apply xle_cxr_l; 1: smt(fcardU1).
+      rewrite /pot /=; case: (y \in O.s{hr}) => hy /=; smt().
+    rewrite EpD EpC Ep_mu dT_ll /=.
+    have hmu : mu dT (mem O.s{hr}) <= (card O.s{hr})%r * eps.
+    * by apply mu_mem_le => x _; apply dT_max.
+    have hX : 0%r <= (qP + qS)%r * eps.
+    * by apply mulr_ge0; [smt(qP_ge0 qS_ge0) | exact eps_ge0].
+    have hb : (card O.s{hr})%r * eps <= (qP + qS)%r * eps.
+    * by apply ler_wpmul2r; [exact eps_ge0 | smt()].
+    case: hc => hbad [hcp hcs].
+    rewrite /pot hbad hcp hcs /= (to_pos_pos _ hk).
+    have -> : (qS - Count.cs{hr})%r * (qP + qS)%r * eps =
+              (qS - (Count.cs{hr} + 1))%r * (qP + qS)%r * eps + (qP + qS)%r * eps.
+    * by rewrite (_ : qS - Count.cs{hr} = (qS - (Count.cs{hr} + 1)) + 1) 1:#ring fromintD; ring.
+    rewrite to_pos_pos; smt().
+  apply (xle_trans (Ep dT (fun _ => (pot O.bad{hr} Count.cp{hr} Count.cs{hr})%xr))).
+  + apply le_Ep => y _ /=; apply xle_cxr_l; 1: smt(fcardU1).
+    rewrite /pot /=; smt().
+  by rewrite EpC dT_ll.
+inline *; auto => &hr /=; rewrite fcards0 /= /pot /=.
+- apply le_pos; rewrite fromintM.
+  have -> : (qP + qS)%r * qS%r * eps = qS%r * (qP + qS)%r * eps by ring.
+  by case: (0 <= qP /\ 0 < qS) => // _; apply mulr_ge0; [smt(qP_ge0 qS_ge0) | exact eps_ge0].
+apply mulr_ge0; 2: exact eps_ge0.
+by rewrite le_fromint; apply StdOrder.IntOrder.mulr_ge0; smt(qP_ge0 qS_ge0).
+qed.
+
+(* Query-bounded adversaries *)
+declare axiom A_bound (O <: Oracle {-A, -Count}) :
+  hoare [ A(Count(O)).main :
+          Count.cp = 0 /\ Count.cs = 0 ==> Count.cp <= qP /\ Count.cs <= qS ].
+
+lemma fresh_collision &m :
+  Pr [ Game(A).main() @ &m : O.bad ] <= ((qP + qS) * qS)%r * eps.
+proof.
+apply: ler_trans (fresh_collision_count &m).
+byequiv (_ : ={glob A} ==> ={glob O} /\ (Count.cp <= qP /\ Count.cs <= qS){2}) => //.
+proc.
+conseq (_ : _ ==> ={glob O}) _ (_ : _ ==> Count.cp <= qP /\ Count.cs <= qS).
+- by call (A_bound O); inline *; auto.
+by sim.
+qed.
+
+end section PROOF.

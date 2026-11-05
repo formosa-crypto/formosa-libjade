@@ -8,6 +8,7 @@ require import MLDSA_RO.
 require import DistrExtra JWordExtra StdBigop StdOrder.
 require DS_ROM.
 
+require import Leakage.
 abstract theory MLDSA_ROSep.
 
 clone include MLDSA_RO.MLDSA_RO.
@@ -20,8 +21,7 @@ op dxi : Bytes32.t distr = dmap (dlist W8.dword 32) Bytes32.of_list.
 op [lossless] drnd : rnd_ distr.
 
 op dblock : W8.t list distr = dlist W8.dword 64.
-op dbytes64 : Bytes64.t distr = dmap (dlist W8.dword 64) Bytes64.of_list.
-op dbytesCT : BytesCT.t distr = dmap (dlist W8.dword (lambda %/ 4)) BytesCT.of_list.
+(* dbytes64, dbytesCT: defined in MLDSATargetFIPS *)
 
 (*************** ML-DSA with SHAKE256 and SHAKE128 as random oracles ****************)
 
@@ -30,7 +30,7 @@ clone import DS_ROM.DS_ROM_x2 as DS2 with
   type skey    <- BytesSK.t,
   type msg     <- W8.t list,
   type sig     <- BytesSig.t,
-  type leakage <- Leakage list,
+  type leakage <- leakage,
   type RO1.in_t  <- W8.t list * int,
   type RO1.out_t <- W8.t list,
   op   RO1.dout  <- fun _ => dblock,
@@ -46,7 +46,7 @@ module MLDSA_RO_DS(H : BlockOracle, G : Oracle) = {
     return (pk, sk);
   }
 
-  proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * Leakage list = {
+  proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * leakage = {
     var coins, r;
     coins <$ drnd;
     r <@ MLDSA_RO(H, G).sign_derand(sk, m, coins);
@@ -69,7 +69,7 @@ clone import DS_ROM.DS_ROM_x5 as DS5 with
   type skey    <- BytesSK.t,
   type msg     <- W8.t list,
   type sig     <- BytesSig.t,
-  type leakage <- Leakage list,
+  type leakage <- leakage,
   type RO1.in_t  <- W8.t list * int,
   type RO1.out_t <- W8.t,
   op   RO1.dout  <- fun _ => W8.dword,
@@ -131,19 +131,22 @@ module MLDSA_ROSep(XA : DS5.POracle1, XC : DS5.POracle2,
     return (pk,sk);
   }
 
-  proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * Leakage list = {
+  proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * leakage = {
      var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,rhopp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
-         cs2,z,r0,ct0,h,leakage,sigma,bz,bh,bs,sl;
+         cs2,z,r0,ct0,h,leakage,sigma,bct0,bs,sl;
+     var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
      coins <$ drnd;
      ct <- witness;
      ctl <- witness;
      sigma <- witness;
-     leakage <- [];
+     rf <- witness;
+     hf <- witness;
      (rho,_K,tr,s1,s2,t0) <@ SkEncDec.skDecode(sk);
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
+     leakage <- kvec_leak t0h;
      _A <@ ExpandA(XOFA_O(XA)).sample(rho);
      mu <@ Hmu.get(tr, m);
      bs <@ Squeeze(RO_rhopp.RO).squeeze(Bytes32.to_list _K ++ rnd_to_list coins ++ Bytes64.to_list mu, 64);
@@ -157,21 +160,27 @@ module MLDSA_ROSep(XA : DS5.POracle1, XC : DS5.POracle2,
        ct <@ Hct.get(mu, w1Encode w1);
        (c, sl) <@ SampleInBall_O(XC).sample(ct);
        ctl <- ((ct, c), sl);
-       leakage <- leakage ++ [ RO ctl.`2] ;
+       leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
+       leakage <- lcat leakage (poly_leak ch);
        cs1 <- invnttv (ntt_smul ch s1h);
-       cs2 <- invnttv (ntt_smul ch s2h);
        z <- y + cs1;
-       r0 <- polykvec_LowBits (w - cs2);
-       bz <- infnorm_lt z (gamma1 - Beta) &&
-                  infnorm_lt r0 (gamma2 - Beta);
-       leakage <- leakage ++ [ CheckZ bz ];
-       if (bz) {
-          ct0 <- invnttv (ntt_smul ch t0h);
-          h <- MakeHint (PolyKVec.zerov-ct0) (w - cs2 + ct0);
-          bh <- infnorm_lt ct0 gamma2 && hammw h w_hint;
-          leakage <- leakage ++ [ CheckH bh ];
-          if (bh) { zh <- Some (z,h); }
+       zf <- zfail_idx z;
+       leakage <- lcat leakage (oileak zf);
+       if (zf = None) {
+         cs2 <- invnttv (ntt_smul ch s2h);
+         r0 <- polykvec_LowBits (w - cs2);
+         rf <- r0fail_idx r0;
+         leakage <- lcat leakage (oileak rf);
+         if (rf = None) {
+           ct0 <- invnttv (ntt_smul ch t0h);
+           h <- MakeHint (PolyKVec.zerov-ct0) (w - cs2 + ct0);
+           hf <- hintfail_idx h;
+           leakage <- lcat leakage (oileak hf);
+           (* public test: c and t0 are leaked *)
+           bct0 <- infnorm_lt ct0 gamma2;
+           if (bct0 /\ hf = None) { zh <- Some (z,h); }
+         }
        }
        kappa <- kappa + 1;
      }
@@ -368,7 +377,7 @@ module CountH(H : DS2.POracle1) = {
 
 module CountS(O : DS2.SOracle) = {
   var c : int
-  proc sign(m : W8.t list) : BytesSig.t option * Leakage list = {
+  proc sign(m : W8.t list) : BytesSig.t option * leakage = {
     var r;
     c <- c + 1;
     r <@ O.sign(m);

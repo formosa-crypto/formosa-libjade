@@ -9,6 +9,7 @@ require import MLDSA_ROSep_Hop4 MLDSA_ROSep_Hop5 MLDSA_ROSep_Hop6 MLDSA_ROSep_Ho
 require import MLDSA_ROSep_Hop9 MLDSA_ROSep_Hop10 MLDSA_ROSep_Hop11.
 require import ConcreteDRing MLDSATargetFIPS Leakage.
 require DS_ROM.
+require Byte.
 
 abstract theory MLDSA_ROSep_Hop12.
 
@@ -21,33 +22,33 @@ import Round ZModQ Zq MLDSAParams.
 (*************** The target game ****************)
 
 clone DS_ROM.DS_ROM_x5 as DST with
-  type pkey    <- TF.PK,
-  type skey    <- TF.SK,
+  type pkey    <- MP.T.PK,
+  type skey    <- MP.T.SK,
   type msg     <- W8.t list,
-  type sig     <- TF.Sig,
+  type sig     <- MP.T.Sig,
   type leakage <- Leakage.leakage,
   type RO1.in_t  <- (Bytes32.t * int * int) * int,
   type RO1.out_t <- W8.t,
-  op   RO1.dout  <- fun _ => TF.SIB.B.dB,
+  op   RO1.dout  <- fun _ => Byte.dB,
   type RO2.in_t  <- BytesCT.t * int,
   type RO2.out_t <- W8.t,
-  op   RO2.dout  <- fun _ => TF.SIB.B.dB,
-  type RO3.in_t  <- TF.PK,
+  op   RO2.dout  <- fun _ => Byte.dB,
+  type RO3.in_t  <- MP.T.PK,
   type RO3.out_t <- Bytes64.t,
   op   RO3.dout  <- fun _ => dbytes64,
   type RO4.in_t  <- Bytes64.t * W8.t list,
   type RO4.out_t <- Bytes64.t,
   op   RO4.dout  <- fun _ => dbytes64,
-  type RO5.in_t  <- TF.DV.HL.S.sT list * Bytes64.t,
+  type RO5.in_t  <- DV.HL.S.sT list * Bytes64.t,
   type RO5.out_t <- BytesCT.t,
   op   RO5.dout  <- fun _ => dbytesCT.
 
 (*************** Representations ****************)
 
-op vec_of_l (v : polylvec) : TF.DV.MatRq.Vectors.vector =
-  TF.DV.MatRq.Vectors.oflist (map poly2alg (LArray.to_list v)).
-op l_of_vec (v : TF.DV.MatRq.Vectors.vector) : polylvec =
-  LArray.init (fun i => alg2poly (TF.DV.MatRq.Vectors."_.[_]" v i)).
+op vec_of_l (v : polylvec) : DV.MatRq.Vectors.vector =
+  DV.MatRq.Vectors.oflist (map poly2alg (LArray.to_list v)).
+op l_of_vec (v : DV.MatRq.Vectors.vector) : polylvec =
+  LArray.init (fun i => alg2poly (DV.MatRq.Vectors."_.[_]" v i)).
 
 op hints_of (h : polykvec) : bool list list =
   map (fun (p : poly) => map (fun c => c <> Zq.zero) (Array256.to_list p)) (KArray.to_list h).
@@ -59,8 +60,8 @@ op t1_of (t1 : polykvec) : int list list =
 op poly_of_t1 (t1 : int list list) : polykvec =
   KArray.init (fun i => Array256.init (fun j => incoeff (nth 0 (nth [] t1 i) j))).
 
-op w1_key (w1 : polykvec) : TF.DV.HL.S.sT list =
-  map (fun (p : poly) => TF.DV.HL.S.insubd (map asint (Array256.to_list p))) (KArray.to_list w1).
+op w1_key (w1 : polykvec) : DV.HL.S.sT list =
+  map (fun (p : poly) => DV.HL.S.insubd (map asint (Array256.to_list p))) (KArray.to_list w1).
 
 op xa_key (x : W8.t list * int) : (Bytes32.t * int * int) * int =
   ((Bytes32.of_list (take 32 x.`1), to_uint (nth W8.zero x.`1 33), to_uint (nth W8.zero x.`1 32)), x.`2).
@@ -110,13 +111,8 @@ module Hctw(Hct : DST.POracle5) = {
   }
 }.
 
-lemma dB_dword : TF.SIB.B.dB = W8.dword.
-proof.
-apply eq_distr => x.
-rewrite (mu1_uni_ll _ _ TF.SIB.B.dB_uni TF.SIB.B.dB_ll) (mu1_uni_ll _ _ W8.dword_uni W8.dword_ll).
-have -> : support TF.SIB.B.dB = support W8.dword by apply fun_ext => y; rewrite TF.SIB.B.dB_full W8.dword_fu.
-done.
-qed.
+lemma dB_dword : Byte.dB = W8.dword.
+proof. exact Byte.dB_dword. qed.
 
 lemma highbits_shift_gen (c : int) :
   0 <= c < hb_range => highbits (2 * gamma2) (incoeff (c * (2 * gamma2))) = c.
@@ -149,9 +145,9 @@ lemma w1_img (p : poly) :
 proof. by move=> hp; apply w1_img_gen => j hj; smt(hb_range_cases). qed.
 
 lemma w1_key_nth (w : polykvec) i :
-  0 <= i < kvec => nth witness (w1_key w) i = TF.DV.HL.S.insubd (map asint (Array256.to_list w.[i])).
+  0 <= i < kvec => nth witness (w1_key w) i = DV.HL.S.insubd (map asint (Array256.to_list w.[i])).
 proof.
-by move=> hi; rewrite /w1_key (nth_map witness witness (fun (p : poly) => TF.DV.HL.S.insubd (map asint (Array256.to_list p))))
+by move=> hi; rewrite /w1_key (nth_map witness witness (fun (p : poly) => DV.HL.S.insubd (map asint (Array256.to_list p))))
              ?KArray.size_to_list // KArray.get_to_list.
 qed.
 
@@ -159,7 +155,7 @@ lemma w1_key_inj (w w' : polykvec) : w1rng w => w1rng w' => w1_key w = w1_key w'
 proof.
 move=> hw hw' heq; apply KArray.ext_eq => i hi.
 have h : nth witness (w1_key w) i = nth witness (w1_key w') i by rewrite heq.
-move: h; rewrite !w1_key_nth // => /(congr1 TF.DV.HL.S.val); rewrite !TF.DV.HL.S.insubdK.
+move: h; rewrite !w1_key_nth // => /(congr1 DV.HL.S.val); rewrite !DV.HL.S.insubdK.
 + by apply w1_img_gen => j hj; exact: hw i j hi hj.
 + by apply w1_img_gen => j hj; exact: hw' i j hi hj.
 move=> h2; apply Array256.ext_eq => j hj.
@@ -188,9 +184,9 @@ op pk_t1 (p : BytesPK.t) : polykvec =
   KArray.init (fun i => SimpleBitUnpack (take ((n * (q_bits - d)) %/ 8)
                           (drop (((n * (q_bits - d)) %/ 8) * i + 32) (BytesPK.to_list p))) (2 ^ (q_bits - d) - 1)).
 
-op pk_dec (p : BytesPK.t) : TF.PK = (Bytes32.of_list (take 32 (BytesPK.to_list p)), t1_of (pk_t1 p)).
+op pk_dec (p : BytesPK.t) : MP.T.PK = (Bytes32.of_list (take 32 (BytesPK.to_list p)), t1_of (pk_t1 p)).
 
-op pk_enc (pk : TF.PK) : BytesPK.t =
+op pk_enc (pk : MP.T.PK) : BytesPK.t =
   BytesPK.of_list (Bytes32.to_list pk.`1 ++
                    flatten (map (fun p => SimpleBitPack p (2 ^ (q_bits - d) - 1)) (KArray.to_list (poly_of_t1 pk.`2)))).
 
@@ -283,7 +279,7 @@ move=> _; split => hin; split => hin'.
 by rewrite he.
 qed.
 
-op rel_tr (m5 : (BytesPK.t, Bytes64.t) fmap) (mt : (TF.PK, Bytes64.t) fmap) : bool =
+op rel_tr (m5 : (BytesPK.t, Bytes64.t) fmap) (mt : (MP.T.PK, Bytes64.t) fmap) : bool =
   forall p, m5.[p] = mt.[pk_dec p].
 
 equiv tr_get : DS5.RO3.RO.get ~ Htrw(DST.RO3.RO).get :
@@ -307,7 +303,7 @@ split => hin; split => hin'.
 by rewrite he.
 qed.
 
-op rel_ct (m5 : (polykvec * Bytes64.t, BytesCT.t) fmap) (mt : (TF.DV.HL.S.sT list * Bytes64.t, BytesCT.t) fmap) : bool =
+op rel_ct (m5 : (polykvec * Bytes64.t, BytesCT.t) fmap) (mt : (DV.HL.S.sT list * Bytes64.t, BytesCT.t) fmap) : bool =
   forall w1 mu, w1rng w1 => m5.[(w1, mu)] = mt.[(w1_key w1, mu)].
 
 equiv ct_get : DS10.RO5.RO.get ~ Hctw(DST.RO5.RO).get :
@@ -348,8 +344,8 @@ equiv sib_eq : SampleInBall_B(RO_xc.RO).sample ~ SampleInBall_B(XCw(DST.RO2.RO))
   ={rho} /\ rel_xc RO_xc.RO.m{1} DST.RO2.RO.m{2} ==> ={res} /\ rel_xc RO_xc.RO.m{1} DST.RO2.RO.m{2}.
 proof.
 proc.
-while (={i, c, h, pos, leakage, rho} /\ rel_xc RO_xc.RO.m{1} DST.RO2.RO.m{2}).
-+ wp; while (={i, j, pos, leakage, rho} /\ rel_xc RO_xc.RO.m{1} DST.RO2.RO.m{2}).
+while (={i, c, h, pos, leak, rho} /\ rel_xc RO_xc.RO.m{1} DST.RO2.RO.m{2}).
++ wp; while (={i, j, pos, leak, rho} /\ rel_xc RO_xc.RO.m{1} DST.RO2.RO.m{2}).
   - by wp; call xc_get; auto => />; rewrite BytesCT.size_to_list.
   by wp; call xc_get; auto => />; rewrite BytesCT.size_to_list.
 wp; call (: ={x, len} /\ size x{1} = lambda %/ 4 /\ rel_xc RO_xc.RO.m{1} DST.RO2.RO.m{2}
@@ -381,7 +377,7 @@ equiv sign_12 :
       rel_ct DS10.RO5.RO.m{1} DST.RO5.RO.m{2}.
 proof.
 proc.
-seq 10 10 : (={coins, ct, ctl, sigma, leakage, rho, tr, s1, s2, t0, _A, mu, kappa, zh, glob XOFA_O, RO_y.RO.m} /\
+seq 12 12 : (={coins, ct, ctl, sigma, leakage, rho, tr, s1, s2, t0, _A, mu, kappa, zh, glob XOFA_O, RO_y.RO.m} /\
              DS5.RO4.RO.m{1} = DST.RO4.RO.m{2} /\ rel_xa DS5.RO1.RO.m{1} DST.RO1.RO.m{2} RO_xr.RO.m{2} /\
              rel_xc RO_xc.RO.m{1} DST.RO2.RO.m{2} /\ rel_ct DS10.RO5.RO.m{1} DST.RO5.RO.m{2}).
 + wp; call (: DS5.RO4.RO.m{1} = DST.RO4.RO.m{2}); 1: by auto.
@@ -441,7 +437,7 @@ qed.
 
 module G12(A : DS2.Adversary) = {
   module O = {
-    proc sign(m : W8.t list) : BytesSig.t option * Leakage list = {
+    proc sign(m : W8.t list) : BytesSig.t option * leakage = {
       var r;
       DS11.EUF_CMA.qs <- m :: DS11.EUF_CMA.qs;
       r <@ MLDSA_RO_DS11(XAw(DST.RO1.RO), XCw(DST.RO2.RO), Htrw(DST.RO3.RO), DST.RO4.RO,

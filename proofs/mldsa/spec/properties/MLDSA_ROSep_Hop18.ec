@@ -19,14 +19,40 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 import PolyReduce.
-import TF.DV TF.DV.MatRq.Vectors TF.DV.MatRq.Matrices.
+import DV DV.MatRq.Vectors DV.MatRq.Matrices.
 
 (*************** The reduction to the target ****************)
 
+(* The queries of the adversary to SHAKE128 (the hops only count SHAKE256,
+   CountH, and the signing queries, CountS) *)
+module CountG(G : DS2.POracle2) = {
+  var c : int
+  proc get(x : W8.t list * int) : W8.t = {
+    var b;
+    c <- c + 1;
+    b <@ G.get(x);
+    return b;
+  }
+}.
+
+(* A with its three query counters *)
+module CountAG(A : DS2.Adversary)(H1 : DS2.POracle1, H2 : DS2.POracle2, O : DS2.SOracle) = {
+  proc forge(pk : BytesPK.t) : W8.t list * BytesSig.t = {
+    var r;
+    CountH.c <- 0;
+    CountG.c <- 0;
+    CountS.c <- 0;
+    r <@ A(CountH(H1), CountG(H2), CountS(O)).forge(pk);
+    return r;
+  }
+}.
+
+(* B runs A through its query counters (they are not used by B; they make
+   the query bounds of A, stated on these counters, transfer to B) *)
 module B(A : DS2.Adversary)(H1 : DST.POracle1, H2 : DST.POracle2, H3 : DST.POracle3, H4 : DST.POracle4,
                             H5 : DST.POracle5, O : DST.SOracle) = {
   module O' = {
-    proc sign(m : W8.t list) : BytesSig.t option * Leakage list = {
+    proc sign(m : W8.t list) : BytesSig.t option * leakage = {
       var rs, sg, s;
       rs <@ O.sign(m);
       sg <- None;
@@ -34,22 +60,22 @@ module B(A : DS2.Adversary)(H1 : DST.POracle1, H2 : DST.POracle2, H3 : DST.POrac
         s <@ SigEncDec.sigEncode((oget rs.`1).`1, l_of_vec (oget rs.`1).`2.`1, poly_of_hints (oget rs.`1).`2.`2);
         sg <- Some s;
       }
-      return (sg, tleak rs.`2);
+      return (sg, rs.`2);
     }
   }
 
-  proc forge(pk : TF.PK) : W8.t list * TF.Sig = {
+  proc forge(pk : MP.T.PK) : W8.t list * MP.T.Sig = {
     var pkb, m, s, ct, z, h;
     RO_xr.RO.init();
     pkb <@ PkEncDec.pkEncode(pk.`1, poly_of_t1 pk.`2);
-    (m, s) <@ Router11(A, XAw(H1), XCw(H2), Htrw(H3), H4, Hctw(H5), O').forge(pkb);
+    (m, s) <@ Router11(CountAG(A), XAw(H1), XCw(H2), Htrw(H3), H4, Hctw(H5), O').forge(pkb);
     (ct, z, h) <@ SigEncDec.sigDecode(s);
     return (m, (ct, (vec_of_l z, if h = None then [] else hints_of (oget h))));
   }
 }.
 
 lemma tfverify_rej :
-  phoare [TF.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).verify :
+  phoare [MP.T.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).verify :
           size sig.`2.`2 <> kvec ==> !res] = 1%r.
 proof.
 conseq tfverify_ll (_ : size sig.`2.`2 <> kvec ==> !res) => //.
@@ -66,39 +92,49 @@ declare module A <: DS2.Adversary {
   -RO_pad.RO, -RO_pad.FRO, -RO_seed.RO, -RO_S.RO, -RO_rhopp.RO, -RO_v.RO, -CountH, -CountS, -St5,
   -RO_lp.RO, -RO_lp.FRO, -St6, -St7, -Router, -RO_y.RO, -DS8.EUF_CMA, -DS10.EUF_CMA, -DS10.RO5.RO,
   -RO_hr.RO, -Router10, -DS11.EUF_CMA, -RO_xc.RO, -RO_xc.FRO, -Router11, -DST.RO1.RO, -DST.RO2.RO,
-  -DST.RO3.RO, -DST.RO4.RO, -DST.RO5.RO, -DST.EUF_CMA, -RO_xr.RO, -G13, -Coins }.
+  -DST.RO3.RO, -DST.RO4.RO, -DST.RO5.RO, -DST.EUF_CMA, -RO_xr.RO, -G13, -Coins, -CountG }.
 
 lemma G17_B &m :
   Pr[G17(A).main() @ &m : res] =
-  Pr[DST.EUF_CMA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO, TF.MLDSA, B(A)).main() @ &m : res].
+  Pr[DST.EUF_CMA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO, MP.T.MLDSA, B(A)).main() @ &m : res].
 proof.
 byequiv (: ={glob A} ==> ={res}) => //.
 proc.
-inline{2} DST.EUF_CMA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO, TF.MLDSA, B(A)).A.forge.
+inline{2} DST.EUF_CMA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO, MP.T.MLDSA, B(A)).A.forge.
 inline{1} Router11(A, XAw(DST.RO1.RO), XCw(DST.RO2.RO), Htrw(DST.RO3.RO), DST.RO4.RO, Hctw(DST.RO5.RO), G17(A).O).forge.
-inline{2} Router11(A, XAw(DST.RO1.RO), XCw(DST.RO2.RO), Htrw(DST.RO3.RO), DST.RO4.RO, Hctw(DST.RO5.RO),
+inline{2} Router11(CountAG(A), XAw(DST.RO1.RO), XCw(DST.RO2.RO), Htrw(DST.RO3.RO), DST.RO4.RO, Hctw(DST.RO5.RO),
                    B(A, DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO,
-                     DST.EUF_CMA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO, TF.MLDSA, B(A)).O).O').forge.
+                     DST.EUF_CMA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO, MP.T.MLDSA, B(A)).O).O').forge.
+inline{2} CountAG(A, Router11(CountAG(A), XAw(DST.RO1.RO), XCw(DST.RO2.RO), Htrw(DST.RO3.RO), DST.RO4.RO,
+                              Hctw(DST.RO5.RO),
+                              B(A, DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO,
+                                DST.EUF_CMA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO, MP.T.MLDSA,
+                                            B(A)).O).O').H,
+                 XAw(DST.RO1.RO),
+                 B(A, DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO,
+                   DST.EUF_CMA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO, MP.T.MLDSA, B(A)).O).O').forge.
 inline{1} V16.verify KG16.keygen.
-seq 22 18 : (={ct, z, h, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO3.RO, glob DST.RO4.RO, glob DST.RO5.RO} /\
+seq 22 23 : (={ct, z, h, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO3.RO, glob DST.RO4.RO, glob DST.RO5.RO} /\
              pk2{1} = pk{2} /\ m{1} = m0{2} /\ m0{1} = m0{2} /\ G13.qs{1} = DST.EUF_CMA.qs{2}).
 + call (: true); 1: by sim.
   wp.
   call (: ={glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO, glob DST.RO3.RO, glob DST.RO4.RO, glob DST.RO5.RO,
             RO_rest.RO.m, RO_pad.RO.m, RO_hr.RO.m, Router11.tr} /\
           G13.qs{1} = DST.EUF_CMA.qs{2} /\ G13.sk{1} = DST.EUF_CMA.sk{2}).
-  + proc; inline{1} Sign17.sign;
-      inline{2} DST.EUF_CMA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO, TF.MLDSA, B(A)).O.sign.
-    seq 4 4 : (={rs, glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO, glob DST.RO3.RO, glob DST.RO4.RO,
+  + proc; inline{1} Sign17.sign; inline{2} 2;
+      inline{2} DST.EUF_CMA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO, MP.T.MLDSA, B(A)).O.sign.
+    seq 4 6 : (={rs, glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO, glob DST.RO3.RO, glob DST.RO4.RO,
                  glob DST.RO5.RO, RO_rest.RO.m, RO_pad.RO.m, RO_hr.RO.m, Router11.tr} /\
                G13.qs{1} = DST.EUF_CMA.qs{2} /\ G13.sk{1} = DST.EUF_CMA.sk{2}).
     + wp; call (: ={glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO3.RO, glob DST.RO4.RO, glob DST.RO5.RO});
         1: by sim.
       by auto.
     by sp; if => //; [wp; call (: true); [sim | auto => />] | auto => />].
-  + by sim.
-  + by sim.
-  call (: ={glob DST.RO3.RO}); 1: by sim.
+  + by proc*; inline{2} 1; wp; call (: ={glob DST.RO1.RO, glob RO_xr.RO}); [sim | auto].
+  + by proc*; inline{2} 1; wp;
+      call (: ={glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO, glob DST.RO3.RO, glob DST.RO4.RO,
+                glob DST.RO5.RO, RO_rest.RO.m, RO_pad.RO.m, RO_hr.RO.m, Router11.tr}); [sim | auto].
+  wp; call (: ={glob DST.RO3.RO}); 1: by sim.
   inline{1} RO_rest.RO.init RO_pad.RO.init RO_hr.RO.init;
     inline{2} RO_rest.RO.init RO_pad.RO.init RO_hr.RO.init RO_xr.RO.init; wp.
   call (: true); 1: by sim.
@@ -121,7 +157,7 @@ lemma mldsa_euf_cma (qH qS : int) (eps : real) &m : 0 <= qH => 0 <= qS => (foral
      hoare [A(CountH(H), G, CountS(O)).forge :
               CountH.c = 0 /\ CountS.c = 0 ==> CountH.c <= qH /\ CountS.c <= qS]) =>
   Pr[DS2.EUF_CMA(DS2.RO1.RO, DS2.RO2.RO, MLDSA_RO_DS, A).main() @ &m : res] <=
-  Pr[DST.EUF_CMA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO, TF.MLDSA, B(A)).main() @ &m : res] +
+  Pr[DST.EUF_CMA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO, MP.T.MLDSA, B(A)).main() @ &m : res] +
   (2 * (qH + qS * (1 + kappa_max)) + qS * (qS + qH + 1) + 6)%r * p512 + (3 * qH + qS + 4)%r * p256 +
   (qS * (qS - 1))%r / 2%r * eps.
 proof.

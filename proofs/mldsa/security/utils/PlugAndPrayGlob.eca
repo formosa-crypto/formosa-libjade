@@ -1,0 +1,50 @@
+require import AllCore List Distr.
+require PlugAndPray.
+
+(* This is a syntactic variant of the PlugAndPray theory from the
+   standard library, where the sampled value is global, and sampled
+   before the main game is run.
+   TODO: Incorporate it in the standard library. *)
+
+type tval, tin, tres.
+op indices : { tval list | indices <> [] } as indices_not_nil.
+abbrev card = size (undup indices).
+
+module type Game = {
+  proc main (x : tin) : tres
+}.
+
+module Guess (G : Game) = {
+  var i : tval
+  proc main (x : tin) : tres = {
+    var o;
+    i <$ duniform indices;
+    o <@ G.main(x);
+    return o;
+  }
+}.
+
+section PROOF.
+local clone PlugAndPray as PAP with
+  type tval <- tval,
+  type tin <- tin,
+  type tres <- tres,
+  op indices <- indices
+proof *.
+realize indices_not_nil by exact indices_not_nil.
+
+lemma PBound (G <: Game{-Guess.i})
+             (phi : (glob G) -> tres -> bool)
+             (psi : (glob G) -> tres -> tval)
+             x0 &m:
+  (forall gG o, phi gG o => psi gG o \in indices) =>
+  Pr[G.main(x0) @ &m: phi (glob G) res] = card%r *
+    Pr[Guess(G).main(x0) @ &m: phi (glob G) res /\ Guess.i = psi (glob G) res ].
+proof.
+move => /(PAP.PBound_mult G _ _ x0 &m) ->.
+congr. byequiv => //.
+proc. swap{2} 1 1. rnd.
+conseq (: ={glob G, o}) => />.
+by sim.
+qed.
+end section PROOF.
