@@ -19,53 +19,7 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 import PolyReduce.
-import TF.DV TF.DV.MatRq.Vectors TF.DV.MatRq.Matrices.
-
-(*************** The leakage of G15 from the leakage of the target ****************)
-
-op if_flag (l : leakage) : bool =
-  with l = Seq _ => false
-  with l = If b _ => b
-  with l = While _ _ => false
-  with l = Decl _ => false.
-
-op if_body (l : leakage) : leakage =
-  with l = Seq _ => Empty
-  with l = If _ l' => l'
-  with l = While _ _ => Empty
-  with l = Decl _ => Empty.
-
-op while_body (l : leakage) : leakage =
-  with l = Seq _ => Empty
-  with l = If _ _ => Empty
-  with l = While _ l' => l'
-  with l = Decl _ => Empty.
-
-op iter_leak (l : leakage) : Leakage list =
-  let lc = nth Empty (to_seq (while_body l)) 1 in
-  let lz = nth Empty (to_seq (while_body l)) 2 in
-  [RO (sib_bools (ints_of lc)); CheckZ (if_flag lz)] ++
-  (if if_flag lz then [CheckH (if_flag (if_body lz) /\ if_flag (if_body (if_body lz)))] else []).
-
-op tleak (l : leakage) : Leakage list = flatten (map iter_leak (to_seq l)).
-
-lemma tleak_catFS (l : leakage) (b b12 b3 b4 : bool) (lc : leakage) :
-  tleak (catFS l (b, (Empty, lc, ite b12 (ite b3 (ite b4 Empty Empty) Empty) Empty))) =
-  tleak l ++ [RO (sib_bools (ints_of lc)); CheckZ b12] ++ (if b12 then [CheckH (b3 /\ b4)] else []).
-proof.
-have hw : forall w, tleak (Seq (to_seq l ++ [w])) = tleak l ++ iter_leak w
-  by move=> w; rewrite /tleak /= map_cat flatten_cat /= flatten_cons flatten_nil cats0.
-rewrite /catFS /lcat /fs_leak /=.
-case: (l = Empty) => [-> | hne] /=.
-+ by rewrite /tleak /iter_leak /= /ite /=; case: b12; case: b3.
-rewrite ifF; 1: by rewrite /Empty.
-rewrite hw /iter_leak /ite /=.
-case: b12 => /=; case: b3 => /=; rewrite /Empty /=.
-+ by move=> *; rewrite -catA.
-+ by move=> *; rewrite -catA.
-+ by move=> *; rewrite ?cats0.
-by move=> *; rewrite ?cats0.
-qed.
+import DV DV.MatRq.Vectors DV.MatRq.Matrices.
 
 (*************** Public keys ****************)
 
@@ -118,12 +72,12 @@ qed.
 lemma b2hb_valid (t : vector) : size t = kvec => t1_valid (base2highbitsV t).
 proof.
 move=> hs; rewrite /t1_valid size_base2highbitsV hs /=.
-apply/List.allP => li /mapP [p [_ ->]]; rewrite /TF.DV.HL.base2highbits /= size_mkseq.
+apply/List.allP => li /mapP [p [_ ->]]; rewrite /DV.HL.base2highbits /= size_mkseq.
 split; 1: smt().
 apply/List.allP => x /mkseqP [j [hj ->]] /=; smt(highbits2_rng).
 qed.
 
-lemma expandA_size : hoare [TF.ExpandA(DST.RO1.RO).get : true ==> rows res = kvec /\ cols res = lvec].
+lemma expandA_size : hoare [MP.T.ExpandA(DST.RO1.RO).get : true ==> rows res = kvec /\ cols res = lvec].
 proof.
 proc.
 while (rows mA = kvec /\ cols mA = lvec).
@@ -134,33 +88,34 @@ while (rows mA = kvec /\ cols mA = lvec).
 by auto => />; smt(gt0_k gt0_l).
 qed.
 
-equiv expandA_eq_size : TF.ExpandA(DST.RO1.RO).get ~ TF.ExpandA(DST.RO1.RO).get :
+equiv expandA_eq_size : MP.T.ExpandA(DST.RO1.RO).get ~ MP.T.ExpandA(DST.RO1.RO).get :
   ={rho, DST.RO1.RO.m} ==> ={res, DST.RO1.RO.m} /\ rows res{1} = kvec /\ cols res{1} = lvec.
 proof. by conseq (_ : ={rho, DST.RO1.RO.m} ==> ={res, DST.RO1.RO.m}) expandA_size _; sim. qed.
 
 (*************** G16: the scheme of the target, with y from the table ****************)
 
-module MLDSA_Y(XA : TF.XOF_A, XC : TF.SIB.XOF_t, Htr : TF.Hash_tr, Hmu : TF.Hash_mu, Hct : TF.Hash_ct) = {
-  proc keygen = TF.MLDSA(XA, XC, Htr, Hmu, Hct).keygen
-  proc verify = TF.MLDSA(XA, XC, Htr, Hmu, Hct).verify
+module MLDSA_Y(XA : MP.T.XOF_A, XC : MP.T.SIB.XOF_t, Htr : MP.T.Hash_tr, Hmu : MP.T.Hash_mu, Hct : MP.T.Hash_ct) = {
+  proc keygen = MP.T.MLDSA(XA, XC, Htr, Hmu, Hct).keygen
+  proc verify = MP.T.MLDSA(XA, XC, Htr, Hmu, Hct).verify
 
-  proc sign(sk : TF.SK, m : W8.t list, coins : rnd_) : TF.Sig option * leakage = {
+  proc sign(sk : MP.T.SK, m : W8.t list, coins : rnd_) : MP.T.Sig option * leakage = {
     var z : vector;
     var h : bool list list;
     var response : (vector * bool list list) option;
     var c : polyXnD1;
     var ct : BytesCT.t;
     var ctr : int;
-    var rho, tr, s1, s2, t0, mA, mu, y, yv, w, w1;
-    var lc, lz, leak;
-    var b1, b2, b3, b4;
+    var rho, tr, s1, s2, t0, mA, mu, y, yv, w, w0, w1;
+    var lc, leak;
+    var ct0_ok : bool;
+    var z_fail, r0_fail, hint_fail : int option;
     ct <- witness;
-    b3 <- witness;
-    b4 <- witness;
+    r0_fail <- witness;
+    hint_fail <- witness;
     (rho, tr, s1, s2, t0) <- sk;
-    mA <@ TF.ExpandA(XA).get(rho);
+    leak <- MP.T.t0_leak t0;
+    mA <@ MP.T.ExpandA(XA).get(rho);
     mu <@ Hmu.get(tr, m);
-    leak <- Empty;
     response <- None;
     ctr <- 0;
     while (response = None /\ ctr < kappa_max) {
@@ -169,20 +124,27 @@ module MLDSA_Y(XA : TF.XOF_A, XC : TF.SIB.XOF_t, Htr : TF.Hash_tr, Hmu : TF.Hash
       w <- mA *^ y;
       w1 <- highBitsV w;
       ct <@ Hct.get(w1, mu);
-      (c, lc) <@ TF.SIB.SampleInBall(XC).get(ct);
+      (c, lc) <@ MP.T.SIB.SampleInBall(XC).get(ct);
+      leak <- lcat leak lc;
+      leak <- lcat leak (MP.T.c_leak c);
       z <- y + c ** s1;
-      b1 <- inf_normv z < gamma1 - Beta;
-      b2 <- inf_normv (lowBitsV (w - c ** s2)) < gamma2 - Beta;
-      if (b1 /\ b2) {
-        h <- makeHintV (- c ** t0) (w - c ** s2 + c ** t0);
-        b3 <- inf_normv (c ** t0) < gamma2;
-        b4 <- check_hw h;
-        if (b3 /\ b4) {
-          response <- Some (z, h);
+      z_fail <- check_z z;
+      leak <- lcat leak (oileak z_fail);
+      if (z_fail = None) {
+        w0 <- w - c ** s2;
+        r0_fail <- check_r0 w0;
+        leak <- lcat leak (oileak r0_fail);
+        if (r0_fail = None) {
+          h <- makeHintV (- c ** t0) (w0 + c ** t0);
+          hint_fail <- hint_fail_idx h;
+          leak <- lcat leak (oileak hint_fail);
+          (* test on c t0: a public computation of the leaked (c, t0) *)
+          ct0_ok <- check_ct0 (c ** t0);
+          if (ct0_ok /\ hint_fail = None) {
+            response <- Some (z, h);
+          }
         }
       }
-      lz <- ite (b1 /\ b2) (ite b3 (ite b4 Empty Empty) Empty) Empty;
-      leak <- catFS leak (response = None, (Empty, lc, lz));
       ctr <- ctr + 1;
     }
     return (omap (fun r => (ct, r)) response, leak);
@@ -190,7 +152,7 @@ module MLDSA_Y(XA : TF.XOF_A, XC : TF.SIB.XOF_t, Htr : TF.Hash_tr, Hmu : TF.Hash
 }.
 
 module KG16 = {
-  proc keygen() : BytesPK.t * TF.SK * TF.PK = {
+  proc keygen() : BytesPK.t * MP.T.SK * MP.T.PK = {
     var pk, sk, pkb;
     RO_y.RO.init();
     (pk, sk) <@ MLDSA_Y(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).keygen();
@@ -200,7 +162,7 @@ module KG16 = {
 }.
 
 module Sign16 = {
-  proc sign(sk : TF.SK, m : W8.t list) : BytesSig.t option * Leakage list = {
+  proc sign(sk : MP.T.SK, m : W8.t list) : BytesSig.t option * leakage = {
     var coins, rs, sg, s;
     coins <$ drnd;
     rs <@ MLDSA_Y(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign(sk, m, coins);
@@ -209,12 +171,12 @@ module Sign16 = {
       s <@ SigEncDec.sigEncode((oget rs.`1).`1, l_of_vec (oget rs.`1).`2.`1, poly_of_hints (oget rs.`1).`2.`2);
       sg <- Some s;
     }
-    return (sg, tleak rs.`2);
+    return (sg, rs.`2);
   }
 }.
 
 module V16 = {
-  proc verify(pk : TF.PK, m : W8.t list, s : BytesSig.t) : bool = {
+  proc verify(pk : MP.T.PK, m : W8.t list, s : BytesSig.t) : bool = {
     var ct, z, h, b;
     (ct, z, h) <@ SigEncDec.sigDecode(s);
     b <- false;
@@ -262,27 +224,25 @@ equiv sign_16 :
 proof.
 proc.
 inline{2} MLDSA_Y(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign.
-seq 9 13 : (={rho, tr, s1, s2, t0, mA, mu, ct, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO4.RO, glob DST.RO5.RO,
-              RO_y.RO.m} /\
-            coins{1} = coins0{2} /\ kappa{1} = ctr{2} /\ zh{1} = response{2} /\ leakage{1} = tleak leak{2}).
+seq 9 13 : (coins{1} = coins0{2} /\ ={ct, mA, mu, s1, s2, t0, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO4.RO,
+               glob DST.RO5.RO, RO_y.RO.m} /\ kappa{1} = ctr{2} /\ zh{1} = response{2} /\ leakage{1} = leak{2}).
 + wp; call (: ={glob DST.RO4.RO}); 1: by sim.
   call (: ={glob DST.RO1.RO}); 1: by sim.
-  by auto => />.
-seq 1 1 : (={ct, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO4.RO, glob DST.RO5.RO, RO_y.RO.m} /\
-           zh{1} = response{2} /\ leakage{1} = tleak leak{2}).
-+ while (={s1, s2, t0, mA, mu, ct, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO4.RO, glob DST.RO5.RO, RO_y.RO.m} /\
-         coins{1} = coins0{2} /\ kappa{1} = ctr{2} /\ zh{1} = response{2} /\ leakage{1} = tleak leak{2});
-    2: by auto => /> /#.
-  wp; call (: ={glob DST.RO2.RO}); 1: by sim.
-  wp; call (: ={glob DST.RO5.RO}); 1: by sim.
-  wp; call (: ={RO_y.RO.m}); 1: by sim.
-  auto => /> &1 &2 _ y c.
-  rewrite !tleak_catFS /= ?cats0 -?catA /=.
-  smt().
-sp 0 2.
-if; 1: by move=> &1 &2 /> /#.
-+ wp; call (: true); 1: by sim.
+  by auto.
+seq 1 1 : (coins{1} = coins0{2} /\ ={ct, mA, mu, s1, s2, t0, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO4.RO,
+               glob DST.RO5.RO, RO_y.RO.m} /\ kappa{1} = ctr{2} /\ zh{1} = response{2} /\ leakage{1} = leak{2}).
++ while (coins{1} = coins0{2} /\ ={ct, mA, mu, s1, s2, t0, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO4.RO,
+               glob DST.RO5.RO, RO_y.RO.m} /\ kappa{1} = ctr{2} /\ zh{1} = response{2} /\ leakage{1} = leak{2}).
+  * wp; call (: ={glob DST.RO2.RO}); 1: by sim.
+    wp; call (: ={glob DST.RO5.RO}); 1: by sim.
+    wp; call (: ={RO_y.RO.m}); 1: by sim.
+    by auto => /> /#.
   by auto => /> /#.
+sp 0 2; if{1}.
++ rcondt{2} 1; 1: by auto => /> /#.
+  wp; call (: true); 1: by sim.
+  auto => />; by move=> &2; case: (response{2}).
+rcondf{2} 1; 1: by auto => /> /#.
 by auto => /> /#.
 qed.
 
@@ -324,7 +284,7 @@ qed.
 
 module G16(A : DS2.Adversary) = {
   module O = {
-    proc sign(m : W8.t list) : BytesSig.t option * Leakage list = {
+    proc sign(m : W8.t list) : BytesSig.t option * leakage = {
       var r;
       G13.qs <- m :: G13.qs;
       r <@ Sign16.sign(G13.sk, m);

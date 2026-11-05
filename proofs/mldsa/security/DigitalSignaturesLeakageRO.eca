@@ -1,0 +1,61 @@
+(* EF-KOA and EF-CMA in the random oracle model, for the schemes with
+   leakage of DigitalSignaturesLeakage.eca. Adapted from the random
+   oracle variant of the verifyhashbased project (Matthias Meijers,
+   Andreas Hülsing). *)
+
+require import AllCore List.
+require PROM.
+
+require DigitalSignaturesLeakage.
+
+clone import DigitalSignaturesLeakage as DS.
+
+clone import DS.Stateless.EFCMA.
+import Stateless.
+
+(* We keep the input and output type of the hash function abstract *)
+clone import PROM.FullRO as PRO.
+
+(* We use a PROM to stay flexible, but the security games really only use the
+"get" function of the random oracle *)
+module type Hash = {
+  proc get (x : PRO.in_t) : PRO.out_t
+}.
+
+module type Hash_i = {
+  include Hash
+  proc init() : unit
+}.
+
+(* Type of Schemes that require a Hash oracle *)
+module type SchemeRO (H : Hash) = { include Scheme }.
+
+(** EF-KOA game *)
+
+module type Adv_EFKOA_RO(H : Hash) = {
+  proc forge(pk : pk_t) : msg_t * sig_t { H.get }
+}.
+
+module EF_KOA_RO(S : SchemeRO, A : Adv_EFKOA_RO, H : Hash_i) = {
+  proc main() : bool = {
+    var r;
+    H.init();
+    r <@ Stateless.EF_KOA(S(H), A(H)).main();
+    return r;
+  }
+}.
+
+(** EF-CMA game *)
+
+module type Adv_EFCMA_RO (H : Hash) (O : SOracle_CMA) = {
+  proc forge(pk : pk_t) : msg_t * sig_t
+}.
+
+module EF_CMA_RO(S : SchemeRO, A : Adv_EFCMA_RO, H : Hash_i, O : Oracle_CMA) = {
+  proc main() : bool = {
+    var r;
+    H.init();
+    r <@ EF_CMA(S(H), A(H), O).main();
+    return r;
+  }
+}.

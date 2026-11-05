@@ -6,6 +6,7 @@ from CryptoSpecs require import Keccak1600_Orbit.
 require import Parameters GFq Rq.
 require import Rejstream.
 require import Symmetric.
+require import Leakage.
 
 abstract theory SamplingT.
 
@@ -16,7 +17,9 @@ import Round ZModQ Zq MLDSAParams.
 
 op "_.[_]" : 'a list -> int -> 'a = nth witness.
 
-type sib_leakage = bool list.
+(* The leakage of SampleInBall: the pairs (stream position after the read,
+   byte read) of the rejection loop, declassified (flat leakage model) *)
+type sib_leakage = leakage.
 
 module type LeakyRO(XOF : XOF_SIB) = {
    proc init() : unit
@@ -25,12 +28,14 @@ module type LeakyRO(XOF : XOF_SIB) = {
 
 module SampleInBall(XOF : XOF_SIB) = {
    proc sample(rho : BytesCT.t) : poly * sib_leakage = {
-      var leakage : bool list;
+      var leak : (int * int) list;
+      var ctx : int;
       var s : Bytes8.t;
       var h : bool list;
       var i,j;
       var c : poly;
-      leakage <- [];
+      leak <- [];
+      ctx <- 8;
       c <- poly_zero;
       s <- H_sib rho;
       h <- BytesToBits (Bytes8.to_list s);
@@ -38,13 +43,18 @@ module SampleInBall(XOF : XOF_SIB) = {
       i <- 256 - tau;
       while (i < 256) {
           j <@ XOF.next();
-          while(i < W8.to_uint j) { leakage <- leakage ++ [true]; j <@ XOF.next(); }
-          leakage <- leakage ++ [false]; 
+          ctx <- ctx + 1;
+          leak <- rcons leak (ctx, W8.to_uint j);
+          while(i < W8.to_uint j) {
+            j <@ XOF.next();
+            ctx <- ctx + 1;
+            leak <- rcons leak (ctx, W8.to_uint j);
+          }
           c.[i] <- c.[W8.to_uint j];
           c.[W8.to_uint j] <- if h.[i+tau-256] then incoeff (-1) else incoeff (1);
           i <- i + 1;
       }
-      return (c,leakage);
+      return (c, pairs_to_leakage leak);
    }
 }.
 
@@ -64,20 +74,22 @@ op sib_signs (ct : BytesCT.t) : bool list =
 op sib_skip (ct : BytesCT.t) (i p : int) : int =
   argmin idfun (fun k => sib_byte ct (p + k) <= i).
 
-(* one iteration of the outer loop on (c, leakage, stream position) *)
-op sib_step (ct : BytesCT.t) (st : poly * sib_leakage * int) (i : int) =
+(* one iteration of the outer loop on (c, leaked pairs, stream position):
+   the k rejected bytes and the accepted one, read at positions p .. p + k,
+   leak the pairs (p + m + 1, byte at p + m) *)
+op sib_step (ct : BytesCT.t) (st : poly * (int * int) list * int) (i : int) =
   let k = sib_skip ct i st.`3 in
   let j = sib_byte ct (st.`3 + k) in
   (st.`1.[i <- st.`1.[j]].[j <- if (sib_signs ct).[i + tau - 256]
                                 then incoeff (-1) else incoeff 1],
-   st.`2 ++ nseq k true ++ [false],
+   st.`2 ++ map (fun m => (st.`3 + m + 1, sib_byte ct (st.`3 + m))) (iota_ 0 (k + 1)),
    st.`3 + k + 1).
 
-op sib_iter (ct : BytesCT.t) (n : int) : poly * sib_leakage * int =
+op sib_iter (ct : BytesCT.t) (n : int) : poly * (int * int) list * int =
   foldl (sib_step ct) (poly_zero, [], 8) (iota_ (256 - tau) n).
 
 op sampleInBall (ct : BytesCT.t) : poly * sib_leakage =
-  ((sib_iter ct tau).`1, (sib_iter ct tau).`2).
+  ((sib_iter ct tau).`1, pairs_to_leakage (sib_iter ct tau).`2).
 
 (* the termination criterion of Alg. 29: every index finds an
    acceptable byte after the current stream position *)
@@ -111,34 +123,40 @@ proof.
 have [ge1t ltau] := tau_bound.
 proc; inline MLDSA_XOF_SIB.init.
 while (XOFSIB_state.seed = BytesCT.to_list _ct /\ h = sib_signs _ct /\ 256 - tau <= i <= 256
-  /\ (c, leakage, XOFSIB_state.pos) = sib_iter _ct (i - (256 - tau))).
+  /\ ctx = XOFSIB_state.pos
+  /\ (c, leak, XOFSIB_state.pos) = sib_iter _ct (i - (256 - tau))).
 - exlim (sib_iter _ct (i - (256 - tau))) => st.
   inline MLDSA_XOF_SIB.next; wp.
   while (XOFSIB_state.seed = BytesCT.to_list _ct /\ h = sib_signs _ct /\ 256 - tau <= i < 256
      /\ st = sib_iter _ct (i - (256 - tau))
-     /\ c = st.`1 /\ 0 <= XOFSIB_state.pos - 1 - st.`3
-     /\ leakage = st.`2 ++ nseq (XOFSIB_state.pos - 1 - st.`3) true
+     /\ c = st.`1 /\ 0 <= XOFSIB_state.pos - 1 - st.`3 /\ ctx = XOFSIB_state.pos
+     /\ leak = st.`2 ++ map (fun m => (st.`3 + m + 1, sib_byte _ct (st.`3 + m)))
+                            (iota_ 0 (XOFSIB_state.pos - st.`3))
      /\ to_uint j = sib_byte _ct (XOFSIB_state.pos - 1)
      /\ forall k, 0 <= k < XOFSIB_state.pos - 1 - st.`3 => i < sib_byte _ct (st.`3 + k)).
-  + wp; skip => &hr [#] hs hh rgi hst hc ge0 hl hj hmin hlt hg /=.
-    do 6! (split; 1: smt()).
+  + wp; skip => &hr [#] hs hh rgi lti hst hc ge0 hctx hl hj hmin hg /=.
+    do 7! (split; 1: smt()).
     split.
-    * rewrite hj (_ : XOFSIB_state.pos{hr} - st.`3 = (XOFSIB_state.pos{hr} - 1 - st.`3) + 1) 1:#ring.
-      by rewrite nseqSr // -cats1 catA.
+    * rewrite hl (_ : XOFSIB_state.pos{hr} + 1 - st.`3 = (XOFSIB_state.pos{hr} - st.`3) + 1) 1:#ring.
+      rewrite iotaSr 1:/# map_rcons -rcons_cat /=.
+      rewrite hctx (_ : st.`3 + (XOFSIB_state.pos{hr} - st.`3) = XOFSIB_state.pos{hr}) 1:#ring.
+      by rewrite /sib_byte hs.
     split; 1: by rewrite /sib_byte hs.
-    move=> k rgk; case: (k = XOFSIB_state.pos{hr} - 1 - st.`3) => [->>|ne]; 2: by apply hlt => /#.
-    by rewrite (_ : st.`3 + (XOFSIB_state.pos{hr} - 1 - st.`3) = XOFSIB_state.pos{hr} - 1) 1:#ring -hmin.
-  wp; skip => &hr [hst [[hs [hh [rg hcl]]] hlt]].
+    move=> k rgk; case: (k = XOFSIB_state.pos{hr} - 1 - st.`3) => [->>|ne]; 2: by apply hmin => /#.
+    by rewrite (_ : st.`3 + (XOFSIB_state.pos{hr} - 1 - st.`3) = XOFSIB_state.pos{hr} - 1) 1:#ring -hj.
+  wp; skip => &hr [hst [[hs [hh [rg [hctx hcl]]]] hlt]].
   rewrite -hst in hcl.
   have hc : c{hr} = st.`1 by rewrite -hcl.
-  have hl : leakage{hr} = st.`2 by rewrite -hcl.
+  have hl : leak{hr} = st.`2 by rewrite -hcl.
   have hp : XOFSIB_state.pos{hr} = st.`3 by rewrite -hcl.
   split.
-  - rewrite hp; do 6! (split; 1: smt()).
-    split; 1: by rewrite (_ : st.`3 + 1 - 1 - st.`3 = 0) 1:#ring nseq0 cats0.
+  - rewrite hp hctx hp; do 7! (split; 1: smt()).
+    split.
+    + rewrite hl (_ : st.`3 + 1 - st.`3 = 0 + 1) 1:#ring iotaSr //= iota0 //=.
+      by rewrite -cats1 /sib_byte hs.
     split; 1: by rewrite /sib_byte hs.
     smt().
-  move=> pos j0 l0 hge [#] _ _ _ _ _ _ hk0 -> hj0 hmin /=.
+  move=> pos ctx0 j0 l0 hge [#] _ _ _ _ _ _ hk0 -> -> hj0 hmin /=.
   have hsk : sib_skip _ct i{hr} st.`3 = pos - 1 - st.`3.
   - rewrite /sib_skip (argmin_eq idfun _ (pos - 1 - st.`3)) //=.
     + by rewrite (_ : st.`3 + (pos - 1 - st.`3) = pos - 1) 1:#ring -hj0 /#.
@@ -148,8 +166,8 @@ while (XOFSIB_state.seed = BytesCT.to_list _ct /\ h = sib_signs _ct /\ 256 - tau
   rewrite (_ : 256 - tau + (i{hr} - (256 - tau)) = i{hr}) 1:#ring /sib_step /= hsk.
   have hj : sib_byte _ct (st.`3 + (pos - 1 - st.`3)) = to_uint j0.
   - by rewrite hj0; congr; ring.
-  rewrite hj hc hh -catA /=.
-  by ring.
+  rewrite hj hc hh /=.
+  by split; [do 3! congr; ring | ring].
 auto=> />; split; 1: by rewrite /sib_iter iota0 /= /sib_signs; smt().
 move=> pos c0 i0 l0 hge _ hle hc0.
 have ->> : i0 = 256 by smt().

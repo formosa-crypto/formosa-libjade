@@ -1,0 +1,342 @@
+(* The SelfTargetMSIS assumption with pre-image challenges and leakage, and
+   its reduction to the standard assumption of [SelfTargetMSIS.eca].
+
+   The random oracle of the game returns a pair [(c, l)], where [c : C] is
+   a challenge "pre-image" (e.g. the SampleInBall encoding: sign bytes and
+   index bytes) from which the ring element is derived by [to_R : C -> R],
+   and [l : LkgRO] is an independent leakage.  The adversary wins if it
+   outputs a short [y] and a message [mu] such that the last entry of [y]
+   is [to_R c] where [(c, l) = H((I || A) * y, mu)].
+
+   The standard SelfTargetMSIS game (RO returning the ring element only) is
+   the special case [C = R], [to_R = idfun], [LkgRO = unit].
+
+   Theory [Std] below is the standard game, with an oracle returning
+   [r <$ dCR] where [dCR = dmap dC to_R].  Lemma [StMSIS_Std] shows that
+   the generalized game is exactly as hard as the standard one:
+   [Pr[Game(B, PRO.RO)] = Pr[Std.Game(RedStd(FS, B), Std.PRO.RO)]].
+   The reduction [RedStd(FS, B)] makes one standard query per fresh query of
+   [B] (and none for repeated queries), so it preserves the number of
+   random oracle queries.
+
+   On a fresh query, the reduction must sample a pre-image of the ring
+   element [r] returned by the standard oracle.  It does so by calling a
+   fibre-sampling program [FS : FiberSampler_t], a parameter of the
+   reduction [RedStd(FS, B)], so that the efficiency of the reduction is
+   visible in its code.  The only requirement on [FS] is that it samples
+   the distribution [dfiber r] (hypothesis [FS_dfiber]:
+   [equiv [FS.sample ~ DFiber.sample : ={r} ==> ={res}]], where
+   [DFiber.sample(r)] is [c <$ dfiber r]) and that it does not touch the
+   oracles.  The theory parameter [dfiber : R -> C distr] only has to
+   satisfy [dfiber_supp] (it returns pre-images of [r]) and
+   [dfiber_marginal] (sampling [r <$ dCR] then [c <$ dfiber r] gives
+   [dC]).  The conditional distribution [dcond dC (fun c => to_R c = r)]
+   always satisfies both axioms, but it is a mathematical object; for ML-DSA an
+   efficient sampler (the program [FiberSampler]) is given in
+   [security/ChallengeFiber.eca]. *)
+
+require import AllCore Distr FMap.
+require (*--*) DynMatrix PROM SelfTargetMSIS.
+
+clone import DynMatrix as M.
+
+type M.
+
+(* Distribution of the entries of the matrix *)
+op dR : R distr.
+
+(* Challenge pre-images, their distribution and the map to ring elements *)
+type C.
+op dC : C distr.
+axiom dC_ll : is_lossless dC.
+op to_R : C -> R.
+
+(* Leakage returned by the random oracle, independent of the challenge *)
+type LkgRO.
+op dLkgRO : LkgRO distr.
+axiom dLkgRO_ll : is_lossless dLkgRO.
+
+(* Distribution of the ring element [to_R c] *)
+op dCR : R distr = dmap dC to_R.
+
+(* Sampling a pre-image of a ring element: [dfiber r] returns pre-images of
+   [r], and is the conditional distribution of [dC] given [to_R c = r] (in
+   the sense of [dfiber_marginal]). *)
+op dfiber : R -> C distr.
+axiom dfiber_supp r c : r \in dCR => c \in dfiber r => to_R c = r.
+axiom dfiber_marginal : dlet dCR dfiber = dC.
+
+clone import PROM.FullRO as PRO with
+  type in_t <- vector*M,
+  type out_t <- C * LkgRO,
+  op dout <- (fun _ => dC `*` dLkgRO)
+proof*.
+
+op inf_norm : vector -> int.
+
+op m : { int | 0 < m } as gt0_m.
+op n : { int | 0 < n } as gt0_n.
+op gamma : int.
+
+module type Adversary (H : RO) = {
+  proc guess(mA : matrix) : vector * M { H.get }
+}.
+
+module Game (A : Adversary) (H : RO) = {
+  proc main() = {
+    var mA, y, mu, c, cl';
+    H.init();
+    mA <$ dmatrix dR m n;
+    (y, mu) <@ A(H).guess(mA);
+    c <- y.[m + n - 1];
+    cl' <@ H.get((onem m || mA) *^ y, mu);
+    return inf_norm y <= gamma /\ c = to_R cl'.`1;
+  }
+}.
+
+(* -------------------------------------------------------------------- *)
+(* The standard SelfTargetMSIS game: the oracle returns [r <$ dCR].      *)
+clone SelfTargetMSIS as Std with
+  theory M <- M,
+  type M <- M,
+  op dR <- dR,
+  op dC <- dCR,
+  op inf_norm <- inf_norm,
+  op m <- m,
+  op n <- n,
+  op gamma <- gamma
+proof *.
+realize gt0_m by exact gt0_m.
+realize gt0_n by exact gt0_n.
+
+(* -------------------------------------------------------------------- *)
+(* Reduction from the generalized game to the standard one.             *)
+
+(* Fibre samplers: programs returning a pre-image of a ring element. *)
+module type FiberSampler_t = {
+  proc sample(r : R) : C
+}.
+
+(* The reference fibre sampler: sampling [dfiber r]. *)
+module DFiber : FiberSampler_t = {
+  proc sample(r : R) : C = {
+    var c;
+    c <$ dfiber r;
+    return c;
+  }
+}.
+
+(* Simulated oracle: on a fresh input [x], ask [r = H(x)] to the standard
+   oracle, sample a pre-image [c <@ FS.sample(r)] of [r] and an
+   independent leakage [l]; memoize [(c, l)]. *)
+module ORed (FS : FiberSampler_t) (H : Std.PRO.RO) : PRO.RO = {
+  var m : (vector * M, C * LkgRO) fmap
+
+  proc init() = {
+    m <- empty;
+  }
+
+  proc get(x : vector * M) = {
+    var r, c, l;
+    if (x \notin m) {
+      r <@ H.get(x);
+      c <@ FS.sample(r);
+      l <$ dLkgRO;
+      m.[x] <- (c, l);
+    }
+    return oget m.[x];
+  }
+
+  (* never used by the adversary (it only has access to [get]) *)
+  proc set(x : vector * M, y : C * LkgRO) = {
+    m.[x] <- y;
+  }
+
+  proc rem(x : vector * M) = {
+    m <- rem m x;
+  }
+
+  proc sample(x : vector * M) = {
+    get(x);
+  }
+}.
+
+(* The reduction forwards the output of [B] unchanged. *)
+module RedStd (FS : FiberSampler_t) (B : Adversary) (H : Std.PRO.RO) = {
+  proc guess(mA : matrix) : vector * M = {
+    var y, mu;
+    ORed(FS, H).init();
+    (y, mu) <@ B(ORed(FS, H)).guess(mA);
+    return (y, mu);
+  }
+}.
+
+(* Marginal sampling: sampling [(c, l) <$ dC `*` dLkgRO] directly, or
+   sampling [r <$ dCR] first, then [c] in the fiber of [r] and [l], gives
+   the same distribution (of any function [F] of [(to_R c, c, l)]). *)
+lemma dfiber_eq ['a] (F : R * C * LkgRO -> 'a) :
+  dlet dCR (fun r => dlet (dfiber r)
+                          (fun c => dmap dLkgRO (fun l => F (r, c, l))))
+  = dmap (dC `*` dLkgRO) (fun (p : C * LkgRO) => F (to_R p.`1, p.`1, p.`2)).
+proof.
+rewrite eq_sym dmap_dprodE -{1}dfiber_marginal dlet_dlet.
+apply in_eq_dlet => r r_in /=; apply in_eq_dlet => c /= c_in.
+by rewrite (dfiber_supp _ _ r_in c_in).
+qed.
+
+section.
+
+declare module FS <: FiberSampler_t {-PRO.RO, -Std.PRO.RO, -ORed}.
+declare module B <: Adversary {-PRO.RO, -Std.PRO.RO, -ORed, -FS}.
+
+(* [FS] samples [dfiber]. *)
+declare axiom FS_dfiber : equiv [FS.sample ~ DFiber.sample : ={r} ==> ={res}].
+
+(* Final query: sampling [(c, l) <$ dC `*` dLkgRO] and returning [to_R c]
+   is the same as sampling [r <$ dCR]. *)
+local module S = {
+  proc direct() = {
+    var p;
+    p <$ dC `*` dLkgRO;
+    return p;
+  }
+
+  proc std() = {
+    var r;
+    r <$ dCR;
+    return r;
+  }
+}.
+
+local equiv S_direct_std : S.direct ~ S.std : true ==> to_R res{1}.`1 = res{2}.
+proof.
+bypr (to_R res{1}.`1) res{2} => // &1 &2 r.
+have -> : Pr[S.direct() @ &1 : to_R res.`1 = r] =
+          mu (dC `*` dLkgRO) (fun (p : C * LkgRO) => to_R p.`1 = r).
+- by byphoare => //; proc; rnd; auto.
+have -> : Pr[S.std() @ &2 : res = r] = mu dCR (pred1 r).
+- by byphoare => //; proc; rnd; auto.
+rewrite dmapE (mu_eq _ _ (fun (p : C * LkgRO) => (fun c => to_R c = r) p.`1 /\ predT p.`2)) //.
+by rewrite dprodE dLkgRO_ll.
+qed.
+
+(* The tables of the two oracles are coupled as follows: the simulated
+   oracle [ORed] holds the same pre-images and leakages as [PRO.RO], and
+   the standard oracle holds their images by [to_R]. *)
+local equiv ORedD_get :
+  PRO.RO.get ~ ORed(DFiber, Std.PRO.RO).get :
+     ={x} /\ PRO.RO.m{1} = ORed.m{2}
+  /\ Std.PRO.RO.m{2} = map (fun _ (p : C * LkgRO) => to_R p.`1) PRO.RO.m{1}
+  ==>
+     ={res} /\ PRO.RO.m{1} = ORed.m{2}
+  /\ Std.PRO.RO.m{2} = map (fun _ (p : C * LkgRO) => to_R p.`1) PRO.RO.m{1}.
+proof.
+proc; inline *.
+case (x{1} \in PRO.RO.m{1}).
+- (* already queried: both oracles return the stored value *)
+  rcondf{1} 2; 1: by auto.
+  rcondf{2} 1; 1: by auto => />.
+  rnd{1}; auto => /> *; apply dprod_ll; split; [exact dC_ll | exact dLkgRO_ll].
+(* fresh query: marginal sampling *)
+rcondt{1} 2; 1: by auto.
+rcondt{2} 1; 1: by auto => />.
+rcondt{2} 3; 1: by auto => /> &hr; rewrite mem_map.
+sp 0 1; rndsem*{2} 0; wp.
+rnd (fun (p : C * LkgRO) =>
+       (Std.PRO.RO.m{2}.[x{2} <- to_R p.`1], ORed.m{2}.[x{2} <- p]))
+    (fun (t : _ * (_, C * LkgRO) fmap) => oget t.`2.[x{2}]).
+skip => &1 &2 [-> [[-> [<- ->]] x_notin]].
+(* the joint distribution of the new tables, by marginal sampling *)
+have -> : forall (mR : (vector * M, R) fmap) (mC : (vector * M, C * LkgRO) fmap),
+  dlet dCR (fun (r0 : R) =>
+    dlet (dfiber (oget mR.[x{2} <- r0].[x{2}]))
+      (fun (c0 : C) => dmap dLkgRO
+         (fun (l0 : LkgRO) => (mR.[x{2} <- r0], mC.[x{2} <- (c0, l0)]))))
+  = dmap (dC `*` dLkgRO)
+      (fun (p : C * LkgRO) => (mR.[x{2} <- to_R p.`1], mC.[x{2} <- p])).
+- move=> mR mC.
+  rewrite (in_eq_dlet _ (fun r0 => dlet (dfiber r0)
+     (fun c0 => dmap dLkgRO (fun l0 => (mR.[x{2} <- r0], mC.[x{2} <- (c0, l0)])))))
+     => [r0 _ /= | ]; 1: by rewrite get_set_sameE.
+  have := dfiber_eq (fun (t : R * C * LkgRO) =>
+                       (mR.[x{2} <- t.`1], mC.[x{2} <- (t.`2, t.`3)])).
+  rewrite /= => ->.
+  by congr; apply fun_ext => -[c l].
+split => [mm /supp_dmap [p [_ ->]] /= | _]; 1: by rewrite get_set_sameE.
+split => [mm /supp_dmap [p [_ ->]] /= | _ p p_in].
+- rewrite get_set_sameE /=.
+  rewrite (in_dmap1E_can _ _ (fun (t : _ * (_, C * LkgRO) fmap) => oget t.`2.[x{2}])) /=.
+  + by rewrite get_set_sameE.
+  + move=> q _ [_ /(congr1 (fun (m : (_, C * LkgRO) fmap) => m.[x{2}])) /=].
+    by rewrite !get_set_sameE.
+  by rewrite get_set_sameE.
+split; 1: by apply supp_dmap; exists p.
+by rewrite /= get_set_sameE map_set.
+qed.
+
+(* Replacing the fibre-sampling program by [dfiber]. *)
+local equiv ORed_get :
+  PRO.RO.get ~ ORed(FS, Std.PRO.RO).get :
+     ={x} /\ PRO.RO.m{1} = ORed.m{2}
+  /\ Std.PRO.RO.m{2} = map (fun _ (p : C * LkgRO) => to_R p.`1) PRO.RO.m{1}
+  ==>
+     ={res} /\ PRO.RO.m{1} = ORed.m{2}
+  /\ Std.PRO.RO.m{2} = map (fun _ (p : C * LkgRO) => to_R p.`1) PRO.RO.m{1}.
+proof.
+transitivity ORed(DFiber, Std.PRO.RO).get
+  (={x} /\ PRO.RO.m{1} = ORed.m{2}
+   /\ Std.PRO.RO.m{2} = map (fun _ (p : C * LkgRO) => to_R p.`1) PRO.RO.m{1}
+   ==>
+   ={res} /\ PRO.RO.m{1} = ORed.m{2}
+   /\ Std.PRO.RO.m{2} = map (fun _ (p : C * LkgRO) => to_R p.`1) PRO.RO.m{1})
+  (={x, ORed.m, Std.PRO.RO.m} ==> ={res, ORed.m, Std.PRO.RO.m}).
+- by move=> &1 &2 [h1 [h2 h3]]; exists PRO.RO.m{1} Std.PRO.RO.m{2} x{2}.
+- by move=> &1 &m &2 /> -> ->.
+- exact ORedD_get.
+proc; if => //; auto.
+call (: ={r} ==> ={res}).
+- by symmetry; conseq FS_dfiber.
+by call (: ={Std.PRO.RO.m}); 1: by sim.
+qed.
+
+(* Final query, made directly to [PRO.RO] and [Std.PRO.RO]: only the ring
+   element matters. *)
+local equiv RO_get_std :
+  PRO.RO.get ~ Std.PRO.RO.get :
+     ={x}
+  /\ Std.PRO.RO.m{2} = map (fun _ (p : C * LkgRO) => to_R p.`1) PRO.RO.m{1}
+  ==> to_R res{1}.`1 = res{2}.
+proof.
+proc; case (x{1} \in PRO.RO.m{1}).
+- rcondf{1} 2; 1: by auto.
+  rcondf{2} 2; 1: by auto => /> &hr; rewrite mem_map.
+  rnd{1}; rnd{2}; auto => /> &1 &2 x_in.
+  split; 1: by apply dmap_ll; exact dC_ll.
+  move=> _ _ _; split; 1: by apply dprod_ll; split; [exact dC_ll | exact dLkgRO_ll].
+  by move=> _ _ _; rewrite mapE; move: x_in; rewrite domE; case: (PRO.RO.m{1}.[x{2}]).
+rcondt{1} 2; 1: by auto.
+rcondt{2} 2; 1: by auto => /> &hr; rewrite mem_map.
+wp; outline{1} 1 ~ S.direct; outline{2} 1 ~ S.std.
+by call S_direct_std; auto => /> &1 &2 _ p; rewrite !get_set_sameE.
+qed.
+
+lemma StMSIS_Std &m :
+  Pr[Game(B, PRO.RO).main() @ &m : res] =
+  Pr[Std.Game(RedStd(FS, B), Std.PRO.RO).main() @ &m : res].
+proof.
+byequiv => //; proc.
+inline{2} 3.
+call RO_get_std; wp.
+call (: PRO.RO.m{1} = ORed.m{2}
+     /\ Std.PRO.RO.m{2} = map (fun _ (p : C * LkgRO) => to_R p.`1) PRO.RO.m{1}).
+- exact ORed_get.
+inline *; auto => />.
+by rewrite map_empty.
+qed.
+
+lemma StMSIS_Std_le &m :
+  Pr[Game(B, PRO.RO).main() @ &m : res] <=
+  Pr[Std.Game(RedStd(FS, B), Std.PRO.RO).main() @ &m : res].
+proof. by rewrite (StMSIS_Std &m). qed.
+
+end section.

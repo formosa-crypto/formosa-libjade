@@ -7,6 +7,7 @@ require MLDSA_ROSep_Hop8.
 require import MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2 MLDSA_ROSep_Hop3.
 require import MLDSA_ROSep_Hop4 MLDSA_ROSep_Hop5 MLDSA_ROSep_Hop6 MLDSA_ROSep_Hop7 MLDSA_ROSep_Hop8.
 
+require import Leakage.
 abstract theory MLDSA_ROSep_Hop9.
 
 clone include MLDSA_ROSep_Hop8.MLDSA_ROSep_Hop8.
@@ -34,15 +35,18 @@ module MLDSA_RO_DS9(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
   }
 
   proc sign(sk : Bytes32.t * Bytes64.t * polylvec * polykvec * polykvec, m : W8.t list) :
-    BytesSig.t option * Leakage list = {
-     var coins,rho,tr,s1,s2,t0,_A,mu,kappa,y,w,w1,ctl,ct,c,cs1,cs2,z,r0,ct0,h,leakage,sigma,bz,bh,sl;
+    BytesSig.t option * leakage = {
+     var coins,rho,tr,s1,s2,t0,_A,mu,kappa,y,w,w1,ctl,ct,c,cs1,cs2,z,r0,ct0,h,leakage,sigma,bct0,sl;
+     var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
      coins <$ drnd;
      ct <- witness;
      ctl <- witness;
      sigma <- witness;
-     leakage <- [];
+     rf <- witness;
+     hf <- witness;
      (rho,tr,s1,s2,t0) <- sk;
+     leakage <- kvec_leak (nttv t0);
      _A <@ ExpandA(XOFA_O(XA)).sample(rho);
      mu <@ Hmu.get(tr, m);
      kappa <- 0;
@@ -54,20 +58,26 @@ module MLDSA_RO_DS9(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
        ct <@ Hct.get(mu, w1Encode w1);
        (c, sl) <@ SampleInBall_O(XC).sample(ct);
        ctl <- ((ct, c), sl);
-       leakage <- leakage ++ [ RO ctl.`2] ;
+       leakage <- lcat leakage ctl.`2;
+       leakage <- lcat leakage (poly_leak (ntt c));
        cs1 <- psmul c s1;
-       cs2 <- psmul c s2;
        z <- y + cs1;
-       r0 <- polykvec_LowBits (w - cs2);
-       bz <- infnorm_lt z (gamma1 - Beta) &&
-                  infnorm_lt r0 (gamma2 - Beta);
-       leakage <- leakage ++ [ CheckZ bz ];
-       if (bz) {
-          ct0 <- psmul c t0;
-          h <- MakeHint (PolyKVec.zerov-ct0) (w - cs2 + ct0);
-          bh <- infnorm_lt ct0 gamma2 && hammw h w_hint;
-          leakage <- leakage ++ [ CheckH bh ];
-          if (bh) { zh <- Some (z,h); }
+       zf <- zfail_idx z;
+       leakage <- lcat leakage (oileak zf);
+       if (zf = None) {
+         cs2 <- psmul c s2;
+         r0 <- polykvec_LowBits (w - cs2);
+         rf <- r0fail_idx r0;
+         leakage <- lcat leakage (oileak rf);
+         if (rf = None) {
+           ct0 <- psmul c t0;
+           h <- MakeHint (PolyKVec.zerov-ct0) (w - cs2 + ct0);
+           hf <- hintfail_idx h;
+           leakage <- lcat leakage (oileak hf);
+           (* public test: c and t0 are leaked *)
+           bct0 <- infnorm_lt ct0 gamma2;
+           if (bct0 /\ hf = None) { zh <- Some (z,h); }
+         }
        }
        kappa <- kappa + 1;
      }
@@ -120,7 +130,7 @@ equiv sign89 :
   ==> ={res, glob DS5.RO1.RO, DS5.RO2.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O, RO_y.RO.m}.
 proof.
 proc.
-seq 13 10 : (={coins, ct, ctl, sigma, leakage, rho, tr, s1, s2, t0, _A, mu, kappa, zh, glob DS5.RO1.RO,
+seq 15 12 : (={coins, ct, ctl, sigma, leakage, rho, tr, s1, s2, t0, _A, mu, kappa, zh, glob DS5.RO1.RO,
                DS5.RO2.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O, RO_y.RO.m} /\
              s1h{1} = PolyLVec.nttv s1{1} /\ s2h{1} = PolyKVec.nttv s2{1} /\ t0h{1} = PolyKVec.nttv t0{1}).
 + wp; call (: ={DS5.RO4.RO.m}); 1: by sim.

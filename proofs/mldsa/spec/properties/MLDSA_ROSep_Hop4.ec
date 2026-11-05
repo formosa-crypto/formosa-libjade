@@ -7,6 +7,7 @@ require MLDSA_ROSep_Hop3.
 require import MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2 MLDSA_ROSep_Hop3.
 require import DistrExtra.
 
+require import Leakage.
 abstract theory MLDSA_ROSep_Hop4.
 
 clone include MLDSA_ROSep_Hop3.MLDSA_ROSep_Hop3.
@@ -41,19 +42,22 @@ module MLDSA_RO_DS3(H : BlockOracle, G : Oracle) = {
     return (pk,sk);
   }
 
-  proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * Leakage list = {
+  proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * leakage = {
      var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,rhopp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
-         cs2,z,r0,ct0,h,leakage,sigma,bz,bh,bs,sl;
+         cs2,z,r0,ct0,h,leakage,sigma,bct0,bs,sl;
+     var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
      coins <$ drnd;
      ct <- witness;
      ctl <- witness;
      sigma <- witness;
-     leakage <- [];
+     rf <- witness;
+     hf <- witness;
      (rho,_K,tr,s1,s2,t0) <@ SkEncDec.skDecode(sk);
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
+     leakage <- kvec_leak t0h;
      _A <@ ExpandA(XOFA_O(G)).sample(rho);
      mu <@ DS5.RO4.RO.get(tr, m);
      bs <@ Squeeze(RO_rhopp.RO).squeeze(Bytes32.to_list _K ++ rnd_to_list coins ++ Bytes64.to_list mu, 64);
@@ -67,21 +71,27 @@ module MLDSA_RO_DS3(H : BlockOracle, G : Oracle) = {
        ct <@ HctPad.get(mu, w1Encode w1);
        (c, sl) <@ SampleInBall_O(DS5.RO2.RO).sample(ct);
        ctl <- ((ct, c), sl);
-       leakage <- leakage ++ [ RO ctl.`2] ;
+       leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
+       leakage <- lcat leakage (poly_leak ch);
        cs1 <- invnttv (ntt_smul ch s1h);
-       cs2 <- invnttv (ntt_smul ch s2h);
        z <- y + cs1;
-       r0 <- polykvec_LowBits (w - cs2);
-       bz <- infnorm_lt z (gamma1 - Beta) &&
-                  infnorm_lt r0 (gamma2 - Beta);
-       leakage <- leakage ++ [ CheckZ bz ];
-       if (bz) {
-          ct0 <- invnttv (ntt_smul ch t0h);
-          h <- MakeHint (PolyKVec.zerov-ct0) (w - cs2 + ct0);
-          bh <- infnorm_lt ct0 gamma2 && hammw h w_hint;
-          leakage <- leakage ++ [ CheckH bh ];
-          if (bh) { zh <- Some (z,h); }
+       zf <- zfail_idx z;
+       leakage <- lcat leakage (oileak zf);
+       if (zf = None) {
+         cs2 <- invnttv (ntt_smul ch s2h);
+         r0 <- polykvec_LowBits (w - cs2);
+         rf <- r0fail_idx r0;
+         leakage <- lcat leakage (oileak rf);
+         if (rf = None) {
+           ct0 <- invnttv (ntt_smul ch t0h);
+           h <- MakeHint (PolyKVec.zerov-ct0) (w - cs2 + ct0);
+           hf <- hintfail_idx h;
+           leakage <- lcat leakage (oileak hf);
+           (* public test: c and t0 are leaked *)
+           bct0 <- infnorm_lt ct0 gamma2;
+           if (bct0 /\ hf = None) { zh <- Some (z,h); }
+         }
        }
        kappa <- kappa + 1;
      }
@@ -269,8 +279,7 @@ proof.
 proc; sp 1 0; if{1}.
 + rcondt{1} 1; 1: by move=> &m; skip => />.
   inline *; wp; rnd{1}; rnd{2}; auto => /> &1 &2 htrs hsz ha2 hs1 hs2 hs3 hs4 hb hinv htk r0 hr0.
-  split; 1: by rewrite /dbytes64; apply dmap_ll; apply dlist_ll; apply W8.dword_ll.
-  move=> _ r1 _.
+  move=> r1 _.
   have hrs : size r0 = 64 by move: hr0; rewrite /dblock supp_dlist //; smt().
   case: (a \in RO_rhopp.RO.m{2}) => hin /=.
   - by move: hb; rewrite /bad4; smt().
@@ -363,7 +372,7 @@ equiv sign4 : MLDSA_RO_DS2(RoutedH, DS2.RO2.RO).sign ~ MLDSA_RO_DS3(RoutedH, DS2
       RoutedH.trset{2} /\ hshape RO_seed.RO.m{2} RO_S.RO.m{2} RO_rhopp.RO.m{2} RO_v.RO.m{2} /\
       inv4 RO_rest.RO.m{1} RO_rest.RO.m{2} RO_seed.RO.m{2} RO_S.RO.m{2} RO_rhopp.RO.m{2} RO_v.RO.m{2}.
 proof.
-proc; seq 11 11 : (={sk, m, coins, ct, ctl, sigma, leakage, rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu,
+proc; seq 13 13 : (={sk, m, coins, ct, ctl, sigma, leakage, rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu,
                      glob DS2.RO2.RO, glob XOFA_O} /\
                    ={RoutedH.tr, RoutedH.trset, RO_pad.RO.m, DS5.RO2.RO.m, DS5.RO3.RO.m, DS5.RO4.RO.m,
                      DS5.RO5.RO.m} /\
@@ -677,7 +686,7 @@ hoare sign3_B : MLDSA_RO_DS3(RoutedH, DS2.RO2.RO).sign :
   RoutedH.trset /\ bad4 RoutedH.tr RO_rest.RO.m RO_seed.RO.m RO_S.RO.m RO_rhopp.RO.m
   ==> RoutedH.trset /\ bad4 RoutedH.tr RO_rest.RO.m RO_seed.RO.m RO_S.RO.m RO_rhopp.RO.m.
 proof.
-proc; seq 16 : (RoutedH.trset /\ bad4 RoutedH.tr RO_rest.RO.m RO_seed.RO.m RO_S.RO.m RO_rhopp.RO.m);
+proc; seq 18 : (RoutedH.trset /\ bad4 RoutedH.tr RO_rest.RO.m RO_seed.RO.m RO_S.RO.m RO_rhopp.RO.m);
   2: by if; [call (: true); [by conseq /> | auto] | auto].
 while (RoutedH.trset /\ bad4 RoutedH.tr RO_rest.RO.m RO_seed.RO.m RO_S.RO.m RO_rhopp.RO.m).
 + wp; call (: true); 1: by conseq />.
@@ -692,7 +701,7 @@ proof. by islossless; apply dlist_ll; apply W8.dword_ll. qed.
 
 lemma sign3_ll : islossless MLDSA_RO_DS3(RoutedH, DS2.RO2.RO).sign.
 proof.
-proc; seq 16 : true => //; last by if; [call sigEncode_ll | ].
+proc; seq 18 : true => //; last by if; [call sigEncode_ll | ].
 while true (kappa_max - kappa).
 + move=> z; wp; call sib_XC_ll; call hctpad_ll; wp; call (emask_ll RO_v.RO RO_v_get_ll).
   by auto => /#.
@@ -902,14 +911,14 @@ ehoare sign3_mb (tr0 : Bytes64.t) (k : real) : MLDSA_RO_DS3(RoutedH, DS2.RO2.RO)
     (b2r (mapbad tr0 DS5.RO4.RO.m DS5.RO5.RO.m) + (1 + kappa_max)%r * p512 + k)%xr
   ==> (RoutedH.trset /\ RoutedH.tr = tr0) `|` (b2r (mapbad tr0 DS5.RO4.RO.m DS5.RO5.RO.m) + k)%xr.
 proof.
-proc; seq 15 : ((RoutedH.trset /\ RoutedH.tr = tr0 /\ 0%r <= k /\ kappa = 0) `|`
+proc; seq 17 : ((RoutedH.trset /\ RoutedH.tr = tr0 /\ 0%r <= k /\ kappa = 0) `|`
                 (b2r (mapbad tr0 DS5.RO4.RO.m DS5.RO5.RO.m) + kappa_max%r * p512 + k)%xr).
-+ seq 12 : ((RoutedH.trset /\ RoutedH.tr = tr0 /\ 0%r <= k) `|`
++ seq 14 : ((RoutedH.trset /\ RoutedH.tr = tr0 /\ 0%r <= k) `|`
             (b2r (mapbad tr0 DS5.RO4.RO.m DS5.RO5.RO.m) + kappa_max%r * p512 + k)%xr);
     2: by auto => &hr; apply xle_cxr => />.
-  seq 11 : ((RoutedH.trset /\ RoutedH.tr = tr0 /\ 0%r <= k) `|`
+  seq 13 : ((RoutedH.trset /\ RoutedH.tr = tr0 /\ 0%r <= k) `|`
             (b2r (mapbad tr0 DS5.RO4.RO.m DS5.RO5.RO.m) + kappa_max%r * p512 + k)%xr).
-  - seq 10 : ((RoutedH.trset /\ RoutedH.tr = tr0 /\ 0%r <= k) `|`
+  - seq 12 : ((RoutedH.trset /\ RoutedH.tr = tr0 /\ 0%r <= k) `|`
               (b2r (mapbad tr0 DS5.RO4.RO.m DS5.RO5.RO.m) + (1 + kappa_max)%r * p512 + k)%xr).
     * exlim DS5.RO4.RO.m, DS5.RO5.RO.m => m4 m5.
       call /(fun y => (DS5.RO4.RO.m = m4 /\ DS5.RO5.RO.m = m5 /\ RoutedH.trset /\ RoutedH.tr = tr0) `|` y)

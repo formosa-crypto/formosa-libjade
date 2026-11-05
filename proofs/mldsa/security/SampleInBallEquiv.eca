@@ -1,299 +1,51 @@
 require import AllCore List FMap Int IntDiv StdOrder Real.
-require import Distr DBool DList DMap DJoin DistrExtras.
-require import Leakage Geometric.
-require Byte RejectionRO SplitRO DParams BitEncoding.
+require import Distr DBool DList DMap DJoin Dexcepted DistrExtras.
+require import Leakage Byte Geometric FoldlO.
+require RejectionRO DParams BitEncoding PROM SampleInBallDefs.
 import Real.RField.
 import IntOrder.
 
-(* only [tau] is used in this file. *)
-clone import DParams as Params.
-
-clone import Byte as B.
+(* The parameters ([in_t], [challenge], [to_concrete], [Params]), the
+   encodings and their distributions; only [tau] is used in this file. *)
+clone include SampleInBallDefs.
+import Params.
 
 (* This script instantiates twice the [RejectionRO] argument in order to
    justify the reduction from the concrete game, where the adversary has
    access to a XOF and a leaky sampling algorithm on top of it (which
    corresponds to the [SampleInBall] algorithm in the specification of MLDSA),
-   to a game where the adversary has only access to a challenge-generating RO,
-   with independent leakage. *)
+   to a game where the adversary has only access to a random oracle whose
+   outputs are a product: a uniform challenge pre-image and an independent
+   leakage.
+
+   Interface (used by [SimplifiedScheme], where [C := challenge_ir],
+   [dC := SIB.dI] and [dLkgRO := SIB.dLeakRej]):
+   - [challenge_ir = byte list * byte list]: the 8 sign bytes and the [tau]
+     accepted index bytes; [dI] is its (uniform) distribution, and
+     [to_concrete (to_challenge ir)] the corresponding challenge.
+   - [rej_ir = int list list]: for each of the [tau] positions
+     [i = 256 - tau, .., 255], the bytes rejected by the rejection sampling
+     loop of [SampleInBall], in order. Its distribution [dRej] is independent
+     of [challenge_ir]: at position [i], a geometric number (success
+     probability [(i + 1) / 256], minus one) of bytes uniform in (i, 255].
+     [rej_to_leakage] (injective, inverse [leakage_to_rej]) encodes it as a
+     leakage; [dLeakRej = dmap dRej rej_to_leakage].
+   - [full_leak ir r] is the leakage of [SampleInBall]: the list of pairs
+     [(ctx, j)] observed after each iteration of the inner loop (rejected and
+     accepted bytes alike), rebuilt from the accepted indices of [ir] and the
+     rejected bytes [r] (the contexts are determined: 8 sign bytes first,
+     then one context per inner iteration).
+   - [SampleInBall(X).get(x) : challenge * leakage] (real algorithm, over a
+     XOF [X]), [ROC] the ideal oracle with output [challenge_ir * leakage]
+     distributed as [dI `*` dLeakRej], [ToC(R)] the challenge oracle built
+     on top of it ([(to_concrete (to_challenge ir), full_leak ir (leakage_to_rej l))]),
+     and [Sim(R)] the XOF simulator.
+   - [adv_xof_roc : GameReal(A).main ~ GameROC(ORedXOFROC(A)).main], where
+     [ORedXOFROC(A)(R)] runs [A(Sim(R), ToC(R))]. *)
 
 (* For the sake of this proof, SampleInBall is factored in two distinct phases:
-   first the signs and permutation indices are sampled, then they are combined
-   to form the final challenge. *)
-
-(** base types *)
-
-type in_t.
-type challenge.
-
-(* Challenges are encoded as lists of integer coefficients *)
-type challenge_ = int list.
-
-(* Leakage is encoded as a list of specific XOF-context integer values *)
-type leak_ir = int list.
-
-(* Intermediate representation of challenges *)
-(* A list of 8 bytes used to compute signs, as well as a list of [tau] byte-encoded
-   valid indices. *)
-type challenge_ir = byte list * byte list.
-
-(* Transforms leakage into a "concrete" leakage value.
-   This is done with a declassify operation. *)
-op to_leakage (l : leak_ir) = Decl (List (map Int l)).
-
-(* how to generate a concrete challenge from this encoding. *)
-(* This allows other files to have a different (but equivalent)
-   representation for challenges, using DVect for instance. *)
-op to_concrete : challenge_ -> challenge.
-
-(* The encodings produced by [to_challenge]: 256 coefficients in {-1, 0, 1}. *)
-op valid_challenge (c : challenge_) =
-  size c = 256 /\ all (fun x => x = -1 \/ x = 0 \/ x = 1) c.
-
-(* This concretisation function must be injective on valid encodings. This
-   allows to lift the fact that the output distribution is uniform. *)
-axiom to_concrete_inj (c c' : challenge_) :
-  valid_challenge c => valid_challenge c' => to_concrete c = to_concrete c' => c = c'.
-
-(* lossless variant of dcond; result is unspecified whenever
-   the predicate isn't inhabited. *)
-op dcond' (d : 'a distr) p =
-  if (exists x, p x /\ x \in d) then dcond d p else dunit witness.
-
-op dcond_prod (p: 'a -> bool) d = dcond' d (predC p) `*` dcond' d p.
-
-op dB_le i = dcond dB (fun b => to_int b <= i).
-op small_enough i b = !(i < to_int b).
-op dB_thres i = mu dB (small_enough i).
-op dbias i = DBool.Biased.dbiased (dB_thres i).
-
-lemma dB_le_ll i :
-  0 <= i => is_lossless (dB_le i).
-proof.
-move => ?; apply/dcond_ll/witness_support.
-exists (from_int 0) => /=.
-by rewrite tK' 1:// dB_full.
-qed.
-
-lemma dB_to_int_drange :
-  dmap dB to_int = drange 0 256.
-proof.
-rewrite /dB dmap_comp (eq_dmap_in _ _ idfun) 2:dmap_id //.
-by move => ? /supp_drange; apply tK'.
-qed.
-
-lemma dB_le_range i :
-  0 <= i < 256 =>
-    dmap (dB_le i) to_int = drange 0 (i + 1).
-proof.
-rewrite /dB_le => [#] 2?.
-have -> : (fun b => to_int b <= i) = (fun b => b <= i) \o to_int.
-- by apply fun_ext.
-rewrite -dcond_dmap dB_to_int_drange.
-apply distr_eq_supp.
-- by apply/dcond_uni/drange_uni.
-- exact drange_uni.
-- apply dcond_ll. apply witness_support.
-  exists 0. by rewrite supp_drange.
-- by apply drange_ll => /#.
-by move => ?; rewrite dcond_supp 2!supp_drange /#.
-qed.
-
-lemma dcond'_ll (d : 'a distr) p : is_lossless (dcond' d p).
-proof.
-rewrite /dcond'.
-case (exists x, p x /\ x \in d) => [/witness_support|_].
-- exact dcond_ll.
-exact dunit_ll.
-qed.
-
-abbrev dtaurange (f : int -> 'a distr) = djoinmap f (range (256 - tau) 256).
-
-(* Uniform indices used to construct a challenge, as sampled in SampleInBall *)
-op dI : challenge_ir distr =
-  dlist dB 8 `*` dtaurange dB_le.
-
-(* FIXME: move this somewhere else *)
-op foldl_map ['a, 'b, 'c] (f : 'b -> 'a -> 'b * 'c) (b:'b) (l : 'a list) =
-  foldl (fun (bl : _ * _) a =>
-           let bc = f bl.`1 a in
-           (bc.`1, rcons bl.`2 bc.`2)) (b,[]) l.
-
-op geom_i (i:int) = geometric ((i + 1)%r / 256%r).
-
-(* Leakage distribution that follows the rejection sampling pattern *)
-op dL : leak_ir distr =
-  dmap (dtaurange geom_i)
-    (fun l => (foldl_map (fun i k => (i + k, i + k)) 8 l).`2).
-
-(** Functional representation of challenge generation from a given
-   intermediate representation. **)
-
-section TO_BOOL.
-import BitEncoding.BS2Int.
-
-op to_bool_list = flatten \o map (int2bs 8 \o to_int).
-op to_bool bl i = nth witness (to_bool_list bl) i.
-
-(*
-lemma test n :
-  0 <= n =>
-  dmap (drange 0 (2 ^ n)) (int2bs n) = dlist {0,1} n.
-proof.
-elim/natind: n => [].
-- move => n ??. have -> /= : n = 0 by smt.
-  rewrite /dlist /=.
-rewrite /fold/iter/int2bs iteri0 1:// expr0.
-have -> : drange 0 1 = dunit 0.
-admit.
-by rewrite dmap_dunit /= mkseq0.
-move => n n_ge_0 Hi ?.
-have ? := Hi n_ge_0.
-rewrite dlistS 1:n_ge_0 /=.
-admitted.
-
-lemma len_to_bool bl :
-  size (to_bool_list bl) = 8 * size bl.
-proof.
-rewrite /to_bool_list size_flatten -map_comp /sumz.
-have -> : size \o int2bs 8 \o to_int = fun _ => 8.
-- by apply fun_ext => ?; apply size_mkseq.
-by elim: bl => //= ? ->; ring.
-qed.
-
-(* uniformly-sampled byte lists can also be seen as
-   uniformly-sampled bit lists of size multiplied by 8 *)
-(* TODO: this is probably needed later *)
-lemma to_bool_dB_uni n :
-  0 <= n =>
-  dmap (dlist dB n) to_bool_list = dlist {0,1} (8 * n).
-proof.
-move => n_ge0.
-rewrite -dlist_dlist 1,2://.
-rewrite /to_bool_list -(dmap_comp _ flatten) -dlist_dmap.
-do 2!congr.
-rewrite -dmap_comp dB_to_int_drange.
-admit.
-qed.
-*)
-end section TO_BOOL.
-
-(* Apply one step of permutation on the given in-construction challenge. *)
-op to_challenge_body signs indices i' challenge =
-  let i0 = 256 - tau in
-  let i = i0 + i' in
-  let j = to_int (nth witness indices i') in
-  let coeff = nth witness challenge j in
-  let challenge = put challenge i coeff in
-  let coeff = if nth witness signs (i + tau - 256) then -1 else 1 in
-  put challenge j coeff.
-
-op to_challenge_aux (i : challenge_ir) tau_=
-  iteri tau_ (to_challenge_body (to_bool_list i.`1) i.`2) (nseq 256 0).
-
-op to_challenge (i : challenge_ir) = to_challenge_aux i tau.
-
-op to_challenge' (x : challenge_ir * leak_ir) = (to_concrete (to_challenge x.`1), to_leakage x.`2).
-
-lemma to_challenge_aux0 si i :
-   i <= 0 =>
-   to_challenge_aux si i = nseq 256 0.
-proof. by move=> ?;rewrite /to_challenge_aux iteri0. qed.
-
-lemma to_challenge_auxS si i :
-  0 <= i =>
-  to_challenge_aux si (i+1) = to_challenge_body (to_bool_list si.`1) si.`2 i (to_challenge_aux si i).
-proof. by move=> ?; rewrite /to_challenge_aux iteriS. qed.
-
-lemma to_challenge_aux_rcons signs indices byte i :
-  i <= size indices =>
-  to_challenge_aux (signs, rcons indices byte) i =
-  to_challenge_aux (signs, indices) i.
-proof.
-elim /natind : i.
-+ by move=> i ??; rewrite !to_challenge_aux0.
-move=> i h0i ih /ltzE hs.
-rewrite !to_challenge_auxS // ih 1:ltzW //=.
-by rewrite /to_challenge_body /= nth_rcons hs.
-qed.
-
-lemma to_challenge_aux_valid (signs indices : byte list) m :
-  0 <= m <= tau =>
-  (forall k, 0 <= k < m => to_int (nth witness indices k) <= 256 - tau + k) =>
-  valid_challenge (to_challenge_aux (signs, indices) m).
-proof.
-elim /natind: m => [m hm0 _ _ | m hm0 ih hm hidx].
-+ rewrite to_challenge_aux0 // /valid_challenge size_nseq /=; split; 1: smt().
-  by apply/allP => x; rewrite mem_nseq => -[_ ->].
-rewrite to_challenge_auxS //.
-have [hsz hall] := ih _ _; 1: smt().
-+ by move=> k hk; apply hidx; smt().
-rewrite /to_challenge_body /=.
-pose c := to_challenge_aux (signs, indices) m.
-pose j := to_int (nth witness indices m).
-have hj : 0 <= j < 256 by rewrite to_int_in_surj; exists (nth witness indices m).
-have hj' : j <= 256 - tau + m by apply hidx; smt().
-have hi : 0 <= 256 - tau + m < 256 by smt(tau_bound).
-rewrite /valid_challenge !size_put hsz /=.
-apply (all_nthP _ _ witness) => k; rewrite !size_put hsz => hk.
-move/(all_nthP _ _ witness): hall; rewrite hsz => hall.
-rewrite nth_put; 1: by rewrite size_put hsz.
-rewrite nth_put; 1: by rewrite hsz.
-case: (j = k) => _ /=; 1: smt().
-by case: (256 - tau + m = k) => _ /=; [apply hall | apply hall].
-qed.
-
-lemma to_challenge_valid x : x \in dI => valid_challenge (to_challenge x).
-proof.
-case: x => signs indices; rewrite /dI supp_dprod /= supp_djoinmap => -[_ [hsz hall]].
-rewrite /to_challenge; apply to_challenge_aux_valid; 1: smt(tau_bound).
-move=> k hk; move/(all_nthP _ _ (witness, witness)): hall => /(_ k _).
-+ by rewrite size_zip -hsz; smt(size_range).
-rewrite nth_zip // nth_range /=; 1: smt().
-by rewrite /dB_le dcond_supp /= /#.
-qed.
-
-op dC : challenge distr = dmap dI (to_concrete \o to_challenge).
-op dLeak : leakage distr = dmap dL to_leakage.
-
-(** Distribution properties. *)
-lemma dI_uni : is_uniform dI.
-proof.
-apply dprod_uni; 1: by apply /dlist_uni/dB_uni.
-apply djoin_uni => _ /mapP [ ? [ /mem_range ? -> ]] /=.
-by apply/dcond_uni/dB_uni.
-qed.
-
-lemma dC_uni : is_uniform dC.
-proof.
-rewrite /dC -dmap_comp.
-apply dmap_uni_in_inj.
-+ move=> x y /supp_dmap [a [ha ->]] /supp_dmap [b [hb ->]].
-  by apply to_concrete_inj; apply to_challenge_valid.
-admit. (* TODO: function [to_challenge] (variant of Fisher-Yates), produces
-          uniformly random challenges. *)
-qed.
-
-lemma dI_ll : is_lossless dI.
-proof.
-apply dprod_ll. split; 1: by apply/dlist_ll/dB_ll.
-apply djoin_ll => _ /mapP [ ? [ /mem_range ? -> ]] /=.
-apply dB_le_ll.
-smt(tau_bound).
-qed.
-
-lemma dL_ll : is_lossless dL.
-proof.
-rewrite /dL /=.
-apply/dmap_ll/djoin_ll => ? /mapP [i [/mem_iota ? ->]] /=.
-apply/geometric_ll; smt(tau_bound).
-qed.
-
-lemma dC_ll : is_lossless dC.
-proof. by apply/dmap_ll/dI_ll. qed.
-
-lemma dLeak_ll : is_lossless dLeak.
-proof. by apply/dmap_ll/dL_ll. qed.
+   first the signs, permutation indices and rejected bytes are sampled, then
+   the challenge and the leakage are computed from them. *)
 
 (** Oracles, base signatures and modules. *)
 (* "Raw" XOF which outputs bytes for a given integer state and input type combination. *)
@@ -302,11 +54,11 @@ clone PROM.FullRO as XOF with
   type out_t <- byte,
   op dout <- fun _ => dB.
 
-(* Random Oracle for Challenges *)
+(* Ideal Random Oracle: challenge pre-images and independent leakage *)
 clone PROM.FullRO as ROC with
   type in_t <- in_t,
-  type out_t <- challenge * leakage,
-  op dout <- fun _ => dC `*` dLeak.
+  type out_t <- challenge_ir * leakage,
+  op dout <- fun _ => dI `*` dLeakRej.
 
 module type XOF_t = {
   include XOF.RO [get]
@@ -316,7 +68,12 @@ module type ROC_t = {
   include ROC.RO [get]
 }.
 
-module SampleInBall(X : XOF_t) : ROC_t = {
+(* Challenge oracles: challenges with their leakage *)
+module type SIB_t = {
+  proc get(x : in_t) : challenge * leakage
+}.
+
+module SampleInBall(X : XOF_t) : SIB_t = {
   proc get(x : in_t) = {
     var signs <- [];
     var challenge <- nseq 256 0;
@@ -338,8 +95,8 @@ module SampleInBall(X : XOF_t) : ROC_t = {
         byte <@ X.get(x, ctx);
         j <- to_int byte;
         ctx <- ctx + 1;
+        leak <- rcons leak (ctx, j);
       }
-      leak <- rcons leak ctx;
 
       coeff <- nth witness challenge j;
       challenge <- put challenge i coeff;
@@ -347,14 +104,22 @@ module SampleInBall(X : XOF_t) : ROC_t = {
       challenge <- put challenge j coeff;
       i <- i + 1;
     }
-    return (to_concrete challenge, to_leakage leak);
+    return (to_concrete challenge, pairs_to_leakage leak);
   }
 }.
 
+(* The challenge oracle built on top of the ideal oracle *)
+module ToC(R : ROC_t) : SIB_t = {
+  proc get(x : in_t) = {
+    var ir, l;
+    (ir, l) <@ R.get(x);
+    return (to_concrete (to_challenge ir), full_leak ir (leakage_to_rej l));
+  }
+}.
 
 (** Adversary types, game definition and definition of [SampleInBall] *)
 type input, output.
-module type XOFAdversary(X : XOF_t, R : ROC_t) = {
+module type XOFAdversary(X : XOF_t, R : SIB_t) = {
   proc run(x : input) : output { X.get, R.get }
 }.
 
@@ -380,18 +145,17 @@ module GameROC(A : ROCAdversary) = {
   }
 }.
 
-op sample_indices_body (xctxbyte : (in_t * int) * byte) (state: (_ * _ * _)) =
-  let (i, leak, indices) = state in
-  let (xctx, byte) = xctxbyte in
-  let (x, ctx) = xctx in
+(* state: current position, rejected bytes of the previous positions,
+   rejected bytes of the current position, accepted bytes *)
+op sample_indices_body (xctxbyte : (in_t * int) * byte)
+   (state: int * int list list * int list * byte list) =
+  let (i, rej, rejc, indices) = state in
+  let byte = xctxbyte.`2 in
   if i < 256 then
     let j = to_int byte in
-    Some (if (i < j) then (i, leak, indices)
-         else (i+1, rcons leak (ctx + 1), rcons indices byte))
+    Some (if (i < j) then (i, rej, rcons rejc j, indices)
+         else (i+1, rcons rej rejc, [], rcons indices byte))
   else None.
-
-op foldl_o (f : 'a -> 's -> 's option) (os : 's option) (l:'a list) =
-  foldl (fun os a => obind (f a) os) os l.
 
 op sample_indices (log : ((in_t * int) * byte) list) (x: in_t) =
   if (8 <= size log /\
@@ -399,11 +163,12 @@ op sample_indices (log : ((in_t * int) * byte) list) (x: in_t) =
       unzip2 (unzip1 log) = iota_ 0 (size log)) then
     let signs = map snd (take 8 log) in
     let log = drop 8 log in
-    let ostate = foldl_o sample_indices_body (Some (256 - tau, [], [])) log in
-    obind (fun state : _ * _ * _ => if state.`1 = 256 then Some ((signs, state.`3), state.`2) else None) ostate
+    let ostate = foldl_o sample_indices_body (Some (256 - tau, [], [], [])) log in
+    obind (fun (state : int * int list list * int list * byte list) =>
+      if state.`1 = 256 then Some ((signs, state.`4), state.`2) else None) ostate
   else None.
 
-op to_challenge'_log (log : (in_t * (challenge_ir * leak_ir)) list) (x:in_t) =
+op to_challenge'_log (log : (in_t * (challenge_ir * rej_ir)) list) (x:in_t) =
   if size log = 1 /\ (head witness log).`1 = x then
     Some (to_challenge' (head witness log).`2)
   else None.
@@ -413,13 +178,13 @@ clone RejectionRO.TwoSteps as RR with
   type ro_out <- byte,
   type s_inner_in <- in_t,
   type s_in <- in_t,
-  type s_inner_out <- challenge_ir * leak_ir,
-  type s_out <- challenge * leakage,
+  type s_inner_out <- challenge_ir * rej_ir,
+  type s_out <- challenge_ir * leakage,
   type input <- input,
   type output <- output,
   op F1.dout <- fun _ => dB,
-  op F1.ideal_sampler <- fun _ => dI `*` dL,
-  op F2.ideal_sampler <- fun _ => dC `*` dLeak,
+  op F1.ideal_sampler <- fun _ => dI `*` dRej,
+  op F2.ideal_sampler <- fun _ => dI `*` dLeakRej,
   op F1.sampler_of <- fst,
   op F2.sampler_of <- idfun,
   op F1.op_sample <- sample_indices,
@@ -427,10 +192,21 @@ clone RejectionRO.TwoSteps as RR with
 proof*.
 realize F1.dout_ll by move => _; apply dB_ll.
 realize F1.ideal_sampler_ll
-  by move => _; apply dprod_ll; split; [ exact dI_ll | exact dL_ll ].
+  by move => _; apply dprod_ll; split; [ exact dI_ll | exact dRej_ll ].
 realize F2.dout_ll by exact F1.ideal_sampler_ll.
 realize F2.ideal_sampler_ll
-  by move => _; apply dprod_ll; split; [ exact dC_ll | exact dLeak_ll ].
+  by move => _; apply dprod_ll; split; [ exact dI_ll | exact dLeakRej_ll ].
+
+(* The byte stream read by [SampleInBall] on the XOF, as a function of the
+   signs, accepted indices and rejected bytes. *)
+op stream (r : challenge_ir * rej_ir) : byte list =
+  r.`1.`1 ++ flatten (map (fun (p : byte * int list) => rcons (map from_int p.`2) p.`1)
+                          (zip r.`1.`2 r.`2)).
+
+(* Writing a byte stream in a map, starting at context [c] *)
+op sets (m : (in_t * int, byte) fmap) (x : in_t) (c : int) (bs : byte list) =
+  with bs = [] => m
+  with bs = b :: bs' => sets m.[(x, c) <- b] x (c + 1) bs'.
 
 section PROOF.
 import RR.
@@ -441,8 +217,8 @@ module (SampleIndices : F1.Sampler)(R : F1.RO_t) = {
   proc sample(x : in_t) = {
     var signs <- [];
     var indices <- [];
-    var leak <- [];
-    var ctx, byte, i, j;
+    var rej <- [];
+    var rejc, ctx, byte, i, j;
 
     byte <- witness;
     ctx <- 0;
@@ -455,26 +231,29 @@ module (SampleIndices : F1.Sampler)(R : F1.RO_t) = {
     i <- 256 - tau;
     while (i < 256) {
       j <- i + 1;
+      rejc <- [];
       while (i < j) {
         byte <@ R.get(x, ctx);
         j <- to_int byte;
         ctx <- ctx + 1;
+        rejc <- if i < j then rcons rejc j else rejc;
       }
-      leak <- rcons leak ctx;
+      rej <- rcons rej rejc;
       indices <- rcons indices byte;
       i <- i + 1;
     }
-    return ((signs, indices), leak);
+    return ((signs, indices), rej);
   }
 }.
 
+(* The same, with fresh samples instead of RO queries. *)
 module SampleIndicesRaw : F1.Sampler_t = {
   proc init() = {}
   proc sample(x : in_t) = {
     var signs <- [];
     var indices <- [];
-    var leak <- [];
-    var ctx, byte, _byte, i, b;
+    var rej <- [];
+    var rejc, ctx, byte, i, j;
 
     byte <- witness;
     ctx <- 0;
@@ -486,50 +265,34 @@ module SampleIndicesRaw : F1.Sampler_t = {
 
     i <- 256 - tau;
     while (i < 256) {
-      b <- false;
-      while (!b) {
-        b <$ dbias i;
+      j <- i + 1;
+      rejc <- [];
+      while (i < j) {
+        byte <$ dB;
+        j <- to_int byte;
         ctx <- ctx + 1;
+        rejc <- if i < j then rcons rejc j else rejc;
       }
-      (_byte, byte) <$ dcond_prod (small_enough i) dB;
-      leak <- rcons leak ctx;
+      rej <- rcons rej rejc;
       indices <- rcons indices byte;
       i <- i + 1;
     }
-    return ((signs, indices), leak);
+    return ((signs, indices), rej);
   }
 }.
 
 (* A reprogrammer that allows to simulate the behaviour of the Sampler module
-   above when it is replaced by its ideal variant *)
+   above when it is replaced by its ideal variant: the output determines all
+   the bytes read, which are written back in order. *)
 module (ReprogIndices : F1.Reprogrammer)(R : F1.RO_set) = {
-  proc reprogram(x : in_t, r : challenge_ir * leak_ir) : unit = {
-    var i, ctx_success, ctx, signs, indices, rs, leak, byte, _byte;
-    (rs, leak) <- r;
-    (signs, indices) <- rs;
-
+  proc reprogram(x : in_t, r : challenge_ir * rej_ir) : unit = {
+    var bs, ctx;
+    bs <- stream r;
     ctx <- 0;
-    while (ctx < 8) {
-      byte <- head witness signs;
-      signs <- behead signs;
-      R.set((x, ctx), byte);
+    while (bs <> []) {
+      R.set((x, ctx), head witness bs);
+      bs <- behead bs;
       ctx <- ctx + 1;
-    }
-
-    i <- 256 - tau;
-    while (i < 256) {
-      ctx_success <- head witness leak;
-      leak <- behead leak;
-      while (ctx < ctx_success - 1) {
-        (byte, _byte) <$ dcond_prod (small_enough i) dB;
-        R.set((x, ctx), byte);
-        ctx <- ctx + 1;
-      }
-      byte <- head witness indices;
-      indices <- behead indices;
-      R.set((x, ctx_success - 1), byte);
-      ctx <- ctx + 1;
-      i <- i + 1;
     }
   }
 }.
@@ -548,1448 +311,173 @@ module SampleChallengeRaw : F2.Sampler_t = {
   proc init() = {}
   proc sample(x : in_t) = {
     var r, rs;
-    r <$ dI `*` dL;
+    r <$ dI `*` dRej;
     rs <- to_challenge' r;
     return rs;
   }
 }.
 
 module (ReprogChallenge : F2.Reprogrammer)(R : F2.RO_set) = {
-  proc reprogram(x : in_t, r : challenge * _) = {
+  proc reprogram(x : in_t, r : challenge_ir * _) = {
     var y <- witness;
-    if (exists y, to_challenge' y = r /\ y \in dI `*` dL) {
-      y <$ dcond (dI `*` dL) (fun y => to_challenge' y = r);
+    if (exists y, to_challenge' y = r /\ y \in dI `*` dRej) {
+      y <$ dcond (dI `*` dRej) (fun y => to_challenge' y = r);
     }
     R.set(x, y);
   }
 }.
 
+(* Losslessness of the reprogrammers (for any lossless [set]). *)
+lemma ReprogIndices_ll (R <: F1.RO_set) :
+  islossless R.set => islossless ReprogIndices(R).reprogram.
+proof.
+move=> R_ll; proc; while true (size bs); 2: by auto; smt(size_eq0 size_ge0).
+by move=> z; wp; call R_ll; auto; smt(size_behead size_eq0 size_ge0).
+qed.
+
+(* The challenge reprogrammer only samples from the (conditional)
+   distribution of pre-images when it is not empty. *)
+lemma ReprogChallenge_ll (R <: F2.RO_set) :
+  islossless R.set => islossless ReprogChallenge(R).reprogram.
+proof.
+move=> R_ll; proc; call R_ll; sp; if => //.
+by rnd; skip => ? [_ /witness_support/dcond_ll].
+qed.
+
+(* The challenge oracle built on top of a sampler of [F2]. *)
+module ToCS(S : F2.Sampler_t) : SIB_t = {
+  proc get(x : in_t) = {
+    var ir, l;
+    (ir, l) <@ S.sample(x);
+    return (to_concrete (to_challenge ir), full_leak ir (leakage_to_rej l));
+  }
+}.
+
+lemma zip_iota_rcons c (l : 'a list) a :
+  zip (iota_ c (size l + 1)) (rcons l a) = rcons (zip (iota_ c (size l)) l) (c + size l, a).
+proof. by rewrite iotaSr 1:size_ge0 zip_rcons // size_iota; smt(size_ge0). qed.
+
 local equiv sample_comp :
-  SampleInBall(XOF.RO).get ~ Comp(SampleChallenge, SampleIndices, F1.RO).sample :
+  SampleInBall(XOF.RO).get ~ ToCS(Comp(SampleChallenge, SampleIndices, F1.RO)).get :
   ={arg} /\ ={RO.m}(XOF,F1) ==> ={res} /\ ={RO.m}(XOF,F1).
 proof.
-proc.
-inline{2} ^ <@; wp.
-while (={RO.m}(XOF,F1)  /\ ={i, leak, signs, ctx} /\ x{1} = x0{2} /\
-       (i <= 256 /\ size indices = i - (256 - tau)){2} /\
-       challenge{1} = (to_challenge_aux (signs, indices) (i - (256 - tau))){2}).
-+ auto.
-  while (={RO.m}(XOF,F1) /\ x{1} = x0{2} /\ ={i, j, ctx} /\
-         (j <= i => j = to_int byte){2}).
-  + wp; conseq (: (={RO.m}(XOF,F1) /\ ={byte})) => />.
-    by sim.
-  auto => /> &2 3?; split; 1: smt().
-  move=> byte j ? _ ?; split.
-  + smt(size_rcons).
+proc; inline{2} ^ <@; inline{2} ^ <@; wp.
+while (={RO.m}(XOF,F1) /\ ={i, signs, ctx} /\ x{1} = x1{2} /\
+       (i <= 256 /\ size indices = i - (256 - tau) /\ size rej = size indices){2} /\
+       challenge{1} = (to_challenge_aux (signs, indices) (i - (256 - tau))){2} /\
+       leak{1} = (full_pairs (signs, indices) rej).`2{2} /\
+       ctx{2} = (full_pairs (signs, indices) rej).`1{2}).
++ wp.
+  while (={RO.m}(XOF,F1) /\ x{1} = x1{2} /\ ={i, j, ctx, signs} /\
+         (j <= i => j = to_int byte){2} /\
+         (i < 256 /\ size indices = i - (256 - tau) /\ size rej = size indices){2} /\
+         challenge{1} = (to_challenge_aux (signs, indices) (i - (256 - tau))){2} /\
+         leak{1} = (full_pairs (signs, indices) rej).`2{2} ++
+                   (if i < j then zip (iota_ ((full_pairs (signs, indices) rej).`1 + 1)
+                                             (size rejc)) rejc
+                    else seg (full_pairs (signs, indices) rej).`1 rejc j){2} /\
+         ctx{2} = (full_pairs (signs, indices) rej).`1{2} + size rejc{2} +
+                  (if i < j then 0 else 1){2}).
+  + wp; call (: ={RO.m}(XOF,F1)); 1: by sim.
+    auto => /> &2 _ _ _ _ _ b; rewrite /seg.
+    have hA : forall (a b : int), a + 1 + b = a + b + 1 by smt().
+    case: (i{2} < to_int b) => /= _;
+      rewrite ?size_rcons !zip_iota_rcons rcons_cat hA //.
+    by rewrite addzA.
+  auto => />.
+  move=> &2 hi hsz1 hsz2 hlt.
+  have -> /= : i{2} < i{2} + 1 by smt().
+  rewrite iota0 // cats0 /=; split; 1: smt().
+  move=> byte j rejc hlt' _ hj.
+  have {hj} -> := hj _; 1: smt().
+  rewrite full_pairs_rcons 1:/# /=.
+  split; 1: smt(size_rcons).
   have -> /= : i{2} + 1 - (256 - tau) = (i{2} - (256 - tau)) + 1 by ring.
   rewrite to_challenge_auxS; 1:smt(size_ge0).
   rewrite to_challenge_aux_rcons 1:/# /=.
   rewrite /to_challenge_body /= nth_rcons.
   have -> : 256 - tau + (i{2} - (256 - tau)) = i{2} by ring.
-  rewrite (_ : (i{2} - (256 - tau) < size indices{2}) = false) 1:/#.
-  rewrite (_ : (i{2} - (256 - tau) = size indices{2}) = true) 1:/# /=.
-  have <- : j = to_int byte by smt().
-  by rewrite /to_bool.
-swap{1} 2 4; swap{2} 3 4; wp.
-conseq (: ={RO.m}(XOF,F1) /\ x{1} = x0{2} /\ ={signs, leak, ctx}); 2: by sim.
-rewrite /to_challenge' /to_challenge /= => />.
-smt(to_challenge_aux0 tau_bound).
-qed.
-
-(* TODO: Reprograming is correct *)
-
-(* In the main program, i is not treated as an integer.
-   This is done here because it gives type information that
-   i < 256, which is necessary in proofs like sample_spec. *)
-local clone SplitRO.Split with
-  type from <- int * int, (* i ⨯ ctx *)
-  type to <- byte,
-  op sampleto <- fun _ => dB,
-
-  type input <- in_t,
-  type output <- challenge_ir * leak_ir.
-
-local lemma dcond_prod_ll p (d : 'a distr) : is_lossless (dcond_prod p d).
-proof.
-by apply dprod_ll; split; exact dcond'_ll.
-qed.
-
-local lemma dcond_prod_supp p (d : 'a distr) :
-  is_lossless d => 0%r < mu d p < 1%r =>
-    forall x y, (x, y) \in dcond_prod p d <=> (x \in d /\ y \in d /\ !p x /\ p y).
-proof.
-move => d_ll ???.
-rewrite /dcond_prod/dcond' -2!witness_support.
-have -> /= : (0%r < mu d p) by move => /#.
-have -> /= : (0%r < mu d (predC p)) by rewrite mu_not d_ll /#.
-by rewrite supp_dprod 2!dcond_supp.
-qed.
-
-local lemma mul_if x u v : x * (if x = 0%r then u else v) = x * v by case (x = 0%r) => //.
-
-local lemma mul_if_pos x u v :
-  0%r <= x =>
-    x * (if 0%r < x then u else v) = x * u.
-proof. by case (x = 0%r) => /#. qed.
-
-local lemma split_distr d p :
-  is_lossless d =>
-  let dbias = DBool.Biased.dbiased (mu d p) in
-  d = dmap (dbias `*` dcond_prod p d)
-    (fun (dfs : bool * ('a * 'a)) =>
-      if dfs.`1 then dfs.`2.`2 else dfs.`2.`1).
-proof.
-move => d_ll dbias.
-apply eq_distr => x.
-rewrite dmap_dprodE dletE_bool /=.
-rewrite dfst_dprod 1:dcond'_ll.
-rewrite dsnd_dprod 1:dcond'_ll.
-have -> : mu1 dbias true = mu d p.
-- rewrite DBool.Biased.dbiased1E /=.
-  by apply/Biased.clamp_id/mu_bounded.
-have -> : mu1 dbias false = mu d (predC p).
-- rewrite DBool.Biased.dbiased1E mu_not d_ll /=.
-  do 2 ! congr. by apply/Biased.clamp_id/mu_bounded.
-
-rewrite /dcond' -2!witness_support 2!fun_if 2!if_arg.
-rewrite 2!(mul_if_pos _ _ _ (ge0_mu _ _)).
-rewrite eq_mu_E 2!mu_Ec.
-apply Ec_split.
-by apply (hasE_le _ _ (fun _ => 1%r) (hasEC _ _)) => /#.
-qed.
-
-local clone Split.SplitCodom with
-  type to1 <- bool,
-  type to2 <- byte * byte,
-  op sampleto1 <- fun (i : int * int) => dbias i.`2,
-  op sampleto2 <- fun (i : int * int) => dcond_prod (small_enough i.`2) dB,
-  op topair <- fun b => (true, (b, b)),
-  op ofpair <- fun (biasres : bool * (byte * byte)) =>
-    if biasres.`1 then biasres.`2.`2 else biasres.`2.`1
-proof*.
-realize topairK by done.
-realize sample_spec.
-move => [_ i] /=; exact (split_distr dB (small_enough i) dB_ll).
-qed.
-
-local module type RO_env = {
-  proc init_inner(x : in_t) : unit
-  proc get_sign(ctx : int) : byte
-  proc get_indices(ctx : int, i : int) : byte * int
-  proc and_then_sign(r : challenge_ir, leak : leak_ir) : unit
-  proc and_then_indices(r : challenge_ir, leak : leak_ir) : unit
-}.
-
-local module SampleIndicesWithEnv(R : RO_env) = {
-  proc sample(x : in_t) = {
-    var signs <- [];
-    var indices <- [];
-    var leak <- [];
-    var ctx, byte, i;
-
-    R.init_inner(x);
-
-    byte <- witness;
-    ctx <- 0;
-    while (ctx < 8) {
-      byte <@ R.get_sign(ctx);
-      signs <- rcons signs byte;
-      ctx <- ctx + 1;
-    }
-
-    i <- 256 - tau;
-    while (i < 256) {
-      (byte, ctx) <@ R.get_indices(ctx, i);
-      leak <- rcons leak ctx;
-      indices <- rcons indices byte;
-      i <- i + 1;
-    }
-
-    R.and_then_sign((signs, indices), leak);
-    R.and_then_indices((signs, indices), leak);
-
-    return ((signs, indices), leak);
-  }
-}.
-
-local module SRO = Split.IdealAll.RO.
-
-(* log all get's in a dedicated, fresh RO dubbed SRO *)
-local module GetThenSet : RO_env = {
-  var x_arg : in_t
-  proc init_inner(x) = {
-    SRO.init();
-    x_arg <- x;
-  }
-
-  proc get(ctx, i) = {
-    var b : byte;
-    b <@ SRO.get(ctx, i);
-    F1.RO.set((x_arg, ctx), b);
-    return b;
-  }
-
-  proc get_sign(ctx) = {
-    var r : byte;
-    r <@ get(ctx, 0);
-    return r;
-  }
-
-  proc get_indices(ctx, i) = {
-    var j <- i + 1;
-    var byte <- witness;
-    while (i < j) {
-      byte <@ get(ctx, i);
-      j <- to_int byte;
-      ctx <- ctx + 1;
-    }
-    return (byte, ctx);
-  }
-
-  proc and_then_sign(r : challenge_ir, leak : leak_ir) = {}
-  proc and_then_indices(r : challenge_ir, leak : leak_ir) = {}
-}.
-
-(* Only log results in F1.RO after a complete execution *)
-(* It is written as a functor for reusability purposes only *)
-(* This version does not use variable [leak] to reprogram F1.RO
-   during [and_then_sign]. This is done in the next step. *)
-local module SetAfterNoLeakReuseM(SRO : Split.IdealAll.RO) : RO_env = {
-  import var GetThenSet
-
-  proc init_inner(x) = {
-    SRO.init();
-    x_arg <- x;
-  }
-
-  proc get_sign(ctx) = {
-    var r : byte;
-    r <@ SRO.get(ctx, 0);
-    return r;
-  }
-
-  proc get_indices(ctx, i) = {
-    var j <- i + 1;
-    var byte <- witness;
-    while (i < j) {
-      byte <@ SRO.get(ctx, i);
-      j <- to_int byte;
-      ctx <- ctx + 1;
-    }
-    return (byte, ctx);
-  }
-
-  proc and_then_sign(r : challenge_ir, leak : leak_ir) = {
-    var byte : byte;
-    var ctx <- 0;
-    while (ctx < 8) {
-      byte <@ SRO.get(ctx, 0);
-      F1.RO.set((x_arg, ctx), byte);
-      ctx <- ctx + 1;
-    }
-  }
-
-  proc and_then_indices(r : challenge_ir, leak : leak_ir) = {
-    var ctx_success, byte;
-    var i <- 256 - tau;
-    var ctx <- 8;
-    while (i < 256) {
-      ctx_success <- head witness leak;
-      leak <- behead leak;
-      while (ctx < ctx_success) {
-        byte <@ SRO.get(ctx, i);
-        F1.RO.set((x_arg, ctx), byte);
-        ctx <- ctx + 1;
-      }
-      i <- i + 1;
-    }
-  }
-}.
-
-local module SetAfter' = SetAfterNoLeakReuseM(SRO).
-
-(* Same module, but replace the last iteration of the loop with
-   a read from the matching index from the leakage list, which is equal *)
-local module SetAfterM(SRO : Split.IdealAll.RO) : RO_env = {
-  import var GetThenSet
-  include SetAfterNoLeakReuseM(SRO) [-and_then_indices]
-  
-  proc and_then_indices(r : challenge_ir, leak : leak_ir) = {
-    var ctx_success, byte;
-    var i <- 256 - tau;
-    var ctx <- 8;
-    var indices <- r.`2;
-    
-    while (i < 256) {
-      ctx_success <- head witness leak;
-      leak <- behead leak;
-      while (ctx < ctx_success - 1) {
-        byte <@ SRO.get(ctx, i);
-        F1.RO.set((x_arg, ctx), byte);
-        ctx <- ctx + 1;
-      }
-
-      byte <- head witness indices;
-      indices <- behead indices;
-      F1.RO.set((x_arg, ctx_success - 1), byte);
-      ctx <- ctx + 1;
-      i <- i + 1;
-    }
-  }
-}.
-
-local module SetAfter = SetAfterM(SRO).
-
-local module ProdRO = SplitCodom.RO_Pair(SplitCodom.I1.RO, SplitCodom.I2.RO).
-
-local module SetAfterBiasM(I2 : SplitCodom.I2.RO) = {
-  include var SetAfterM(SplitCodom.RO_Pair(SplitCodom.I1.RO, I2)) [-get_indices]
-
-  proc get_indices(ctx, i) = {
-    var b <- false;
-    var _byte, byte;
-    while (!b) {
-      b <@ SplitCodom.I1.RO.get(ctx, i);
-      I2.sample(ctx, i);
-      ctx <- ctx + 1;
-    }
-    (_byte, byte) <@ I2.get(ctx - 1, i);
-    return (byte, ctx);
-  }
-}.
-
-local module SetAfterBias = SetAfterBiasM(SplitCodom.I2.RO).
-local module SetAfterBiasLazy = SetAfterBiasM(SplitCodom.I2.LRO).
-
-local module SetAfterLazyNoIdea : RO_env = {
-  import var GetThenSet
-  include SetAfterBiasLazy [-and_then_indices]
-
-  proc and_then_indices(r : challenge_ir, leak : leak_ir) = {
-    var ctx_success, byte, _byte;
-    var i <- 256 - tau;
-    var ctx <- 8;
-    var indices <- r.`2;
-    
-    while (i < 256) {
-      ctx_success <- head witness leak;
-      leak <- behead leak;
-      while (ctx < ctx_success - 1) {
-        SplitCodom.I1.RO.sample(ctx, i); (* known and equal to false *)
-        (_byte, byte) <$ dcond_prod (small_enough i) dB;
-        SplitCodom.I2.RO.m.[ctx, i] <- (_byte, byte);
-        F1.RO.set((x_arg, ctx), _byte);
-        ctx <- ctx + 1;
-      }
-
-      byte <- head witness indices;
-      indices <- behead indices;
-      F1.RO.set((x_arg, ctx_success - 1), byte);
-      ctx <- ctx + 1;
-      i <- i + 1;
-    }
-  }
-}.
-
-local module SetAfterLazyNoBiasRO : RO_env = {
-  import var GetThenSet
-  include SetAfterBiasLazy [-and_then_indices,get_indices]
-  
-  proc get_indices(ctx, i) = {
-    var b <- false;
-    var _byte, byte;
-    while (!b) {
-      b <$ dbias i; (* No one ever reads I1, so it can be ignored *)
-      ctx <- ctx + 1;
-    }
-    (_byte, byte) <@ SplitCodom.I2.RO.get(ctx - 1, i);
-    return (byte, ctx);
-  }
-    
-  proc and_then_indices(r : challenge_ir, leak : leak_ir) = {
-    var ctx_success, byte, _byte;
-    var i <- 256 - tau;
-    var ctx <- 8;
-    var indices <- r.`2;
-    
-    while (i < 256) {
-      ctx_success <- head witness leak;
-      leak <- behead leak;
-      while (ctx < ctx_success - 1) {
-        (_byte, byte) <$ dcond_prod (small_enough i) dB;
-        SplitCodom.I2.RO.m.[ctx, i] <- (_byte, byte);
-        F1.RO.set((x_arg, ctx), _byte);
-        ctx <- ctx + 1;
-      }
-
-      byte <- head witness indices;
-      indices <- behead indices;
-      F1.RO.set((x_arg, ctx_success - 1), byte);
-      ctx <- ctx + 1;
-      i <- i + 1;
-    }
-  }
-}.
-
-(* No internal RO is read anymore, except for the sign bytes: [R] is
-   the RO used for them. With [ProdRO] this is the lazy version obtained
-   from [SetAfterLazyNoBiasRO]; with [SRO] it is the last environment
-   before [SampleIndicesRaw]. *)
-local module SetAfterNoOutM(R : Split.IdealAll.RO) : RO_env = {
-  import var GetThenSet
-  include SetAfterNoLeakReuseM(R) [init_inner, get_sign, and_then_sign]
-
-  proc get_indices(ctx, i) = {
-    var b <- false;
-    var _byte, byte;
-    while (!b) {
-      b <$ dbias i;
-      ctx <- ctx + 1;
-    }
-    (_byte, byte) <$ dcond_prod (small_enough i) dB;
-    return (byte, ctx);
-  }
-
-  proc and_then_indices(r : challenge_ir, leak : leak_ir) = {
-    var ctx_success, byte, _byte;
-    var i <- 256 - tau;
-    var ctx <- 8;
-    var indices <- r.`2;
-
-    while (i < 256) {
-      ctx_success <- head witness leak;
-      leak <- behead leak;
-      while (ctx < ctx_success - 1) {
-        (_byte, byte) <$ dcond_prod (small_enough i) dB;
-        (* I2 is never read either *)
-        F1.RO.set((x_arg, ctx), _byte);
-        ctx <- ctx + 1;
-      }
-
-      byte <- head witness indices;
-      indices <- behead indices;
-      F1.RO.set((x_arg, ctx_success - 1), byte);
-      ctx <- ctx + 1;
-      i <- i + 1;
-    }
-  }
-}.
-
-local module SetAfterLazyNoOutRO = SetAfterNoOutM(ProdRO).
-local module SetAfterSRO = SetAfterNoOutM(SRO).
-
-local equiv reprog1_hop1 :
-  SampleIndices(F1.ProgRO).sample ~ SampleIndicesWithEnv(GetThenSet).sample :
-  ={arg, F1.RO.m} ==> ={res, F1.RO.m}.
-proof.
-proc.
-inline and_then_sign and_then_indices. wp.
-while (={leak, byte, signs, indices, x, i, ctx, F1.RO.m} /\ (x{1} = GetThenSet.x_arg{2})
-  /\ (forall ctx' j, ctx <= ctx' => (ctx', j) \notin SRO.m){2}); last first.
-- wp. while(={leak, byte, signs, indices, ctx, F1.RO.m, x} /\ (x{1} = GetThenSet.x_arg{2})
-  /\ (forall ctx' j, ctx <= ctx' => (ctx', j) \notin SRO.m){2}); 2: by inline; auto; smt(mem_empty).
-  inline. rcondt{2} ^if; 1: by auto => /#.
-  sp. seq 1 1: (#pre /\ r{1} = r2{2}); 1: by auto.
-  by wp; skip; smt(get_set_sameE mem_set).
-inline get_indices.
-wp. rcondt{2} ^while; 1: by auto => /> _ _ _ /#.
-rcondt{1} ^while; 1: by auto => /> _ _ /#.
-while (#post /\ ={j, leak, indices} /\ (x, i){1} = (x, i0){2}); last first.
-- inline. rcondt{2} ^if; 1: auto => /#.
-  sp. seq 1 1: (#pre /\ r{1} = r1{2}); 1: by auto.
-  by wp; skip; smt(get_set_sameE mem_set).
-wp. inline.
-rcondt{2} ^if; 1: auto => /#.
-by wp; rnd; auto => />; smt(get_set_sameE mem_set).
-qed.
-
-local abbrev inv_distinct(x, f1, f2 : (in_t * int, byte) fmap) =
-  forall ctx x', x' <> x => f1.[x', ctx] = f2.[x', ctx].
-
-(* min and max define a "reprogramming window": the corresponding
-   elements need to be reprogrammed to ensure equality *)
-local abbrev inv_signs(x, min, max, f1 : (in_t * int, byte) fmap, f2, sro) =
-  forall ctx, ctx < 8 => if min <= ctx < max
-    then (ctx, 0) \in sro /\ f1.[x, ctx] = sro.[ctx, 0]
-    else f1.[x, ctx] = f2.[x, ctx].
-
-local lemma inv_signs_set x ctx f1 f2 sro r :
-  0 <= ctx =>
-  inv_signs x 0 ctx f1 f2 sro =>
-  inv_signs x 0 (ctx + 1) f1.[x, ctx <- r] f2 sro.[ctx, 0 <- r].
-proof. smt(mem_set get_set_sameE get_set_neqE). qed.
-
-op ranges acc (l : 'a list) =
- with l = [] => []
- with l = x :: l' => 
-   if l' = [] then [] else (acc, x, head witness l') :: ranges (acc + 1) l'.
-
-lemma ranges_empty n : ranges<:'a> n [] = [] by done.
-lemma ranges_singleton n (x : 'a) : ranges n [x] = [] by done.
-lemma ranges_cons_cons n (x y : 'a) l :
-  ranges n (x :: y :: l) = (n, x, y) :: ranges (n + 1) (y :: l) by done.
-
-local op inv_indices x (f1 : (in_t * int, byte) fmap) f2 sro acc leak =
-  forall ctx, 8 <= ctx =>
-  let r = ranges acc leak in
-    all (fun imm => let (i, min, max) = imm in min <= max /\
-      (min <= ctx < max => ((ctx, i) \in sro /\ f1.[x, ctx] = sro.[ctx, i]))) r
-    /\ (has (fun nmm => let (_, min, max) = nmm in min <= ctx < max) r
-      \/ f1.[x, ctx] = f2.[x, ctx]).
-
-local lemma inv_indices_rem x f1 f2 sro acc ctx leak :
-  inv_indices x f1 f2 sro acc (ctx :: ctx :: leak) =>
-  inv_indices x f1 f2 sro (acc + 1) (ctx :: leak).
-proof.
-move => inv ctx' ctxr r.
-have [] := inv ctx' ctxr.
-rewrite ranges_cons_cons.
-move => [] _ H HH. split => //.
-move: HH => [[]|] /#.
-qed.
-
-local lemma inv_indices_cons x f1 f2 sro acc a b leak :
-  8 <= a => a < b =>
-  inv_indices x f1 f2 sro acc (a :: b :: leak) =>
-  (a, acc) \in sro.
-proof.
-move => a8 ab inv.
-have [[] /= [] _ H _ _] // := inv a a8.
-by have // := H ab.
-qed.
-
-local lemma inv_indices_set x f1 f2 sro acc ctx min leak :
-  8 <= ctx < min =>
-  inv_indices x f1 f2 sro acc (ctx :: min :: leak) =>
-  inv_indices x f1 f2.[x, ctx <- oget sro.[ctx, acc]] sro acc ((ctx + 1) :: min :: leak).
-proof.
-move => [ctx_ge_8 ctx_lt_min] inv ctx' ctx'_ge_8.
-case (ctx = ctx') => [<- | ctx_neq_ctx'].
-- have /= [ ?? ] := inv ctx ctx_ge_8.
-  by rewrite get_setE /#.
-- by rewrite get_set_neqE /#.
-qed.
-
-local op inv2 (x : glob GetThenSet) (y : glob SetAfter') leak min1 max1 imin =
-  let (_x, f1, _sro) = x in
-  let (x, f2, sro) = y in
-  inv_distinct x f1 f2
-    /\ inv_signs x min1 max1 f1 f2 sro
-    /\ sorted (<=)%Int leak
-    /\ inv_indices x f1 f2 sro imin leak.
-
-local phoare miaou g1 l : [ SetAfter'.and_then_sign :
-      inv2 g1 (glob SetAfter') l 0 8 (256 - tau)
-  ==> inv2 g1 (glob SetAfter') l 8 8 (256 - tau) ] = 1%r.
-proof.
-proc.
-while (inv2 g1 (glob SetAfter') l ctx 8 (256 - tau)) (8 - ctx); 2: by auto => /#.
-move => z.
-inline. rcondf ^if; 1: by auto => /#.
-elim: g1 => [? f1 ?].
-auto => &m [#] [?[inv_signs[??]]] ctx_lt_8 ? _.
-split; 1: exact dB_ll.
-move => _ ? _ ? /=.
-split; 2: smt().
-split; 1: smt(get_set_neqE).
-split; 2: smt(get_set_neqE).
-move => y ?.
-case (y = ctx{m}) => [->/=|]; 2: smt(get_set_neqE).
-have := inv_signs ctx{m} ctx_lt_8.
-smt(get_setE get_some).
-qed.
-
-local lemma sorted_rcons_rcons r l (a b : 'a) :
-  r a b => sorted r (rcons l a) => sorted r (rcons (rcons l a) b).
-proof.
-elim: l => // ? /=.
-case => // ?? iH rab [] ? sH.
-by have // := iH rab sH.
-qed.
-
-local lemma list_sorted_rcons_succ l x :
-  sorted (<=) (rcons l x) => sorted (<=) (rcons l (x + 1)).
-proof.
-elim: l => // y /=.
-case => [/#| ?? iH [??]].
-split => //.
-by apply iH.
-qed.
-
-local lemma all_rcons p l (x : 'a) :
-  all p (rcons l x) <=> all p l /\ p x.
-proof.
-elim: l => // ?? iH /=.
-by rewrite iH.
-qed.
-
-local lemma has_rcons p l (x : 'a) :
-  has p (rcons l x) <=> has p l \/ p x.
-proof.
-elim: l => // ?? iH /=.
-by rewrite iH orbA.
-qed.
-
-local lemma ranges_rcons acc l x (y : 'a) :
-  ranges acc (rcons (rcons l x) y) = rcons (ranges acc (rcons l x)) (acc + size l, x, y).
-proof.
-elim: l acc => [//|z l iH acc].
-have /= -> := iH (acc + 1).
-do 2!have -> /= : forall l x, rcons<:'a> l x <> [] by case.
-split; 2: by rewrite addzA.
-by case: l iH => //.
-qed.
-
-
-local lemma ranges_max_le acc l (max : int) :
-  all (fun (imm : int * int * int) => imm.`2 <= imm.`3) (ranges acc (rcons l max)) =>
-  all (fun (imm : int * int * int) => imm.`3 <= max) (ranges acc (rcons l max)).
-proof.
-move: max; elim/last_ind: l => [//=|l y iH] max.
-rewrite !ranges_rcons !all_rcons /= => [[h ylemax]].
-have := iH y h.
-rewrite !allP => h2 imm imm_in.
-by have := h2 imm imm_in => /#.
-qed.
-
-local lemma inv_indices_rcons x r f1 f2 sro acc i leak ctx :
-  leak <> []
-  => inv_indices x f1 f2 sro acc (rcons leak ctx)
-  => i = acc + size leak - 1
-  => inv_indices x f1.[x, ctx <- r] f2 sro.[ctx, i <- r] acc (rcons leak (ctx + 1)).
-proof.
-move => + + + ctx' ctxH.
-elim/last_ind: leak => //= l max _ _ inv.
-have := inv ctx' ctxH.
-rewrite !ranges_rcons /= !all_rcons !has_rcons size_rcons => /= [[[/allP h1 [] max_le_ctx h3 ] h2]] iH.
-split; last first.
-- move: h2 => [[?|/#]| <-]; 1: by left; left.
-  rewrite -orabP.
-  right => /negb_or [] _ ?.
-  by apply get_set_neqE => /#.
-have ->/= : i = acc + size l by smt().
-split; last first.
-- split; 1: smt().
-  case (ctx' = ctx) => [->|ne]; 1: by rewrite mem_set !get_set_sameE.
-  move => ?.
-  have [??] := h3 _; 1: smt().
-  by rewrite mem_set !get_set_neqE /#.
-have /allP hmax : all (fun (imm : int * int * int) => imm.`3 <= max) (ranges acc (rcons l max)).
-- apply ranges_max_le.
-  by apply/allP => imm /h1 /#.
-apply/allP => imm imm_in.
-have := h1 imm imm_in.
-have := hmax imm imm_in.
-case: imm imm_in => i0 min max0 _ /= max0_le [#] ? h4.
-split; 1: done.
-move => rng.
-have [??] := h4 rng.
-by rewrite mem_set !get_set_neqE /#.
-qed.
-
-local lemma inv_indices_rcons_id x f1 f2 sro acc leak ctx :
-  inv_indices x f1 f2 sro acc (rcons leak ctx) =>
-  inv_indices x f1 f2 sro acc (rcons (rcons leak ctx) ctx).
-proof.
-move => inv ctx' ctxH /=.
-have -> := ranges_rcons acc leak ctx ctx.
-have [? i2] := inv ctx' ctxH.
-split; 1: by apply all_rcons => /> /#.
-case i2 => ?; 2: by right.
-left.
-apply has_rcons.
-by left.
-qed.
-
-local lemma rcons_lastE x l (y : 'a) :
-  y = last x l <=> exists l', x :: l = rcons l' y.
-proof.
-split.
-- elim: l x y => /= [??->|z l]; 1: by exists [].
-  move => iH x y last_eq.
-  have [l' ->] := iH z y last_eq.
-  by exists (x :: l').
-rewrite -(last_cons witness).
-move => [l' ->].
-by rewrite last_rcons.
-qed.
-
-local equiv reprog1_hop2 :
-  SampleIndicesWithEnv(GetThenSet).sample ~ SampleIndicesWithEnv(SetAfter').sample :
-  ={arg, F1.RO.m} ==> ={res, F1.RO.m}.
-proof.
-proc.
-call (:
- (size leak = tau){2} /\
- inv2 (glob GetThenSet){1} (glob SetAfter'){2} (8 :: leak){2} 8 8 (256 - tau)
- ==> ={F1.RO.m}
-).
-- proc.
-  while{2} ((sorted (<=)%Int (8 :: ctx :: leak) /\ i <= 256 /\ size leak = 256 - i){2}
-    /\ (inv2 (glob GetThenSet){1} (glob SetAfter') (ctx :: leak) 8 8 i){2}
-    /\ (i = 256 => leak = []){2}
-  ) (256 - i){2}; 2: by auto => />; smt(tau_bound fmap_eqP ranges_singleton).
-  move => &m z.
-  wp.
-  while (8 <= ctx /\ ctx <= ctx_success /\
-(inv2 (glob GetThenSet){m} (glob SetAfter') (ctx :: ctx_success :: leak) 8 8 i)) (ctx_success - ctx).
-  + move => z'. inline. rcondf ^if; 1: by auto; smt(inv_indices_cons).
-    by auto => />; smt(dB_ll inv_indices_set get_setE).
-  auto => /> &hr.
-  smt(size_eq0 inv_indices_rem).
-ecall{2} (miaou (glob GetThenSet){1} (8 :: leak{2})).
-inline and_then_sign. wp.
-while ( ={i, signs, indices, leak, ctx, SRO.m, GetThenSet.x_arg}
-  /\ (8 <= ctx /\ i <= 256 /\ size leak = i - 256 + tau /\ ctx = last witness (8 :: leak)
-    /\ forall ctx' i, ctx <= ctx' => (ctx', i) \notin SRO.m){2}
-  /\ inv2 (glob GetThenSet){1} (glob SetAfter'){2} (8 :: leak){2} 0 8 (256 - tau)) => //.
-- inline get_indices. wp.
-  while ( ={byte0, i0, j, ctx0, SRO.m, GetThenSet.x_arg}
-    /\ (8 <= ctx0 /\ size leak = i0 - 256 + tau
-      /\ forall ctx' i, ctx0 <= ctx' => (ctx', i) \notin SRO.m){2}
-    /\ inv2 (glob GetThenSet){1} (glob SetAfter'){2} (8 :: rcons leak ctx0){2} 0 8 (256 - tau)) => //; last first.
-  + wp. auto => &1 &2 [#] 7-> 3?.
-    have -> : 8 :: rcons leak{2} ctx{2} = rcons (8 :: leak{2}) ctx{2} by smt().
-    move => /rcons_lastE [ l' -> ] fresh_ro ? _ ?.
-    smt(size_rcons last_rcons inv_indices_rcons_id sorted_rcons_rcons).
-  inline.
-  rcondt{1} ^if; 1: by auto => /#.
-  rcondt{2} ^if; 1: by auto => /#.
-  (* SMTs give up at this point even with the correct hints.
-     So, making some progress manually. *)
-  auto => &1 &2 [#] _ 5-> 3? [?[?[??]]] _ _ /= b ?.
-  split => // _.
-  split; 1: smt(list_sorted_rcons_succ mem_set).
-  rewrite !get_setE /=.
-  do 2!(split; 1: smt(get_set_neqE)).
-  split; 1: smt(list_sorted_rcons_succ).
-  have -> : forall a b l, a :: rcons<:int> l b = rcons (a :: l) b by done.
-  by apply inv_indices_rcons => /#.
+  have hs : i{2} - (256 - tau) = size indices{2} by smt().
+  by rewrite hs /= /to_bool.
 wp.
-while ( ={signs, leak, ctx, SRO.m, GetThenSet.x_arg}
-  /\ (0 <= ctx <= 8 /\ leak = []
-    /\ forall ctx' i, ctx <= ctx' => (ctx', i) \notin SRO.m){2}
-  /\ inv2 (glob GetThenSet){1} (glob SetAfter'){2} (8 :: leak){2} 0 ctx{2} (256 - tau));
-2: by inline; auto; smt(mem_empty tau_bound).
-inline.
-rcondt{1} ^if; 1: by auto => /#.
-rcondt{2} ^if; 1: by auto => /#.
-auto => /> &1 &2 h0 h8 fresh dist signs ind lt8 r _; rewrite get_set_sameE /=.
-split; 1: smt(mem_set).
-split; 1: smt(get_set_neqE).
-split.
-+ move=> c hc.
-  have := inv_signs_set GetThenSet.x_arg{2} ctx{2} F1.RO.m{1} F1.RO.m{2} Split.IdealAll.RO.m{2} r h0 signs c hc.
-  smt().
-move: ind; rewrite /inv_indices /= => ind c hc; have := ind c hc.
-by rewrite get_set_neqE /#.
+while (={RO.m}(XOF,F1) /\ x{1} = x1{2} /\ ={signs, ctx} /\ ctx{1} <= 8).
++ by wp; call (: ={RO.m}(XOF,F1)); [sim | auto => /#].
+auto => /> ctx signs h1 _ h2.
+have ->> /= : ctx = 8 by smt().
+split; 1: smt(tau_bound to_challenge_aux0).
+move=> i indices rej h3 _ h4 hsz1 hsz2.
+have ->> : i = 256 by smt().
+by rewrite /to_challenge' /= rej_to_leakageK /to_challenge /full_leak /=; smt().
 qed.
 
-local op range_inv (sro : (int * int, byte) fmap) acc indices leak =
-  with indices = idx :: indices, leak = ctx :: leak =>
-    sro.[ctx - 1, acc] = Some idx /\ range_inv sro (acc + 1) indices leak
-  with indices = [], leak = [] => true
-  with indices = _, leak = _ => false.
- 
-local op inv3 sro (indices : byte list) (leak : leak_ir) s imin ctx =
-  (size leak = s) /\
-  sorted (<) (ctx :: leak) /\ range_inv sro imin indices leak.
+(** Correctness of the reprogramming *)
 
-local lemma range_inv_l sro c' i j r indices c leak :
-  c' < c - 1
-  => sorted (<=) (c :: leak)
-  => range_inv sro i indices (c :: leak)
-  => range_inv sro.[c', j <- r] i indices (c :: leak).
+lemma sets_rcons m x c bs b :
+  sets m x c (rcons bs b) = (sets m x c bs).[(x, c + size bs) <- b].
 proof.
-elim: leak indices c i j => + //=.
-- do 2!(case => //= ?). smt(get_set_neqE).
-move => c2 leak iH [] // idx indices c i j bound sorted inv.
-have [??] := inv.
-split; 1: smt(get_set_neqE).
-by apply iH => /#.
+elim: bs m c => [|b' bs ih] m c /=; 1: done.
+by rewrite ih addzA.
 qed.
 
-local op incl (p1 p2 : 'a rel) = forall x y, p1 x y => p2 x y.
+lemma sets0_rcons m x bs b :
+  sets m x 0 (rcons bs b) = (sets m x 0 bs).[(x, size bs) <- b].
+proof. by rewrite sets_rcons. qed.
 
-local lemma sorted_incl l r1 r2 :
-  incl<:'a> r1 r2 => sorted r1 l => sorted r2 l.
+lemma stream_rcons (s idx : byte list) (r : rej_ir) b rk :
+  size idx = size r =>
+  stream ((s, rcons idx b), rcons r rk) =
+  stream ((s, idx), r) ++ rcons (map from_int rk) b.
 proof.
-elim: l => [//|x l].
-case: l => // y l iH incl [xy sr1].
-split; 1: by apply incl.
-by apply iH.
-qed.
-
-(* Setting a key whose second component is beyond the range covered by
-   [leak] does not affect [range_inv]. *)
-local lemma range_inv_set_hi sro acc indices leak c j r :
-  acc + size leak <= j
-  => range_inv sro acc indices leak
-  => range_inv sro.[c, j <- r] acc indices leak.
-proof.
-elim: leak indices acc => [|c0 leak ih] [|idx indices] acc //=.
-move => hj [h1 h2].
-split; 1: smt(get_set_neqE size_ge0).
-by apply ih => //; smt().
-qed.
-
-(* Extending [range_inv] on the right when the binding is already there. *)
-local lemma range_inv_rcons_get sro acc indices leak idx ctx :
-  sro.[ctx - 1, acc + size leak] = Some idx
-  => range_inv sro acc indices leak
-  => range_inv sro acc (rcons indices idx) (rcons leak ctx).
-proof.
-elim: leak indices acc => [|c leak ih] [|idx0 indices] acc //=.
-move => h [-> h2] /=.
-by apply ih => //; smt().
-qed.
-
-local lemma sorted_rcons_last r (l : 'a list) (a b : 'a) :
-  r (last a l) b => sorted r (a :: l) => sorted r (a :: rcons l b).
-proof.
-move => rb sl.
-have [l' hl'] : exists l', a :: l = rcons l' (last a l) by apply rcons_lastE.
-have -> : a :: rcons l b = rcons (a :: l) b by done.
-rewrite hl'.
-by apply sorted_rcons_rcons => //; rewrite -hl'.
-qed.
-
-local equiv reprog1_hop2b :
-  SampleIndicesWithEnv(SetAfter').sample ~ SampleIndicesWithEnv(SetAfter).sample :
-  ={arg, F1.RO.m} ==> ={res, F1.RO.m}.
-proof.
-proc.
-call (: ={arg, glob SetAfter} /\ (inv3 SRO.m arg.`1.`2 arg.`2 tau (256 - tau) 8){2}
-        ==> ={F1.RO.m}).
-- proc.
-  while (={ctx, i, leak, glob SetAfter} /\ (inv3 SRO.m indices leak (256 - i) i ctx){2});
-    2: by auto => /#.
-  wp 3 6.
-  splitwhile{1} ^while: (ctx < ctx_success - 1).
-  (* the two loops now run in lockstep, up to [ctx_success - 1] *)
-  seq 3 3 : (={ctx, ctx_success, i, leak, glob SetAfter} /\
-    (ctx = ctx_success - 1 /\
-     inv3 SRO.m indices (ctx_success :: leak) (256 - i) i ctx){2}).
-  + while (={ctx, ctx_success, i, leak, glob SetAfter} /\
-      (inv3 SRO.m indices (ctx_success :: leak) (256 - i) i ctx){2});
-      2: by auto => />; smt(head_behead size_eq0 size_ge0).
-    by inline; auto => />; smt(sorted_incl range_inv_l).
-  (* the left program performs exactly one more iteration, on a key which is
-     already in [SRO.m] and bound to [head indices] *)
-  rcondt{1} ^while; 1: by auto => /#.
-  rcondf{1} ^while; 1: by move => ?; inline; auto => /#.
-  inline.
-  rcondf{1} ^if.
-  + by move => &m; auto => />; case: (indices{m}) => //=; smt(domE).
-  auto => /> &2 ?? _.
-  by case: (indices{2}) => //=; smt(dB_ll).
-conseq (: _ ==> ={signs, indices, leak, glob SetAfter} /\
-  (inv3 SRO.m indices leak tau (256 - tau) 8){2}); 1: smt().
-(* [and_then_sign] only reads keys that are already in [SRO.m] *)
-inline and_then_sign.
-while (={signs, indices, leak, ctx0, glob SetAfter} /\
-  (0 <= ctx0 /\ inv3 SRO.m indices leak tau (256 - tau) 8 /\
-   forall c, 0 <= c < 8 => (c, 0) \in SRO.m){2}).
-- inline.
-  rcondf{1} ^if; 1: by auto => /#.
-  rcondf{2} ^if; 1: by auto => /#.
-  by auto => /#.
-wp.
-(* the prefix is the same on both sides; all that is left is to establish
-   [inv3] on the right *)
-conseq
-  (: ={x, F1.RO.m} ==> ={signs, indices, leak, glob SetAfter})
-  (: true ==> true)
-  (: true ==> inv3 SRO.m indices leak tau (256 - tau) 8 /\
-     forall c, 0 <= c < 8 => (c, 0) \in SRO.m).
-- smt().
-- by auto.
-- while (256 - tau <= i /\ i <= 256 /\ size leak = i - (256 - tau) /\
-    sorted (<) (8 :: leak) /\ ctx = last 8 leak /\
-    range_inv SRO.m (256 - tau) indices leak /\
-    (forall c, 0 <= c < 8 => (c, 0) \in SRO.m)).
-  + inline; wp.
-    while (i0 = i /\ 256 - tau <= i /\ i < 256 /\
-      size leak = i - (256 - tau) /\
-      sorted (<) (8 :: leak) /\ ctx = last 8 leak /\
-      range_inv SRO.m (256 - tau) indices leak /\
-      (forall c, 0 <= c < 8 => (c, 0) \in SRO.m) /\
-      ctx <= ctx1 /\ (ctx1 = ctx => j = i + 1) /\
-      (ctx < ctx1 => SRO.m.[ctx1 - 1, i] = Some byte1)).
-    * by auto => />; smt(range_inv_set_hi mem_set get_set_sameE get_some).
-    by auto => />; smt(sorted_rcons_last last_rcons size_rcons range_inv_rcons_get).
-  wp.
-  while (0 <= ctx <= 8 /\ leak = [] /\ indices = [] /\
-    forall c, 0 <= c < ctx => (c, 0) \in SRO.m).
-  + by inline; auto; smt(mem_set).
-  by inline; auto; smt(tau_bound mem_empty).
-by sim.
-qed.
-
-local lemma mu_small_enough i :
-  mu dB (small_enough i) = Biased.clamp ((i + 1)%r / 256%r).
-proof.
-have -> : small_enough i = (fun j => j <= i) \o to_int.
-- by apply fun_ext => b; rewrite /small_enough /(\o) /#.
-rewrite -dmapE dB_to_int_drange.
-by apply mu_drange_le.
-qed.
-
-local lemma mu_small_enough_bnd i :
-  0 <= i < 255 => 0%r < mu dB (small_enough i) < 1%r.
-proof. by move => ?; rewrite mu_small_enough /Biased.clamp; smt(). qed.
-
-(* when i = 255 every byte is small enough, so the bias is trivial *)
-local lemma dbias255 b : b \in dbias 255 => b.
-proof.
-rewrite /support /dbias /dB_thres mu_small_enough /=.
-have -> : Biased.clamp (256%r / 256%r) = 1%r by rewrite /Biased.clamp; smt().
-by rewrite Biased.dbiased1E /Biased.clamp; smt().
-qed.
-
-local lemma to_int_bnd b : 0 <= to_int b < 256.
-proof. by rewrite to_int_in_surj; exists b. qed.
-
-local equiv reprog1_hop3 :
-  SampleIndicesWithEnv(SetAfterM(ProdRO)).sample ~ SampleIndicesWithEnv(SetAfterBias).sample :
-  ={arg, F1.RO.m} ==> ={res, F1.RO.m}.
-proof. (* FIXME: this proof feels very clumsy. *)
-proc.
-sim 9 9.
-while (#post /\ ={i, ctx} /\ (0 <= i /\
-  forall ctx' i', ctx <= ctx' => i <= i' =>
-    (ctx', i') \notin SplitCodom.I2.RO.m /\ (ctx', i') \notin SplitCodom.I1.RO.m){1}); last first.
-- conseq />. wp. while (#post); 1: by inline; auto; smt(mem_set).
-  by inline; auto; smt(mem_empty tau_bound).
-inline get_indices. wp.
-conseq />.
-seq  5 4 : (={leak, ctx0, i, i0, SplitCodom.I1.RO.m, SplitCodom.I2.RO.m} /\ (0 <= i /\ i = i0 /\ (ctx0 - 1, i0) \in SplitCodom.I2.RO.m /\ byte0 = snd (oget SplitCodom.I2.RO.m.[ctx0 - 1, i0])
-  /\ (forall ctx' i', ctx0 <= ctx' => i0 <= i' => (ctx', i') \notin SplitCodom.I2.RO.m /\ (ctx', i') \notin SplitCodom.I1.RO.m)
-){1}); last first.
-- inline; auto => />; smt(dcond_prod_ll).
-while (={leak, ctx0, i, i0, SplitCodom.I1.RO.m, SplitCodom.I2.RO.m} /\ (i = i0 /\ 0 <= i < 256 /\ (b{2} => (ctx0 - 1, i0) \in SplitCodom.I2.RO.m /\ byte0 = snd (oget SplitCodom.I2.RO.m.[ctx0 - 1, i0]))
-  /\ (forall ctx' i', ctx0 <= ctx' => i0 <= i' =>
-    (ctx', i') \notin SplitCodom.I2.RO.m /\ (ctx', i') \notin SplitCodom.I1.RO.m)){1}); 2: auto => /#.
-inline{1} ^ <@.
-seq 2 1 : (={i, leak, ctx0, i0, SplitCodom.I1.RO.m, SplitCodom.I2.RO.m} /\ r1{1} = b{2} /\
-  (0 <= i < 256 /\ i = i0 /\ x0 = (ctx0, i0) /\ r1 \in dbias i0 /\
-  forall ctx' i', ctx0 <= ctx' => i0 <= i' =>
-  (ctx', i') \notin SplitCodom.I2.RO.m /\ (ctx' + 1, i') \notin SplitCodom.I1.RO.m){1}).
-- inline.
-  rcondt{1} ^if; 1: by auto => /#.
-  rcondt{2} ^if; 1: by auto => /#.
-  auto => />. smt(mem_set get_set_sameE).
-inline.
-rcondt{1} ^if; 1: by auto => /#.
-rcondt{2} ^if; 1: by auto => /#.
-auto => /> &2 2? Hb H [] rf rt.
-case (i0{2} = 255) => [E | ?].
-(* i0 = 255: every byte is small enough, so b is true and the value always fits *)
-- move: Hb; rewrite E => /dbias255 ->.
-  move => _; rewrite !get_set_sameE mem_set => />.
-  split; 2: smt(to_int_bnd).
-  move => ctx' i' 2?.
-  have ? := H (ctx' - 1) i' _ _; 1,2: smt().
-  have ? := H ctx' i' _ _; 1,2: smt().
-  split; 2: smt().
-  smt(mem_set).
-have Hsupp /Hsupp [#] _ _ 2? := dcond_prod_supp (small_enough i0{2}) _ dB_ll _.
-- by apply mu_small_enough_bnd; smt().
-rewrite !get_set_sameE mem_set => />.
-(* unsure why smt(mem_set) does not suffice here *)
-split; 2: smt().
-move => ctx' i' 2?.
-have ? := H (ctx' - 1) i' _ _; 1,2: smt().
-have ? := H ctx' i' _ _; 1,2: smt().
-split; 2: smt().
-smt(mem_set).
-qed.
-
-(* for FullEager: the environment only accesses the value oracle I2 through
-   its parameter, so it is a legitimate RO distinguisher. *)
-local module SamplerBiasD(I2 : SplitCodom.I2.RO) = {
-  proc distinguish = SampleIndicesWithEnv(SetAfterBiasM(I2)).sample
-}.
-
-(* Make the sampling of the index bytes lazy: an instance of the
-   eager/lazy theorem for the value oracle I2. *)
-local equiv reprog1_hop3b :
-  SampleIndicesWithEnv(SetAfterBias).sample ~ SampleIndicesWithEnv(SetAfterBiasLazy).sample :
-  ={arg, F1.RO.m} ==> ={res, F1.RO.m}.
-proof.
-transitivity SamplerBiasD(SplitCodom.I2.RO).distinguish
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m, GetThenSet.x_arg, SplitCodom.I1.RO.m, SplitCodom.I2.RO.m} ==>
- ={res, F1.RO.m}); 1,2: smt().
-- by proc; sim.
-transitivity SamplerBiasD(SplitCodom.I2.LRO).distinguish
-(={arg, F1.RO.m, GetThenSet.x_arg, SplitCodom.I1.RO.m, SplitCodom.I2.RO.m} ==>
- ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- conseq (SplitCodom.I2.FullEager.RO_LRO_D SamplerBiasD _); 1,2: smt().
-  by move => ?; exact dcond_prod_ll.
-by proc; sim.
-qed.
-
-(* for splitRO *)  
-local module SamplerD(R : Split.IdealAll.RO) = {
-  proc distinguish = SampleIndicesWithEnv(SetAfterM(R)).sample
-}.
-
-local abbrev inv_fresh (i1 : (int * int, 'a) fmap) (i2 : (int * int, 'b) fmap) ctx =
-  forall ctx' i, ctx <= ctx' => (ctx', i) \notin i1 /\ (ctx', i) \notin i2.
-
-(* [ranges_false m1 m2 i ctx leak] records, for the k-th index [i + k] of
-   [leak], that the bias RO [m1] answered [false] on every context from the
-   starting one (included) to the successful one (excluded), and that the
-   value RO [m2] holds no entry at all on those contexts. *)
-local op ranges_false (m1 : (int * int, bool) fmap) (m2 : (int * int, 'a) fmap) i ctx leak =
-  with leak = [] => true
-  with leak = c :: leak =>
-    ctx < c
-    /\ (forall c', ctx <= c' < c - 1 => m1.[c', i] = Some false /\ (c', i) \notin m2)
-    /\ ranges_false m1 m2 (i + 1) c leak.
-
-(* Writing outside of the index window covered by [leak] is harmless. *)
-local lemma ranges_false_set1 m1 (m2 : (int * int, 'a) fmap) i ctx leak c j b :
-  (j < i \/ i + size leak <= j) =>
-  ranges_false m1 m2 i ctx leak =>
-  ranges_false m1.[c, j <- b] m2 i ctx leak.
-proof.
-elim: leak i ctx => //= c0 leak ih i ctx hj [h1 [h2 h3]].
-split; 1: done.
-split; 1: smt(get_set_neqE size_ge0).
-by apply ih => //; smt(size_ge0).
-qed.
-
-local lemma ranges_false_set2 m1 (m2 : (int * int, 'a) fmap) i ctx leak c j v :
-  (j < i \/ i + size leak <= j) =>
-  ranges_false m1 m2 i ctx leak =>
-  ranges_false m1 m2.[c, j <- v] i ctx leak.
-proof.
-elim: leak i ctx => //= c0 leak ih i ctx hj [h1 [h2 h3]].
-split; 1: done.
-split; 1: smt(mem_set size_ge0).
-by apply ih => //; smt(size_ge0).
-qed.
-
-(* Extending [ranges_false] on the right with one more index. *)
-local lemma ranges_false_rcons m1 (m2 : (int * int, 'a) fmap) i ctx leak c :
-  last ctx leak < c =>
-  (forall c', last ctx leak <= c' < c - 1 =>
-     m1.[c', i + size leak] = Some false /\ (c', i + size leak) \notin m2) =>
-  ranges_false m1 m2 i ctx leak =>
-  ranges_false m1 m2 i ctx (rcons leak c).
-proof.
-elim: leak i ctx => [|c0 leak ih] i ctx /=; 1: smt().
-move => hlast hrng [h1 [h2 h3]].
-do 2!(split; 1: done).
-by apply ih => //; smt(size_ge0).
-qed.
-
-(* On the contexts strictly below the successful one, the left program reads a
-   [false] bit out of [SplitCodom.I1.RO.m] and a *fresh* value out of
-   [SplitCodom.I2.RO.m]: this is exactly what the right program samples and
-   stores by hand. *)
-local equiv reprog1_hop4_lemma1 :
- SetAfterBiasLazy.and_then_indices ~ SetAfterLazyNoIdea.and_then_indices :
- ={arg, F1.RO.m, SplitCodom.I1.RO.m, SplitCodom.I2.RO.m, GetThenSet.x_arg}
- /\ (size arg.`2 = tau /\
-     ranges_false SplitCodom.I1.RO.m SplitCodom.I2.RO.m (256 - tau) 8 arg.`2){1}
- ==> ={F1.RO.m}.
-proof.
-proc.
-while (={ctx, i, leak, indices, F1.RO.m, GetThenSet.x_arg,
-         SplitCodom.I1.RO.m, SplitCodom.I2.RO.m} /\
-  (size leak = 256 - i /\
-   ranges_false SplitCodom.I1.RO.m SplitCodom.I2.RO.m i ctx leak){1}); last first.
-- by auto => /> /#.
-inline F1.RO.set. wp.
-while (={ctx, ctx_success, i, leak, indices, F1.RO.m, GetThenSet.x_arg,
-         SplitCodom.I1.RO.m, SplitCodom.I2.RO.m} /\
-  (ctx <= ctx_success - 1 /\ size leak = 255 - i /\
-   (forall c', ctx <= c' < ctx_success - 1 =>
-      SplitCodom.I1.RO.m.[c', i] = Some false /\ (c', i) \notin SplitCodom.I2.RO.m) /\
-   ranges_false SplitCodom.I1.RO.m SplitCodom.I2.RO.m (i + 1) ctx_success leak){1});
-  last first.
-- by auto => />; smt(head_behead size_eq0 size_ge0).
-inline. inline.
-rcondf{1} ^if; 1: by auto => /> /#.
-rcondf{2} ^if; 1: by auto => /> /#.
-rcondt{1} ^if; 1: by auto => /> /#.
-auto => />.
-smt(get_set_sameE mem_set ranges_false_set2).
-qed.
-
-local equiv reprog1_hop4 :
- SampleIndicesWithEnv(SetAfterBiasLazy).sample ~ SampleIndicesWithEnv(SetAfterLazyNoIdea).sample :
-  ={arg, F1.RO.m} ==> ={res, F1.RO.m}.
-proof.
-proc.
-call reprog1_hop4_lemma1.
-(* [and_then_sign] is the same on both sides and only touches index 0 *)
-inline and_then_sign.
-while (={signs, indices, leak, ctx0, F1.RO.m, GetThenSet.x_arg,
-         SplitCodom.I1.RO.m, SplitCodom.I2.RO.m} /\
-  (size leak = tau /\
-   ranges_false SplitCodom.I1.RO.m SplitCodom.I2.RO.m (256 - tau) 8 leak){1}).
-- by inline; auto => />; smt(tau_bound ranges_false_set1 ranges_false_set2).
-wp.
-(* the prefix is the same on both sides; all that is left is to establish
-   [ranges_false] on the left *)
-conseq
-  (: ={x, F1.RO.m} ==> ={signs, indices, leak, F1.RO.m, GetThenSet.x_arg,
-                         SplitCodom.I1.RO.m, SplitCodom.I2.RO.m})
-  (: true ==> size leak = tau /\
-      ranges_false SplitCodom.I1.RO.m SplitCodom.I2.RO.m (256 - tau) 8 leak)
-  (: true ==> true).
-- smt().
-while (256 - tau <= i <= 256 /\ size leak = i - (256 - tau) /\
-  8 <= ctx /\ ctx = last 8 leak /\
-  ranges_false SplitCodom.I1.RO.m SplitCodom.I2.RO.m (256 - tau) 8 leak /\
-  inv_fresh SplitCodom.I1.RO.m SplitCodom.I2.RO.m ctx).
-inline SetAfterBiasM(SplitCodom.I2.LRO).get_indices. wp.
-(* the rejection loop answers [false] on [ctx .. ctx1 - 2] and never touches
-   [SplitCodom.I2.RO.m] *)
-seq 4 : (256 - tau <= i < 256 /\ i0 = i /\ size leak = i - (256 - tau) /\
-  8 <= ctx /\ ctx = last 8 leak /\ ctx < ctx1 /\
-  (forall c', ctx <= c' < ctx1 - 1 =>
-     SplitCodom.I1.RO.m.[c', i] = Some false /\ (c', i) \notin SplitCodom.I2.RO.m) /\
-  ranges_false SplitCodom.I1.RO.m SplitCodom.I2.RO.m (256 - tau) 8 leak /\
-  (forall c' i', ctx1 <= c' => (c', i') \notin SplitCodom.I1.RO.m) /\
-  (forall c' i', ctx <= c' => (c', i') \notin SplitCodom.I2.RO.m)).
-while (256 - tau <= i < 256 /\ i0 = i /\ size leak = i - (256 - tau) /\
-  8 <= ctx /\ ctx = last 8 leak /\ ctx <= ctx1 /\ (b => ctx < ctx1) /\
-  (forall c', ctx <= c' < (if b then ctx1 - 1 else ctx1) =>
-     SplitCodom.I1.RO.m.[c', i] = Some false /\ (c', i) \notin SplitCodom.I2.RO.m) /\
-  ranges_false SplitCodom.I1.RO.m SplitCodom.I2.RO.m (256 - tau) 8 leak /\
-  (forall c' i', ctx1 <= c' => (c', i') \notin SplitCodom.I1.RO.m) /\
-  (forall c' i', ctx <= c' => (c', i') \notin SplitCodom.I2.RO.m)).
-inline.
-rcondt ^if; 1: by auto => /#.
-auto => />.
-smt(get_set_sameE get_set_neqE mem_set ranges_false_set1).
-by auto => /#.
-inline.
-rcondt ^if; 1: by auto => /#.
-auto => />.
-move => &hr h1 h2 hsz h8 hlt hrng hrf hf1 hf2 r00 _.
-do 4!(split; 1: smt(size_rcons last_rcons)).
-split; last by smt(mem_set).
-apply ranges_false_rcons; 1: smt().
-- move => c' hc'; have [??] := hrng c' hc'; smt(mem_set).
-by apply ranges_false_set2 => //; smt().
-wp.
-while (0 <= ctx <= 8 /\ leak = [] /\ inv_fresh SplitCodom.I1.RO.m SplitCodom.I2.RO.m ctx).
-- by inline; auto => />; smt(mem_set).
-by inline; auto; smt(mem_empty tau_bound).
-- by auto.
-by sim.
-qed.
-
-local equiv reprog1_hop5 :
- SampleIndicesWithEnv(SetAfterLazyNoIdea).sample ~ SampleIndicesWithEnv(SetAfterLazyNoBiasRO).sample :
-  ={arg, F1.RO.m} ==> ={res, F1.RO.m}.
-proof.
-proc.
-call (: ={GetThenSet.x_arg, F1.RO.m, SplitCodom.I2.RO.m}).
-- wp. while (={GetThenSet.x_arg, F1.RO.m, SplitCodom.I2.RO.m, ctx, indices, i, leak}); 2: by auto.
-  inline F1.RO.set. wp.
-  while (={GetThenSet.x_arg, F1.RO.m, SplitCodom.I2.RO.m, ctx, indices, i, leak, ctx_success}); 2: by auto.
-  auto => />.
-  islossless => ?.
-  exact Biased.dbiased_ll.
-conseq />.
-(* [and_then_sign] only reads index 0 of [SplitCodom.I1.RO.m], where the two
-   maps agree and where the key is already present on both sides *)
-inline and_then_sign.
-while (={signs, indices, leak, ctx0, F1.RO.m, GetThenSet.x_arg, SplitCodom.I2.RO.m} /\
-  0 <= ctx0{1} /\
-  (forall c, SplitCodom.I1.RO.m{1}.[c, 0] = SplitCodom.I1.RO.m{2}.[c, 0]) /\
-  (forall c, 0 <= c < 8 => (c, 0) \in SplitCodom.I1.RO.m{2})).
-- inline SplitCodom.RO_Pair(SplitCodom.I1.RO, SplitCodom.I2.LRO).get.
-  inline SplitCodom.I1.RO.get.
-  rcondf{1} ^if; 1: by auto => />; smt(domE).
-  rcondf{2} ^if; 1: by auto => /#.
-  seq 4 4 : (#pre /\ ={x0, r1}); 1: by auto => /> /#.
-  by inline; auto => /> /#.
-wp.
-conseq (: _ ==> ={signs, indices, leak, F1.RO.m, GetThenSet.x_arg, SplitCodom.I2.RO.m} /\
-  (forall c, SplitCodom.I1.RO.m{1}.[c, 0] = SplitCodom.I1.RO.m{2}.[c, 0]) /\
-  (forall c, 0 <= c < 8 => (c, 0) \in SplitCodom.I1.RO.m{2})); 1: smt().
-(* in the index loop the left [SplitCodom.I1.RO.get] always hits a fresh key,
-   so it samples exactly what the right program samples directly; the keys it
-   adds have a non-zero index, hence index 0 keeps agreeing *)
-while (={signs, indices, leak, ctx, i, F1.RO.m, GetThenSet.x_arg, SplitCodom.I2.RO.m} /\
-  (256 - tau <= i){1} /\ (8 <= ctx){1} /\
-  (forall c i', ctx{1} <= c => (c, i') \notin SplitCodom.I1.RO.m{1}) /\
-  (forall c, SplitCodom.I1.RO.m{1}.[c, 0] = SplitCodom.I1.RO.m{2}.[c, 0]) /\
-  (forall c, 0 <= c < 8 => (c, 0) \in SplitCodom.I1.RO.m{2})).
-- inline SetAfterLazyNoIdea.get_indices SetAfterLazyNoBiasRO.get_indices. wp.
-  seq 4 4 : (={signs, indices, leak, ctx1, i, i0, F1.RO.m, GetThenSet.x_arg,
-               SplitCodom.I2.RO.m} /\
-    (i0 = i /\ 256 - tau <= i /\ i < 256 /\ 8 <= ctx1){1} /\
-    (forall c i', ctx1{1} <= c => (c, i') \notin SplitCodom.I1.RO.m{1}) /\
-    (forall c, SplitCodom.I1.RO.m{1}.[c, 0] = SplitCodom.I1.RO.m{2}.[c, 0]) /\
-    (forall c, 0 <= c < 8 => (c, 0) \in SplitCodom.I1.RO.m{2}));
-    last by inline; auto => /> /#.
-  while (={signs, indices, leak, ctx1, i, i0, b, F1.RO.m, GetThenSet.x_arg,
-           SplitCodom.I2.RO.m} /\
-    (i0 = i /\ 256 - tau <= i /\ i < 256 /\ 8 <= ctx1){1} /\
-    (forall c i', ctx1{1} <= c => (c, i') \notin SplitCodom.I1.RO.m{1}) /\
-    (forall c, SplitCodom.I1.RO.m{1}.[c, 0] = SplitCodom.I1.RO.m{2}.[c, 0]) /\
-    (forall c, 0 <= c < 8 => (c, 0) \in SplitCodom.I1.RO.m{2})); 2: by auto.
-  inline{1} SplitCodom.I1.RO.get SplitCodom.I2.LRO.sample.
-  rcondt{1} ^if; 1: by auto => /#.
-  by auto => />; smt(mem_set get_set_sameE get_set_neqE tau_bound).
-wp.
-(* the sign loop is the same code on both sides and fills exactly the keys
-   [(0, 0) .. (7, 0)] *)
-conseq (: _ ==> ={signs, indices, leak, ctx, F1.RO.m, GetThenSet.x_arg,
-                 SplitCodom.I1.RO.m, SplitCodom.I2.RO.m} /\
-  ctx{1} = 8 /\ (forall c i', 8 <= c => (c, i') \notin SplitCodom.I1.RO.m{1}) /\
-  (forall c, 0 <= c < 8 => (c, 0) \in SplitCodom.I1.RO.m{2})); 1: smt(tau_bound).
-while (={signs, indices, leak, ctx, F1.RO.m, GetThenSet.x_arg,
-         SplitCodom.I1.RO.m, SplitCodom.I2.RO.m} /\
-  0 <= ctx{1} <= 8 /\
-  (forall c i', ctx{1} <= c => (c, i') \notin SplitCodom.I1.RO.m{1}) /\
-  (forall c, 0 <= c < ctx{1} => (c, 0) \in SplitCodom.I1.RO.m{2})).
-- by inline; auto => />; smt(mem_set).
-by inline; auto => />; smt(mem_empty).
-qed.
-
-(* [SplitCodom.I2.RO.m] is only ever read at index 0 -- by [and_then_sign] --
-   so all that must be kept of it is that both sides agree there, and that the
-   eight keys [and_then_sign] reads are already filled in. *)
-local abbrev inv_zero (m1 m2 : (int * int, byte * byte) fmap) =
-  (forall c, m1.[c, 0] = m2.[c, 0]) /\ (forall c, 0 <= c < 8 => (c, 0) \in m2).
-
-local equiv reprog1_hop6 :
- SampleIndicesWithEnv(SetAfterLazyNoBiasRO).sample ~ SampleIndicesWithEnv(SetAfterLazyNoOutRO).sample :
-  ={arg, F1.RO.m} ==> ={res, F1.RO.m}.
-proof.
-proc.
-(* [and_then_indices] only writes [SplitCodom.I2.RO.m] on the left *)
-call (: ={GetThenSet.x_arg, F1.RO.m}).
-while (={GetThenSet.x_arg, F1.RO.m, ctx, indices, i, leak}); 2: by auto.
-inline F1.RO.set. wp.
-while (={GetThenSet.x_arg, F1.RO.m, ctx, indices, i, leak, ctx_success}); 2: by auto.
-by auto.
-conseq (: _ ==> ={signs, indices, leak, GetThenSet.x_arg, F1.RO.m}); 1: smt().
-(* [and_then_sign] only reads index 0, where the two maps agree and are set *)
-inline and_then_sign.
-while (={signs, indices, leak, ctx0, F1.RO.m, GetThenSet.x_arg, SplitCodom.I1.RO.m} /\
-  0 <= ctx0{2} /\ inv_zero SplitCodom.I2.RO.m{1} SplitCodom.I2.RO.m{2}).
-inline.
-rcondf{1} 8; 1: by auto; smt(domE).
-rcondf{2} 8; 1: by auto; smt(domE).
-by auto => /> /#.
-wp.
-(* the left [SplitCodom.I2.RO.get] always hits a fresh key, and never index 0
-   since [256 - tau > 0] *)
-while (={signs, indices, leak, ctx, i, F1.RO.m, GetThenSet.x_arg, SplitCodom.I1.RO.m} /\
-  (8 <= ctx /\ 256 - tau <= i /\
-   forall c' i', ctx <= c' => (c', i') \notin SplitCodom.I2.RO.m){1} /\
-  inv_zero SplitCodom.I2.RO.m{1} SplitCodom.I2.RO.m{2}).
-inline get_indices. wp.
-(* the rejection loops are identical and leave [SplitCodom.I2.RO.m] alone *)
-seq 4 4 : (={signs, indices, leak, ctx, i, i0, ctx1, F1.RO.m, GetThenSet.x_arg,
-             SplitCodom.I1.RO.m} /\
-  (8 <= ctx /\ 256 - tau <= i /\ i = i0 /\ i < 256 /\ ctx < ctx1 /\
-   forall c' i', ctx <= c' => (c', i') \notin SplitCodom.I2.RO.m){1} /\
-  inv_zero SplitCodom.I2.RO.m{1} SplitCodom.I2.RO.m{2}).
-while (={signs, indices, leak, ctx, i, i0, ctx1, b, F1.RO.m, GetThenSet.x_arg,
-         SplitCodom.I1.RO.m} /\
-  (8 <= ctx /\ 256 - tau <= i /\ i = i0 /\ i < 256 /\ ctx <= ctx1 /\ (b => ctx < ctx1) /\
-   forall c' i', ctx <= c' => (c', i') \notin SplitCodom.I2.RO.m){1} /\
-  inv_zero SplitCodom.I2.RO.m{1} SplitCodom.I2.RO.m{2}).
-by auto => /> /#.
-by auto => /> /#.
-inline{1}.
-rcondt{1} ^if; 1: by auto => /#.
-by auto => />; smt(tau_bound mem_set get_set_sameE get_set_neqE).
-wp.
-(* the sign loop is the same on both sides, and fills in index 0 *)
-while (={signs, indices, leak, ctx, F1.RO.m, GetThenSet.x_arg,
-         SplitCodom.I1.RO.m, SplitCodom.I2.RO.m} /\
-  (0 <= ctx <= 8 /\ inv_fresh SplitCodom.I1.RO.m SplitCodom.I2.RO.m ctx){1} /\
-  (forall c, 0 <= c < ctx{2} => (c, 0) \in SplitCodom.I2.RO.m{2})).
-inline.
-rcondt{1} ^if; 1: by auto => /#.
-rcondt{2} ^if; 1: by auto => /#.
-rcondt{1} ^if; 1: by auto => /#.
-rcondt{2} ^if; 1: by auto => /#.
-by auto => />; smt(mem_set).
-by inline; auto; smt(mem_empty).
-qed.
-
-(* for SplitRO *)
-local module SamplerNoOutD(R : Split.IdealAll.RO) = {
-  proc distinguish = SampleIndicesWithEnv(SetAfterNoOutM(R)).sample
-}.
-
-(* Split the internal RO into the bias oracle I1 and the value oracle I2:
-   an instance of the SplitCodom theorem. *)
-local equiv reprog1_hop2c :
-  SampleIndicesWithEnv(SetAfter).sample ~ SampleIndicesWithEnv(SetAfterM(ProdRO)).sample :
-  ={arg, F1.RO.m} ==> ={res, F1.RO.m}.
-proof.
-transitivity Split.IdealAll.MainD(SamplerD, SRO).distinguish
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m, GetThenSet.x_arg} ==> ={res, F1.RO.m}); 1,2: smt().
-- proc; inline{2} 2.
-  seq 0 2 : (x{1} = x0{2} /\ ={F1.RO.m}); 1: by inline*; auto.
-  by wp; sim.
-transitivity Split.IdealAll.MainD(SamplerD, ProdRO).distinguish
-(={arg, F1.RO.m, GetThenSet.x_arg} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- by conseq (SplitCodom.RO_split SamplerD); smt().
-proc; inline{1} 2.
-seq 2 0 : (x0{1} = x{2} /\ ={F1.RO.m}); 1: by inline*; auto.
-by wp; sim.
-qed.
-
-(* Go back from the split oracle (I1, I2) to SRO, which is now only used
-   for the sign bytes: an instance of the SplitCodom theorem. *)
-local equiv reprog1_hop7a :
- SampleIndicesWithEnv(SetAfterLazyNoOutRO).sample ~ SampleIndicesWithEnv(SetAfterSRO).sample :
-  ={arg, F1.RO.m} ==> ={res, F1.RO.m}.
-proof.
-transitivity Split.IdealAll.MainD(SamplerNoOutD, ProdRO).distinguish
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m, GetThenSet.x_arg} ==> ={res, F1.RO.m}); 1,2: smt().
-- proc; inline{2} 2.
-  seq 0 2 : (x{1} = x0{2} /\ ={F1.RO.m}); 1: by inline*; auto.
-  by wp; sim.
-transitivity Split.IdealAll.MainD(SamplerNoOutD, SRO).distinguish
-(={arg, F1.RO.m, GetThenSet.x_arg} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- by symmetry; conseq (SplitCodom.RO_split SamplerNoOutD); smt().
-proc; inline{1} 2.
-seq 2 0 : (x0{1} = x{2} /\ ={F1.RO.m}); 1: by inline*; auto.
-by wp; sim.
-qed.
-
-local equiv reprog1_hop7b :
- SampleIndicesWithEnv(SetAfterSRO).sample ~ F1.DelayReprog(SampleIndicesRaw, ReprogIndices).sample :
-  ={arg, F1.RO.m} ==> ={res, F1.RO.m}.
-proof.
-proc.
-inline{2} ^r<@.
-inline{2} ReprogIndices(F1.RO).reprogram.
-inline{1} SetAfterNoOutM(Split.IdealAll.RO).and_then_indices
-          SetAfterNoOutM(Split.IdealAll.RO).and_then_sign
-          SetAfterNoOutM(Split.IdealAll.RO).get_indices
-          SetAfterNoOutM(Split.IdealAll.RO).get_sign
-          SetAfterNoOutM(Split.IdealAll.RO).init_inner.
-(* reprogramming of the index bytes: same control flow, same samples --
-   the left keeps the first component of the pair, the right the second one,
-   but they are named the other way round *)
-while (={F1.RO.m} /\ GetThenSet.x_arg{1} = x1{2} /\ i1{1} = i0{2} /\
-  ctx3{1} = ctx0{2} /\ leak1{1} = leak0{2} /\ indices0{1} = indices0{2} /\
-  ((signs{1}, indices{1}), leak{1}) = r{2}).
-- inline F1.RO.set. wp.
-  while (={F1.RO.m} /\ GetThenSet.x_arg{1} = x1{2} /\ i1{1} = i0{2} /\
-    ctx3{1} = ctx0{2} /\ ctx_success{1} = ctx_success{2} /\
-    leak1{1} = leak0{2} /\ indices0{1} = indices0{2} /\
-    ((signs{1}, indices{1}), leak{1}) = r{2}); 2: by auto.
-  by inline; auto.
-wp.
-(* reprogramming of the sign bytes: the left reads [SRO.m], which already
-   holds exactly the bytes collected in [signs] *)
-while (={F1.RO.m} /\ GetThenSet.x_arg{1} = x1{2} /\ ctx2{1} = ctx0{2} /\
-  0 <= ctx2{1} <= 8 /\ leak{1} = leak0{2} /\ indices{1} = indices0{2} /\
-  ((signs{1}, indices{1}), leak{1}) = r{2} /\
-  signs0{2} = drop ctx0{2} signs{1} /\ size signs{1} = 8 /\
-  (forall c, 0 <= c < 8 => SRO.m{1}.[c, 0] = Some (nth witness signs{1} c))).
-- inline{1} Split.IdealAll.RO.get.
-  rcondf{1} ^if; 1: by auto; smt(domE).
-  inline F1.RO.set. wp. rnd{1}. auto => />.
-  move => &1 &2 h0 h8 hsz hm hlt.
-  by rewrite (drop_nth witness ctx0{2} signs{1}) 1:/# /= hm 1:/# /=; smt(dB_ll).
-wp.
-conseq (: _ ==> ={signs, indices, leak, F1.RO.m} /\ GetThenSet.x_arg{1} = x{2} /\
-  size signs{1} = 8 /\
-  (forall c, 0 <= c < 8 => SRO.m{1}.[c, 0] = Some (nth witness signs{1} c)));
-  1: smt(drop0).
-(* the index loop never touches [SRO.m] and is identical on both sides *)
-while (={signs, indices, leak, ctx, i, F1.RO.m} /\ GetThenSet.x_arg{1} = x{2} /\
-  size signs{1} = 8 /\
-  (forall c, 0 <= c < 8 => SRO.m{1}.[c, 0] = Some (nth witness signs{1} c))).
-- wp; rnd;
-  while (={b, signs, indices, leak, i, F1.RO.m} /\ ctx1{1} = ctx{2} /\
-    i0{1} = i{2} /\ GetThenSet.x_arg{1} = x{2} /\ size signs{1} = 8 /\
-    (forall c, 0 <= c < 8 => SRO.m{1}.[c, 0] = Some (nth witness signs{1} c)));
-    by auto.
-wp.
-conseq (: _ ==> ={signs, indices, leak, ctx, F1.RO.m} /\ GetThenSet.x_arg{1} = x{2} /\
-  size signs{1} = 8 /\
-  (forall c, 0 <= c < 8 => SRO.m{1}.[c, 0] = Some (nth witness signs{1} c))); 1: smt().
-(* the left [SRO.get] always hits a fresh key, so it samples [dB] like the
-   right does, and logs the sampled byte at index [(ctx, 0)] *)
-while (={signs, indices, leak, ctx, F1.RO.m} /\ GetThenSet.x_arg{1} = x{2} /\
-  0 <= ctx{1} <= 8 /\ size signs{1} = ctx{1} /\
-  (forall c j, ctx{1} <= c => (c, j) \notin SRO.m{1}) /\
-  (forall c, 0 <= c < ctx{1} => SRO.m{1}.[c, 0] = Some (nth witness signs{1} c))).
-- inline{1}; rcondt{1} ^if; 1: by auto => /#.
-  by auto => />; smt(mem_set get_set_sameE get_set_neqE nth_rcons size_rcons).
-by inline; auto => />; smt(mem_empty).
+move=> hsz; rewrite /stream /= zip_rcons // map_rcons -cats1 flatten_cat.
+by rewrite flatten_seq1 catA.
 qed.
 
 local equiv reprog1_correct :
   SampleIndices(F1.ProgRO).sample ~ F1.DelayReprog(SampleIndicesRaw, ReprogIndices).sample :
   ={arg, F1.RO.m} ==> ={res, F1.RO.m}.
 proof.
-transitivity SampleIndicesWithEnv(GetThenSet).sample
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- exact reprog1_hop1. (* syntactic *)
-transitivity SampleIndicesWithEnv(SetAfter').sample
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- exact reprog1_hop2. (* use an internal RO, delay sampling *)
-transitivity SampleIndicesWithEnv(SetAfter).sample
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- exact reprog1_hop2b. (* reuse known indices during reprogramming *)
-transitivity SampleIndicesWithEnv(SetAfterM(ProdRO)).sample
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- exact reprog1_hop2c. (* split the internal RO, uses SplitRO *)
-transitivity SampleIndicesWithEnv(SetAfterBias).sample
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- exact reprog1_hop3. (* Restructure index rejection sampling *)
-transitivity SampleIndicesWithEnv(SetAfterBiasLazy).sample
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- exact reprog1_hop3b. (* lazy sampling of I2, uses FullEager *)
-transitivity SampleIndicesWithEnv(SetAfterLazyNoIdea).sample
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- exact reprog1_hop4. (* remove use of bias in reprogramming *)
-transitivity SampleIndicesWithEnv(SetAfterLazyNoBiasRO).sample
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- exact reprog1_hop5. (* systematic sampling of bytes in reprogramming *)
-transitivity SampleIndicesWithEnv(SetAfterLazyNoOutRO).sample
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- exact reprog1_hop6. (* remove oracle I1 *)
-transitivity SampleIndicesWithEnv(SetAfterSRO).sample
-(={arg, F1.RO.m} ==> ={res, F1.RO.m})
-(={arg, F1.RO.m} ==> ={res, F1.RO.m}); 1,2: smt().
-- exact reprog1_hop7a. (* back to a single RO for the signs, uses SplitRO *)
-exact reprog1_hop7b. (* syntactic *)
+proc; inline{2} ^r<@; inline{2} ReprogIndices(F1.RO).reprogram; inline F1.RO.set.
+(* the reprogramming loop writes the stream of bytes in order *)
+while{2} (F1.RO.m{1} = sets F1.RO.m{2} x1{2} ctx0{2} bs{2}) (size bs{2}).
++ move=> &1 z; auto => /> &2 hbs.
+  by case: (bs{2}) hbs => //= l; smt(size_ge0).
+wp.
+(* the left program writes the bytes as it reads them, on fresh contexts *)
+while (={signs, indices, rej, i, ctx, byte} /\ x{1} = x{2} /\
+       F1.RO.m{1} = sets F1.RO.m{2} x{2} 0 (stream ((signs, indices), rej)){2} /\
+       ctx{2} = size (stream ((signs, indices), rej)){2} /\
+       size indices{2} = size rej{2}).
++ wp.
+  while (={signs, indices, rej, i, j, ctx, rejc, byte} /\ x{1} = x{2} /\
+         F1.RO.m{1} = sets F1.RO.m{2} x{2} 0 (stream ((signs, indices), rej) ++
+                        map from_int rejc ++ (if i < j then [] else [byte])){2} /\
+         ctx{2} = size (stream ((signs, indices), rej) ++
+                        map from_int rejc ++ (if i < j then [] else [byte])){2} /\
+         (j <= i => j = to_int byte){2} /\
+         size indices{2} = size rej{2}).
+  + inline F1.ProgRO.get; auto => /> &2 h1 hsz hlt b hb.
+    rewrite !get_set_sameE /= !cats0.
+    case: (i{2} < to_int b) => h /=.
+    * by rewrite cats0 map_rcons tK -rcons_cat sets0_rcons size_rcons.
+    by rewrite cats1 sets0_rcons size_rcons.
+  auto => /> &2 hsz hlt.
+  have -> /= : i{2} < i{2} + 1 by smt().
+  rewrite !cats0; split; 1: smt().
+  move=> byte j rejc _ _ _.
+  by rewrite stream_rcons // -cats1 catA /=; smt(size_rcons).
+wp.
+while (={signs, ctx, byte} /\ x{1} = x{2} /\
+       F1.RO.m{1} = sets F1.RO.m{2} x{2} 0 signs{2} /\
+       ctx{2} = size signs{2} /\ ctx{2} <= 8).
++ inline F1.ProgRO.get; auto => /> &2 h1 h2 b _.
+  by rewrite get_set_sameE /= sets0_rcons size_rcons; smt().
+auto => /> &2 signs _ _ _; rewrite /stream /= cats0 /=.
+by move=> *; smt(size_eq0 size_ge0).
 qed.
 
 (* Conversion of adversary from this theory to the RejectionRO theory *)
 local module (ToRR(A : XOFAdversary) : Distinguisher)(R : F1.RO_t, S : F2.Sampler_t) = {
-  module S' : ROC_t = {
-    include S [init]
-    proc get = S.sample
-  }
-  proc distinguish = A(R, S').run
+  proc distinguish = A(R, ToCS(S)).run
 }.
 
 module Sim(R : ROC_t) : XOF_t = {
@@ -2019,7 +507,7 @@ module (ORedXOFROC(A : XOFAdversary) : ROCAdversary)(R : ROC_t) = {
   proc run(x : input) = {
     var r;
     Sim(R).init();
-    r <@ A(Sim(R), R).run(x);
+    r <@ A(Sim(R), ToC(R)).run(x);
     return r;
   }
 }.
@@ -2028,118 +516,12 @@ section SampleIndices_Proofs.
 import F1.
 
 (** Helping lemmas *)
-local lemma foldl_o_None  (f : 'a -> 's -> 's option) (l:'a list) :
-  foldl_o f None l = None.
-proof. by elim: l. qed.
-
-local lemma foldl_o_cons  (f : 'a -> 's -> 's option) os a (l:'a list) :
-  foldl_o f os (a::l) = foldl_o f (obind (f a) os) l.
-proof. done. qed.
-
-lemma foldl_o_cat ['b, 'a] (f : 'a -> 'b -> 'b option) z0 s1 s2 :
-     foldl_o f z0 (s1 ++ s2) = foldl_o f (foldl_o f z0 s1) s2.
-proof. by rewrite /foldl_o foldl_cat. qed.
-
-(* FIXME : move this in RejectionRO *)
-lemma LogRO_get_ll x0 log0 m0 : phoare [ F1.LogRO.get :
-  F1.LogRO.log = log0 /\ x = x0 /\ RO.m = m0 /\ x \in RO.m
-  ==>
-  F1.LogRO.log = rcons log0 (x0, res) /\ RO.m = m0 /\ RO.m.[x0] = Some res
-] = 1%r.
-proof.
-proc; inline *; swap 2 -1; wp.
-conseq (:true); last by islossless; apply (F1.dout_ll x0).
-move=> /> b; smt(domE get_setE set_get).
-qed.
-
-local module T = {
-(*  proc s1 (i:int) : bool * int = {
-    var byte;
-    byte <$ dB;
-    return (to_int byte <= i, to_int byte);
-  }
-  proc s2 (i:int) : bool * int = {
-    var t, byte;
-    t <$ Biased.dbiased ((i + 1)%r / 256%r);
-    if (t) byte <$ drange 0 (i + 1); else byte <$ drange (i + 1) 256;
-    return (t, byte);
-  }
-*)
-  proc s () = {
-    var signs, li;
-    signs <$ dlist dB 8;
-    li <$ dtaurange (fun i => geom_i i `*` dB_le i);
-    return
-      let indices = unzip2 li in
-      let leak = foldl_map (fun i k => (i+k, i+k)) 8 (unzip1 li) in
-      ((signs, indices), leak.`2);
-  }
-
-  proc s' () = {
-    var r;
-    r <$ dI `*` dtaurange geom_i;
-    return (r.`1, (foldl_map (fun i k => (i+k, i+k)) 8 r.`2).`2);
-  }
-}.
-
-(* FIXME: move this *)
-local lemma dprodA ['a 'b 'c] (d1:'a distr) (d2:'b distr) (d3:'c distr) :
-  (d1 `*` d2) `*` d3 = dmap (d1 `*` (d2 `*` d3)) (fun (p : _ * (_ * _)) => ((p.`1, p.`2.`1), p.`2.`2)).
-proof.
-  rewrite !dprod_dlet dmap_dlet dlet_dlet.
-  apply eq_dlet => //= x1.
-  rewrite dmap_dlet !dlet_dlet; apply eq_dlet => //= x2.
-  rewrite !dlet_dlet dlet_unit /=; apply eq_dlet => //= x3.
-  by rewrite dlet_unit /= dmap_dunit.
-qed.
-
-(* FIXME : move this *)
-local lemma djoinmap_prod ['a 'b 'c] (d1 : 'c -> 'a distr) (d2 : 'c -> 'b distr) l:
-  djoinmap (fun i => d1 i `*` d2 i) l =
-  dmap (djoinmap d1 l `*` djoinmap d2 l) (fun l : _ * _ => zip l.`1 l.`2).
-proof.
-  elim: l => //=.
-  + by rewrite !djoin_nil dprod_dunit dmap_dunit.
-  move=> c l ih.
-  rewrite !djoin_cons /= ih !dmap_dprod !dmap_comp dmap_dprodR dmap_comp.
-  rewrite !dprodA !dmap_comp !(dprod_dlet (d1 c)) !dmap_dlet; apply eq_dlet => //= x1.
-  rewrite (dprodC (djoinmap d1 l) (_ `*` _)) dprodA !(dprod_dlet (d2 c)).
-  rewrite !dmap_dlet !dlet_dlet; apply eq_dlet => //= x2.
-  rewrite dprodC !dlet_dlet; apply eq_dlet => //= -[l2 l1].
-  by rewrite /(\o) /= !(dlet_unit,dmap_dunit) /= !(dlet_unit, dmap_dunit) /= !dmap_dunit.
-qed.
-
-local equiv T_s_s' : T.s ~ T.s' : true ==> ={res}.
-proof.
-  proc.
-  rndsem{1} 0.
-  rnd
-    (fun (sli : _ * _) => ((sli.`1, unzip2 sli.`2), unzip1 sli.`2))
-    (fun (r: (_ * _) * _) => (r.`1.`1, zip r.`2 r.`1.`2)); skip => /=.
-  rewrite -dprod_dlet djoinmap_prod (dprodC (djoinmap geom_i _)).
-  rewrite dmap_comp dmap_dprodR /dI dprodA /(\o).
-  split.
-  + move=> ? /supp_dmap /> ? /supp_dprod [] ? /supp_dprod [] /supp_djoinmap [] hsz1 _ /supp_djoinmap [] hsz2 _.
-    by rewrite !(unzip1_zip, unzip2_zip) -?hsz1 -?hsz2.
-  move=> _; split.
-  + move=> ? /supp_dmap /> ? /supp_dprod [] ? /supp_dprod [] /supp_djoinmap [] hsz1 _ /supp_djoinmap [] hsz2 _.
-    rewrite !dmap1E /(\o) /pred1 /=.
-    apply mu_eq_support => /= ? /supp_dprod [] ? /supp_dprod [] /supp_djoinmap [] hsz1' _ /supp_djoinmap [] hsz2' _.
-    smt (unzip1_zip unzip2_zip).
-  move=> _ ? /supp_dmap /> [signs [indices leaks]] /supp_dprod [] ? /supp_dprod [] /supp_djoinmap [] /= hsz1 ? /supp_djoinmap [] /= hsz2 ?.
-  split; 2: by move=> _; rewrite !(unzip1_zip, unzip2_zip) -?hsz1 -?hsz2.
-  apply supp_dmap => /=; exists (signs, (indices, leaks)) => /=.
-  split; 2: by rewrite !(unzip1_zip, unzip2_zip) -?hsz1 -?hsz2.
-  apply supp_dprod; split => //.
-  by apply supp_dprod => /=; split; apply supp_djoinmap.
-qed.
-
 local lemma mu_dB_le i :
   mu dB (fun b => to_int b <= i) = Biased.clamp ((i + 1)%r / 256%r).
 proof.
 have -> : (fun b => to_int b <= i) = (fun j => j <= i) \o to_int.
 - by apply fun_ext.
-rewrite -dmapE dB_to_int_drange.
+rewrite -dmapE dB_to_int.
 by apply mu_drange_le.
 qed.
 
@@ -2157,7 +539,7 @@ exlim
   (listmax (fun (x x' : in_t * int) => x.`2 <= x'.`2) witness (FSet.elems (fdom F1.RO.m))).`2
   => mi.
 splitwhile ^while: (ctx <= mi).
-seq 2 : true 1%r 1%r 0%r 0%r (0 < i < 256 /\ (i < j => forall c, ctx <= c => (x, c) \notin F1.RO.m)) => //.
+seq 3 : true 1%r 1%r 0%r 0%r (0 < i < 256 /\ (i < j => forall c, ctx <= c => (x, c) \notin F1.RO.m)) => //.
 - while ((forall c, mi < c => (x, c) \notin F1.RO.m)).
   - inline *; auto => />; smt(get_setE).
   auto => /> &2 _ _; split; 2: smt().
@@ -2171,7 +553,7 @@ conseq (: (0 < i < 256 /\ forall (c : int), ctx <= c => (x, c) \notin F1.RO.m) =
 while (0 < i < 256 /\ forall (c : int), ctx <= c => (x, c) \notin F1.RO.m)
             (b2i (i < j)) 1 ((i+1)%r / 256%r); 1..3: smt().
 - move=> h.
-  seq 3 : true 1%r 1%r 0%r 0%r
+  seq 4 : true 1%r 1%r 0%r 0%r
     (0 < i < 256 /\ forall (c : int), ctx <= c => (x, c) \notin F1.RO.m) => //.
   - inline *; auto => />; smt(get_setE).
   by islossless; apply dB_ll.
@@ -2195,7 +577,7 @@ sp.
 (* [ProgRO] resamples on every query: the rejection loop terminates a.s. *)
 conseq (: 0 < i < 256 ==> true); 1: smt().
 while (0 < i < 256) (b2i (i < j)) 1 ((i+1)%r / 256%r); 1..3: smt().
-- move=> h; seq 3 : true 1%r 1%r 0%r 0%r (0 < i < 256) => //.
+- move=> h; seq 4 : true 1%r 1%r 0%r 0%r (0 < i < 256) => //.
   - by inline *; auto.
   by islossless; apply dB_ll.
 - by inline *; auto => />; rewrite dB_ll.
@@ -2205,26 +587,76 @@ wp. rnd (fun r => to_int r <= i); auto => /> &hr *.
 by rewrite mu_dB_le; smt(get_set_sameE).
 qed.
 
+(** Ideal sampling: the output of [SampleIndicesRaw] is distributed as
+    [dI `*` dRej]. *)
+
+local module T = {
+  proc s () = {
+    var signs, li;
+    signs <$ dlist dB 8;
+    li <$ dtaurange (fun i => dRejPos i `*` dB_le i);
+    return ((signs, unzip2 li), unzip1 li);
+  }
+
+  proc s' () = {
+    var r;
+    r <$ dI `*` dRej;
+    return r;
+  }
+}.
+
+local equiv T_s_s' : T.s ~ T.s' : true ==> ={res}.
+proof.
+proc.
+rndsem{1} 0.
+rnd
+  (fun (sli : _ * _) => ((sli.`1, unzip2 sli.`2), unzip1 sli.`2))
+  (fun (r: (_ * _) * _) => (r.`1.`1, zip r.`2 r.`1.`2)); skip => /=.
+rewrite -dprod_dlet djoinmap_prod (dprodC (djoinmap dRejPos _)).
+rewrite dmap_comp dmap_dprodR /dI dprodA /(\o).
+rewrite /dRej.
+split.
++ move=> ? /supp_dmap /> ? /supp_dprod [] ? /supp_dprod [] /supp_djoinmap [] hsz1 _ /supp_djoinmap [] hsz2 _.
+  by rewrite !(unzip1_zip, unzip2_zip) -?hsz1 -?hsz2.
+move=> _; split.
++ move=> ? /supp_dmap /> ? /supp_dprod [] ? /supp_dprod [] /supp_djoinmap [] hsz1 _ /supp_djoinmap [] hsz2 _.
+  rewrite !dmap1E /(\o) /pred1 /=.
+  apply mu_eq_support => /= ? /supp_dprod [] ? /supp_dprod [] /supp_djoinmap [] hsz1' _ /supp_djoinmap [] hsz2' _.
+  smt (unzip1_zip unzip2_zip).
+move=> _ ? /supp_dmap /> [signs [indices leaks]] /supp_dprod [] ? /supp_dprod [] /supp_djoinmap [] /= hsz1 ? /supp_djoinmap [] /= hsz2 ?.
+split; 2: by move=> _; rewrite !(unzip1_zip, unzip2_zip) -?hsz1 -?hsz2.
+apply supp_dmap => /=; exists (signs, (indices, leaks)) => /=.
+split; 2: by rewrite !(unzip1_zip, unzip2_zip) -?hsz1 -?hsz2.
+apply supp_dprod; split => //.
+by apply supp_dprod => /=; split; apply supp_djoinmap.
+qed.
+
 (* clones for manipulating distribution in the next proof. *)
 local clone DList.Program as Ds with
   type t <- byte,
   op d <- dB.
 
-local clone DMapSampling as Dm with
-  type t1 <- (byte list * byte list) * int list,
-  type t2 <- (byte list * byte list) * int list.
+local clone DList.ParametricProgram as Dl with
+  type t <- int.
 
 local clone JoinMapSampling as Dj with
   type ta <- int,
-  type tb <- int * byte.
-
-local clone DProd.ProdSampling as Dpb with
-  type t1 <- byte,
-  type t2 <- byte.
+  type tb <- int list * byte.
 
 local clone DProd.ProdSampling as Dcb with
-  type t1 <- int,
+  type t1 <- int list,
   type t2 <- byte.
+
+local clone DProd.DLetSampling as Dd with
+  type t <- int,
+  type u <- int list.
+
+local clone Geometric.ModuleBased.RejSampling as RS with
+  type out_t <- byte.
+
+local lemma mu_small_enough i :
+  mu dB (small_enough i) = Biased.clamp ((i + 1)%r / 256%r).
+proof. by rewrite -mu_dB_le; apply mu_eq => b; rewrite /small_enough /#. qed.
 
 local lemma dB_thres_val i : 0 <= i < 256 => dB_thres i = (i + 1)%r / 256%r.
 proof. by move=> ?; rewrite /dB_thres mu_small_enough /Biased.clamp; smt(). qed.
@@ -2238,91 +670,290 @@ have -> /= : 0%r < mu dB (fun (x : byte) => small_enough i x).
 by rewrite /dB_le; congr; apply fun_ext => b; rewrite /small_enough /#.
 qed.
 
+(* The distribution of a try of the rejection sampling loop, knowing whether
+   it succeeds, is the one of the RO below. *)
+local lemma sample_biased_distr i t :
+  0 <= i < 256 => t \in Biased.dbiased (mu dB (small_enough i)) =>
+  (if t then dcond dB (small_enough i) else dB \ small_enough i) =
+  (if t then dcond' dB (small_enough i) else dcond' dB (predC (small_enough i))).
+proof.
+move=> hi ht; case: t ht => /= ht.
++ rewrite /dcond'; have -> // : exists x, small_enough i x /\ x \in dB.
+  by exists (from_int 0); rewrite /small_enough tK' // dB_full /#.
+have hi255 : i < 255.
++ move: ht; rewrite /support Biased.dbiased1E mu_small_enough /Biased.clamp.
+  smt().
+rewrite /dcond'; have -> /= : exists x, predC (small_enough i) x /\ x \in dB.
++ by exists (from_int 255); rewrite /predC /small_enough tK' // dB_full /#.
+by rewrite /(\) /dcond.
+qed.
+
+(* A RO for the tries of the rejection sampling loop at position [i]:
+   [(i, k, false)] is the value of the [k]-th try if it fails,
+   [(i, k, true)] if it succeeds. *)
+local clone PROM.FullRO as PR with
+  type in_t <- int * int * bool,
+  type out_t <- byte,
+  op dout <- fun (x : int * int * bool) =>
+    if x.`3 then dcond' dB (small_enough x.`1)
+    else dcond' dB (predC (small_enough x.`1)),
+  type d_in_t <- int,
+  type d_out_t <- int list * byte.
+
+local module PD(G : PR.RO) = {
+  proc distinguish(i : int) = {
+    var t, c, k, b, rejc;
+    t <- false;
+    c <- 0;
+    while (!t) {
+      t <$ dbias i;
+      G.sample(i, c, t);
+      c <- c + 1;
+    }
+    rejc <- [];
+    k <- 0;
+    while (k < c - 1) {
+      b <@ G.get(i, k, false);
+      rejc <- rcons rejc (to_int b);
+      k <- k + 1;
+    }
+    b <@ G.get(i, c - 1, true);
+    return (rejc, b);
+  }
+}.
+
 (* One iteration of the index loop of [SampleIndicesRaw] *)
 local module Step = {
   proc left(i : int) = {
-    var b, c, _byte, byte;
-    c <- 0;
-    b <- false;
-    while (!b) { b <$ dbias i; c <- c + 1; }
-    (_byte, byte) <$ dcond_prod (small_enough i) dB;
-    return (c, byte);
+    var j, byte, rejc;
+    byte <- witness;
+    rejc <- [];
+    j <- i + 1;
+    while (i < j) {
+      byte <$ dB;
+      j <- to_int byte;
+      rejc <- if i < j then rcons rejc j else rejc;
+    }
+    return (rejc, byte);
+  }
+
+  proc left2(i : int) = {
+    var t, byte, rejc;
+    byte <- witness;
+    rejc <- [];
+    t <- false;
+    while (!t) {
+      (t, byte) <@ RS.Rej.sample_test(dB, small_enough i);
+      rejc <- if !t then rcons rejc (to_int byte) else rejc;
+    }
+    return (rejc, byte);
   }
 
   proc mid(i : int) = {
-    var c, _byte, byte;
-    c <$ geometric (dB_thres i);
-    _byte <$ dcond' dB (predC (small_enough i));
-    byte <$ dcond' dB (small_enough i);
-    return (c, byte);
+    var t, byte, rejc;
+    byte <- witness;
+    rejc <- [];
+    t <- false;
+    while (!t) {
+      (t, byte) <@ RS.Rej.sample_biased(dB, small_enough i);
+      rejc <- if !t then rcons rejc (to_int byte) else rejc;
+    }
+    return (rejc, byte);
+  }
+
+  proc geo(i : int) = {
+    var rejc, byte;
+    rejc <@ Dd.SampleDep.sample(geom_i i, fun c => dlist (dRejB i) (c - 1));
+    byte <$ dB_le i;
+    return (rejc, byte);
+  }
+
+  proc geo1(i : int) = {
+    var c, rejc, byte;
+    c <@ Geometric.ModuleBased.M.loop_try(dB_thres i);
+    rejc <@ Dl.LoopSnoc.sample(dRejB i, c - 1);
+    byte <$ dB_le i;
+    return (rejc, byte);
   }
 
   proc right(i : int) = {
     var r;
-    r <$ geom_i i `*` dB_le i;
+    r <@ Dcb.S.sample(dRejPos i, dB_le i);
     return r;
   }
 }.
 
-local equiv step_left_mid : Step.left ~ Step.mid : ={i} ==> ={res}.
+local equiv step_left_left2 : Step.left ~ Step.left2 : ={i} ==> ={res}.
 proof.
-proc.
-seq 3 1 : (={i, c}).
-+ transitivity*{1} { c <@ Geometric.ModuleBased.M.loop_try(dB_thres i); }.
-  + inline *; wp.
-    while (b{1} = b0{2} /\ c{1} = i0{2} /\ p{2} = dB_thres i{1}); by auto.
-  transitivity*{1} { c <@ Geometric.ModuleBased.M.geometric(dB_thres i); }.
-  + by call Geometric.ModuleBased.loop_try_equiv; auto.
-  by inline *; auto.
-transitivity*{1}
-  { (_byte, byte) <@ Dpb.S.sample(dcond' dB (predC (small_enough i)),
-                                  dcond' dB (small_enough i)); }.
-+ by inline *; auto.
-transitivity*{1}
-  { (_byte, byte) <@ Dpb.S.sample2(dcond' dB (predC (small_enough i)),
-                                   dcond' dB (small_enough i)); }.
-+ by call Dpb.sample_sample2; auto.
+proc; inline RS.Rej.sample_test; wp.
+while (={byte, rejc, i} /\ (i < j){1} = !t{2}).
++ by auto => /> &2 _ b _; rewrite /small_enough.
+by auto => />; smt().
+qed.
+
+local equiv step_left2_mid : Step.left2 ~ Step.mid : ={i} ==> ={res}.
+proof.
+proc; wp.
+while (={t, byte, rejc, i}).
++ by wp; call RS.sample_test_biased; auto => />; smt(dB_ll).
+by auto.
+qed.
+
+local equiv step_mid_ro : Step.mid ~ PR.MainD(PD, PR.RO).distinguish :
+  i{1} = x{2} /\ 0 <= i{1} < 256 ==> ={res}.
+proof.
+proc; inline *; wp; rnd{2}; wp.
+(* the right program reads back the values written by its first loop *)
+while{2} (rejc{2} = take k{2} rejc{1} /\ 0 <= k{2} <= c{2} - 1 /\
+          c{2} = size rejc{1} + 1 /\
+          (forall k, 0 <= k < size rejc{1} =>
+             (i{2}, k, false) \in PR.RO.m{2} /\
+             to_int (oget PR.RO.m{2}.[(i{2}, k, false)]) = nth 0 rejc{1} k) /\
+          PR.RO.m{2}.[(i{2}, c{2} - 1, true)] = Some byte{1})
+         (c{2} - 1 - k{2}).
++ move=> &1 z; auto => /> &hr hk0 hk1 hin hacc hk.
+  split; 1: exact dcond'_ll.
+  move=> _ v _ _; have [hm hv] := hin k{hr} _; 1: smt().
+  rewrite hm /= (take_nth 0) 1:/# hv /=; smt().
+wp.
+(* each try of the left loop is the sample of a fresh key of the RO *)
+while (={t} /\ i{1} = i{2} /\ 0 <= i{1} < 256 /\
+       c{2} = size rejc{1} + b2i t{1} /\
+       (forall k, 0 <= k < size rejc{1} =>
+          (i{2}, k, false) \in PR.RO.m{2} /\
+          to_int (oget PR.RO.m{2}.[(i{2}, k, false)]) = nth 0 rejc{1} k) /\
+       (t{1} => PR.RO.m{2}.[(i{2}, c{2} - 1, true)] = Some byte{1}) /\
+       (forall k b, c{2} <= k => (i{2}, k, b) \notin PR.RO.m{2})).
++ wp; rnd; wp; rnd; auto => /> &1 &2 hi0 hi1 hacc _ hfresh ht _ b hb _.
+  have {hfresh} hf : forall k0 b0, size rejc{1} <= k0 => (i{2}, k0, b0) \notin PR.RO.m{2}.
+  + by move=> k0 b0 hk; apply hfresh; move: ht; case: (t{2}) => //= _; rewrite /b2i /#.
+  rewrite (sample_biased_distr i{2} b) //=.
+  move=> r hr; split => // _.
+  have hnin := hf (size rejc{1}) b _; 1: done.
+  rewrite /b2i /= hnin /=.
+  case: b hb hnin hr => hb hnin hr /=.
+  + split; 1: smt(mem_set get_setE).
+    rewrite get_set_sameE /= => k0 b0 hk; rewrite mem_set /= negb_or.
+    by split; [apply hf | ]; smt().
+  rewrite size_rcons /=; split.
+  + move=> k0 hk0 hk1; rewrite mem_set get_setE nth_rcons.
+    case: (k0 = size rejc{1}) => [->|hne] /=; 1: done.
+    have /= -> := hne; smt().
+  move=> k0 b0 hk; rewrite mem_set /= negb_or.
+  by split; [apply hf | ]; smt().
+auto => />.
+move=> &2 hx0 hx1; split; 1: smt(mem_empty).
+move=> byte rejc t m t' _ _ hacc hbyte hfresh.
+have hb1 : b2i true = 1 by rewrite /b2i.
+move: hbyte; rewrite hb1 /= take0 /= => hbyte; split; 1: smt(size_ge0).
+move=> m' k; split; 1: smt().
+move=> hk hk0 hk1 hacc' hbyte'; split; 1: exact dcond'_ll.
+move=> _ r _; rewrite domE hbyte' /=.
+have ->> : k = size rejc by smt().
+by rewrite take_size.
+qed.
+
+local equiv step_lro_geo1 : PR.MainD(PD, PR.LRO).distinguish ~ Step.geo1 :
+  x{1} = i{2} /\ 0 <= i{2} < 256 ==> ={res}.
+proof.
+proc; inline *.
+wp; rnd; wp.
+while (k{1} = i1{2} /\ rejc{1} = l{2} /\ n{2} = c{1} - 1 /\ d{2} = dRejB i{2} /\
+       i{1} = i{2} /\ 0 <= i{2} < 256 /\
+       (forall kk bb, (i{1}, kk, bb) \in PR.RO.m{1} => kk < k{1} /\ !bb)).
++ wp; rnd to_int from_int; auto => />.
+  move=> &1 &2 hi0 hi1 hm hk; split.
+  + by move=> r /supp_dmap [b [_ ->]]; rewrite tK.
+  move=> _; split.
+  + move=> r /supp_dmap [b [_ ->]]; rewrite tK /dRejB dmap1E /(\o) /pred1.
+    by apply mu_eq => b' /=; apply eq_iff; split => [/to_int_inj|->].
+  move=> _ r hr; split; 1: by rewrite supp_dmap; exists r.
+  move=> _; rewrite tK /=.
+  have hn : (i{2}, i1{2}, false) \notin PR.RO.m{1} by smt().
+  rewrite hn /= get_set_sameE /= cats1 /=.
+  by move=> kk bb; rewrite mem_set; smt().
+wp.
+while (t{1} = b{2} /\ c{1} = i0{2} /\ p{2} = dB_thres i{2} /\ i{1} = i{2}).
++ by auto.
+auto => />.
+move=> &2 hi0 hi1 t b c _ _; split; 1: smt(mem_empty).
+move=> m k _ _ hm; rewrite dcond'_small_enough //=.
+move=> r hr; have -> /= : (i{2}, c - 1, true) \notin m by smt().
+by rewrite hr get_set_sameE.
+qed.
+
+local equiv step_geo1_geo : Step.geo1 ~ Step.geo :
+  ={i} /\ 0 <= i{2} < 256 ==> ={res}.
+proof.
+proc; rnd; inline{2} Dd.SampleDep.sample; wp.
+seq 1 3 : (={i} /\ c{1} = t{2} /\ du{2} = (fun c => dlist (dRejB i{2}) (c - 1)) /\ 0 <= i{2} < 256).
++ transitivity*{1} { c <@ Geometric.ModuleBased.M.geometric(dB_thres i); }.
+  + by call Geometric.ModuleBased.loop_try_equiv.
+  by inline *; auto => /> &2 h0 h1; rewrite dB_thres_val.
+transitivity{1} { rejc <@ Dl.Sample.sample(dRejB i, c - 1); }
+  (={i, c} ==> ={i, rejc})
+  (={i} /\ c{1} = t{2} /\ du{2} = (fun c => dlist (dRejB i{2}) (c - 1)) ==> ={i} /\ rejc{1} = u{2}).
++ by move=> &1 &2 h; exists c{1} i{1}; smt().
++ smt().
++ by symmetry; call Dl.Sample_LoopSnoc_eq.
 by inline *; auto.
 qed.
 
-local equiv step_mid_right :
-  Step.mid ~ Step.right : ={i} /\ 0 <= i{1} < 256 ==> ={res}.
+local equiv step_lro_geo : PR.MainD(PD, PR.LRO).distinguish ~ Step.geo :
+  x{1} = i{2} /\ 0 <= i{2} < 256 ==> ={res}.
+proof.
+transitivity Step.geo1
+  (x{1} = i{2} /\ 0 <= i{2} < 256 ==> ={res}) (={i} /\ 0 <= i{2} < 256 ==> ={res}); 1,2: smt().
++ exact step_lro_geo1.
+exact step_geo1_geo.
+qed.
+
+local equiv dep_dlet : Dd.SampleDep.sample ~ Dd.SampleDLet.sample : ={dt, du} ==> ={res}.
+proof.
+transitivity Dd.SampleDep.sample2
+  (={dt, du} ==> res{1} = res{2}.`2) (={dt, du} ==> res{1}.`2 = res{2}); 1,2: smt().
++ exact Dd.SampleDep.
+transitivity Dd.SampleDLet.sample2
+  (={dt, du} ==> ={res}) (={dt, du} ==> res{1}.`2 = res{2}); 1,2: smt().
++ exact Dd.SampleDepDLet2.
+by symmetry; conseq Dd.SampleDLet => /> /#.
+qed.
+
+local equiv step_geo_right : Step.geo ~ Step.right : ={i} ==> ={res}.
 proof.
 proc.
-swap{1} 2 1.
-rnd{1}.
-conseq (: _ ==> (c{1}, byte{1}) = r{2}); 1: smt(dcond'_ll).
-transitivity*{1}
-  { (c, byte) <@ Dcb.S.sample2(geometric (dB_thres i), dcond' dB (small_enough i)); }.
-+ by inline *; auto.
-transitivity*{1}
-  { (c, byte) <@ Dcb.S.sample(geometric (dB_thres i), dcond' dB (small_enough i)); }.
-+ by symmetry; call Dcb.sample_sample2; auto.
-inline *; auto.
-by move=> &1 &2 [-> hi] /=; rewrite dB_thres_val // dcond'_small_enough //= /geom_i /#.
+transitivity*{2} { r <@ Dcb.S.sample2(dRejPos i, dB_le i); }.
++ inline{2} Dcb.S.sample2; wp; rnd.
+  transitivity*{1} { rejc <@ Dd.SampleDLet.sample(geom_i i, fun c => dlist (dRejB i) (c - 1)); }.
+  + by call dep_dlet.
+  by inline *; auto.
+by symmetry; call Dcb.sample_sample2.
 qed.
 
 local equiv step_eq :
   Step.left ~ Step.right : ={i} /\ 0 <= i{1} < 256 ==> ={res}.
 proof.
-transitivity Step.mid
-  (={i} ==> ={res}) (={i} /\ 0 <= i{1} < 256 ==> ={res}) => //; 1: smt().
-+ by apply step_left_mid.
-by apply step_mid_right.
+transitivity Step.left2 (={i} ==> ={res}) (={i} /\ 0 <= i{1} < 256 ==> ={res});
+  1,2: smt(); 1: exact step_left_left2.
+transitivity Step.mid (={i} ==> ={res}) (={i} /\ 0 <= i{1} < 256 ==> ={res});
+  1,2: smt(); 1: exact step_left2_mid.
+transitivity PR.MainD(PD, PR.RO).distinguish
+  (i{1} = x{2} /\ 0 <= i{1} < 256 ==> ={res}) (x{1} = i{2} /\ 0 <= i{2} < 256 ==> ={res});
+  1,2: smt(); 1: exact step_mid_ro.
+transitivity PR.MainD(PD, PR.LRO).distinguish
+  (={x} ==> ={res}) (x{1} = i{2} /\ 0 <= i{2} < 256 ==> ={res}); 1,2: smt().
++ conseq (PR.FullEager.RO_LRO PD _) => //.
+  by move=> x; case: (x.`3) => _; apply dcond'_ll.
+transitivity Step.geo
+  (x{1} = i{2} /\ 0 <= i{2} < 256 ==> ={res}) (={i} ==> ={res}); 1,2: smt().
++ exact step_lro_geo.
+exact step_geo_right.
 qed.
 
 equiv SampleIndices_IdealSampling :
   SampleIndicesRaw.sample ~ F1.ISAsProc.get : ={arg} ==> ={res}.
 proof.
 proc.
-proc change{2} 1 : { r <@ Dm.S.sample(dI `*` dtaurange geom_i,
-  (fun r : _ * _ => (r.`1, (foldl_map (fun i k => (i+k, i+k)) 8 r.`2).`2))); }.
-+ inline *; auto => />.
-  rewrite -(dmap_dprod _ _ idfun (fun r => (foldl_map (fun (i k : int) => (i + k, i + k)) 8 r).`2)).
-  by rewrite dmap_id /dL //.
-proc change{2} 1 : { r <@ Dm.S.map(dI `*` dtaurange geom_i,
-  (fun r : _ * _ => (r.`1, (foldl_map (fun i k => (i+k, i+k)) 8 r.`2).`2))); }.
-+ by call Dm.sample.
 proc change{2} 1 : { r <@ T.s'(); }.
 + by inline *; auto.
 proc change{2} 1 : { r <@ T.s(); }.
@@ -2336,32 +967,35 @@ seq 4 1 : (={x, signs} /\ ctx{1} = 8).
   + by call Ds.Sample_LoopSnoc_eq.
   inline sample get; wp.
   by while ((ctx,signs){1} = (i, l){2} /\ n{2} = 8 /\ ctx{1} <= 8); auto => /> *; rewrite ?cats1 /#.
-pose dp := fun i => geom_i i `*` dB_le i.
+pose dp := fun i => dRejPos i `*` dB_le i.
 proc change{2} 1 :
   { li <@ Dj.S.sample (dp, (range (256 - tau) 256)); }.
 + by inline *; auto.
 proc change{2} 1 :
   { li <@ Dj.S.loop_first (dp, (range (256 - tau) 256)); }.
 + by call Dj.Sample_Loop_first_eq.
-inline *;wp.
-pose fm := fun l => foldl_map (fun (i k : int) => (i + k, i + k)) 8 l.
-while (indices{1} = unzip2 l{2} /\ (ctx{1}, leak{1}) = fm (unzip1 l{2}) /\
-      xs{2} = range i{1} 256 /\ d{2} = dp /\  0 < i{1} <= 256);
+inline *; wp.
+while (indices{1} = unzip2 l{2} /\ rej{1} = unzip1 l{2} /\
+      xs{2} = range i{1} 256 /\ d{2} = dp /\ 0 < i{1} <= 256);
  last first.
 + by auto => />; smt (range_ltn range_geq tau_bound).
 wp.
 exlim ctx{1} => ctx_.
-transitivity*{1} { (ctx, byte) <@ Step.left(i); ctx <- ctx_ + ctx; }.
+transitivity*{1} { (rejc, byte) <@ Step.left(i); j <- to_int byte;
+                   ctx <- ctx_ + size rejc + 1; }.
 + inline Step.left; wp.
-  rnd; while (b{1} = b0{2} /\ ctx{1} = ctx_ + c{2} /\ i{1} = i0{2}).
-  + by auto => /> /#.
+  while ((!(i{1} < j{1}) => byte{1} = byte0{2}) /\ j{1} = j0{2} /\ i{1} = i0{2} /\ rejc{1} = rejc0{2} /\
+         ctx{1} = ctx_ + size rejc0{2} + (if i{1} < j{1} then 0 else 1)).
+  + by auto => />; smt(size_rcons).
   by auto => /> /#.
-transitivity*{1} { (ctx, byte) <@ Step.right(i); ctx <- ctx_ + ctx; }.
+transitivity*{1} { (rejc, byte) <@ Step.right(i); j <- to_int byte;
+                   ctx <- ctx_ + size rejc + 1; }.
 + by wp; call step_eq; auto => /> /#.
-inline Step.right; auto.
-move=> &1 &2 /> heq h1 h2 hi _.
-rewrite /dp (range_ltn _ _ hi) /= => rl hrl /=; move: heq.
-by rewrite !map_rcons /fm /foldl_map foldl_rcons /= => <- /=; smt(range_ltn range_geq).
+inline Step.right Dcb.S.sample; auto.
+move=> &1 &2 [#] _ -> -> -> -> h0 h1 hi _ /=.
+rewrite /dp (range_ltn _ _ hi) /=.
+move=> r hr; rewrite hr /= !map_rcons /=.
+smt(range_ltn range_geq).
 qed.
 
 hoare SampleIndices_OpSampleGame x :
@@ -2372,7 +1006,7 @@ proc; inline sample F1.LogRO.get.
 seq 8 : (signs = map snd F1.LogRO.log /\ size F1.LogRO.log = 8 /\
          all (fun (p : (in_t * int) * byte) => p.`1.`1 = x) F1.LogRO.log /\
          unzip2 (unzip1 F1.LogRO.log) = iota_ 0 8 /\
-         leak = [] /\ indices = [] /\ ctx = 8 /\ x0 = x).
+         rej = [] /\ indices = [] /\ ctx = 8 /\ x0 = x).
 + while (signs = map snd F1.LogRO.log /\ size F1.LogRO.log = ctx /\
          all (fun (p : (in_t * int) * byte) => p.`1.`1 = x) F1.LogRO.log /\
          unzip2 (unzip1 F1.LogRO.log) = iota_ 0 ctx /\ ctx <= 8 /\ x0 = x).
@@ -2384,13 +1018,13 @@ wp.
 while ( all (fun (p : (in_t * int) * byte) => p.`1.`1 = x) F1.LogRO.log /\ i <= 256 /\
         signs = unzip2 (take 8 F1.LogRO.log) /\ size F1.LogRO.log = ctx /\
         unzip2 (unzip1 F1.LogRO.log) = iota_ 0 ctx /\ 8 <= ctx /\ x0 = x /\
-        foldl_o sample_indices_body (Some (256 - tau, [], [])) (drop 8 F1.LogRO.log) = Some (i, leak, indices)).
+        foldl_o sample_indices_body (Some (256 - tau, [], [], [])) (drop 8 F1.LogRO.log) = Some (i, rej, [], indices)).
 + wp; while ( all (fun (p : (in_t * int) * byte) => p.`1.`1 = x) F1.LogRO.log /\ i < 256 /\
         signs = unzip2 (take 8 F1.LogRO.log) /\ size F1.LogRO.log = ctx /\
         unzip2 (unzip1 F1.LogRO.log) = iota_ 0 ctx /\ 8 <= ctx /\ x0 = x /\
-        foldl_o sample_indices_body (Some (256 - tau, [], [])) (drop 8 F1.LogRO.log) =
-           Some (if i < j then (i, leak, indices)
-                 else (i + 1, rcons leak ctx, rcons indices byte))).
+        foldl_o sample_indices_body (Some (256 - tau, [], [], [])) (drop 8 F1.LogRO.log) =
+           Some (if i < j then (i, rej, rejc, indices)
+                 else (i + 1, rcons rej rejc, [], rcons indices byte))).
   + wp; call (:true); auto => /> &hr hall hi hunzip hsz hfold hij b.
     rewrite iotaSr 1:/# -!cats1 all_cat !map_cat /= drop_cat_le hall hunzip hsz /=.
     rewrite size_cat /= take_catl //.
@@ -2399,7 +1033,7 @@ while ( all (fun (p : (in_t * int) * byte) => p.`1.`1 = x) F1.LogRO.log /\ i <= 
 auto => /> &hr hsz hall_ hunzip_.
 rewrite drop_oversize 1:hsz // {1}/foldl_o /= take_oversize 1:hsz //=.
 split; 1: smt (tau_bound).
-move=> log i leak indices hi hall hi' htake hunzip hszl hbody.
+move=> log i indices rej hi hall hi' htake hunzip hszl hbody.
 rewrite /sample_indices hszl hunzip hall /= hbody /=.
 smt().
 qed.
@@ -2416,24 +1050,24 @@ rewrite /sample_indices /=; wp.
           (forall (a : in_t * int) (b : byte), (a, b) \in log => F1.RO.m.[a] = Some b) /\
           all (fun (p : (in_t * int) * byte) => p.`1.`1 = x0) log /\
           unzip2 (unzip1 log) = iota_ 0 (size log) /\
-          exists leaks_ indices_,
-            foldl_o sample_indices_body (Some (i, leak, indices)) (drop ctx log) = Some (256, leaks_, indices_) )
+          exists rej_ rejc_ indices_,
+            foldl_o sample_indices_body (Some (i, rej, [], indices)) (drop ctx log) = Some (256, rej_, rejc_, indices_) )
         (256 - i).
   + move=> zi; wp.
     while ( F1.LogRO.log = take ctx log /\ 0 <= ctx <= size log /\ i < 256 /\ F1.RO.m = m /\
             (forall (a : in_t * int) (b : byte), (a, b) \in log => F1.RO.m.[a] = Some b) /\
             all (fun (p : (in_t * int) * byte) => p.`1.`1 = x0) log /\
             unzip2 (unzip1 log) = iota_ 0 (size log) /\
-            exists leaks_ indices_,
+            exists rej_ rejc_ indices_,
               foldl_o sample_indices_body
-                (Some (if i < j then (i, leak, indices)
-                       else (i + 1, rcons leak ctx, rcons indices byte)))
-                (drop ctx log) = Some (256, leaks_, indices_) )
+                (Some (if i < j then (i, rej, rejc, indices)
+                       else (i + 1, rcons rej rejc, [], rcons indices byte)))
+                (drop ctx log) = Some (256, rej_, rejc_, indices_) )
            (if i < j then size log - ctx else 0).
     + move=> zc; wp.
       exlim x0, ctx, F1.LogRO.log => x0_ ctx_ log_.
       call (LogRO_get_ll (x0_, ctx_) log_ m); skip.
-      move=> &hr /> hctx hsz hi hin hall hunzip leaks_ indices_ + hij.
+      move=> &hr /> hctx hsz hi hin hall hunzip rej_ rejc_ indices_ + hij.
       case _ : (drop _ log) => [ | [ [x' ctx'] b] log'] heq.
       + by rewrite /foldl_o /= /#.
       rewrite foldl_o_cons /= {2}/sample_indices_body hij /= hi /=.
@@ -2458,15 +1092,15 @@ rewrite /sample_indices /=; wp.
           by rewrite take0 cats1.
         rewrite !andbA andbC -!andbA !andbA; split.
         + rewrite hlog size_cat htake /=; smt(size_ge0).
-        exists leaks_ indices_; rewrite -hbody.
+        exists rej_ rejc_ indices_; rewrite -hbody.
         rewrite hlog drop_catr htake // 1:/#.
         have -> : ctx{hr} + 1 - ctx{hr} = 1 by ring.
         by rewrite drop_cons /= drop0; case: (i{hr} < _).
-      auto => /> &hr 5? leaks_ indices_.
+      auto => /> &hr 5? rej_ rejc_ indices_.
       have -> /= : i{hr} < i{hr} + 1 by smt().
       move=> -> ?; split; 1:smt().
       move=> b ctx0 j0 *; split; 2: smt().
-      move=> 3? leaks_0 indices_0.
+      move=> 3? rej_0 rejc_0 indices_0.
       case: (i{hr} < j0) => // _ + h.
       rewrite drop_oversize 1:/# /foldl_o /= /#.
     wp.
@@ -2502,14 +1136,14 @@ rewrite /sample_indices /=; wp.
            all (fun (p : (in_t * int) * byte) => p.`1.`1 = x{hr}) log /\
            unzip2 (unzip1 log) = iota_ 0 (size log)) => />.
     move=> 3?.
-    case _ : (foldl_o sample_indices_body (Some (256 - tau, [], [])) (drop 8 log)) => [|[i_ leaks_ indices_]] heq //=.
+    case _ : (foldl_o sample_indices_body (Some (256 - tau, [], [], [])) (drop 8 log)) => [|[i_ rej_ rejc_ indices_]] heq //=.
     case: (i_ = 256) => />; split.
     + by rewrite take0.
     move=> ctx0; split; 1: smt().
     move=> *. have ->> : ctx0 = 8 by smt().
     split; 1: smt().
-    move=> ctx1 i0 indices0 leak0; split; 1: smt().
-    move=> hi 2? leaks_0 indices_0.
+    move=> ctx1 i0 indices0 rej0; split; 1: smt().
+    move=> hi 2? rej_0 rejc_0 indices_0.
     case : (ctx1 = size log).
     + by move=> ->; rewrite take_size.
     move=> ?.
@@ -2517,7 +1151,7 @@ rewrite /sample_indices /=; wp.
     rewrite -{1}hlog drop_cat size_take //=.
     have -> /= : ctx1 < size log by smt().
     rewrite foldl_o_cons /= {2}/sample_indices_body /= hi /=.
-    by case: (nth _ _ _) => -[??] ? /=; rewrite foldl_o_None.
+    by rewrite foldl_o_None.
 qed.
 end section SampleIndices_Proofs.
 
@@ -2534,55 +1168,42 @@ apply (equiv_rej_sim
   split; 1: exact SampleIndices_ll.
   exact SampleIndices_prog_ll.
 - exact SampleIndices_IdealSampling.
-- proc. inline.
+- proc; inline.
   do 2 ! (while (F1.SamplerOfCorrect.is_valid /\ x = F1.SamplerOfCorrect.sampler_input /\
     0 <= ctx /\ forall i, (x, i) \in RO.m => 0 <= i < ctx);
   wp); auto => />; smt(get_setE).
 - exact SampleIndices_OpSampleGame.
 - exact SampleIndices_OpSampleGameFun.
-- move=> R hR.
-  proc. islossless.
-  + while true (256 - i); 2: by skip => /#.
-    move=> z; wp; call hR; conseq (: true);1: smt().
-    islossless.
-    while true (ctx_success - ctx); 2: by skip => /#.
-    move=> z'; wp; call hR; conseq (: true);1: smt().
-    islossless => &hr.
-    exact dcond_prod_ll.
-  while true (8 - ctx); 2: by skip => /#.
-  move=> z; wp; call hR; auto => /#.
-
-- proc. inline.
-  do 2 ! (while (F1.SamplerOfCorrect.is_valid /\ x = F1.SamplerOfCorrect.sampler_input);
-  wp); auto => /#.
+- by move=> R; apply (ReprogIndices_ll R).
+- proc; while (x = F1.SamplerOfCorrect.sampler_input /\ F1.SamplerOfCorrect.is_valid).
+  + by inline; auto.
+  by auto.
 - by conseq reprog1_correct => //.
 
 (* Lemmas regarding the second Sampler/Reprog pair *)
 - split; 1: by proc.
   split; proc; islossless;
-    by apply dprod_ll; split; [ exact dI_ll | exact dL_ll ].
-- proc. inline. proc rewrite{2} 1 dmap_dprod.
+    by apply dprod_ll; split; [ exact dI_ll | exact dRej_ll ].
+- proc. inline. proc rewrite{2} 1 dmap_dprodR.
   by rndsem*{1} 0; rnd.
 - proc. inline. auto => /#.
 - by move=> x_; proc; inline *; auto.
 - move=> log y m.
   proc; inline *; swap 5 -4; wp.
   conseq (: true); last
-    by islossless; apply dprod_ll; rewrite dI_ll dL_ll.
+    by islossless; apply dprod_ll; rewrite dI_ll dRej_ll.
   move=> &hr /> hlog; rewrite /to_challenge'_log.
   case: log hlog => [ // | [x' b] [ | //=]]; last by smt(size_ge0).
   move=> /(_ x' b _) //; rewrite domE /=.
   by case: (x' = x{hr}) => /> ->.
-- move=> ??. proc.
-  call (: true). sp. if => //.
-  by rnd; skip => ? [_ /witness_support/dcond_ll].
+- by move=> R; apply (ReprogChallenge_ll R).
 - by proc; inline; auto => />.
 
 have H2 :
-  dlet (dI `*` dL) (fun r =>
-    dmap (dcond (dI `*` dL) (fun r1 => to_challenge' r1 = to_challenge' r))
-      (fun y => y)) = (dI `*` dL).
-- rewrite {3} (marginal_sampling (dI `*` dL) to_challenge') dlet_dmap.
+  dlet (dI `*` dRej) (fun r =>
+    dmap (dcond (dI `*` dRej) (fun r1 => to_challenge' r1 = to_challenge' r))
+      (fun y => y)) = (dI `*` dRej).
+- rewrite {3} (marginal_sampling (dI `*` dRej) to_challenge') dlet_dmap.
   congr. by apply fun_ext=> ?; apply dmap_id.
 
 (* dealing with distributions in equiv is always tedious. This script
@@ -2591,8 +1212,8 @@ have H2 :
 proc. inline*. wp. swap{2} ^x1<- @^ <$. sp.
 conseq (: (r0, to_challenge' r0){1} = (y, r){2}); 1: smt(get_setE).
 transitivity{2}
-  { r0 <$ (dI `*` dL); r1 <- to_challenge' r0;
-    y <$ dcond (dI `*` dL) (fun r => to_challenge' r = r1); }
+  { r0 <$ (dI `*` dRej); r1 <- to_challenge' r0;
+    y <$ dcond (dI `*` dRej) (fun r => to_challenge' r = r1); }
   (true ==> r0{1} = y{2}) (true ==> (y, to_challenge' y){1} = (y, r){2}); 1,2: smt().
 - rndsem*{2} 0. by proc rewrite{2} 1 H2; sim.
 rcondt{2} ^if; 1: by auto => _ _ y ?; exists y.

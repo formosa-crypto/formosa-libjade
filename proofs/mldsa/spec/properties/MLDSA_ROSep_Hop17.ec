@@ -19,14 +19,14 @@ import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
 import PolyReduce.
-import TF.DV TF.DV.MatRq.Vectors TF.DV.MatRq.Matrices.
+import DV DV.MatRq.Vectors DV.MatRq.Matrices.
 
 (*************** Termination ****************)
 
 lemma xaw_get_ll : islossless XAw(DST.RO1.RO).get.
 proof.
 islossless.
-by rewrite dB_dword; exact W8.dword_ll.
+by rewrite Byte.dB_dword; exact W8.dword_ll.
 qed.
 
 lemma xpandA_fips_ll : islossless ExpandA(XOFA_O(XAw(DST.RO1.RO))).sample.
@@ -38,7 +38,7 @@ apply (ExpandA_ll (XAw(DST.RO1.RO))
 + move=> g0 x /= hk; proc; if; inline *.
   - rcondt 3; 1: by auto; smt().
     wp; rnd (pred1 W8.zero); auto => />.
-    move=> &hr _ _; rewrite dB_dword JWordExtra.DW8.mu1_dword /=.
+    move=> &hr _ _; rewrite Byte.dB_dword JWordExtra.DW8.mu1_dword /=.
     by move=> v _ ->; rewrite get_set_sameE.
   - rcondt 3; 1: by auto; smt().
     wp; rnd (pred1 W8.zero); auto => />.
@@ -51,19 +51,19 @@ have [B hB] := fmap_bounded_snd g.`1 r.
 by exists B.
 qed.
 
-lemma tfexpandA_ll : islossless TF.ExpandA(DST.RO1.RO).get.
+lemma tfexpandA_ll : islossless MP.T.ExpandA(DST.RO1.RO).get.
 proof.
 bypr => &m _.
 have <- : Pr[ExpandA(XOFA_O(XAw(DST.RO1.RO))).sample(arg{m}) @ &m : true] =
-          Pr[TF.ExpandA(DST.RO1.RO).get(arg{m}) @ &m : true].
+          Pr[MP.T.ExpandA(DST.RO1.RO).get(arg{m}) @ &m : true].
 + byequiv (_ : ={rho, DST.RO1.RO.m, RO_xr.RO.m} ==> true) => //; conseq expandA_14.
 by byphoare xpandA_fips_ll.
 qed.
 
 lemma ro2_get_ll : islossless DST.RO2.RO.get.
-proof. by islossless; rewrite dB_dword; exact W8.dword_ll. qed.
+proof. by islossless; rewrite Byte.dB_dword; exact W8.dword_ll. qed.
 
-lemma tfsib_ll : islossless TF.SIB.SampleInBall(DST.RO2.RO).get.
+lemma tfsib_ll : islossless MP.T.SIB.SampleInBall(DST.RO2.RO).get.
 proof.
 proc.
 while (0 <= ctx /\ 0 <= i) (256 - i); last first.
@@ -88,18 +88,18 @@ while (x = x0 /\ i = i0 /\ 0 <= ctx /\ 0 <= i < 256 /\ 256 - i = z /\
   case: ((x{hr}, c) \in m) => hm /=; 2: smt().
   by have := hk c hm; smt().
 + move=> hw.
-  seq 3 : (x = x0 /\ i = i0 /\ 0 <= ctx /\ 0 <= i < 256 /\ 256 - i = z /\
+  seq 4 : (x = x0 /\ i = i0 /\ 0 <= ctx /\ 0 <= i < 256 /\ 256 - i = z /\
            (forall c, (x, c) \in DST.RO2.RO.m => c < B \/ c < ctx)).
   * by wp; call (: true); auto.
   * wp; inline *; auto => /> &hr hc hi0 hi hz hk hij.
-    rewrite dB_dword W8.dword_ll /=.
+    rewrite Byte.dB_dword W8.dword_ll /=.
     move=> v _; split => hm; (split; 1: smt()); move=> c; rewrite ?mem_set; smt().
   * by apply hw.
   * hoare; wp; inline *; auto => /> &hr hc hi0 hi hz hk hij v _.
     split => hm; (split; 1: smt()); move=> c; rewrite ?mem_set; smt().
   * by [].
 + wp; inline *; auto => />.
-  move=> &hr hc hi0 hi hk hij; rewrite dB_dword W8.dword_ll /= => v _.
+  move=> &hr hc hi0 hi hk hij; rewrite Byte.dB_dword W8.dword_ll /= => v _.
   split => hm; (split; 1: smt()); move=> c; rewrite ?mem_set; smt().
 split; 1: smt().
 move=> z0; case ((x, ctx) \in DST.RO2.RO.m).
@@ -107,14 +107,14 @@ move=> z0; case ((x, ctx) \in DST.RO2.RO.m).
   inline *; rcondf 3; 1: by auto.
   wp; rnd; auto => />.
   move=> &hr hc hi0 hi hk hij hm.
-  rewrite dB_dword W8.dword_ll /=.
+  rewrite Byte.dB_dword W8.dword_ll /=.
   have hcB : ctx{hr} < B by smt().
   smt().
 inline *; rcondt 3; 1: by auto.
 wp; rnd (pred1 W8.zero); auto => />.
 move=> &hr hc hi0 hi hk hij hm.
-rewrite dB_dword JWordExtra.DW8.mu1_dword /=.
-move=> v _ ->; rewrite get_set_sameE /= ?W8.to_uint0; smt().
+rewrite Byte.dB_dword JWordExtra.DW8.mu1_dword /=.
+move=> v _ ->; rewrite get_set_sameE /= /Byte.to_int ?W8.to_uint0; smt().
 qed.
 
 lemma roy_get_ll : islossless RO_y.RO.get.
@@ -130,7 +130,7 @@ lemma dbytesCT_ll : is_lossless dbytesCT.
 proof. by apply dmap_ll; apply dlist_ll; exact W8.dword_ll. qed.
 
 lemma ro1_get_ll : islossless DST.RO1.RO.get.
-proof. by islossless; rewrite dB_dword; exact W8.dword_ll. qed.
+proof. by islossless; rewrite Byte.dB_dword; exact W8.dword_ll. qed.
 
 lemma ro3_get_ll : islossless DST.RO3.RO.get.
 proof. by islossless; exact dbytes64_ll. qed.
@@ -149,16 +149,16 @@ while true (kappa_max - ctr).
 by wp; call ro4_get_ll; call tfexpandA_ll; auto => /> /#.
 qed.
 
-lemma tfsign_ll : islossless TF.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign.
+lemma tfsign_ll : islossless MP.T.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign.
 proof.
 proc.
 while true (kappa_max - ctr).
 + move=> z; wp; call tfsib_ll; call ro5_get_ll; auto => />.
-  smt(TF.dRq_mask_ll TF.DV.MatRq.Vectors.dvector_ll).
+  smt(MP.T.dRq_mask_ll DV.MatRq.Vectors.dvector_ll).
 by wp; call ro4_get_ll; call tfexpandA_ll; auto => /> /#.
 qed.
 
-lemma tfverify_ll : islossless TF.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).verify.
+lemma tfverify_ll : islossless MP.T.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).verify.
 proof. by proc; call ro5_get_ll; wp; call tfsib_ll; call ro4_get_ll; call ro3_get_ll; call tfexpandA_ll; auto. qed.
 
 lemma v16_ll : islossless V16.verify.
@@ -209,7 +209,7 @@ qed.
 lemma dpolyl_mask : dmap (dpolyl (dpoly (-gamma1 + 1) gamma1)) vec_of_l = dvector dmask lvec.
 proof.
 have /= H := param_sets.
-rewrite /dpolyl /LArrayE.darray /TF.DV.MatRq.Vectors.dvector /dmask (_ : max 0 lvec = lvec) 1:/#.
+rewrite /dpolyl /LArrayE.darray /DV.MatRq.Vectors.dvector /dmask (_ : max 0 lvec = lvec) 1:/#.
 rewrite (dlist_dmap (dpoly (-gamma1 + 1) gamma1) poly2alg lvec) !dmap_comp.
 apply eq_dmap_in => x hx; rewrite /(\o) /vec_of_l LArray.of_listK //.
 by move: hx; rewrite supp_dlist; smt(gt0_l).
@@ -224,21 +224,21 @@ qed.
 (*************** G17: y sampled afresh in every iteration ****************)
 
 module Sign17 = {
-  proc sign(sk : TF.SK, m : W8.t list) : BytesSig.t option * Leakage list = {
+  proc sign(sk : MP.T.SK, m : W8.t list) : BytesSig.t option * leakage = {
     var rs, sg, s;
-    rs <@ TF.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign(sk, m);
+    rs <@ MP.T.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign(sk, m);
     sg <- None;
     if (rs.`1 <> None) {
       s <@ SigEncDec.sigEncode((oget rs.`1).`1, l_of_vec (oget rs.`1).`2.`1, poly_of_hints (oget rs.`1).`2.`2);
       sg <- Some s;
     }
-    return (sg, tleak rs.`2);
+    return (sg, rs.`2);
   }
 }.
 
 module G17(A : DS2.Adversary) = {
   module O = {
-    proc sign(m : W8.t list) : BytesSig.t option * Leakage list = {
+    proc sign(m : W8.t list) : BytesSig.t option * leakage = {
       var r;
       G13.qs <- m :: G13.qs;
       r <@ Sign17.sign(G13.sk, m);
@@ -279,7 +279,7 @@ module Coins = {
 }.
 
 module Sign16c = {
-  proc sign(sk : TF.SK, m : W8.t list) : BytesSig.t option * Leakage list = {
+  proc sign(sk : MP.T.SK, m : W8.t list) : BytesSig.t option * leakage = {
     var coins, rs, sg, s;
     coins <@ Coins.draw();
     rs <@ MLDSA_Y(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign(sk, m, coins);
@@ -288,12 +288,12 @@ module Sign16c = {
       s <@ SigEncDec.sigEncode((oget rs.`1).`1, l_of_vec (oget rs.`1).`2.`1, poly_of_hints (oget rs.`1).`2.`2);
       sg <- Some s;
     }
-    return (sg, tleak rs.`2);
+    return (sg, rs.`2);
   }
 }.
 
 module Sign17c = {
-  proc sign(sk : TF.SK, m : W8.t list) : BytesSig.t option * Leakage list = {
+  proc sign(sk : MP.T.SK, m : W8.t list) : BytesSig.t option * leakage = {
     var r;
     Coins.draw();
     r <@ Sign17.sign(sk, m);
@@ -302,12 +302,12 @@ module Sign17c = {
 }.
 
 module type Signer = {
-  proc sign(sk : TF.SK, m : W8.t list) : BytesSig.t option * Leakage list
+  proc sign(sk : MP.T.SK, m : W8.t list) : BytesSig.t option * leakage
 }.
 
 module GC(S : Signer, A : DS2.Adversary) = {
   module O = {
-    proc sign(m : W8.t list) : BytesSig.t option * Leakage list = {
+    proc sign(m : W8.t list) : BytesSig.t option * leakage = {
       var r;
       G13.qs <- m :: G13.qs;
       r <@ S.sign(G13.sk, m);
@@ -341,7 +341,7 @@ op yinv (m : (rnd_ * Bytes64.t * int, polylvec) fmap) (cl : rnd_ list) =
 
 equiv ysign_fresh (cl0 : rnd_ list) :
   MLDSA_Y(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign ~
-  TF.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign :
+  MP.T.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign :
   ={sk, m, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO3.RO, glob DST.RO4.RO, glob DST.RO5.RO} /\
   yinv RO_y.RO.m{1} cl0 /\ coins{1} \in cl0 /\ (forall mu k, (coins{1}, mu, k) \notin RO_y.RO.m{1})
   ==> ={res, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO3.RO, glob DST.RO4.RO, glob DST.RO5.RO} /\
@@ -424,10 +424,10 @@ qed.
 (*************** Potentials that the oracles leave unchanged ****************)
 
 ehoare ro1_e (u : xreal) : DST.RO1.RO.get : u ==> u.
-proof. by proc; auto => &hr; rewrite (eq_Ep _ _ (fun _ => u)) 1:/# EpC dB_dword W8.dword_ll. qed.
+proof. by proc; auto => &hr; rewrite (eq_Ep _ _ (fun _ => u)) 1:/# EpC Byte.dB_dword W8.dword_ll. qed.
 
 ehoare ro2_e (u : xreal) : DST.RO2.RO.get : u ==> u.
-proof. by proc; auto => &hr; rewrite (eq_Ep _ _ (fun _ => u)) 1:/# EpC dB_dword W8.dword_ll. qed.
+proof. by proc; auto => &hr; rewrite (eq_Ep _ _ (fun _ => u)) 1:/# EpC Byte.dB_dword W8.dword_ll. qed.
 
 ehoare ro3_e (u : xreal) : DST.RO3.RO.get : u ==> u.
 proof. by proc; auto => &hr; rewrite (eq_Ep _ _ (fun _ => u)) 1:/# EpC dbytes64_ll. qed.
@@ -487,7 +487,7 @@ if.
 by call (RO_rest_e u); skip => &hr; do ! (apply xle_cxr_r => _).
 qed.
 
-ehoare tfexpandA_e (u : xreal) : TF.ExpandA(DST.RO1.RO).get : u ==> u.
+ehoare tfexpandA_e (u : xreal) : MP.T.ExpandA(DST.RO1.RO).get : u ==> u.
 proof.
 proc; while (u); [by move=> &hr; apply xle_cxr_r | | by auto].
 wp; while (u); [by move=> &hr; apply xle_cxr_r | | by auto => &hr; apply xle_cxr_r].
@@ -495,7 +495,7 @@ wp; while (u); [by move=> &hr; apply xle_cxr_r | | by auto => &hr; apply xle_cxr
 by wp; do 3! call (ro1_e u); auto => &hr; apply xle_cxr_r.
 qed.
 
-ehoare tfsib_e (u : xreal) : TF.SIB.SampleInBall(DST.RO2.RO).get : u ==> u.
+ehoare tfsib_e (u : xreal) : MP.T.SIB.SampleInBall(DST.RO2.RO).get : u ==> u.
 proof.
 proc; wp.
 while (u); [by move=> &hr; apply xle_cxr_r | | ].
@@ -504,12 +504,12 @@ while (u); [by move=> &hr; apply xle_cxr_r | | ].
 wp; while (u); [by move=> &hr; apply xle_cxr_r | by wp; call (ro2_e u); auto => &hr; apply xle_cxr_r | by auto].
 qed.
 
-ehoare tfsign_e (u : xreal) : TF.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign :
+ehoare tfsign_e (u : xreal) : MP.T.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign :
   u ==> u.
 proof.
 proc; while (u); [by move=> &hr; apply xle_cxr_r | | by wp; call (ro4_e u); call (tfexpandA_e u); auto].
 wp; call (tfsib_e u); call (ro5_e u); auto => &hr.
-have hll : is_lossless (dvector dmask lvec) by smt(TF.dRq_mask_ll dvector_ll).
+have hll : is_lossless (dvector dmask lvec) by smt(MP.T.dRq_mask_ll dvector_ll).
 by rewrite EpC hll smul1m; apply xle_cxr_r.
 qed.
 
@@ -531,7 +531,7 @@ conseq (_ : _ ==> u).
 + by move=> &hr; rewrite !EpC hk hl !smul1m.
 + by move=> _; rewrite !EpC hk hl !smul1m; apply xle_cxr_r.
 call (tfexpandA_e u); auto => &hr.
-by rewrite EpC TF.dseed_ll smul1m.
+by rewrite EpC MP.T.dseed_ll smul1m.
 qed.
 
 ehoare kg16_e (u : xreal) : KG16.keygen : u ==> u.

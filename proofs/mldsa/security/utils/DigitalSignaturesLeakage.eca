@@ -1,0 +1,243 @@
+(**************************************************************************)
+(* Existential unforgeability of a signature scheme whose signing         *)
+(* procedure may fail and leaks: sign returns an optional signature       *)
+(* together with its leakage (type sigl_t), and the EF-CMA game bounds    *)
+(* the number of signing queries (q_efcma).                               *)
+(*                                                                        *)
+(* Adapted from DigitalSignatures.eca of the verifyhashbased project      *)
+(* (Matthias Meijers, Andreas Hülsing; also in the EasyCrypt standard     *)
+(* library), in the patched copy made by Christian Doczkal for the        *)
+(* Dilithium proof. Manuel Barbosa kept only EF-KOA and EF-CMA and added  *)
+(* the leakage. The original file is based on:                            *)
+(* - "A Digital Signature Scheme Secure Against Adaptive                  *)
+(*    Chosen-Message Attack", DOI: 10.1137/0217017                        *)
+(* - "Digital Signatures", DOI: 10.1007/978-0-387-27712-7                 *)
+(**************************************************************************)
+
+(* --- Require/Import Theories --- *)
+(* -- Built-in (i.e, standard library) -- *)
+require import AllCore List.
+
+
+
+(* --- General --- *)
+(* -- Types -- *)
+(* Types for to-be-signed artifacts ('messages') and signatures, respectively *)
+type msg_t.
+type sig_t.
+type lkg_t.
+(* A signing procedure may fail (bounded rejection loop): no signature, only leakage. *)
+type sigl_t = sig_t option * lkg_t.
+
+(* Types for public/verification keys and secret/private/signing keys, respectively *)
+type pk_t.
+type sk_t.
+
+
+(* -- Distributions -- *)
+
+
+
+
+(* --- Stateless Signature Schemes --- *)
+theory Stateless.
+  (* -- General -- *)
+  (* Module type for stateless signature schemes *)
+  module type Scheme = {
+    proc keygen() : pk_t * sk_t
+    proc sign(sk : sk_t, m : msg_t) : sigl_t
+    proc verify(pk : pk_t, m : msg_t, s : sig_t) : bool
+  }.
+
+  (*
+    --
+    Key-Only Attack (KOA).
+    Attacks in which the adversary is only given the public/verification key
+    --
+  *)
+
+
+  (*
+    -
+    Existential Forgery under Key-Only Attack (EF-KOA).
+    Given the public/verification key, the adversary is tasked with forging a signature
+    for any fresh message
+    -
+  *)
+  (* Class of adversaries against EF-KOA *)
+  module type Adv_EFKOA = {
+    proc forge(pk : pk_t) : msg_t * sig_t
+  }.
+
+  (* EF-KOA game *)
+  module EF_KOA(S : Scheme, A : Adv_EFKOA) = {
+    proc main() : bool = {
+      var pk : pk_t;
+      var sk : sk_t;
+      var m : msg_t;
+      var sig : sig_t;
+      var is_valid: bool;
+
+      (* Generate a key pair using the considered signature scheme *)
+      (pk, sk) <@ S.keygen();
+
+      (*
+        Ask adversary to forge a signature on any message (and provide both the
+        message and the signature) given the public key pk
+      *)
+      (m, sig) <@ A.forge(pk);
+
+      (*
+        Verify (w.r.t. message m) the signature sig provided by the adversary
+        using the verification algorithm of the considered signature scheme
+      *)
+      is_valid <@ S.verify(pk, m, sig);
+
+      (* Success iff the signature provided by the adversary is valid *)
+      return is_valid;
+    }
+  }.
+
+  (*
+    --
+    (Adaptive) Chosen-Message Attack (CMA).
+    Attacks in which the adversary is given the public/verification key as well as
+    the signatures for a set of *chosen* messages. Here, all messages are chosen
+    adaptively and may depend on the public key; that is, the adversary
+    (1) immediately receives a signature for a chosen message before choosing the
+        subsequent message, and
+    (2) is given the public key when asked to provide the messages.
+    --
+  *)
+  (* - General - *)
+  (*
+    Type for signing oracles used in (adaptive) CMA game, including procedures
+    for initialization and auxiliary tasks
+  *)
+  module type Oracle_CMA(S : Scheme) = {
+    proc init(sk_init : sk_t) : unit {}
+    proc sign(m : msg_t) : sigl_t {S.sign}
+    proc fresh(m : msg_t) : bool {}
+    proc nr_queries() : int {}
+  }.
+
+  (*
+    Type for signing oracles used in (adaptive) CMA games, only exposing the
+    procedure for signing
+  *)
+  module type SOracle_CMA = {
+    proc sign(m : msg_t) : sigl_t
+  }.
+
+  (*
+    Default implementation of a signing oracle including procedures for
+    initialization and auxiliary tasks
+  *)
+  module (O_CMA_Default : Oracle_CMA) (S : Scheme) = {
+    var sk : sk_t
+    var qs : msg_t list
+
+    (* Initialize secret/signing key and oracle query list qs *)
+    proc init(sk_init : sk_t) : unit = {
+      sk <- sk_init;
+      qs <- [];
+    }
+
+    (*
+      Sign given message m using the considered signature scheme with the
+      secret/signing key sk and append m to the list of oracle queries qs
+    *)
+    proc sign(m : msg_t) : sigl_t = {
+      var sigl : sigl_t;
+
+      sigl <@ S.sign(sk, m);
+
+      qs <- rcons qs m;
+
+      return sigl;
+    }
+
+    (*
+      Check whether given message m is fresh, i.e., whether m is not contained in
+      the list of oracle queries qs
+    *)
+    proc fresh(m : msg_t) : bool = {
+      return ! m \in qs;
+    }
+
+    (* Get the number of oracle queries, i.e., the size of the oracle query list qs *)
+    proc nr_queries() : int = {
+      return size qs;
+    }
+  }.
+
+
+  (*
+    -
+    Existential Forgery under Chosen-Message Attack (EF-CMA)
+    Given the public/verification key and the signatures for a set of adaptively
+    chosen messages, the adversary is tasked with forging a signature for any fresh message
+    -
+  *)
+  abstract theory EFCMA.
+  (* Maximum number of oracle queries the adversary is allowed to make in EF-CMA game *)
+  const q_efcma : { int | 0 <= q_efcma } as ge0_qefcma.
+
+  (* Class of adversaries against EF-CMA *)
+  module type Adv_EFCMA(O : SOracle_CMA) = {
+    proc forge(pk : pk_t) : msg_t * sig_t
+  }.
+
+  (* EF-CMA game *)
+  module EF_CMA(S : Scheme, A : Adv_EFCMA, O : Oracle_CMA) = {
+
+    proc main() : bool = {
+      var pk : pk_t;
+      var sk : sk_t;
+      var m : msg_t;
+      var sig : sig_t;
+      var nrqs : int;
+      var is_valid, is_fresh : bool;
+
+      (* Generate a key pair using the considered signature scheme *)
+      (pk, sk) <@ S.keygen();
+
+      (* Initialize the signing oracle with the generated secret key *)
+      O(S).init(sk);
+
+      (*
+        Ask the adversary to forge a signature for any message (and provide both the
+        message and the signature) given the public key pk and access to a signing oracle
+        that it can query at most q_efcma times
+      *)
+      (m, sig) <@  A(O(S)).forge(pk);
+
+      (*
+        Verify (w.r.t. message m) the signature sig provided by the adversary
+        using the verification algorithm of the considered signature scheme
+      *)
+      is_valid <@ S.verify(pk, m, sig);
+
+      (*
+        Check whether message for which the adversary forged a signature is fresh
+        (i.e., check whether message is not included in the list of messages for which
+        the adversary received signatures through an oracle query)
+      *)
+      is_fresh <@ O(S).fresh(m);
+
+      (* Get the total number of oracle queries that the adversary made *)
+      nrqs <@ O(S).nr_queries();
+
+      (*
+        Success iff
+        (1) "nrqs <= q_efcma": the adversary made at most q_efcma oracle queries, and
+        (2) "is_valid": the forged signature provided by the adversary is valid, and
+        (3) "is_fresh": the message for which the adversary forged a signature is fresh.
+      *)
+      return nrqs <= q_efcma /\ is_valid /\ is_fresh;
+    }
+  }.
+  end EFCMA.
+
+end Stateless.
+

@@ -1,0 +1,177 @@
+(* -------------------------------------------------------------------- *)
+(* Generic bound: a lazily sampled table has a fresh entry that hits a  *)
+(* known value.                                                         *)
+(* The adversary queries the table ([get]: an entry is sampled from     *)
+(* [dout] the first time its input is queried) and adds values to the  *)
+(* known set ([put]). [bad] is set when a fresh entry is in the range   *)
+(* of the table (a collision of the table) or in the known set. With    *)
+(* at most [qG] [get] queries and [qP] [put] queries, [bad] is set with *)
+(* probability at most [(qP + qG) * qG * eps]: a reduction to           *)
+(* [FreshCollision] (the fresh samples are the fresh entries, the known *)
+(* set of [FreshCollision] is the range of the table and the put        *)
+(* values).                                                             *)
+(* Used twice by the security proof of ML-DSA                          *)
+(* ([MLDSAProof_Collisions.ec]): on the table of [Hmu] (no [put]), and  *)
+(* on the table of [Hct] (the [put] values are the [c~] queried to the  *)
+(* challenge XOF outside the range of [Hct]).                           *)
+(* -------------------------------------------------------------------- *)
+require import AllCore FSet FMap Distr StdOrder.
+import RealOrder.
+require FreshCollision.
+
+type in_t, out_t.
+
+op [lossless] dout : out_t distr.
+
+op eps : real.
+
+axiom dout_max (y : out_t) : mu1 dout y <= eps.
+
+clone FreshCollision as FC with
+  type t  <- out_t,
+  op   dT <- dout,
+  op eps  <- eps
+proof dT_ll by exact dout_ll, dT_max by exact dout_max.
+
+module type Oracle = {
+  proc get (x : in_t) : out_t
+  proc put (y : out_t) : unit
+}.
+
+(* The lazily sampled table, with the known set [ks] *)
+module Tab : Oracle = {
+  var m   : (in_t, out_t) fmap
+  var ks  : out_t fset
+  var bad : bool
+
+  proc init () : unit = {
+    m   <- empty;
+    ks  <- fset0;
+    bad <- false;
+  }
+
+  proc get (x : in_t) : out_t = {
+    var y;
+    if (x \notin m) {
+      y <$ dout;
+      bad <- bad \/ y \in frng m \/ y \in ks;
+      m.[x] <- y;
+    }
+    return oget m.[x];
+  }
+
+  proc put (y : out_t) : unit = {
+    ks <- ks `|` fset1 y;
+  }
+}.
+
+module Count (O : Oracle) = {
+  var cg, cp : int
+
+  proc init () : unit = { cg <- 0; cp <- 0; }
+
+  proc get (x : in_t) : out_t = {
+    var r;
+    cg <- cg + 1;
+    r <@ O.get(x);
+    return r;
+  }
+
+  proc put (y : out_t) : unit = {
+    cp <- cp + 1;
+    O.put(y);
+  }
+}.
+
+module type Adversary (O : Oracle) = {
+  proc main () : unit { O.get, O.put }
+}.
+
+module Game (A : Adversary) = {
+  proc main () : unit = {
+    Tab.init();
+    Count(Tab).init();
+    A(Count(Tab)).main();
+  }
+}.
+
+section PROOF.
+
+declare module A <: Adversary {-Tab, -Count, -FC.O, -FC.Count}.
+
+declare op qP : int.
+declare op qG : int.
+
+declare axiom qP_ge0 : 0 <= qP.
+declare axiom qG_ge0 : 0 <= qG.
+
+(* Query-bounded adversaries *)
+declare axiom A_bound (O <: Oracle {-A, -Count}) :
+  hoare [ A(Count(O)).main :
+          Count.cg = 0 /\ Count.cp = 0 ==> Count.cg <= qG /\ Count.cp <= qP ].
+
+(* The table over the oracles of [FreshCollision] *)
+local module TabB (O : FC.Oracle) : Oracle = {
+  proc get (x : in_t) : out_t = {
+    var y;
+    if (x \notin Tab.m) {
+      y <@ O.sample();
+      Tab.m.[x] <- y;
+    }
+    return oget Tab.m.[x];
+  }
+
+  proc put (y : out_t) : unit = {
+    O.put(y);
+  }
+}.
+
+local module B (O : FC.Oracle) = {
+  proc main () : unit = {
+    Tab.m <- empty;
+    Count.cg <- 0;
+    Count.cp <- 0;
+    A(Count(TabB(O))).main();
+  }
+}.
+
+local lemma B_bound (O <: FC.Oracle {-B, -FC.Count}) :
+  hoare [ B(FC.Count(O)).main :
+          FC.Count.cp = 0 /\ FC.Count.cs = 0 ==> FC.Count.cp <= qP /\ FC.Count.cs <= qG ].
+proof.
+proc.
+seq 3 : (FC.Count.cp = 0 /\ FC.Count.cs = 0 /\ Count.cg = 0 /\ Count.cp = 0);
+  1: by auto.
+conseq (: _ ==> FC.Count.cp <= Count.cp /\ FC.Count.cs <= Count.cg)
+       (: Count.cg = 0 /\ Count.cp = 0 ==> Count.cg <= qG /\ Count.cp <= qP) => //;
+  1: smt().
+- by call (A_bound (TabB(FC.Count(O)))).
+call (: FC.Count.cp <= Count.cp /\ FC.Count.cs <= Count.cg).
+- proc; inline TabB(FC.Count(O)).get; sp; if; 2: by auto => /> /#.
+  by inline FC.Count(O).sample; wp; call (: true); auto => /> /#.
+- by proc; inline *; wp; call (: true); auto => /> /#.
+by auto.
+qed.
+
+local lemma Game_B &m :
+  Pr[Game(A).main() @ &m : Tab.bad] <= Pr[FC.Game(B).main() @ &m : FC.O.bad].
+proof.
+byequiv (_ : ={glob A} ==> Tab.bad{1} = FC.O.bad{2}) => //.
+proc; inline *.
+call (: ={Tab.m, Count.cg, Count.cp} /\ Tab.bad{1} = FC.O.bad{2} /\
+        FC.O.s{2} = frng Tab.m{1} `|` Tab.ks{1}).
+- proc; inline *; sp; if => //; 2: by auto.
+  auto => /> &1 &2 hx y _; rewrite frng_set rem_id // in_fsetU /=.
+  by apply fsetP => z; rewrite !in_fsetU in_fset1; smt().
+- by proc; inline *; auto => /> &1 &2; rewrite fsetUA.
+by auto => />; rewrite frng0 fsetU0.
+qed.
+
+lemma table_collision &m :
+  Pr[Game(A).main() @ &m : Tab.bad] <= ((qP + qG) * qG)%r * eps.
+proof.
+apply (ler_trans _ _ _ (Game_B &m)).
+exact (FC.fresh_collision B qP qG qP_ge0 qG_ge0 B_bound &m).
+qed.
+
+end section PROOF.

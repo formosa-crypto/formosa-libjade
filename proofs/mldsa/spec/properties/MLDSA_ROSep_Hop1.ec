@@ -7,6 +7,7 @@ require MLDSA_ROSep.
 require import MLDSA_RO MLDSA_ROSep.
 require import DistrExtra.
 
+require import Leakage.
 abstract theory MLDSA_ROSep_Hop1.
 
 clone include MLDSA_ROSep.MLDSA_ROSep.
@@ -289,11 +290,11 @@ ehoare sign_coll (pk0 : BytesPK.t) (k : real) : MLDSA_RO(DS2.RO1.RO, DS2.RO2.RO)
     (b2r (coll DS2.RO1.RO.m pk0) + (1 + kappa_max)%r * p512 + k)%xr
   ==> inv_m DS2.RO1.RO.m pk0 `|` (b2r (coll DS2.RO1.RO.m pk0) + k)%xr.
 proof.
-proc; seq 15 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k /\ kappa = 0) `|`
+proc; seq 17 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k /\ kappa = 0) `|`
                 (b2r (coll DS2.RO1.RO.m pk0) + kappa_max%r * p512 + k)%xr).
-+ seq 11 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k) `|`
++ seq 13 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k) `|`
             (b2r (coll DS2.RO1.RO.m pk0) + kappa_max%r * p512 + k)%xr).
-  + seq 9 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k) `|`
+  + seq 11 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k) `|`
              (b2r (coll DS2.RO1.RO.m pk0) + (1 + kappa_max)%r * p512 + k)%xr).
     + exlim DS2.RO1.RO.m => m0.
       call /(fun y => (DS2.RO1.RO.m = m0) `|` y)

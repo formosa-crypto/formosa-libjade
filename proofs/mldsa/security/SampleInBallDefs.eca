@@ -1,0 +1,287 @@
+require import AllCore List Int IntDiv StdOrder Real.
+require import Distr DBool DList DMap DJoin.
+require import Leakage Byte Geometric FoldlO.
+require DParams BitEncoding.
+import Real.RField.
+import IntOrder.
+
+(* only [tau] is used in this file. *)
+clone import DParams as Params.
+
+(* The encoding part of [SampleInBallEquiv]: the intermediate representation
+   of challenges ([challenge_ir], its distribution [dI] and its decoding
+   [to_challenge]), the rejected bytes ([rej_ir], [dRej], [dLeakRej]) and the
+   leakage of [SampleInBall] ([full_leak]). It contains no proof about
+   [SampleInBall] itself, so that [ChallengeFiber] can clone it without
+   instantiating the reduction of [SampleInBallEquiv]
+   (which starts with [clone include SampleInBallDefs]). *)
+
+
+(** base types *)
+
+type in_t.
+type challenge.
+
+(* Challenges are encoded as lists of integer coefficients *)
+type challenge_ = int list.
+
+(* Rejected bytes: for each position, the list of rejected byte values *)
+type rej_ir = int list list.
+
+(* Intermediate representation of challenges *)
+(* A list of 8 bytes used to compute signs, as well as a list of [tau] byte-encoded
+   valid indices. *)
+type challenge_ir = byte list * byte list.
+
+(* Encoding of the rejected bytes as a (declassified) leakage value. *)
+op rej_to_leakage (r : rej_ir) : leakage =
+  [List (map (fun (l : int list) => List (map Int l)) r)].
+
+op decl_to_int (d : decl) : int =
+  with d = Int n => n
+  with d = List _ => 0.
+
+op decl_to_ints (d : decl) : int list =
+  with d = Int _ => []
+  with d = List l => map decl_to_int l.
+
+op decl_to_rej (d : decl) : rej_ir =
+  with d = Int _ => []
+  with d = List l => map decl_to_ints l.
+
+op leakage_to_rej (l : leakage) : rej_ir =
+  with l = [] => []
+  with l = d :: _ => decl_to_rej d.
+
+lemma rej_to_leakageK : cancel rej_to_leakage leakage_to_rej.
+proof.
+move=> r; rewrite /rej_to_leakage /= -map_comp -{2}(map_id r).
+apply eq_map => l; rewrite /(\o) /= -map_comp -{2}(map_id l).
+by apply eq_map.
+qed.
+
+(* how to generate a concrete challenge from this encoding. *)
+(* This allows other files to have a different (but equivalent)
+   representation for challenges, using DVect for instance. *)
+op to_concrete : challenge_ -> challenge.
+
+(* Valid challenge encodings: lists of [256] coefficients in {-1, 0, 1}.
+   (see [to_challenge_valid] below). *)
+op is_challenge_list (x : challenge_) =
+  size x = 256 /\ all (fun c => c = -1 \/ c = 0 \/ c = 1) x.
+
+(* lossless variant of dcond; result is unspecified whenever
+   the predicate isn't inhabited. *)
+op dcond' (d : 'a distr) p =
+  if (exists x, p x /\ x \in d) then dcond d p else dunit witness.
+
+op dB_le i = dcond dB (fun b => to_int b <= i).
+op small_enough i b = !(i < to_int b).
+op dB_thres i = mu dB (small_enough i).
+op dbias i = DBool.Biased.dbiased (dB_thres i).
+
+lemma dB_le_ll i :
+  0 <= i => is_lossless (dB_le i).
+proof.
+move => ?; apply/dcond_ll/witness_support.
+exists (from_int 0) => /=.
+by rewrite tK' 1:// dB_full.
+qed.
+
+lemma dcond'_ll (d : 'a distr) p : is_lossless (dcond' d p).
+proof.
+rewrite /dcond'.
+case (exists x, p x /\ x \in d) => [/witness_support|_].
+- exact dcond_ll.
+exact dunit_ll.
+qed.
+
+abbrev dtaurange (f : int -> 'a distr) = djoinmap f (range (256 - tau) 256).
+
+(* Uniform indices used to construct a challenge, as sampled in SampleInBall *)
+op dI : challenge_ir distr =
+  dlist dB 8 `*` dtaurange dB_le.
+
+op geom_i (i:int) = geometric ((i + 1)%r / 256%r).
+
+(* Distribution of a rejected byte value at position [i]: uniform in (i, 255] *)
+op dRejB (i : int) : int distr = dmap (dcond' dB (predC (small_enough i))) to_int.
+
+(* Rejected bytes at position [i]: the number of tries of the rejection
+   sampling loop is geometric, the last try being the accepted one. *)
+op dRejPos (i : int) : int list distr =
+  dlet (geom_i i) (fun n => dlist (dRejB i) (n - 1)).
+
+(* Rejected bytes, for all positions; independent of [dI]. *)
+op dRej : rej_ir distr = dtaurange dRejPos.
+
+(* The leakage distribution of the ideal oracle. *)
+op dLeakRej : leakage distr = dmap dRej rej_to_leakage.
+
+(** Leakage of [SampleInBall]: the pairs [(ctx, j)] after each inner iteration *)
+
+(* Pairs of position [k], when its first context is [c + 1], its rejected
+   bytes are [rk] and its accepted byte is [a]. *)
+op seg (c : int) (rk : int list) (a : int) : (int * int) list =
+  zip (iota_ (c + 1) (size rk + 1)) (rcons rk a).
+
+(* The last context and the list of pairs, for all positions. *)
+op full_pairs (ir : challenge_ir) (r : rej_ir) : int * (int * int) list =
+  foldl (fun (acc : int * (int * int) list) (p : byte * int list) =>
+           (acc.`1 + size p.`2 + 1, acc.`2 ++ seg acc.`1 p.`2 (to_int p.`1)))
+        (8, []) (zip ir.`2 r).
+
+op full_leak (ir : challenge_ir) (r : rej_ir) : leakage =
+  pairs_to_leakage (full_pairs ir r).`2.
+
+lemma full_pairs_rcons (s idx : byte list) (r : rej_ir) b rk :
+  size idx = size r =>
+  full_pairs (s, rcons idx b) (rcons r rk) =
+  ((full_pairs (s, idx) r).`1 + size rk + 1,
+   (full_pairs (s, idx) r).`2 ++ seg (full_pairs (s, idx) r).`1 rk (to_int b)).
+proof. by move=> hsz; rewrite /full_pairs /= zip_rcons // foldl_rcons. qed.
+
+(** Functional representation of challenge generation from a given
+   intermediate representation. **)
+
+section TO_BOOL.
+import BitEncoding.BS2Int.
+
+op to_bool_list = flatten \o map (int2bs 8 \o to_int).
+op to_bool bl i = nth witness (to_bool_list bl) i.
+
+end section TO_BOOL.
+
+(* Apply one step of permutation on the given in-construction challenge. *)
+op to_challenge_body signs indices i' challenge =
+  let i0 = 256 - tau in
+  let i = i0 + i' in
+  let j = to_int (nth witness indices i') in
+  let coeff = nth witness challenge j in
+  let challenge = put challenge i coeff in
+  let coeff = if nth witness signs (i + tau - 256) then -1 else 1 in
+  put challenge j coeff.
+
+op to_challenge_aux (i : challenge_ir) tau_=
+  iteri tau_ (to_challenge_body (to_bool_list i.`1) i.`2) (nseq 256 0).
+
+op to_challenge (i : challenge_ir) = to_challenge_aux i tau.
+
+(* The second step of the factorisation: encode the rejected bytes. *)
+op to_challenge' (x : challenge_ir * rej_ir) = (x.`1, rej_to_leakage x.`2).
+
+lemma all_put (p : 'a -> bool) (s : 'a list) n x :
+  all p s => p x => all p (put s n x).
+proof.
+move=> hs hx; case: (0 <= n < size s) => hn; last by rewrite put_out.
+apply/(all_nthP _ _ witness) => i; rewrite size_put nth_put // => hi.
+by case: (n = i) => // _; move/(all_nthP _ _ witness): hs; apply.
+qed.
+
+lemma to_challenge_body_valid signs indices i' c :
+  is_challenge_list c => is_challenge_list (to_challenge_body signs indices i' c).
+proof.
+rewrite /is_challenge_list /to_challenge_body /= !size_put => -[sz hc].
+rewrite sz /=; apply all_put; last by case: (nth witness signs _).
+apply all_put => //; move/(all_nthP _ _ witness): hc; apply.
+rewrite sz to_int_in_surj; by exists (nth witness indices i').
+qed.
+
+lemma to_challenge_aux0 si i :
+   i <= 0 =>
+   to_challenge_aux si i = nseq 256 0.
+proof. by move=> ?;rewrite /to_challenge_aux iteri0. qed.
+
+lemma to_challenge_auxS si i :
+  0 <= i =>
+  to_challenge_aux si (i+1) = to_challenge_body (to_bool_list si.`1) si.`2 i (to_challenge_aux si i).
+proof. by move=> ?; rewrite /to_challenge_aux iteriS. qed.
+
+lemma to_challenge_aux_rcons signs indices byte i :
+  i <= size indices =>
+  to_challenge_aux (signs, rcons indices byte) i =
+  to_challenge_aux (signs, indices) i.
+proof.
+elim /natind : i.
++ by move=> i ??; rewrite !to_challenge_aux0.
+move=> i h0i ih /ltzE hs.
+rewrite !to_challenge_auxS // ih 1:ltzW //=.
+by rewrite /to_challenge_body /= nth_rcons hs.
+qed.
+
+lemma to_challenge_aux_valid si i : is_challenge_list (to_challenge_aux si i).
+proof.
+elim/natind: i => [i hi|i hi ih].
++ by rewrite to_challenge_aux0 // /is_challenge_list size_nseq all_nseq.
+by rewrite to_challenge_auxS //; apply to_challenge_body_valid.
+qed.
+
+lemma to_challenge_valid si : is_challenge_list (to_challenge si).
+proof. exact to_challenge_aux_valid. qed.
+
+(* The concretisation function must be injective on the encodings produced
+   by [to_challenge] (it cannot be injective on all [int list], which is
+   infinite). This allows to lift the fact that the output distribution is
+   uniform. Since [to_challenge] only produces valid encodings
+   ([to_challenge_valid]), it is implied by injectivity on
+   [is_challenge_list]. *)
+axiom to_concrete_inj_in (x y : challenge_ir) :
+  x \in dI => y \in dI =>
+  to_concrete (to_challenge x) = to_concrete (to_challenge y) =>
+  to_challenge x = to_challenge y.
+
+op dC : challenge distr = dmap dI (to_concrete \o to_challenge).
+
+(** Distribution properties. *)
+lemma dI_uni : is_uniform dI.
+proof.
+apply dprod_uni; 1: by apply /dlist_uni/dB_uni.
+apply djoin_uni => _ /mapP [ ? [ /mem_range ? -> ]] /=.
+by apply/dcond_uni/dB_uni.
+qed.
+
+
+lemma dI_ll : is_lossless dI.
+proof.
+apply dprod_ll. split; 1: by apply/dlist_ll/dB_ll.
+apply djoin_ll => _ /mapP [ ? [ /mem_range ? -> ]] /=.
+apply dB_le_ll.
+smt(tau_bound).
+qed.
+
+(* Support of [dI]: 8 sign bytes and [tau] indices, the [k]-th one being at
+   most the position [256 - tau + k] it is swapped with. *)
+lemma supp_dI (x : challenge_ir) :
+  x \in dI <=>
+     size x.`1 = 8 /\ size x.`2 = tau
+  /\ forall k, 0 <= k < tau => to_int (nth witness x.`2 k) <= 256 - tau + k.
+proof.
+case: x => sg idx; rewrite /dI supp_dprod /= supp_dlist //.
+rewrite (_ : all (support dB) sg) /=; 1: by apply/allP => b _; apply dB_full.
+rewrite supp_djoinmap size_range /=.
+rewrite (_ : max 0 (256 - (256 - tau)) = tau); 1: smt(tau_bound).
+case: (tau = size idx) => [htau | /#] /=; rewrite -htau.
+rewrite -(all_nthP _ _ (witness, witness)) size_zip size_range.
+have -> : min (max 0 (256 - (256 - tau))) (size idx) = tau by smt(tau_bound).
+congr; rewrite /=; apply eq_iff; apply forall_iff => k /=.
+case: (0 <= k < tau) => // hk /=.
+rewrite nth_zip ?size_range; 1: smt(tau_bound).
+rewrite /= nth_range; 1: smt(tau_bound).
+by rewrite /dB_le dcond_supp dB_full.
+qed.
+
+lemma dRejPos_ll i : 0 <= i => is_lossless (dRejPos i).
+proof.
+move=> hi; apply dlet_ll; 1: by apply/geometric_ll; smt().
+by move=> n _ /=; apply/dlist_ll/dmap_ll/dcond'_ll.
+qed.
+
+lemma dRej_ll : is_lossless dRej.
+proof.
+apply djoin_ll => ? /mapP [i [/mem_iota ? ->]] /=.
+apply dRejPos_ll; smt(tau_bound).
+qed.
+
+lemma dLeakRej_ll : is_lossless dLeakRej.
+proof. by apply/dmap_ll/dRej_ll. qed.
+

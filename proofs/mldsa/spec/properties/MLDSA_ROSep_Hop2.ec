@@ -8,6 +8,7 @@ require import MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1.
 require import FMapExtra.
 require import JWordExtra.
 
+require import Leakage.
 abstract theory MLDSA_ROSep_Hop2.
 
 clone include MLDSA_ROSep_Hop1.MLDSA_ROSep_Hop1.
@@ -208,8 +209,8 @@ proc; sp 0 1; if{2}.
     have hvu := view_mu true RoutedH.tr{2} DS5.RO3.RO.m{2} DS5.RO4.RO.m{2} DS5.RO5.RO.m{2}
                   DS5.RO2.RO.m{2} RO_rest.RO.m{2} RO_pad.RO.m{2} x{2} (Bytes64.of_list rL)
                   _ hp h0 => //.
-    rewrite Bytes64.of_listK //=; split; 1: by rewrite /dbytes64 supp_dmap; exists rL.
-    move=> _; split => hmu; split => hx.
+    rewrite Bytes64.of_listK //=.
+    split => hmu; split => hx.
     + rewrite !get_set_sameE /= Bytes64.of_listK //=.
       by move=> x1; rewrite get_setE hvu Bytes64.of_listK // -hv.
     + smt(domE).
@@ -333,8 +334,8 @@ if{2}; 1: (rcondf{2} 3;
                 DS5.RO2.RO.m{2} RO_rest.RO.m{2} RO_pad.RO.m{2} x{2} (Bytes64.of_list rL)
                 _ hpk h0.
   + by move=> m'; rewrite /view /= hnp /= hs hl hpk h0.
-  rewrite Bytes64.of_listK //=; split; 1: by rewrite /dbytes64 supp_dmap; exists rL.
-  move=> _; split => hm; split => hx;
+  rewrite Bytes64.of_listK //=.
+  split => hm; split => hx;
     [ by rewrite !get_set_sameE /= Bytes64.of_listK //= => x1; rewrite get_setE hvu Bytes64.of_listK // -hv
     | by move: hx; rewrite domE hk; move: hm; rewrite domE;
          case: (DS5.RO3.RO.m{2}.[BytesPK.of_list x{2}.`1])
@@ -413,8 +414,7 @@ split => [o _ | _ rL hrL]; 1: by rewrite mu1_dbytes64.
 have hs64 : size rL = 64 by move: hrL; rewrite /dblock supp_dlist //; smt().
 have hx : x{2} \notin DS2.RO1.RO.m{1} by rewrite domE heq -domE; move: (hro x{2}); smt().
 rewrite Bytes64.of_listK //= mem_empty hx /= !get_set_sameE /= Bytes64.of_listK //=.
-split; 1: by rewrite /dbytes64 supp_dmap; exists rL.
-move=> _ hnh; split => [y | l _]; 2: by rewrite !mem_empty.
+move=> hnh; split => [y | l _]; 2: by rewrite !mem_empty.
 move: hnh hro; rewrite /hit /rest_ok Bytes64.of_listK // negb_or negb_exists /= => -[hpk hrest] hro.
 rewrite get_setE /view !emptyE get_setE heq /=.
 rewrite Bytes64.of_listK // emptyE; case: (y = x{2}) => [->> | hne] /=.
@@ -474,7 +474,8 @@ equiv next_unset : XOFS_O(DS2.RO1.RO).next ~ XOFS_O(RoutedH).next :
       inv_pre DS2.RO1.RO.m{1} DS5.RO3.RO.m{2} DS5.RO4.RO.m{2} DS5.RO5.RO.m{2} DS5.RO2.RO.m{2}
               RO_rest.RO.m{2} RO_pad.RO.m{2}.
 proof.
-by proc; inline ReadByte(DS2.RO1.RO).read ReadByte(RoutedH).read; wp; call get_unset; auto => />; smt(w1_bytes_big param_sets).
+by proc; inline ReadByte(DS2.RO1.RO).read ReadByte(RoutedH).read; wp; call get_unset; auto => />;
+  smt(w1_bytes_big param_sets).
 qed.
 
 equiv rbp_unset : RejBoundedPoly(XOFS_O(DS2.RO1.RO)).sample ~ RejBoundedPoly(XOFS_O(RoutedH)).sample :
@@ -559,11 +560,11 @@ equiv sib_set : SampleInBall_O(DS2.RO1.RO).sample ~ SampleInBall_O(RoutedH).samp
       inv_view DS2.RO1.RO.m{1} RoutedH.trset{2} RoutedH.tr{2} DS5.RO3.RO.m{2} DS5.RO4.RO.m{2}
                DS5.RO5.RO.m{2} DS5.RO2.RO.m{2} RO_rest.RO.m{2} RO_pad.RO.m{2}.
 proof.
-proc; while (={i, pos, h, c, leakage, rho} /\ RoutedH.trset{2} /\
+proc; while (={i, pos, h, c, leak, rho} /\ RoutedH.trset{2} /\
              inv_view DS2.RO1.RO.m{1} RoutedH.trset{2} RoutedH.tr{2} DS5.RO3.RO.m{2}
                       DS5.RO4.RO.m{2} DS5.RO5.RO.m{2} DS5.RO2.RO.m{2} RO_rest.RO.m{2}
                       RO_pad.RO.m{2}); 2: by wp; call squeeze_set; auto.
-wp; while (={i, j, pos, leakage, rho} /\ RoutedH.trset{2} /\
+wp; while (={i, j, pos, leak, rho} /\ RoutedH.trset{2} /\
            inv_view DS2.RO1.RO.m{1} RoutedH.trset{2} RoutedH.tr{2} DS5.RO3.RO.m{2}
                     DS5.RO4.RO.m{2} DS5.RO5.RO.m{2} DS5.RO2.RO.m{2} RO_rest.RO.m{2}
                     RO_pad.RO.m{2}); 1: by wp; call read_set; auto.
@@ -602,7 +603,7 @@ equiv sign_set : MLDSA_RO(DS2.RO1.RO, DS2.RO2.RO).sign_derand ~ MLDSA_RO(RoutedH
       inv_view DS2.RO1.RO.m{1} RoutedH.trset{2} RoutedH.tr{2} DS5.RO3.RO.m{2} DS5.RO4.RO.m{2}
                DS5.RO5.RO.m{2} DS5.RO2.RO.m{2} RO_rest.RO.m{2} RO_pad.RO.m{2}.
 proof.
-proc; seq 16 16 : (={sk, m, coins, rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp, kappa,
+proc; seq 18 18 : (={sk, m, coins, rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp, kappa,
                      zh, ct, ctl, sigma, leakage, glob DS2.RO2.RO, glob XOFA_O} /\
                    RoutedH.trset{2} /\
                    inv_view DS2.RO1.RO.m{1} RoutedH.trset{2} RoutedH.tr{2} DS5.RO3.RO.m{2}
@@ -672,7 +673,7 @@ qed.
 hoare sign_keep (b : bool) : MLDSA_RO(RoutedH, DS2.RO2.RO).sign_derand :
   RoutedH.trset /\ RoutedH.bad = b ==> RoutedH.trset /\ RoutedH.bad = b.
 proof.
-proc; seq 16 : (RoutedH.trset /\ RoutedH.bad = b);
+proc; seq 18 : (RoutedH.trset /\ RoutedH.bad = b);
   2: by if; [call (: true); [by conseq /> | auto] | auto].
 while (RoutedH.trset /\ RoutedH.bad = b).
 + inline SIB_RO_O(RoutedH).get ExpandMask_O(RoutedH).sample; wp; call (sib_keep b); wp.
@@ -693,12 +694,7 @@ by if; [wp; call (squeeze_keep b); wp; call (sib_keep b); wp; call (squeeze_keep
 qed.
 
 lemma RoutedH_get_ll : islossless RoutedH.get.
-proof.
-islossless.
-+ by rewrite /dbytes64; apply dmap_ll; apply dlist_ll; apply W8.dword_ll.
-+ by rewrite /dbytesCT; apply dmap_ll; apply dlist_ll; apply W8.dword_ll.
-by rewrite /dbytes64; apply dmap_ll; apply dlist_ll; apply W8.dword_ll.
-qed.
+proof. by islossless. qed.
 
 lemma RO1_get_ll : islossless DS2.RO1.RO.get.
 proof. by islossless; apply dlist_ll; apply W8.dword_ll. qed.
@@ -785,7 +781,7 @@ lemma sign_ll (H <: BlockOracle) :
   islossless H.get => islossless SampleInBall_O(H).sample =>
   islossless MLDSA_RO(H, DS2.RO2.RO).sign_derand.
 proof.
-move=> H_ll S_ll; proc; seq 16 : true => //.
+move=> H_ll S_ll; proc; seq 18 : true => //.
 + while true (kappa_max - kappa);
     1: by move=> z; inline SIB_RO_O(H).get; wp; call S_ll; wp; call (Squeeze_ll H H_ll); wp;
           call (emask_ll H H_ll); auto => /#.
@@ -859,7 +855,8 @@ hoare next_pre (rho0 : Bytes64.t) : XOFS_O(RoutedH).next :
   ==> !RoutedH.trset /\ !RoutedH.bad /\ DS5.RO3.RO.m = empty /\ pre_ok rho0 RO_rest.RO.m /\
       take 64 (Bytes66.to_list XOFS_O.seed) = Bytes64.to_list rho0.
 proof.
-by proc; inline ReadByte(RoutedH).read; wp; call (get_pre rho0); auto => />; smt(w1_bytes_big param_sets).
+by proc; inline ReadByte(RoutedH).read; wp; call (get_pre rho0); auto => />;
+  smt(w1_bytes_big param_sets).
 qed.
 
 hoare rbp_pre (rho0 : Bytes64.t) : RejBoundedPoly(XOFS_O(RoutedH)).sample :

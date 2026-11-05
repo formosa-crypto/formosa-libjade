@@ -143,8 +143,14 @@ op MakeHint(v1 : polykvec, v2 : polykvec) : polykvec =
 op MakeHintImpl(v1 : polykvec, v2 : polykvec) : polykvec =
     map2 poly_MakeHintImpl v1 v2.
 
-op infnorm_lt(v : polykvec, bound : int) : bool = 
+op infnorm_lt(v : polykvec, bound : int) : bool =
   all (fun ii => all (fun jj => `|v.[ii].[jj]| < bound) (iota_ 0 256)) (iota_ 0 kvec).
+
+lemma infnorm_lt_polyE (v : polykvec) (bound : int) :
+  infnorm_lt v bound <=> all (fun i => infnorm_lt v.[i] bound) (iota_ 0 kvec).
+proof.
+by rewrite /infnorm_lt allP /=; split => H i Hi /=.
+qed.
 
 import Bigint BIA. 
 op hammw(v : polykvec, bound : int) : bool =

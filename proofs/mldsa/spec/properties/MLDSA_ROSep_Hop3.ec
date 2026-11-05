@@ -7,6 +7,7 @@ require MLDSA_ROSep_Hop2.
 require import MLDSA_RO MLDSA_ROSep MLDSA_ROSep_Hop1 MLDSA_ROSep_Hop2.
 require import FMapExtra JWordExtra.
 
+require import Leakage.
 abstract theory MLDSA_ROSep_Hop3.
 
 clone include MLDSA_ROSep_Hop2.MLDSA_ROSep_Hop2.
@@ -30,19 +31,22 @@ module HctPad = {
 module MLDSA_RO_DS2(H : BlockOracle, G : Oracle) = {
   proc keygen = MLDSA_RO_DS(H, G).keygen
 
-  proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * Leakage list = {
+  proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * leakage = {
      var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,rhopp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
-         cs2,z,r0,ct0,h,leakage,sigma,bz,bh,bs,sl;
+         cs2,z,r0,ct0,h,leakage,sigma,bct0,bs,sl;
+     var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
      coins <$ drnd;
      ct <- witness;
      ctl <- witness;
      sigma <- witness;
-     leakage <- [];
+     rf <- witness;
+     hf <- witness;
      (rho,_K,tr,s1,s2,t0) <@ SkEncDec.skDecode(sk);
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
+     leakage <- kvec_leak t0h;
      _A <@ ExpandA(XOFA_O(G)).sample(rho);
      mu <@ DS5.RO4.RO.get(tr, m);
      bs <@ Squeeze(H).squeeze(Bytes32.to_list _K ++ rnd_to_list coins ++ Bytes64.to_list mu, 64);
@@ -56,21 +60,27 @@ module MLDSA_RO_DS2(H : BlockOracle, G : Oracle) = {
        ct <@ HctPad.get(mu, w1Encode w1);
        (c, sl) <@ SampleInBall_O(DS5.RO2.RO).sample(ct);
        ctl <- ((ct, c), sl);
-       leakage <- leakage ++ [ RO ctl.`2] ;
+       leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
+       leakage <- lcat leakage (poly_leak ch);
        cs1 <- invnttv (ntt_smul ch s1h);
-       cs2 <- invnttv (ntt_smul ch s2h);
        z <- y + cs1;
-       r0 <- polykvec_LowBits (w - cs2);
-       bz <- infnorm_lt z (gamma1 - Beta) &&
-                  infnorm_lt r0 (gamma2 - Beta);
-       leakage <- leakage ++ [ CheckZ bz ];
-       if (bz) {
-          ct0 <- invnttv (ntt_smul ch t0h);
-          h <- MakeHint (PolyKVec.zerov-ct0) (w - cs2 + ct0);
-          bh <- infnorm_lt ct0 gamma2 && hammw h w_hint;
-          leakage <- leakage ++ [ CheckH bh ];
-          if (bh) { zh <- Some (z,h); }
+       zf <- zfail_idx z;
+       leakage <- lcat leakage (oileak zf);
+       if (zf = None) {
+         cs2 <- invnttv (ntt_smul ch s2h);
+         r0 <- polykvec_LowBits (w - cs2);
+         rf <- r0fail_idx r0;
+         leakage <- lcat leakage (oileak rf);
+         if (rf = None) {
+           ct0 <- invnttv (ntt_smul ch t0h);
+           h <- MakeHint (PolyKVec.zerov-ct0) (w - cs2 + ct0);
+           hf <- hintfail_idx h;
+           leakage <- lcat leakage (oileak hf);
+           (* public test: c and t0 are leaked *)
+           bct0 <- infnorm_lt ct0 gamma2;
+           if (bct0 /\ hf = None) { zh <- Some (z,h); }
+         }
        }
        kappa <- kappa + 1;
      }
@@ -155,10 +165,10 @@ equiv sib_xc (t : Bytes64.t) : SampleInBall_O(RoutedH).sample ~ SampleInBall_O(D
   ={rho, glob RoutedH} /\ RoutedH.tr{1} = t /\ take 64 (BytesCT.to_list rho{1}) <> Bytes64.to_list t
   ==> ={res, glob RoutedH} /\ RoutedH.tr{1} = t.
 proof.
-proc; while (={i, pos, h, c, leakage, rho, glob RoutedH} /\ RoutedH.tr{1} = t /\
+proc; while (={i, pos, h, c, leak, rho, glob RoutedH} /\ RoutedH.tr{1} = t /\
              take 64 (BytesCT.to_list rho{1}) <> Bytes64.to_list t);
   2: by wp; call (squeeze_xc t); auto => />; rewrite BytesCT.size_to_list.
-wp; while (={i, j, pos, leakage, rho, glob RoutedH} /\ RoutedH.tr{1} = t /\
+wp; while (={i, j, pos, leak, rho, glob RoutedH} /\ RoutedH.tr{1} = t /\
            take 64 (BytesCT.to_list rho{1}) <> Bytes64.to_list t);
   1: by wp; call (read_xc t); auto => />; rewrite BytesCT.size_to_list.
 by wp; call (read_xc t); auto => />; rewrite BytesCT.size_to_list.
@@ -322,7 +332,7 @@ equiv sign_eq : MLDSA_RO_DS1(RoutedH, DS2.RO2.RO).sign ~ MLDSA_RO_DS2(RoutedH, D
 proof.
 proc; inline{1} MLDSA_RO(RoutedH, DS2.RO2.RO).sign_derand.
 exlim RoutedH.tr{2}, sk{2}, m{2} => t s mm.
-seq 13 10 : (={glob RoutedH, glob DS2.RO2.RO, glob XOFA_O, ct, ctl, sigma, leakage, rho, _K, tr,
+seq 15 12 : (={glob RoutedH, glob DS2.RO2.RO, glob XOFA_O, ct, ctl, sigma, leakage, rho, _K, tr,
                s1, s2, t0, s1h, s2h, t0h, _A} /\
              coins0{1} = coins{2} /\ m0{1} = m{2} /\ m{2} = mm /\ tr{2} = t /\
              RoutedH.trset{2} /\ RoutedH.tr{2} = t /\ !mapbad t DS5.RO4.RO.m{2} DS5.RO5.RO.m{2}).
@@ -468,7 +478,7 @@ hoare sign2_inv (b bb : bool) (t : Bytes64.t) (k : BytesPK.t) : MLDSA_RO_DS2(Rou
   ==> RoutedH.trset /\ RoutedH.tr = t /\ RoutedH.bad = bb /\ DS5.RO3.RO.m.[k] = Some t /\
       (b => mapbad t DS5.RO4.RO.m DS5.RO5.RO.m).
 proof.
-proc; seq 16 : (RoutedH.trset /\ RoutedH.tr = t /\ RoutedH.bad = bb /\ DS5.RO3.RO.m.[k] = Some t /\
+proc; seq 18 : (RoutedH.trset /\ RoutedH.tr = t /\ RoutedH.bad = bb /\ DS5.RO3.RO.m.[k] = Some t /\
                 (b => mapbad t DS5.RO4.RO.m DS5.RO5.RO.m));
   2: by if; [call (: true); [by conseq /> | auto] | auto].
 while (RoutedH.trset /\ RoutedH.tr = t /\ RoutedH.bad = bb /\ DS5.RO3.RO.m.[k] = Some t /\
@@ -481,7 +491,7 @@ qed.
 
 lemma sign2_ll : islossless MLDSA_RO_DS2(RoutedH, DS2.RO2.RO).sign.
 proof.
-proc; seq 16 : true => //; last by if; [call sigEncode_ll | ].
+proc; seq 18 : true => //; last by if; [call sigEncode_ll | ].
 while true (kappa_max - kappa);
   1: by move=> z; wp; call sib_XC_ll; call hctpad_ll; wp; call (emask_ll RoutedH RoutedH_get_ll);
         auto => /#.
@@ -807,7 +817,7 @@ proof. by proc; while (RoutedH.trset /\ RoutedH.bad = b); [wp; call (squeeze_kee
 hoare sign2_keep (b : bool) : MLDSA_RO_DS2(RoutedH, DS2.RO2.RO).sign :
   RoutedH.trset /\ RoutedH.bad = b ==> RoutedH.trset /\ RoutedH.bad = b.
 proof.
-proc; seq 16 : (RoutedH.trset /\ RoutedH.bad = b);
+proc; seq 18 : (RoutedH.trset /\ RoutedH.bad = b);
   2: by if; [call (: true); [by conseq /> | auto] | auto].
 while (RoutedH.trset /\ RoutedH.bad = b);
   1: by wp; call (: true); [by conseq /> | call (: true); [by conseq /> | wp; call (emask_keep b); auto]].

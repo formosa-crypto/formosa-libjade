@@ -9,6 +9,7 @@ from CryptoSpecs require import Keccak1600_Spec.
 require import Xreal.
 require import DistrExtra.
 
+require import Leakage.
 abstract theory MLDSA_RO.
 
 clone include MLDSATargetFIPS.MLDSATargetFIPS.
@@ -119,12 +120,12 @@ module ExpandMask_O(H : BlockOracle) = {
 
 module SampleInBall_O(H : BlockOracle) = {
    proc sample(rho : BytesCT.t) : poly * sib_leakage = {
-      var leakage : bool list;
+      var leak : (int * int) list;
       var s : Bytes8.t;
       var h : bool list;
       var i,j,bs,pos;
       var c : poly;
-      leakage <- [];
+      leak <- [];
       c <- poly_zero;
       bs <@ Squeeze(H).squeeze(BytesCT.to_list rho, 8);
       s <- Bytes8.of_list bs;
@@ -134,17 +135,17 @@ module SampleInBall_O(H : BlockOracle) = {
       while (i < 256) {
           j <@ ReadByte(H).read(BytesCT.to_list rho, pos);
           pos <- pos + 1;
+          leak <- rcons leak (pos, W8.to_uint j);
           while(i < W8.to_uint j) {
-            leakage <- leakage ++ [true];
             j <@ ReadByte(H).read(BytesCT.to_list rho, pos);
             pos <- pos + 1;
+            leak <- rcons leak (pos, W8.to_uint j);
           }
-          leakage <- leakage ++ [false];
           c.[i] <- c.[W8.to_uint j];
           c.[W8.to_uint j] <- if h.[i+tau-256] then incoeff (-1) else incoeff (1);
           i <- i + 1;
       }
-      return (c,leakage);
+      return (c, pairs_to_leakage leak);
    }
 }.
 
@@ -177,18 +178,21 @@ module MLDSA_RO(H : BlockOracle, G : Oracle) = {
      return (sk,pk);
   }
 
-  proc sign_derand(sk : BytesSK.t, m : W8.t list, coins : rnd_) : BytesSig.t option * Leakage list= {
+  proc sign_derand(sk : BytesSK.t, m : W8.t list, coins : rnd_) : BytesSig.t option * leakage= {
      var rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,rhopp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
-         cs2,z,r0,ct0,h,leakage,sigma,bz,bh,bs;
+         cs2,z,r0,ct0,h,leakage,sigma,bct0,bs;
+     var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
      ct <- witness;
      ctl <- witness;
      sigma <- witness;
-     leakage <- [];
+     rf <- witness;
+     hf <- witness;
      (rho,_K,tr,s1,s2,t0) <@ SkEncDec.skDecode(sk);
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
+     leakage <- kvec_leak t0h;
      _A <@ ExpandA(XOFA_O(G)).sample(rho);
      bs <@ Squeeze(H).squeeze(Bytes64.to_list tr ++ m, 64);
      mu <- Bytes64.of_list bs;
@@ -202,21 +206,27 @@ module MLDSA_RO(H : BlockOracle, G : Oracle) = {
        w1 <- polykvec_HighBits w;
        ctl <@ SIB_RO_O(H).get(mu,w1Encode w1);
        (ct,c) <- ctl.`1;
-       leakage <- leakage ++ [ RO ctl.`2] ;
+       leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
+       leakage <- lcat leakage (poly_leak ch);
        cs1 <- invnttv (ntt_smul ch s1h);
-       cs2 <- invnttv (ntt_smul ch s2h);
        z <- y + cs1;
-       r0 <- polykvec_LowBits (w - cs2);
-       bz <- infnorm_lt z (gamma1 - Beta) &&
-                  infnorm_lt r0 (gamma2 - Beta);
-       leakage <- leakage ++ [ CheckZ bz ];
-       if (bz) {
-          ct0 <- invnttv (ntt_smul ch t0h);
-          h <- MakeHint (PolyKVec.zerov-ct0) (w - cs2 + ct0);
-          bh <- infnorm_lt ct0 gamma2 && hammw h w_hint;
-          leakage <- leakage ++ [ CheckH bh ];
-          if (bh) { zh <- Some (z,h); }
+       zf <- zfail_idx z;
+       leakage <- lcat leakage (oileak zf);
+       if (zf = None) {
+         cs2 <- invnttv (ntt_smul ch s2h);
+         r0 <- polykvec_LowBits (w - cs2);
+         rf <- r0fail_idx r0;
+         leakage <- lcat leakage (oileak rf);
+         if (rf = None) {
+           ct0 <- invnttv (ntt_smul ch t0h);
+           h <- MakeHint (PolyKVec.zerov-ct0) (w - cs2 + ct0);
+           hf <- hintfail_idx h;
+           leakage <- lcat leakage (oileak hf);
+           (* public test: c and t0 are leaked *)
+           bct0 <- infnorm_lt ct0 gamma2;
+           if (bct0 /\ hf = None) { zh <- Some (z,h); }
+         }
        }
        kappa <- kappa + 1;
      }
@@ -370,10 +380,10 @@ equiv SampleInBall_equiv :
   ={rho} ==> ={res}.
 proof.
 proc.
-while (={i, c, h, leakage, rho} /\ XOFSIB_state.seed{1} = BytesCT.to_list rho{2}
-       /\ XOFSIB_state.pos{1} = pos{2} /\ 0 <= pos{2}).
-+ wp; while (={i, j, c, h, leakage, rho} /\ XOFSIB_state.seed{1} = BytesCT.to_list rho{2}
-             /\ XOFSIB_state.pos{1} = pos{2} /\ 0 <= pos{2}).
+while (={i, c, h, leak, rho} /\ XOFSIB_state.seed{1} = BytesCT.to_list rho{2}
+       /\ XOFSIB_state.pos{1} = pos{2} /\ ctx{1} = pos{2} /\ 0 <= pos{2}).
++ wp; while (={i, j, c, h, leak, rho} /\ XOFSIB_state.seed{1} = BytesCT.to_list rho{2}
+             /\ XOFSIB_state.pos{1} = pos{2} /\ ctx{1} = pos{2} /\ 0 <= pos{2}).
   + inline *; auto => /> &2 *.
     by rewrite SHAKE256_byte //= /#.
   inline *; auto => /> &2 *.
@@ -413,7 +423,7 @@ lemma sign_derand_equiv :
           ={sk, m, coins} ==> ={res} ].
 proof.
 proc.
-seq 13 15 : (={rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp,
+seq 15 17 : (={rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp, rf, hf,
                kappa, zh, leakage, sigma, ct, ctl}).
 + wp; ecall{2} (Squeeze_SHAKE256_ph
                   (Bytes32.to_list _K{2} ++ rnd_to_list coins{2} ++ Bytes64.to_list mu{2}) 64).
@@ -422,7 +432,7 @@ seq 13 15 : (={rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp,
   wp; call (: true); 1: by sim.
   by auto.
 seq 1 1 : (={zh, leakage, sigma, ct}); last by sim.
-while (={rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp,
+while (={rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp, rf, hf,
          kappa, zh, leakage, sigma, ct, ctl}); 2: by auto.
 wp; call SIB_RO_equiv; wp; call ExpandMask_equiv.
 by auto.
@@ -564,7 +574,7 @@ while (ok (BytesCT.to_list rho) /\ 0 <= pos /\ 0 <= i) (256 - i); last first.
 - by wp; call (Squeeze_ll H H_ll); auto => />; smt(tau_bound).
 move=> z.
 (* the first read of the round *)
-seq 2 : (ok (BytesCT.to_list rho) /\ 0 <= pos /\ 0 <= i /\ i < 256 /\ 256 - i = z).
+seq 3 : (ok (BytesCT.to_list rho) /\ 0 <= pos /\ 0 <= i /\ i < 256 /\ 256 - i = z).
 - by wp; inline ReadByte(H).read; wp; call (: true); auto.
 - by wp; inline ReadByte(H).read; wp; call H_ll; auto => /> /#.
 (* the rejection loop *)

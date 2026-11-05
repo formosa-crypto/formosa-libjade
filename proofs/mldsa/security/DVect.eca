@@ -31,6 +31,7 @@ lemma size_shiftV (w1 : high list) : size (shiftV w1) = size w1.
 proof. by rewrite size_oflist size_map. qed.
 
 lemma size_lowBitsV (v : vector) : size (lowBitsV v) = size v by [].
+
 lemma size_highBitsV (v : vector) : size (highBitsV v) = size v.
 proof. by rewrite /highBitsV size_map size_tolist. qed.
 
@@ -101,6 +102,53 @@ split => ?.
   rewrite mem_tolist in supp_x.
   rewrite ltr_ofint.
   by split => [|/#]; first exact cnorm_ge0.
+qed.
+
+(* Index of the first entry among v.[0], ..., v.[n-1] rejected by [ok]
+   (None when all of them are accepted). This is the data leaked by a
+   short-circuit cascade of n tests; out-of-range entries are zero (getv0E). *)
+op first_fail (ok : Rq -> bool) (n : int) (v : vector) : int option =
+  let i = find (fun i => !ok v.[i]) (range 0 n) in
+  if i < n then Some i else None.
+
+lemma first_fail_has ok n v :
+  (find (fun i => !ok v.[i]) (range 0 n) < n) = has (fun i => !ok v.[i]) (range 0 n).
+proof. by rewrite has_find size_range; smt(find_ge0). qed.
+
+lemma first_fail_None ok n v :
+  first_fail ok n v = None <=> forall i, 0 <= i < n => ok v.[i].
+proof.
+rewrite /first_fail /= first_fail_has.
+case: (has (fun i => !ok v.[i]) (range 0 n)) => /=.
+- by move/hasP => [i] []; rewrite mem_range /#.
+by rewrite hasPn => hall i rg_i; have := hall i _; [by rewrite mem_range|smt()].
+qed.
+
+lemma first_fail_Some ok n v i :
+  first_fail ok n v = Some i =>
+  0 <= i < n /\ !ok v.[i] /\ forall j, 0 <= j < i => ok v.[j].
+proof.
+rewrite /first_fail /= first_fail_has.
+case: (has (fun i => !ok v.[i]) (range 0 n)) => //= hh.
+have hf := hh; rewrite has_find size_range in hf.
+have := nth_find 0 (fun i => !ok v.[i]) (range 0 n) hh.
+rewrite nth_range /=; 1: smt(find_ge0).
+move => nok <-; split; 1: smt(find_ge0).
+split => // j rg_j.
+have := before_find 0 (fun i => !ok v.[i]) (range 0 n) j _; 1: smt(find_ge0).
+by rewrite nth_range /= /#.
+qed.
+
+lemma first_fail_range ok n v i :
+  first_fail ok n v = Some i => 0 <= i < n.
+proof. by move/first_fail_Some. qed.
+
+(* The cascade of norm tests accepts iff the infinity norm is small *)
+lemma first_fail_norm a n v :
+  0 < a => size v = n =>
+  first_fail (fun p => cnorm p < a) n v = None <=> inf_normv v < a.
+proof.
+move => gt0_a <-; rewrite first_fail_None inf_normv_ltr //.
 qed.
 
 lemma inf_normv_ler v a :
@@ -316,4 +364,95 @@ move => k_ge0 o_ge0.
 suff: zerov k \in (to_seq (support (dvector (dRq_ o) k))).
   smt(size_eq0 List.size_ge0).
 rewrite mem_to_seq; [exact finite_dRq_vect|exact: dRq_zerov].
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Law of the first failing index on a product distribution             *)
+
+lemma first_fail_SomeE ok n v i :
+  first_fail ok n v = Some i <=>
+  (0 <= i < n /\ !ok v.[i] /\ forall j, 0 <= j < i => ok v.[j]).
+proof.
+split; 1: exact first_fail_Some.
+move=> [rg_i [nok_i ok_lt]].
+case _: (first_fail ok n v) => [/first_fail_None h | i' /first_fail_Some [rg_i' [nok_i' ok_lt']]].
+- by have := h i rg_i.
+case: (i' < i) => [lt_i'i | /lezNgt le_ii']; 1: by have := ok_lt i' _ => // /#.
+case: (i < i') => [lt_ii' | /lezNgt le_i'i]; 1: by have := ok_lt' i _ => // /#.
+by rewrite (_ : i' = i) 1:/#.
+qed.
+
+(* The coordinates of [y] are independent: probability of the outcome
+   [Some i] of the cascade on [y + v], for [y] sampled in [dvector d n] *)
+lemma dvector_first_fail_Some (d : Rq distr) ok n (v : vector) i :
+  is_lossless d => 0 <= n =>
+  mu (dvector d n) (fun y => first_fail ok n (y + v) = Some i) =
+  if 0 <= i < n
+  then StdBigop.Bigreal.BRM.bigi predT (fun j =>
+         if j < i then mu d (fun x => ok (x + v.[j]))
+         else if j = i then 1%r - mu d (fun x => ok (x + v.[j])) else 1%r) 0 n
+  else 0%r.
+proof.
+move=> d_ll ge0_n; case: (0 <= i < n) => rg_i; last first.
+- rewrite (mu_eq _ _ pred0) ?mu0 // => y.
+  by rewrite /pred0; apply/negbTE/negP => /first_fail_range /#.
+pose p := fun j x => if j < i then ok (x + v.[j])
+                     else if j = i then !ok (x + v.[j]) else true.
+have -> : StdBigop.Bigreal.BRM.bigi predT (fun j =>
+            if j < i then mu d (fun x => ok (x + v.[j]))
+            else if j = i then 1%r - mu d (fun x => ok (x + v.[j])) else 1%r) 0 n =
+          StdBigop.Bigreal.BRM.bigi predT (fun j => mu d (p j)) 0 n.
+- apply StdBigop.Bigreal.BRM.eq_big_int => j rg_j /=; rewrite /p.
+  case: (j < i) => _ //.
+  case: (j = i) => [<<- | hji] /=; last by rewrite -d_ll; apply mu_eq.
+  by rewrite (mu_eq _ (fun x => !ok (x + v.[j])) (predC (fun x => ok (x + v.[j])))) // mu_not d_ll.
+rewrite -(DList.dlistE zeror) /dvector dmapE (_ : max 0 n = n) 1:/#.
+apply mu_eq_support => ys ys_in.
+have size_ys : size ys = n by apply (DList.supp_dlist_size d) => //.
+rewrite /(\o) /= first_fail_SomeE.
+have hget : forall j, 0 <= j < n => (oflist ys + v).[j] = nth zeror ys j + v.[j].
+- by move=> j rg_j; rewrite get_addv (get_oflist zeror) // size_ys.
+rewrite /p eq_iff; split.
+- move=> [_ [nok ok_lt]] j rg_j; rewrite -hget //.
+  case: (j < i) => [/#|_]; case: (j = i) => [-> //|//].
+move=> h; split => //; split.
+- by have := h i rg_i; rewrite ltzz /= hget.
+move=> j rg_j; rewrite hget 1:/#; have := h j _; [smt() | by rewrite ifT 1:/#].
+qed.
+
+(* Probability of the outcome [None] *)
+lemma dvector_first_fail_None (d : Rq distr) ok n (v : vector) :
+  0 <= n =>
+  mu (dvector d n) (fun y => first_fail ok n (y + v) = None) =
+  StdBigop.Bigreal.BRM.bigi predT (fun j => mu d (fun x => ok (x + v.[j]))) 0 n.
+proof.
+move=> ge0_n.
+rewrite -(DList.dlistE zeror d (fun j x => ok (x + v.[j]))) /dvector dmapE (_ : max 0 n = n) 1:/#.
+apply mu_eq_support => ys ys_in.
+have size_ys : size ys = n by apply (DList.supp_dlist_size d) => //.
+rewrite /(\o) /= first_fail_None eq_iff.
+by split => h j rg_j; have := h j rg_j; rewrite get_addv (get_oflist zeror) // size_ys.
+qed.
+
+(* The law of the first failing index of the cascade on [y + v] does not
+   depend on the shift [v] when, on each coordinate, the probability of
+   passing the test does not *)
+lemma first_fail_shift (d : Rq distr) (ok : Rq -> bool) (n : int) (v : vector) :
+  is_lossless d => 0 <= n =>
+  (forall j, 0 <= j < n => mu d (fun x => ok (x + v.[j])) = mu d ok) =>
+  dmap (dvector d n) (fun y => first_fail ok n (y + v)) =
+  dmap (dvector d n) (first_fail ok n).
+proof.
+move=> d_ll ge0_n hv.
+have h0 : mu d (fun x => ok (x + zeror)) = mu d ok.
+- by apply mu_eq => x /=; rewrite addr0.
+rewrite (eq_dmap_in (dvector d n) (first_fail ok n) (fun y => first_fail ok n (y + zerov n))).
+- by move=> y /size_dvector; rewrite lez_maxr.
+apply eq_distr => -[|i]; rewrite !dmap1E /(\o) /pred1 /=.
+- rewrite !dvector_first_fail_None //.
+  apply StdBigop.Bigreal.BRM.eq_big_int => j rg_j /=.
+  by rewrite hv // h0.
+rewrite !dvector_first_fail_Some //; case: (0 <= i < n) => // _.
+apply StdBigop.Bigreal.BRM.eq_big_int => j rg_j /=.
+by rewrite hv // h0.
 qed.

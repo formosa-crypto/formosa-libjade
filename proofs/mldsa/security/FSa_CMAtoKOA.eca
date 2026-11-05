@@ -1,0 +1,785 @@
+(* ----------------------------------------------------------------------------------------------
+
+   Verification of the CMA to NMA reduction for the Fiat-Shamir transform with aborts
+
+   ---------------------------------------------------------------------------------------------- *)
+require import Int Real List Leakage FMap FSet Distr RealExp SmtMap SDist StdOrder.
+require import StdBigop Finite.
+import RealOrder Bigreal Bigreal.BRA.
+
+require DigitalSignaturesLeakageRO PROM ReprogHybrid.
+require FSabort.
+
+(* ********************* IDS based on operators ****************** *)
+
+(* We assume a (generic) FS+abort scheme based in operators. *)
+
+(* ID scheme types and definitions *)
+clone import FSabort as FSa.
+import FSa.ID.
+
+(* Generic FS+abort construction (i.e. Sig = W * Z *)
+clone import FSa.Generic as FSaG.
+import DSS.
+import DSS.PRO.
+import DSS.DS.Stateless.
+
+(* splitting commitment definitionnaly *)
+op [lossless] commit_fun : SK -> (W * Pstate) distr.
+op [lossless] commit_leak : SK -> ID.LkgC distr.
+op commit sk = commit_fun sk `*` commit_leak sk.
+
+clone import OpBased as OP with
+  op commit <= commit
+proof commit_ll.
+realize commit_ll by move=>?; apply/dprod_ll_auto/commit_leak_ll/commit_fun_ll.
+
+(* -- Extra assumptions on the min-entropy of commitments for (good) secret keys -- *)
+
+op dlt, eps : real.
+
+op check_entropy : SK -> bool.
+op check (k : PK * SK) = check_entropy k.`2.
+
+axiom check_entropy_correct :
+  E (dcond keygen check) (fun k : PK * SK => p_max (dfst (commit_fun k.`2))) <= eps.
+
+axiom most_keys_high_entropy :
+  mu keygen (fun k : PK * SK => !check_entropy k.`2) <= dlt.
+
+(* [eps] bounds an expectation of probabilities, hence it is nonnegative *)
+lemma eps_ge0 : 0%r <= eps.
+proof.
+apply: ler_trans check_entropy_correct; rewrite /E.
+by apply: RealSeries.ge0_sum => k /=; apply: mulr_ge0; [apply: pmax_ge0 | apply: ge0_mu1].
+qed.
+
+(* Some upper bound on the rejection probability of [response]
+   for valid keys over the commitment distribution *)
+op p_rej : { real | 0%r <= p_rej < 1%r } as p_rej_bounded.
+
+abbrev respond_tuple sk (x : (W * Pstate) * C) = respond sk x.`2 x.`1.`2.
+abbrev respond_is_none sk x = (respond_tuple sk x).`1 = None.
+
+axiom rej_bound sk : check_entropy sk =>
+  mu (commit_fun sk `*` dC) (respond_is_none sk) <= p_rej.
+
+axiom keygen_finite : is_finite (support keygen).
+
+(* Rewriting the axiom to fit its use later on *)
+lemma rej_bound' sk : check_entropy sk =>
+  mu1 (dlet (commit_fun sk) (fun (w_st : _ * Pstate) =>
+    dmap dC (fun (c : C) => (respond sk c w_st.`2).`1))) None <= p_rej.
+proof.
+pose f (x : (W * _) * _) := (respond sk x.`2 x.`1.`2).`1.
+rewrite -(dmap_dprodE _ _ f) dmap1E.
+exact rej_bound.
+qed.
+
+(* This theory proves the core argument for Hop 4 *)
+(* Some of its axioms cannot be realized now as they depend on the
+   implementation of [respond]. The cloning defers their proof to a
+   later use. *)
+clone ReprogHybrid as RH with
+  type PK <- PK,
+  type SK <- SK,
+  type ST <- Pstate,
+  type Z <- Z,
+  type M <- M,
+  type W <- W,
+  type C <- C,
+  op dC <- dC,
+  op dLeak <- dLkgRO,
+  op qS <- qS,
+  op qH <- qH + 1,
+  op p <- p_rej,
+  op commit_fun <- commit_fun,
+  op commit_leak <- commit_leak,
+  op respond <- respond
+proof commit_fun_ll, commit_leak_ll, dC_ll, dLeak_ll, p_bounded, qS_ge0, qH_ge0.
+realize commit_fun_ll by exact commit_fun_ll.
+realize commit_leak_ll by exact commit_leak_ll.
+realize dC_ll by exact dC_ll.
+realize dLeak_ll by exact dLkgRO_ll.
+realize p_bounded by exact p_rej_bounded.
+realize qS_ge0 by exact qS_ge0.
+realize qH_ge0 by smt(qH_ge0).
+
+(* ----------------------------------------------------------------------*)
+(*                           Start proof                                 *)
+(* ----------------------------------------------------------------------*)
+
+(* We will prove that, given a EUF-CMA adversary, we can actually
+   break EUF-KOA. The bound (loss) of the reduction consists of the
+   reprogramming bound below plus [dlt] for ruling our secret keys
+   that do not provide sufficent entropy for [commit sk] *)
+const reprog_bound = RH.rb_ eps.
+
+(* The following is the actual reduction that can break EF_KOA using
+   an EF_CMA adversary. The first module is the sign oracle the reduction
+   implements, and the second module is the reduction itself. *)
+
+module ORedKOA (Sim : HVZK_Sim) : SOracle_CMA = {
+  var pk : PK
+  var qs : M list
+  var overlay : (W * M, C * LkgRO) fmap
+
+  proc init(pki: PK) : unit = {
+    pk <- pki;
+    qs <- [];
+    overlay <- empty;
+  }
+
+  proc sign(m: M) : Sig option * leakage = {
+    var w, c, z, i, r;
+    var lw, lc, lz, leak;
+
+    var ot <- TrF (witness, witness);
+    w <- witness;
+    c <- witness;
+    lc <- witness;
+    leak <- Empty;
+    i <- 0;
+
+    qs <- rcons qs m;
+    while (is_fail ot /\ i < kappa) {
+      ot <@ Sim.get_trans(pk);
+      lc <$ dLkgRO;
+      (lw, lz) <- tr_lkg ot;
+      leak <- catFS leak (is_fail ot, (lw, lc, lz));
+      i <- i + 1;
+    }
+    r <- None;
+    (* the overlay is only programmed if signing succeeded *)
+    if (!is_fail ot) {
+      (w, c, z) <- tr_wcz ot;
+      overlay.[(w, m)] <- (c, lc);
+      r <- Some (w, z);
+    }
+    return (r, leak);
+  }
+}.
+
+module RedKOA_H' (H : Hash) = {
+  import var ORedKOA
+
+  proc get(x : W * M) : C * LkgRO = {
+    var oc : (C * LkgRO) option;
+    var cl : C * LkgRO;
+
+    oc <- overlay.[x];
+    if (oc = None) {
+      cl <@ H.get(x);
+      oc <- Some cl;
+    }
+    return oget oc;
+  }
+}.
+
+module (RedKOA (A : Adv_EFCMA_RO) (Sim : HVZK_Sim) : Adv_EFKOA_RO) (H : Hash) = {
+  import var ORedKOA
+
+  proc forge (pk : PK) : M * Sig = {
+    var m, sig;
+
+    ORedKOA(Sim).init(pk);
+    (m, sig) <@ A(RedKOA_H'(H), ORedKOA(Sim)).forge(pk);
+    return (m, sig);
+  }
+}.
+
+(* These are two counting wrappers, one for signing oracles and one
+for hash oracles, used to express the query bounds on the adversary *)
+
+module CountS (O : SOracle_CMA) = {
+  var qs : int
+  proc init() = { qs <- 0; }
+
+  proc sign (m : M) = {
+    var s;
+    qs <- qs + 1;
+    s <@ O.sign(m);
+    return s;
+  }
+}.
+
+module CountH (H : Hash) = {
+  var qh : int
+  proc init() = { qh <- 0; }
+
+  proc get (w, m) = {
+    var c;
+    qh <- qh + 1;
+    c <@ H.get(w, m);
+    return c;
+  }
+}.
+
+module Game0 (A:Adv_EFCMA_RO, O:Oracle_CMA) = EF_CMA_RO(IDS_Sig(P, V), A, RO, O).
+
+(* ----------------------------------------------------------------------*)
+(*                            First game hop:                            *)
+(* Simply replace the generic oracle by one that uses our scheme         *)
+(* ----------------------------------------------------------------------*)
+
+
+module (Oracle1 : Oracle_CMA) (S : Scheme)  = {
+  include var O_CMA_Default(S) [-sign]
+
+  proc sign(m: M) : Sig option * leakage = {
+    var w, c, oz, st, r, i;
+    var lw, lc, lz, leak;
+
+    w <- witness;
+    oz <- None;
+    leak <- Empty;
+    i <- 0;
+
+    qs <- rcons qs m;
+    while (oz = None /\ i < kappa) {
+      (r, lw) <$ OP.commit sk;
+      (w, st) <- r;
+      (c, lc) <@ RO.get(w, m);
+      (oz, lz) <- respond sk c st;
+      leak <- catFS leak (oz = None, (lw, lc, lz));
+      i <- i + 1;
+    }
+    return (omap (fun z => (w, z)) oz, leak);
+  }
+}.
+
+(* ----------------------------------------------------------------------*)
+(*                   Third and fourth game hop:                          *)
+(* Only store the ((w, m), c) pair in the oracle for accepting iteration   *)
+(*                                                                       *)
+(* ----------------------------------------------------------------------*)
+
+
+module (Oracle3 : Oracle_CMA) (S : Scheme)  = {
+  import var O_CMA_Default(S)
+  include var Oracle1(S) [-sign]
+
+  proc sign(m: M) : Sig option * leakage = {
+    var w, c, oz, st, r, i;
+    var lw, lc, lz, leak;
+
+    w <- witness;
+    c <- witness;
+    oz <- None;
+    leak <- Empty;
+    lw <- witness;
+    lc <- witness;
+    lz <- witness;
+    i <- 0;
+
+    qs <- rcons qs m;
+    while (oz = None /\ i < kappa) {
+      (r, lw) <$ OP.commit sk;
+      (w, st) <- r;
+      (c, lc) <$ dC `*` dLkgRO;
+      (oz, lz) <- respond sk c st;
+      leak <- catFS leak (oz = None, (lw, lc, lz));
+      i <- i + 1;
+    }
+    (* only set here, and only if signing succeeded *)
+    if (oz <> None) RO.set((w, m), (c, lc));
+    return (omap (fun z => (w, z)) oz, leak);
+  }
+}.
+
+(* Reduction to the [RedOnce] game *)
+module RedOnce(A :  Adv_EFCMA_RO) (O : RH.Oracle) = {
+  module H = {
+    proc get = O.h
+  }
+
+  module SO = {
+    var qs : M list
+    proc sign (m : M) = {
+      var t, leak;
+      qs <- rcons qs m;
+      (t, leak) <@ O.sign(m);
+      return (omap (fun (t : W * C * Z) => (t.`1, t.`3)) t, leak);
+    }
+  }
+
+  proc distinguish(pk:PK) = {
+    var m : M;
+    var sig : Sig;
+    var nrqs : int;
+    var is_valid : bool;
+    var is_fresh : bool;
+
+    SO.qs <- [];
+    CountH(H).init();
+    CountS(SO).init();
+
+    (m, sig) <@ A(CountH(H), CountS(SO)).forge(pk);
+    is_valid <@ IDS_Sig(P, V, CountH(H)).verify(pk, m, sig);
+    is_fresh <- !(m \in SO.qs);
+    nrqs <- size SO.qs;
+    return nrqs <= qS /\ is_valid /\ is_fresh;
+  }
+}.
+
+(* the "workers" for Means are the fixed-key versions of left and right game *)
+(* the loop bound of the hybrid argument is the loop bound [kappa] of the scheme *)
+(* [GW(A, RH.OSign)] and [GW(A, RH.OTrans)] *)
+module GW(A : Adv_EFCMA_RO, O : RH.Oracle_i) = {
+  proc work(k : PK * SK) = {
+    var b;
+    b <@ RH.Game_k(RedOnce(A), O).main(k.`1, k.`2, kappa);
+    return b;
+  }
+}.
+
+(* ----------------------------------------------------------------------*)
+(*                           Fith game hop:                             *)
+(* Generate transcripts using the Honest Execution oracle for the scheme *)
+(*                                                                       *)
+(* ----------------------------------------------------------------------*)
+
+(* This is no longer an Oracle_CMA, because init also takes the public key *)
+module OGame1  = {
+  var sk : SK
+  var pk : PK
+  var qs : M list
+
+  proc init(sk_i : SK, pk_i : PK) : unit = {
+    sk <- sk_i;
+    pk <- pk_i;
+    qs <- [];
+  }
+
+  proc fresh(m : M) : bool = { return ! (m \in qs); }
+
+  proc nr_queries() : int = { return size qs; }
+
+  proc sign(m: M) : Sig option * leakage = {
+    var w, c, z, ot, i, r;
+    var lc, lw, lz, leak;
+
+    w <- witness;
+    c <- witness;
+    ot <- TrF (witness, witness);
+    leak <- Empty;
+    lc <- witness;
+    i <- 0;
+
+    qs <- rcons qs m;
+    while (is_fail ot /\ i < kappa) {
+      ot <@ Honest_Execution(P, V).get_trans(pk, sk);
+      lc <$ dLkgRO;
+      (lw, lz) <- tr_lkg ot;
+      leak <- catFS leak (is_fail ot, (lw, lc, lz));
+      i <- i + 1;
+    }
+    r <- None;
+    if (!is_fail ot) {
+      (w, c, z) <- tr_wcz ot;
+      RO.set((w, m), (c, lc));
+      r <- Some (w, z);
+    }
+    return (r, leak);
+  }
+}.
+
+module Game1 (A : Adv_EFCMA_RO) = {
+  proc main() : bool = {
+    var pk : PK;
+    var sk : SK;
+    var m : M;
+    var sig : Sig;
+    var nrqs : int;
+    var is_valid : bool;
+    var is_fresh : bool;
+
+    RO.init();
+    (pk, sk) <$ keygen;
+    OGame1.init(sk, pk); (* pass public key as well *)
+    (m, sig) <@ A(RO, OGame1).forge(pk);
+    is_valid <@ IDS_Sig(P, V, RO).verify(pk, m, sig);
+    is_fresh <@ OGame1.fresh(m);
+    nrqs <@ OGame1.nr_queries();
+
+    return nrqs <= qS /\ is_valid /\ is_fresh;
+  }
+}.
+
+
+section PROOF.
+
+(* We assume a CMA adversary A making at most [qH] [get] queries to
+the random oracle and at most [qS] queries to the signing oracle. We
+also assume that A.forge is terminating whenever all oracle calls are
+terminating. *)
+
+declare module A <: Adv_EFCMA_RO{
+  -RO, -P, -V, -O_CMA_Default, -ORedKOA, -CountS, -CountH,
+  -RedOnce, -OGame1, -RH.OSign, -RH.RO.RO, -RH.Count
+}.
+
+declare axiom A_query_bound
+ (SO <: SOracle_CMA{-A, -CountH, -CountS})
+ (H <: Hash{-A, -CountH, -CountS}) :
+ hoare[ A(CountH(H), CountS(SO)).forge :
+        CountH.qh = 0 /\ CountS.qs = 0 ==>
+        CountH.qh <= qH /\ CountS.qs <= qS].
+
+declare axiom A_ll : forall (R <: Hash{-A} ) (O <: SOracle_CMA{-A} ),
+  islossless O.sign => islossless R.get => islossless A(R, O).forge.
+
+(* We also assume a perfect HVZK simulator for the ID scheme *)
+
+declare module Sim <: HVZK_Sim {-RO, -P, -V, -A, -ORedKOA, -CountS, -CountH}.
+
+declare axiom Sim_perfect_HVZK k :
+  equiv [ Honest_Execution(P, V).get_trans ~ Sim.get_trans :
+          k \in keygen /\ arg{1} = k /\ arg{2} = k.`1 ==> ={res}].
+
+
+(* This is basically just inlining and renaming  *)
+local lemma hop1 &m :
+  Pr [ Game0(A, O_CMA_Default).main() @ &m : res] =
+  Pr [ Game0(A, Oracle1).main() @ &m : res].
+proof.
+byequiv (_: ={glob A} ==> ={res}) => //. proc. inline{1} 2; inline {2} 2.
+seq 4 4 : (={glob O_CMA_Default, RO.m, m, sig, pk, sk}); last by sim.
+call (: ={RO.m, glob O_CMA_Default}); [|by sim|by inline*; auto].
+proc. inline sign; swap{1} 10 -2; wp.
+while (={oz, w, i, leak, m, glob O_CMA_Default, glob RO}
+       /\ sk{1} = O_CMA_Default.sk{2}
+       /\ m0{1} = m{2}); by inline*; auto => />.
+qed.
+
+
+
+import RField.
+
+(* We use Means to average over the choice of keys *)
+local clone import Means as Mkey with
+  type input <- PK * SK,
+  type output <- bool,
+  op d <- keygen
+proof*.
+
+
+local lemma rb_mono (x y : real) : x <= y => RH.rb_ x <= RH.rb_ y.
+proof.
+move => ler_x_y; rewrite /RH.rb_ ler_add; 1: smt(RH.F_gt0 qS_ge0 qH_ge0 p_rej_bounded).
+(* SMT is stupid and doesn't find this cut ... *)
+apply ler_wpmul2r; smt(qS_ge0 qH_ge0 p_rej_bounded invr_ge0 expr_gt0).
+qed.
+
+local lemma rb_ge0 eps : 0%r <= eps => 0%r <= RH.rb_ eps.
+proof. smt(RH.F_gt0 qS_ge0 qH_ge0 p_rej_bounded invr_ge0 expr_gt0). qed.
+
+(* The workers of [Means] run the games of [RH] with the loop bound [kappa] *)
+local lemma GW_eq pk sk &m :
+  Pr[GW(A, RH.OSign).work((pk, sk)) @ &m : res] =
+  Pr[RH.Game_k(RedOnce(A), RH.OSign).main(pk, sk, kappa) @ &m : res] /\
+  Pr[GW(A, RH.OTrans).work((pk, sk)) @ &m : res] =
+  Pr[RH.Game_k(RedOnce(A), RH.OTrans).main(pk, sk, kappa) @ &m : res].
+proof.
+split; byequiv => //; proc*; inline{1} 1; sp; wp.
++ by call (: ={glob A}); [sim | auto => />].
+by call (: ={glob A}); [sim | auto => />].
+qed.
+
+local lemma hop4 &m :
+     Pr [Game0(A, Oracle1).main() @ &m : res ]
+  <= Pr [Game0(A, Oracle3).main() @ &m : res ] + reprog_bound + dlt.
+(* if [dlt >= 1] there is nothing to show, allows us to condition on good keys later *)
+case (dlt < 1%r) => [gamm_lt1|]; last first.
+  have -> : reprog_bound = RH.rb_ eps by done.
+  smt(mu_bounded rb_ge0 eps_ge0).
+(* We start by expressing both sides as Rand games from Means *)
+have -> : Pr[Game0(A, Oracle1).main() @ &m : res] = Pr[Rand(GW(A, RH.OSign)).main() @ &m : res.`2].
+- byequiv => //. proc. inline{1} 2; inline{2} 2.
+  inline{2} 3. inline{2} 7. inline distinguish.
+  swap{1} 2 -1.
+  seq 4 15 : (={m, sig, pk} /\ (RO.m, O_CMA_Default.qs){1} = (RH.RO.RO.m, RedOnce.SO.qs){2}); last by inline*; auto.
+  call(: (RO.m, O_CMA_Default.qs, O_CMA_Default.sk, kappa){1}
+       = (RH.RO.RO.m, RedOnce.SO.qs, RH.OSign.sk, RH.OSign.kappa){2}); first last.
+  + by proc; inline*; auto => /> /#.
+  + by inline*; auto => />.
+  proc. inline{2} 2. inline{2} 4. wp.
+  while (={oz, w, i} /\ (m, leak, RO.m, O_CMA_Default.qs, O_CMA_Default.sk, kappa){1}
+    = (m1, leak0, RH.RO.RO.m, RedOnce.SO.qs, RH.OSign.sk, RH.OSign.kappa){2}).
+  + by inline*; auto.
+  by auto => /> c i l [].
+have -> : Pr[Game0(A, Oracle3).main() @ &m : res] = Pr[Rand(GW(A, RH.OTrans)).main() @ &m : res.`2].
+- byequiv => //. proc. inline{1} 2; inline{2} 2.
+  inline{2} 3. inline{2} 7. inline RedOnce(A, RH.OTrans).distinguish.
+  swap{1} 2 -1.
+  seq 4 15 : (={m, sig, pk} /\ (RO.m, O_CMA_Default.qs){1} = (RH.RO.RO.m, RedOnce.SO.qs){2});
+     last by inline*; auto; sp; if; auto => />.
+  call(: (RO.m, O_CMA_Default.qs, O_CMA_Default.sk, kappa){1}
+       = (RH.RO.RO.m, RedOnce.SO.qs, RH.OSign.sk, RH.OSign.kappa){2}); first last.
+  + by proc; inline*; auto => /> /#.
+  + by inline*; auto => />.
+  proc. inline{2} 2. inline{2} 4. inline set. wp.
+  while (={oz, c, lc, w, i} /\ (m, leak, RO.m, O_CMA_Default.qs, O_CMA_Default.sk, kappa){1}
+    = (m1, leak0, RH.RO.RO.m, RedOnce.SO.qs, RH.OSign.sk, RH.OSign.kappa){2}).
+  + by inline*; auto.
+  by auto => /> c i l [].
+(* Next we prove that the reduction to the distinguisher is correct
+and preserves the query bounds *)
+have RH_bound := RH.GSign_GTrans (RedOnce(A)) _ _.
+- move => O ? ?; islossless.
+  by apply (A_ll (<: CountH(RedOnce(A, O).H)) (<: CountS(RedOnce(A, O).SO))) => //; islossless.
+move => O; proc.
+seq 4 : (RH.Count.countS <= qS /\ RH.Count.countH <= qH);
+  last by by inline*; wp; call(: true); auto => /> /#.
+conseq (: _ ==> CountH.qh = RH.Count.countH /\ CountS.qs = RH.Count.countS)
+       (: _ ==> CountH.qh <= qH /\ CountS.qs <= qS); 1, 2 : smt().
+- call (A_query_bound (<: RedOnce(A, RH.Count(O)).SO) (<: RedOnce(A, RH.Count(O)).H)).
+  by inline*; auto => />.
+call (: CountH.qh = RH.Count.countH /\ CountS.qs = RH.Count.countS).
+- proc; inline*; auto; call(: true); auto => />.
+- proc; inline*; auto; call(: true); auto => />.
+by inline*; auto => />.
+(* Finally, we average over good (i.e., high entropy) and bad keys *)
+have ? := keygen_finite.
+have ? : is_finite (support (dcond keygen check)) by exact finite_dcond.
+pose supK := to_seq (support keygen).
+have mu_checkC : mu keygen (predC check) <= dlt.
+- by apply: ler_trans most_keys_high_entropy; apply mu_le => />.
+pose Fl (k : PK * SK) := mu1 keygen k * Pr [ GW(A, RH.OSign).work(k) @ &m : res].
+pose Fr (k : PK * SK) := mu1 keygen k * Pr [ GW(A, RH.OTrans).work(k) @ &m : res].
+have -> :Pr[Rand(GW(A, RH.OSign)).main() @ &m : res.`2] = big predT Fl supK.
+  exact (Mean (GW(A, RH.OSign)) &m (fun _ _ r => r) keygen_finite).
+have -> : Pr[Rand(GW(A, RH.OTrans)).main() @ &m : res.`2] = big predT Fr supK.
+  exact (Mean (GW(A, RH.OTrans)) &m (fun _ _ r => r) keygen_finite).
+pose ex := E (dcond keygen check) (fun k : PK * SK => p_max (dfst (commit_fun k.`2))).
+rewrite !(bigEM check).
+have -> : big check Fr supK + big (predC check) Fr supK + reprog_bound + dlt =
+          (big check Fr supK + reprog_bound) + (big (predC check) Fr supK + dlt) by ring.
+apply ler_add; last first.
+- apply (ler_trans dlt); last by apply/ler_paddl => //; apply/sumr_ge0; smt(mu_bounded  mulr_ge0).
+  apply (ler_trans (big (predC check) (mu1 keygen) supK)); last by rewrite -fin_muE // &(mu_checkC).
+  apply ler_sum => -[pk sk] @/Fl _; apply/ler_pimulr; smt(mu_bounded).
+have -> : reprog_bound = RH.rb_ eps by done.
+pose Fl' (k : PK * SK) := mu1 keygen k * Pr[GW(A, RH.OTrans).work(k) @ &m : res] +
+                          mu1 keygen k * RH.rb_ (RH.eps k.`2).
+apply (ler_trans (big check Fl' supK)).
+- apply ler_sum => -[pk sk] @/check @/Fl @/Fl' /= chk_sk.
+  rewrite -mulrDr ler_wpmul2l //; have [-> ->] := GW_eq pk sk &m.
+  exact (RH_bound pk sk (rej_bound' sk chk_sk) kappa &m gt0_kappa).
+rewrite big_split ler_add2l => {Fl} {Fr} {Fl'}.
+pose f (k : PK * SK) := RH.eps k.`2.
+apply (ler_trans (E (dcond keygen check) (RH.rb_ \o f))).
+- rewrite fin_expE ?finite_dcond // -big_filter.
+  have P : perm_eq (filter check supK) (to_seq (support (dcond keygen check))).
+  + apply uniq_perm_eq; rewrite ?filter_uniq // ?uniq_to_seq // => x.
+    by rewrite mem_filter !mem_to_seq // dcond_supp.
+  rewrite -(@eq_big_perm _ _ _ _ P); apply ler_sum_seq => k /=.
+  rewrite mem_filter /f => -[chk_k sup_k].
+  rewrite (RField.mulrC _ (mu1 (dcond keygen check) k)) ler_wpmul2r; 1: exact/rb_ge0/pmax_ge0.
+  exact/mu_dcond_ge.
+apply (ler_trans (RH.rb_ ex)); last exact/rb_mono/check_entropy_correct.
+apply Jensen_fin_concave; 1: exact finite_dcond.
++ apply dcond_ll; smt(mu_not keygen_ll).
+move => a b /=; rewrite /RealFun.convex /=;smt(mulr_ge0).
+qed.
+
+local lemma hop5 &m :
+  Pr [Game0(A, Oracle3).main() @ &m : res ] = Pr [Game1(A).main() @ &m : res ].
+proof.
+byequiv (: ={glob A} ==> _) => //; proc. inline{1} 2.
+seq 4 4 : (   ={m, sig, RO.m, pk, glob A}
+           /\ ={qs, sk}(O_CMA_Default, OGame1)
+           /\ pk{2} = OGame1.pk{2}); last
+  by wp; conseq (: _ ==> ={nrqs, is_valid, is_fresh}); auto; sim => />.
+conseq />.
+call (:  ={RO.m} /\ ={qs, sk}(O_CMA_Default, OGame1)).
+- proc; inline*; conseq />.
+  wp.
+  while (={RO.m, leak, lc, i} /\ ={qs, sk}(O_CMA_Default, OGame1)
+         /\ ot{2} = (if oz = None
+                    then TrF (lw, lz)
+                    else TrS (w, c, oget oz) (lw, lz)){1}).
+  + swap {2} 16 -6; wp; sp.
+    conseq (: (lc, w, lw, st, c){1} = (lc, w0, lc0, P.pstate, c1){2}); 1: by auto => /#.
+    seq 2 5 : ((w, lw, st){1} = (w0, lc0, P.pstate){2}); 1: by auto.
+    rndsem{2} 0. auto => />.
+    have -> : (dlet dC (fun (c1_0 : C) => dmap dLkgRO (fun (cl0 : LkgRO) => (c1_0, cl0)))) = dC `*` dLkgRO; last by smt().
+    rewrite dprod_dlet; do congr; apply fun_ext => ?.
+    by rewrite dlet_dunit.
+  (* after the loop, [oz <> None] iff the transcript is successful *)
+  by auto => /> &2 c lw lz [|z].
+- by proc; inline*; auto.
+by inline*; auto => />.
+qed.
+
+(* ----------------------------------------------------------------------*)
+(*                          Sixth game hop:                              *)
+(*      Replace the Honest Execution oracle with the Sim oracle          *)
+(*                                                                       *)
+(* ----------------------------------------------------------------------*)
+
+
+local module OGame2  = {
+  var pk : PK
+  var qs : M list
+
+  proc init(pk_i : PK) : unit = {
+    pk <- pk_i;
+    qs <- [];
+  }
+
+  proc fresh(m : M) : bool = { return ! (m \in qs); }
+
+  proc nr_queries() : int = { return size qs; }
+
+  proc sign(m: M) : Sig option * leakage = {
+    var w, c, z, ot, i, r;
+    var lc, lw, lz, leak;
+
+    w <- witness;
+    c <- witness;
+    ot <- TrF (witness, witness);
+    leak <- Empty;
+    lc <- witness;
+    i <- 0;
+
+    qs <- rcons qs m;
+    while (is_fail ot /\ i < kappa) {
+      ot <@ Sim.get_trans(pk);
+      lc <$ dLkgRO;
+      (lw, lz) <- tr_lkg ot;
+      leak <- catFS leak (is_fail ot, (lw, lc, lz));
+      i <- i + 1;
+    }
+    r <- None;
+    if (!is_fail ot) {
+      (w, c, z) <- tr_wcz ot;
+      RO.set((w, m), (c, lc));
+      r <- Some (w, z);
+    }
+    return (r, leak);
+  }
+}.
+
+local module Game2 (A : Adv_EFCMA_RO) = {
+  proc main() : bool = {
+    var pk : PK;
+    var sk : SK;
+    var m : M;
+    var sig : Sig;
+    var nrqs : int;
+    var is_valid : bool;
+    var is_fresh : bool;
+
+    RO.init();
+    (pk, sk) <$ keygen;
+    OGame2.init(pk); (* pass public key only *)
+    (m, sig) <@ A(RO, OGame2).forge(pk);
+    is_valid <@ IDS_Sig(P, V, RO).verify(pk, m, sig);
+    is_fresh <@ OGame2.fresh(m);
+    nrqs <@ OGame2.nr_queries();
+
+    return nrqs <= qS /\ is_valid /\ is_fresh;
+  }
+}.
+
+(* We only handle the case where the HVZK advantage is actually O *)
+local lemma hop6 &m :
+  Pr [Game1(A).main() @ &m : res ] = Pr [Game2(A).main() @ &m : res ].
+proof.
+byequiv => //; proc.
+seq 4 4 : (={RO.m, m, pk, sig} /\ ={qs}(OGame1, OGame2)); last by sim.
+inline*.
+call (: =   {RO.m} /\ ={qs, pk}(OGame1, OGame2)
+        /\ (OGame2.pk{2}, OGame1.sk{1}) \in keygen); first last.
+- by proc; inline*; auto.
+- by auto => /> /#.
+proc.
+inline RO.set. wp.
+while (={RO.m, ot, leak, c, lc, i} /\ ={qs, pk}(OGame1, OGame2)
+       /\ (OGame2.pk{2}, OGame1.sk{1}) \in keygen); last by auto => />.
+wp; conseq (: _ ==> ={ot, leak, c, lc}); 1: smt().
+exlim (OGame2.pk{2}) => pk.
+exlim (OGame1.sk{1}) => sk.
+by rnd; call (Sim_perfect_HVZK (pk, sk)); auto => />.
+qed.
+
+(* ----------------------------------------------------------------------*)
+(*                          Final Step:                                  *)
+(*                   Reduction to the KOA (i.e., NMA) game               *)
+(* ----------------------------------------------------------------------*)
+
+
+(* Note that [RedKOA], beeing an adversary, only gets access to the
+[get] procedure of the RO and therefore cannot reprogam the oracle in
+the way the simulation game does. Thus the random oracle passed to the
+CMA adversary A is hidden behind an overlay containing the
+reprogramming necessary during the simulated signing queries. However,
+since a successful forgery by A must be on a fresh message, any such
+forgery is also a valid forgery with respect to the underlying
+(unpatched) oracle.
+
+For strong unforgeability, the argument becomes more involved, as the
+adversary can hit the overlay if he manages to break comutational
+unique response of the ID scheme. *)
+
+local lemma KOA_bound &m :
+     Pr [ Game2(A).main() @ &m : res ]
+  <= Pr [ EF_KOA_RO(IDS_Sig(P, V), RedKOA(A, Sim), RO).main() @ &m : res ].
+proof.
+byequiv (_: ={glob RO, glob A, glob Sim} ==> res{1} => res{2}) => //.
+proc; inline{2} 2.
+seq 4 3 : (={m, sig, pk}
+          /\ (RO.m{1} = (union_map ORedKOA.overlay RO.m){2})
+          /\ ={qs, pk}(OGame2, ORedKOA)
+          /\ forall w m, (w, m) \in ORedKOA.overlay{2} => m \in ORedKOA.qs{2}
+          ).
+- inline{2} 3; wp.
+  call(: ={glob Sim} /\ ={pk, qs}(OGame2, ORedKOA)
+         /\ (RO.m{1} = (union_map ORedKOA.overlay RO.m){2})
+         /\ forall w m, (w, m) \in ORedKOA.overlay{2} => m \in ORedKOA.qs{2}).
+  + proc; inline RO.set; wp.
+    while (={ot, leak, c, lc, i, glob Sim} /\ ={pk}(OGame2, ORedKOA)); 1: by sim.
+    auto => /> &2 hov i lc ot _ _.
+    (* on failure, nothing is added to the overlay *)
+    split => [_|_ _ w0 m0 /hov hm]; last by rewrite mem_rcons /= hm.
+    split; first by rewrite set_union_map_l.
+    move=> w0 m0; rewrite mem_set => -[/hov hm|[_ ->]]; by rewrite mem_rcons /= ?hm.
+  + proc. wp. sp. if{2}.
+    * inline*; auto => /> &1 hO c Hc; rewrite !get_set_eqE => /> => *; split; last first.
+      + move => *; split => *; 1:   by smt(mem_union_map).
+        have Hc' := domNE ORedKOA.overlay{1} x{1}; rewrite c /= in Hc'.
+        by rewrite mergeE //= /#.
+      + move => *; split => *; 1: by rewrite set_union_map_r //.
+        by smt(mem_union_map).
+    * auto => /> &h _ ?? _; split => [*|_]; 1: smt(domNE mem_union_map).
+      by rewrite !mergeE //; case (RO.m{h}.[x{h}]) => /#. 
+  by inline*; auto => />; smt(merge_empty mem_empty).
+- inline{1} 3; inline{1} 2; wp.
+  conseq (:_ ==> is_valid{1} /\ ! (m{1} \in OGame2.qs{1}) => is_valid{2}); 1: smt().
+  inline IDS_Sig(P, V, RO).verify.
+  case (m{1} \in OGame2.qs{1}); first by conseq (: ==> true); [smt()| islossless].
+  conseq (: _ ==> ={is_valid}); 1: smt().
+  inline*; sp.
+  seq 1 1 : (#pre /\ r{1} = r0{2}); first by auto.
+  if; first by auto => />; smt(mem_union_map).
+  - by auto => /> &2 *; rewrite !get_set_eqE //=.
+  - by auto => /> => &2 *; rewrite !mergeE //=; smt(set_union_map_r mergeE).
+qed.
+
+(* ----------------------------------------------------------------------*)
+(*      Final Bound for the CMA to NMA reduction                         *)
+(* ----------------------------------------------------------------------*)
+
+lemma FSabort_bound &m :
+   Pr [ EF_CMA_RO(IDS_Sig(P, V), A, RO, O_CMA_Default).main() @ &m : res]
+<= Pr [ EF_KOA_RO(IDS_Sig(P, V), RedKOA(A, Sim), RO).main() @ &m : res ]
+ + reprog_bound + dlt.
+proof.
+rewrite hop1.
+apply (ler_trans _ _ _ (hop4 &m) _); rewrite !ler_add2r.
+rewrite hop5 hop6.
+exact KOA_bound.
+qed.
+
+end section PROOF.
