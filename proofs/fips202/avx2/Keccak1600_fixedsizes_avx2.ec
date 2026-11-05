@@ -918,11 +918,11 @@ abstract theory KeccakArrayAvx2.
 op _ASIZE: int.
 
 axiom _ASIZE_ge0: 0 <= _ASIZE.
+hint simplify _ASIZE_ge0.
 axiom _ASIZE_u64: _ASIZE < W64.modulus.
 
 clone import PolyArray as A
- with op size <- _ASIZE
-      proof ge0_size by exact _ASIZE_ge0.
+ with op size <- _ASIZE.
 
 clone import WArray as WA
  with op size <- _ASIZE.
@@ -1888,7 +1888,7 @@ seq 6: (0 < _r8 <= 200 /\ _RATE8 = _r8 /\ lO = _ASIZE %% _r8
  auto => |> Hr0 Hr1 Hinv; split.
   split; first smt(divz_ge0 _ASIZE_ge0).
   split; first by rewrite /st_i iter0 // stavx2_to_st25K.
-  rewrite /squeezeblocks iota0 //= flatten_nil /asubwrite /=; split; last smt().
+  rewrite /squeezeblocks iota0 //= flatten_nil /asubwrite /=.
   by rewrite tP => i Hi; rewrite filliE // /#.
  move=> buf i Hi0 Hi1 Hi2 Hsw.
  by have <-: i = _ASIZE %/ _r8 by smt().

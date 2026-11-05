@@ -9,7 +9,7 @@
 
 require import List Real Distr Int IntDiv CoreMap.
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 
 from CryptoSpecs require export Keccakf1600_Spec.
 
@@ -565,6 +565,7 @@ abstract theory KeccakArrayRef.
 op _ASIZE: int.
 
 axiom _ASIZE_ge0: 0 <= _ASIZE.
+hint simplify _ASIZE_ge0.
 axiom _ASIZE_u64: _ASIZE < W64.modulus.
 
 (*
@@ -576,8 +577,7 @@ module type MParam = {
 *)
 
 clone import PolyArray as A
- with op size <- _ASIZE
-      proof ge0_size by exact _ASIZE_ge0.
+ with op size <- _ASIZE.
 
 clone import WArray as WA
  with op size <- _ASIZE.
@@ -1150,7 +1150,7 @@ phoare absorb_ph _l _buf _tb _r8:
        /\ res.`2 = (size _l + _ASIZE) %% _r8
  ] = 1%r.
 proof.
-by conseq absorb_ll (absorb_h _l _buf _tb _r8); smt(ge0_size).
+by conseq absorb_ll (absorb_h _l _buf _tb _r8); smt(_ASIZE_ge0).
 qed.
 
 (*
@@ -1312,7 +1312,7 @@ seq 3: (0 < _r8 <= 200 /\ _RATE8 = _r8 /\ st = st_i _st (_ASIZE %/ _r8) /\ offse
  auto => |> Hr0 Hr1; split.
   split; first smt(divz_ge0 _ASIZE_ge0).
   split; first by rewrite /st_i iter0.
-  rewrite /squeezeblocks iota0 //= flatten_nil /asubwrite /=; split; last smt().
+  rewrite /squeezeblocks iota0 //= flatten_nil /asubwrite /=.
   by rewrite tP => i Hi; rewrite filliE // /#.
  move=> buf i Hi0 Hi1 Hi2 Hsw.
  by have <-: i = _ASIZE %/ _r8 by smt().

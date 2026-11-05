@@ -352,8 +352,8 @@ have /= -> := map_msb_cmpE cs sz8 bnd.
 rewrite W32.to_uintE.
 have -> : w2bits (W32.bits2w (map accept cs)) = map accept cs ++ nseq 24 false.
 - apply (eq_from_nth false).
-  - by rewrite W32.size_w2bits size_cat size_map sz8 size_nseq.
-  move=> i; rewrite W32.size_w2bits => rgi.
+  - by rewrite W32.size_w2bits' size_cat size_map sz8 size_nseq.
+  move=> i; rewrite W32.size_w2bits' => rgi.
   rewrite w2bitsE nth_mkseq //= W32.get_bits2w // nth_cat size_map sz8.
   case: (i < 8) => hc; 1: by done.
   by rewrite nth_default ?size_map ?sz8 1:/# nth_nseq /#.

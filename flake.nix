@@ -12,7 +12,7 @@
     opam-nix.url = "github:tweag/opam-nix";
     nixpkgs.follows = "opam-nix/nixpkgs";
     flake-utils.follows = "opam-nix/flake-utils";
-    # opam-nix's own opam-repository snapshot predates jasmin 2026.03.1;
+    # opam-nix's own opam-repository snapshot predates jasmin 2026.09.0;
     # pin our own (advance with `nix flake update opam-repository`).
     opam-repository = {
       url = "github:ocaml/opam-repository";

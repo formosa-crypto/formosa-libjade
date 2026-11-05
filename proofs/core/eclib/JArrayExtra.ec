@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List Ring IntDiv Distr DList.
 require import StdRing StdOrder.
+require MinMaxSimplify.
 
 from Jasmin require import JArray JWord JWord_array.
 
@@ -96,13 +97,17 @@ abstract theory PAE.
   (* arrays with independent entries drawn from d                         *)
   op darray ['a] (d : 'a distr) : 'a t distr = dmap (dlist d size) (of_list witness).
 
+  (* the size may be negative: dlist then gives the empty list *)
+  lemma dlist_size ['a] (d : 'a distr) : dlist d size = dlist d (max 0 size).
+  proof. rewrite /max; case: (0 < size) => // h; rewrite !dlist0 // /#. qed.
+
   lemma supp_darray ['a] (d : 'a distr) (a : 'a t) :
     a \in darray d <=> forall i, 0 <= i < size => a.[i] \in d.
   proof.
-  rewrite /darray supp_dmap; split => [[l [hl ->]] i rgi | h].
-  - move: hl; rewrite supp_dlist 1:ge0_size => -[hs /List.allP hall].
+  rewrite /darray dlist_size supp_dmap; split => [[l [hl ->]] i rgi | h].
+  - move: hl; rewrite supp_dlist 1:/# => -[hs /List.allP hall].
     by rewrite get_of_list // hall mem_nth /#.
-  exists (to_list a); rewrite to_listK /= supp_dlist 1:ge0_size size_to_list /=.
+  exists (to_list a); rewrite to_listK /= supp_dlist 1:/# size_to_list /=.
   by apply/List.allP => x /mkseqP [i [rgi ->]]; apply h.
   qed.
 
@@ -111,9 +116,12 @@ abstract theory PAE.
 
   lemma darray_uni ['a] (d : 'a distr) : is_uniform d => is_uniform (darray d).
   proof.
-  move=> d_uni; apply/dmap_uni_in_inj/dlist_uni => // x y.
-  rewrite !supp_dlist 1,2:ge0_size => -[hx _] [hy _] hxy.
-  by rewrite -(of_listK witness x) // -(of_listK witness y) // hxy.
+  move=> d_uni; rewrite /darray dlist_size.
+  apply/dmap_uni_in_inj/dlist_uni => // x y.
+  rewrite !supp_dlist 1,2:/# => -[hx _] [hy _] hxy.
+  case: (0 <= size) => hs.
+  - by rewrite -(of_listK witness x) 1:/# -(of_listK witness y) 1:/# hxy.
+  by move: hx hy; rewrite (_ : max 0 size = 0) 1:/# !size_eq0 => -> ->.
   qed.
 end PAE.
 

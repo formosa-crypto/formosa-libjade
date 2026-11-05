@@ -6,7 +6,7 @@
 (* This file is purely additive abstract machinery; it binds nothing.     *)
 (* -------------------------------------------------------------------- *)
 require import AllCore IntDiv List StdBigop.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 require import JWordExtra CircuitBindings.
 import W8 BitEncoding BS2Int BitChunking.
 
@@ -29,7 +29,7 @@ theory WBits.
   axiom initE (f : int -> bool) (i : int) :
     (init f).[i] = if 0 <= i && i < size then f i else false.
 
-  axiom size_w2bits (w : t) : size (w2bits w) = size.
+  axiom size_w2bits' (w : t) : size (w2bits w) = size.
 
   axiom get_w2bits (w : t) (i : int) : nth false (w2bits w) i = w.[i].
 
@@ -69,8 +69,8 @@ abstract theory Extract.
   proof.
   have hi := gt0_isize; have ho := gt0_osize.
   move=> ge0_i hlt; apply/(eq_from_nth false).
-  - rewrite size_w2bits size_take 1:/# size_drop 1://.
-    by rewrite size_w2bits lez_maxr /#.
+  - rewrite size_w2bits' size_take 1:/# size_drop 1://.
+    by rewrite size_w2bits' lez_maxr /#.
   move=> j rgj; rewrite get_w2bits extract_XXE.
   - smt(size_take_le).
   rewrite nth_take ~-1:#smt:(size_take_le) nth_drop ~-1:/#.
@@ -89,7 +89,7 @@ abstract theory A2B.
   clone import WBits as IW with op size <- isize proof gt0_size by apply/gt0_isize.
   clone import WBits as OW with op size <- osize proof gt0_size by apply/gt0_osize.
 
-  clone import PolyArray as A with op size <- asize proof ge0_size by apply/ge0_asize.
+  clone import PolyArray as A with op size <- asize.
 
   op uXX (a : IW.t A.t) : OW.t = OW.init (fun i => a.[i %/ isize].[i %% isize]).
 
@@ -97,11 +97,11 @@ abstract theory A2B.
   proof.
   have eq_sz: size (flatten (map IW.w2bits (to_list a))) = osize.
   - rewrite size_flatten -map_comp -(eq_map (fun _ => isize)) /=.
-    - by move=> wis; rewrite /(\o) size_w2bits.
+    - by move=> wis; rewrite /(\o) size_w2bits'.
     by rewrite map_nseq size_to_list Bigint.sumz_nseq; smt(ge0_asize eq).
-  apply/(eq_from_nth false); first by rewrite eq_sz size_w2bits.
+  apply/(eq_from_nth false); first by rewrite eq_sz size_w2bits'.
   rewrite eq_sz => i rgi; rewrite (nth_flatten _ isize).
-  - by apply/List.allP=> s /mapP[wis /=] [_ ->]; rewrite size_w2bits.
+  - by apply/List.allP=> s /mapP[wis /=] [_ ->]; rewrite size_w2bits'.
   rewrite (nth_map witness) ?size_to_list 1:#smt:(gt0_size gt0_osize ge0_asize eq).
   by rewrite !get_w2bits initE rgi.
   qed.
@@ -126,9 +126,9 @@ abstract theory Concat.
     OW.w2bits (concat_XX l h) = LW.w2bits l ++ HW.w2bits h.
   proof.
   have hl := gt0_lsize; have hh := gt0_hsize; have ho := gt0_osize; have he := eq.
-  apply/(eq_from_nth false); first by rewrite OW.size_w2bits size_cat LW.size_w2bits HW.size_w2bits /#.
-  rewrite OW.size_w2bits => i rgi.
-  rewrite OW.get_w2bits /concat_XX OW.initE rgi /= nth_cat LW.size_w2bits.
+  apply/(eq_from_nth false); first by rewrite OW.size_w2bits' size_cat LW.size_w2bits' HW.size_w2bits' /#.
+  rewrite OW.size_w2bits' => i rgi.
+  rewrite OW.get_w2bits /concat_XX OW.initE rgi /= nth_cat LW.size_w2bits'.
   by rewrite LW.get_w2bits HW.get_w2bits.
   qed.
 end Concat.
@@ -177,8 +177,8 @@ op concat_2u128 (l h : W128.t) = W2u128.pack2 [l; h].
 bind op [W128.t & W128.t & W256.t] concat_2u128 "concat".
 realize bvconcatP.
 proof.
-move=> w1 w2; apply/(eq_from_nth false); first by rewrite size_cat !size_w2bits.
-rewrite size_w2bits => i rgi; rewrite nth_cat !get_w2bits !size_w2bits.
+move=> w1 w2; apply/(eq_from_nth false); first by rewrite size_cat !size_w2bits'.
+rewrite size_w2bits' => i rgi; rewrite nth_cat !get_w2bits !size_w2bits'.
 by rewrite /concat_2u128 pack2wE 1:// get_of_list /#.
 qed.
 realize eq_size by auto.
@@ -208,9 +208,9 @@ abstract theory ZExtend.
     w2bits (zextend_XX w) = w2bits w ++ nseq (osize - isize) false.
   proof.
   have leio := le_iosize; have geo := gt0_osize; have gei := gt0_isize.
-  apply/(eq_from_nth false); first by rewrite size_cat !size_w2bits size_nseq /#.
-  rewrite size_w2bits => i rgi @/zextend_XX.
-  rewrite nth_cat size_w2bits get_w2bits nth_nseq_if if_same /=.
+  apply/(eq_from_nth false); first by rewrite size_cat !size_w2bits' size_nseq /#.
+  rewrite size_w2bits' => i rgi @/zextend_XX.
+  rewrite nth_cat size_w2bits' get_w2bits nth_nseq_if if_same /=.
   rewrite initE iftrue 1:// get_w2bits; smt(IW.get_out).
   qed.
 
@@ -227,7 +227,7 @@ abstract theory SliceSet.
   clone import WBits as IW with op size <- isize proof gt0_size by apply/gt0_isize.
   clone import WBits as OW with op size <- osize proof gt0_size by apply/gt0_osize.
 
-  clone import PolyArray as A with op size <- asize proof ge0_size by apply/ge0_asize.
+  clone import PolyArray as A with op size <- asize.
 
   op sliceset_XX (a : IW.t A.t) (offset : int) (w : OW.t) : IW.t A.t =
     A.init (fun i => IW.init (fun j =>

@@ -1,6 +1,6 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore IntDiv List.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 require import CircuitBindingsExtra.
 import BitEncoding.
 

@@ -8,7 +8,7 @@ import BS2Int.
 
 (* -------------------------------------------------------------------- *)
 lemma w2bits_int2bsE (w : W32.t) : w2bits w = BS2Int.int2bs 32 (W32.to_uint w).
-proof. rewrite to_uintE; smt(W32.size_w2bits BS2Int.bs2intK). qed.
+proof. rewrite to_uintE; smt(W32.size_w2bits' BS2Int.bs2intK). qed.
 
 (* -------------------------------------------------------------------- *)
 abstract theory WE.

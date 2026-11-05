@@ -263,6 +263,7 @@ def role_comment(needed):
 
 def emit_layout(needed, arrays):
     L = [GEN, "require import AllCore IntDiv List.\n",
+         "require MinMaxSimplify.\n",
          "from Jasmin require import JArray JWord_array.\n",
          "require Parameters.\n\n",
          role_comment(needed), "\nabstract theory LayoutT.\n\n",
@@ -280,12 +281,25 @@ def emit_layout(needed, arrays):
         else:
             L.append("lemma ge0_%s : 0 <= %s.\nproof. by rewrite /%s; smt(%s). qed.\n"
                      % (name, name, name, " ".join(["P.param_sets"] + ["ge0_" + d for d in deps(ecdef)])))
+    # the ge0 lemmas of the array sizes as simplify hints, wrapped at 78
+    # columns (the other roles may be abbreviations, not first order)
+    sized = {role for _, role in arrays}
+    names = ["ge0_" + name for name, _, _, _ in ROLES if name in sized]
+    lines, cur = [], "hint simplify"
+    for i, n in enumerate(names):
+        item = " " + n + ("," if i < len(names) - 1 else ".")
+        if len(cur) + len(item) > 78:
+            lines.append(cur); cur = " " * 13
+        cur += item
+    lines.append(cur)
+    L.append("\n(* the array sizes are nonnegative: `max 0 size` simplifies\n"
+             "   (MinMaxSimplify) *)\n")
+    L.append("\n".join(lines) + "\n")
     L.append("\n(* the array theories whose size varies with the parameter set *)\n")
     for kind, role in arrays:
         base = "PolyArray" if kind == "Array" else "WArray"
         size = ROLE[role][1] if is_base(role) else role
-        L.append("clone %s as %s_%s with op size <- %s\n  proof ge0_size by exact ge0_%s.\n"
-                 % (base, kind, role, size, role))
+        L.append("clone %s as %s_%s with op size <- %s.\n" % (base, kind, role, size))
     L.append("\nend LayoutT.\n")
     write("LayoutT.ec", "".join(L))
 

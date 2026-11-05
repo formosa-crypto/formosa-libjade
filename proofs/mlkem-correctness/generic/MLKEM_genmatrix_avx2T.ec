@@ -4,7 +4,7 @@
 (* unpacking of every entry, against the specification's sampleA.       *)
 (* -------------------------------------------------------------------- *)
 require import AllCore IntDiv List.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import WArray512 WArray256 WArray128 WArray8 WArray2 WArray32.
 from JazzEC require import Array2 Array8 Array16 Array25 Array32 Array33 Array128 Array136.
 from JazzEC require import Array1024 Array2144 Array536 Array256.

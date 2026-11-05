@@ -1,5 +1,5 @@
 require import AllCore List Int IntDiv CoreMap Real Number.
-from Jasmin require import JModel JWord.
+from Jasmin require import JModel_x86 JWord.
 from JazzEC require import Array16 WArray512 WArray32 WArray16.
 require import W16extra.
 require import Fq MLKEMFCLib.

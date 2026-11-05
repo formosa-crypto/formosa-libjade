@@ -183,7 +183,7 @@ proc; unroll{1} 3; rcondt{1} 3; 1: by auto => />; have /= H := param_sets; smt()
 rcondf{1} 6; 1: by move=> &m; wp; call (: true); auto => />; have /= H := param_sets; smt().
 wp; inline{1} RoutedH.get; sp 4 0; rcondf{1} 1;
   1: by auto => />; smt(take_size_cat Bytes64.size_to_list Bytes64.to_listK).
-rcondt{1} 1; 1: by auto => />; rewrite size_cat Bytes64.size_to_list BytesW1.size_to_list.
+rcondt{1} 1; 1: by auto => />; rewrite size_cat Bytes64.size_to_list size_BytesW1.
 rcondt{1} 1; 1: by auto.
 inline *; wp; rnd; wp; rnd; auto => />.
 move=> &2 _ r _; rewrite take_size_cat 1:Bytes64.size_to_list // drop_size_cat 1:Bytes64.size_to_list //
@@ -540,9 +540,9 @@ proc; unroll 3; rcondt 3; 1: by auto.
 rcondf 6; 1: by wp; call (: true); auto.
 have hpkl : pk_bytes <> lambda %/ 4 by rewrite /pk_bytes; have /= H := param_sets; smt().
 wp; inline RoutedH.get; sp; rcondf 1; 1: by auto => /#.
-rcondf 1; 1: by auto => />; smt(pk_len_nrel BytesPK.size_to_list).
-rcondf 1; 1: by auto => />; smt(BytesPK.size_to_list).
-rcondt 1; 1: by auto => />; smt(BytesPK.size_to_list).
+rcondf 1; 1: by auto => />; have /= := key_sizes; smt(pk_len_nrel).
+rcondf 1; 1: by auto => />; have /= := key_sizes; smt().
+rcondt 1; 1: by auto => />; have /= := key_sizes; smt().
 rcondf 3; 1: by inline *; auto.
 inline *; auto => />.
 by move=> &hr _ hp _ r _; rewrite domE hp /= take_oversize // Bytes64.size_to_list.
@@ -558,9 +558,9 @@ proc; unroll{1} 3; rcondt{1} 3; 1: by auto.
 rcondf{1} 6; 1: by move=> &m; wp; call (: true); auto.
 have hpkl : pk_bytes <> lambda %/ 4 by rewrite /pk_bytes; have /= H := param_sets; smt().
 wp; inline{1} RoutedH.get; sp 4 0; rcondf{1} 1; 1: by auto => /#.
-rcondf{1} 1; 1: by auto => />; smt(pk_len_nrel BytesPK.size_to_list).
-rcondf{1} 1; 1: by auto => />; smt(BytesPK.size_to_list).
-rcondt{1} 1; 1: by auto => />; smt(BytesPK.size_to_list).
+rcondf{1} 1; 1: by auto => />; have /= := key_sizes; smt(pk_len_nrel).
+rcondf{1} 1; 1: by auto => />; have /= := key_sizes; smt().
+rcondt{1} 1; 1: by auto => />; have /= := key_sizes; smt().
 rcondf{1} 3; 1: by move=> &m; inline *; auto.
 inline *; wp; rnd; auto => />.
 by move=> &2 _ hp _ r _; rewrite domE hp /= take_oversize // Bytes64.size_to_list.
@@ -764,9 +764,9 @@ proc; unroll 3; rcondt 3; 1: by auto.
 rcondf 6; 1: by wp; call (: true); auto.
 have hpkl : pk_bytes <> lambda %/ 4 by rewrite /pk_bytes; have /= H := param_sets; smt().
 wp; inline RoutedH.get; sp; rcondf 1; 1: by auto => /#.
-rcondf 1; 1: by auto => />; smt(pk_len_nrel BytesPK.size_to_list).
-rcondf 1; 1: by auto => />; smt(BytesPK.size_to_list).
-rcondt 1; 1: by auto => />; smt(BytesPK.size_to_list).
+rcondf 1; 1: by auto => />; have /= := key_sizes; smt(pk_len_nrel).
+rcondf 1; 1: by auto => />; have /= := key_sizes; smt().
+rcondt 1; 1: by auto => />; have /= := key_sizes; smt().
 rcondt 3; 1: by inline *; auto.
 inline *; auto => />.
 by move=> &hr _ r _; rewrite /hit; smt(domE get_set_sameE take_oversize Bytes64.size_to_list).

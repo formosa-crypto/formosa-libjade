@@ -147,7 +147,7 @@ namespace signature {
 
     #[safety =
        { requires = is_arr_init(hint_encoded,0,HINT_ENCODED_SIZE)
-       , ensures = (ill_formed_hint != 0 || is_arr_init(hints,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+       , ensures = is_arr_init(hints,0,(ill_formed_hint == 0 ? 4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL) : 0))
        }
      ]
     inline
@@ -303,7 +303,7 @@ namespace signature {
     #[safety =
        { requires = is_arr_init(signature_encoded,0,SIGNATURE_SIZE)
        , ensures = is_arr_init(signer_response,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
-                && (result != 0 || is_arr_init(hints,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+                && is_arr_init(hints,0,(result == 0 ? 4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL) : 0))
        }
      ]
     inline

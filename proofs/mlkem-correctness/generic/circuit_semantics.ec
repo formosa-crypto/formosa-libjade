@@ -1,6 +1,6 @@
 require import AllCore List Int IntDiv CoreMap Real Number.
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array384 Array256 Array128 Array64 Array32 Array16 Array8 Array4 Array2.
 from JazzEC require import Array768 Array960 Array1152 Array1024 Array1408 Array1536 Array160.
 
@@ -107,14 +107,14 @@ rewrite /ByteDecode (nth_map []);
 rewrite /frombytes_circuit /to_sint /BS_W16_W12_U.zeroextu16 of_uintK /= modz_small /=;
  1: by have := W12.to_uint_cmp => /= /#.
 rewrite /BytesToBits JWordList.nth_chunk 1,2:/#.
-rewrite (EclibExtra.size_flatten' 8); 1,2: smt(mapP W8.size_w2bits Array384.size_to_list size_map).
+rewrite (EclibExtra.size_flatten' 8); 1,2: smt(mapP W8.size_w2bits' Array384.size_to_list size_map).
 congr; rewrite /smod /= ifF; 1: by have := W12.to_uint_cmp => /= /#.
 rewrite /to_uint; congr; apply (eq_from_nth false).
-+ rewrite W12.size_w2bits size_take 1:/# size_drop 1:/#.
-  rewrite (EclibExtra.size_flatten' 8); 1,2: smt(mapP W8.size_w2bits Array384.size_to_list size_map).
-move=> k; rewrite W12.size_w2bits => kb.
++ rewrite W12.size_w2bits' size_take 1:/# size_drop 1:/#.
+  rewrite (EclibExtra.size_flatten' 8); 1,2: smt(mapP W8.size_w2bits' Array384.size_to_list size_map).
+move=> k; rewrite W12.size_w2bits' => kb.
 rewrite W12.get_w2bits W12.initiE 1:/# /= nth_take 1,2:/# nth_drop 1,2:/#.
-rewrite (nth_flatten false 8); 1: by rewrite allP => x; rewrite mapP => Hx; elim Hx; smt(W8.size_w2bits).
+rewrite (nth_flatten false 8); 1: by rewrite allP => x; rewrite mapP => Hx; elim Hx; smt(W8.size_w2bits').
 rewrite (nth_map witness); 1: by rewrite size_to_list /= /#.
 by rewrite get_to_list get_w2bits /#.
 qed.
@@ -181,16 +181,16 @@ have -> : (if a.[i %/ 8].[i %% 8] then W32.one else W32.zero) =
    by case (a.[i %/ 8].[i %% 8]) => /=;rewrite /b2i /=. 
 rewrite to_uintD_small /= of_uintK /= /b2i /= modz_small /= 1..3:/#.
 rewrite /BytesToBits JWordList.nth_chunk //= 1:/#.
-+ rewrite (EclibExtra.size_flatten' 8);smt(mapP W8.size_w2bits Array32.size_to_list size_map).
++ rewrite (EclibExtra.size_flatten' 8);smt(mapP W8.size_w2bits' Array32.size_to_list size_map).
 rewrite /smod /= modz_small;1:smt().
 rewrite ifF 1:/# /=;congr;congr;congr;congr;2:smt().
 rewrite /bs2int /= size_take // size_drop 1:/# /=.
-rewrite (EclibExtra.size_flatten' 8);1:smt(mapP W8.size_w2bits Array32.size_to_list size_map).
+rewrite (EclibExtra.size_flatten' 8);1:smt(mapP W8.size_w2bits' Array32.size_to_list size_map).
 rewrite size_map /= size_to_list /=.
 rewrite (: (if 1 < max 0 (256 - i) then 1 else max 0 (256 - i)) = 1) 1:/# /=.
 rewrite /range /= -iotaredE /= StdBigop.Bigint.BIA.big_seq1 /= /b2i /=.
 congr; rewrite nth_take // nth_drop 1:/# //= (nth_flatten false 8);
-  1: by rewrite allP /= => x;  smt(mapP W8.size_w2bits).
+  1: by rewrite allP /= => x;  smt(mapP W8.size_w2bits').
 rewrite (nth_map witness);1: by rewrite size_to_list /= /#.
 by rewrite get_to_list get_w2bits.
 qed.

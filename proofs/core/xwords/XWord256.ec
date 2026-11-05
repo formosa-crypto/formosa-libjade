@@ -1,6 +1,6 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore IntDiv List StdBigop StdOrder.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 require import CircuitBindings CircuitBindingsExtra.
 import BitEncoding BS2Int.
 

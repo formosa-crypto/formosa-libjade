@@ -494,7 +494,7 @@ ecall (APKref.absorb_h [<:W8.t>] verification_key 31 136).
 ecall (state_init_h 136).
 auto => &hr Hvk r0 h0; split => // [st1 a1] /= Ha [st2 o2] /= [_ Ho].
 rewrite -(Array64.to_listK witness o2) Ho Ha -Hvk /H_tr.
-rewrite BytesPK.of_listK 1:Array_pk_enc.size_to_list 1:pk_encE //.
+rewrite BytesPK.of_listK 1:Array_pk_enc.size_to_list /= 1:pk_encE //.
 by rewrite Bytes64.of_listK 1:size_SHAKE256 // /SHAKE256 /KECCAK1600 /SHAKE_DS_BYTE /c512_r8.
 qed.
 
@@ -540,7 +540,7 @@ ecall (state_init_h 136).
 auto => &hr [Hmu Hw1] r0 h0; split => // [st1 a1] /= [Ha _]; split; 1: by rewrite size_to_list.
 move=> _ [st2 a2] /= Ha2 [st3 o3] /= [_ Ho]; rewrite -(Array_ctilde.to_listK witness o3) Ho Ha2 -Hmu -Hw1 /H_ct.
 rewrite Bytes64.of_listK 1:Array64.size_to_list //.
-rewrite BytesW1.of_listK 1:Array_w1vec_enc.size_to_list 1:w1vec_encE //.
+rewrite BytesW1.of_listK 1:Array_w1vec_enc.size_to_list /= 1:w1vec_encE //.
 by rewrite BytesCT.of_listK 1:size_SHAKE256 //; exact ge0_ctilde.
 qed.
 

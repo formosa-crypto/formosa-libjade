@@ -625,6 +625,7 @@ abstract theory KeccakArrayAvx2Safety.
 op _ASIZE: int.
 
 axiom _ASIZE_ge0: 0 <= _ASIZE.
+hint simplify _ASIZE_ge0.
 axiom _ASIZE_u64: _ASIZE < W64.modulus.
 
 (* the ui64 range conditions of the model are stated with the literal 2^64-1 *)
@@ -633,8 +634,7 @@ proof. smt(_ASIZE_u64 pow2_64). qed.
 
 (* `size` is kept as an alias of _ASIZE: ByteArrayInit refers to it *)
 clone import ByteArray as A
- with op size <= _ASIZE
-      proof ge0_size by exact _ASIZE_ge0.
+ with op size <= _ASIZE.
 
 clone import ReadWriteArraySafety as RW
  with op _ASIZE <- _ASIZE,

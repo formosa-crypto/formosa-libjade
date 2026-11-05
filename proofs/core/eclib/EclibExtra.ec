@@ -1,5 +1,6 @@
 (* Miscellaneous results on some constructions from the EC and Jasmin libraries *)
 require import Core Int IntDiv List.
+require MinMaxSimplify.
 
 
 lemma take_nseq ['a] n1 n2 (x: 'a):
@@ -274,8 +275,8 @@ lemma W8_bits2wK' l:
  W8.w2bits (W8.bits2w l) = l ++ nseq (8 - size l) false.
 proof.
 move=> H; apply (eq_from_nth false).
- by rewrite size_w2bits size_cat size_nseq; smt(size_ge0).
-move=> i; rewrite size_w2bits => Hi.
+ by rewrite size_w2bits' size_cat size_nseq; smt(size_ge0).
+move=> i; rewrite size_w2bits' => Hi.
 rewrite get_w2bits get_bits2w 1:// nth_cat.
 case: (i < size l) => C //.
 case: ((i - size l) < (8 - size l)) => C2.
@@ -310,8 +311,8 @@ lemma W64_bits2wK' l:
  W64.w2bits (W64.bits2w l) = l ++ nseq (64 - size l) false.
 proof.
 move=> H; apply (eq_from_nth false).
- by rewrite size_w2bits size_cat size_nseq; smt(size_ge0).
-move=> i; rewrite size_w2bits => Hi.
+ by rewrite size_w2bits' size_cat size_nseq; smt(size_ge0).
+move=> i; rewrite size_w2bits' => Hi.
 rewrite get_w2bits get_bits2w 1:// nth_cat.
 case: (i < size l) => C //.
 case: ((i - size l) < (64 - size l)) => C2.
@@ -412,7 +413,7 @@ have L: forall w, W8.bits w 0 W8.size = w2bits w.
  by rewrite /bits /w2bits /#.
 rewrite !L.
 rewrite (StdBigop.Bigint.BIA.bigD1_cond _ _ _ i) //. 
-  by rewrite size_w2bits mem_range.
+  by rewrite size_w2bits' mem_range.
  by apply range_uniq.
 rewrite addrC eq_sym.
 rewrite (StdBigop.Bigint.BIA.bigD1_cond _ _ _ i) //=. 
@@ -436,7 +437,7 @@ have L: forall w, W64.bits w 0 W64.size = w2bits w.
  by rewrite /bits /w2bits /#.
 rewrite !L.
 rewrite (StdBigop.Bigint.BIA.bigD1_cond _ _ _ i) //. 
-  by rewrite size_w2bits mem_range.
+  by rewrite size_w2bits' mem_range.
  by apply range_uniq.
 rewrite addrC eq_sym.
 rewrite (StdBigop.Bigint.BIA.bigD1_cond _ _ _ i) //=. 

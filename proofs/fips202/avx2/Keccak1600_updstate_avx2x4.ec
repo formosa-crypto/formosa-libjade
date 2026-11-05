@@ -1287,11 +1287,11 @@ abstract theory KeccakUpdstateAvx2x4.
 op _ASIZE: int.
 
 axiom _ASIZE_ge0: 0 <= _ASIZE.
+hint simplify _ASIZE_ge0.
 axiom _ASIZE_u64: _ASIZE < W64.modulus.
 
 clone import PolyArray as A
- with op size <- _ASIZE
-      proof ge0_size by exact _ASIZE_ge0.
+ with op size <- _ASIZE.
 
 clone import WArray as WA
  with op size <- _ASIZE.

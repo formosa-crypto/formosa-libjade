@@ -1,7 +1,7 @@
 (* The semantics of the compression circuits at ML-KEM-512: d_u = 10, d_v = 4 *)
 require import AllCore List Int IntDiv CoreMap Real Number Ring StdOrder BitEncoding.
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array256 Array128 Array64 Array32 Array16 Array8 Array4 Array2.
 from JazzEC require import Array512 Array640 Array768 Array1024 Array1408 Array1024 Array160
   Array1024.
@@ -55,12 +55,12 @@ rewrite /BS_W32_W10_U.zeroextu32 of_uintK /= modz_small /=;1: by smt(W10.to_uint
 rewrite modz_small /=;1: by smt(W10.to_uint_cmp pow2_10).
 rewrite /to_uint;congr;congr;congr;congr;last by smt().
 congr;apply (eq_from_nth false).
-+ by rewrite size_w2bits size_nth_chunk // size_BytesToBits size_to_list /#.
-move => k; rewrite size_w2bits => kb.
++ by rewrite size_w2bits' size_nth_chunk // size_BytesToBits size_to_list /#.
+move => k; rewrite size_w2bits' => kb.
 rewrite get_w2bits initiE 1:/# /=  JWordList.nth_chunk 1,2:/#.
 + by rewrite size_BytesToBits size_to_list /#.
 rewrite /BytesToBits nth_take 1,2:/# nth_drop 1,2:/#.
-rewrite (nth_flatten false 8); 1:by  rewrite allP; smt(mapP W8.size_w2bits  size_map).
+rewrite (nth_flatten false 8); 1:by  rewrite allP; smt(mapP W8.size_w2bits'  size_map).
 rewrite (nth_map witness);1: by rewrite size_to_list /= /#.
 rewrite (nth_map witness);1: by rewrite size_iota /= /#.
 by rewrite nth_iota /#.
@@ -155,12 +155,12 @@ rewrite /BS_W32_W4_U.zeroextu32 of_uintK /= modz_small /=;1: by smt(W4.to_uint_c
 rewrite modz_small /=;1: by smt(W4.to_uint_cmp pow2_4).
 rewrite /to_uint;congr;congr;congr;congr;last by smt().
 congr;apply (eq_from_nth false).
-+ by rewrite size_w2bits size_nth_chunk // size_BytesToBits size_to_list /#.
-move => k; rewrite size_w2bits => kb.
++ by rewrite size_w2bits' size_nth_chunk // size_BytesToBits size_to_list /#.
+move => k; rewrite size_w2bits' => kb.
 rewrite get_w2bits initiE 1:/# /=  JWordList.nth_chunk 1,2:/#.
 + by rewrite size_BytesToBits size_to_list /#.
 rewrite /BytesToBits nth_take 1,2:/# nth_drop 1,2:/#.
-rewrite (nth_flatten false 8); 1:by  rewrite allP; smt(mapP W8.size_w2bits Array32.size_to_list
+rewrite (nth_flatten false 8); 1:by  rewrite allP; smt(mapP W8.size_w2bits' Array32.size_to_list
   size_map).
 rewrite (nth_map witness);1: by rewrite size_to_list /= /#.
 rewrite (nth_map witness);1: by rewrite size_iota /= /#.

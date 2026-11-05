@@ -1,6 +1,6 @@
 require import List Int Ring IntDiv CoreMap.
 import Ring.IntID.
-from Jasmin require import JModel JArray JWord_array.
+from Jasmin require import JModel_x86 JArray JWord_array.
 
 from JazzEC require import Array2 Array4 Array8 Array16 Array32 WArray128.
 

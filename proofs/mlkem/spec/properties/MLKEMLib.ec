@@ -240,11 +240,11 @@ rewrite (mu_eq_support _ _ (pred1 (w2bits w))).
  apply eqboolP; split => H.
   by rewrite -H W8.bits2wK.
  by rewrite H W8.w2bitsK.
-rewrite dlist1E // W8.size_w2bits /=.
+rewrite dlist1E // W8.size_w2bits' /=.
 rewrite (StdBigop.Bigreal.BRM.eq_bigr _ _ (fun _=>inv 2%r)).
  by move=> i _ /=; rewrite DBool.dbool1E /#. 
 rewrite StdBigop.Bigreal.mulr_const.
-rewrite W8.size_w2bits.
+rewrite W8.size_w2bits'.
 by rewrite RealOrder.Domain.exprVn // fromintXn //.
 qed.
 

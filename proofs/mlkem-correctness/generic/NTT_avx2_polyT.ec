@@ -1,5 +1,5 @@
 require import AllCore List Int IntDiv CoreMap Real Number Ring StdOrder BitEncoding.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array256 Array128 Array32 Array16.
 require import MLKEMFCLib.
 require import AVX2_Ops.

@@ -31,8 +31,8 @@ rewrite (W32.to_uint_and_mod 23) //.
 have -> : W4u8.pack4 [x; y; z] = W4u8.pack4 [x; y; z; W8.zero].
 - apply W32.wordP => i rgi; rewrite !W4u8.pack4wE 1,2:// !W4u8.Pack.get_of_list 1,2:/#.
   by have [->|[->|[->|->]]] : i %/ 8 = 0 \/ i %/ 8 = 1 \/ i %/ 8 = 2 \/ i %/ 8 = 3 by smt().
-rewrite to_uint_pack4_3 !BS2Int.bs2int_cat !W8.size_w2bits -!W8.to_uintE.
-rewrite size_cat !W8.size_w2bits /=.
+rewrite to_uint_pack4_3 !BS2Int.bs2int_cat !W8.size_w2bits' -!W8.to_uintE.
+rewrite size_cat !W8.size_w2bits' /=.
 have hx := W8.to_uint_cmp x; have hy := W8.to_uint_cmp y; have hz := W8.to_uint_cmp z.
 rewrite {1}(divz_eq (to_uint z) 128).
 have -> : to_uint x + 256 * to_uint y + 65536 * (to_uint z %/ 128 * 128 + to_uint z %% 128)

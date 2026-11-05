@@ -5,7 +5,7 @@
 (* -------------------------------------------------------------------- *)
 
 require import AllCore IntDiv List.
-from Jasmin require import JModel JUtils.
+from Jasmin require import JModel_x86 JUtils.
 from JazzEC require import Array1 Array4 Array8 Array16 Array32 Array33 Array128 Array256.
 from JazzEC require import WArray128.
 from Spec require import GFq Rq Sampling Symmetric SamplingCBD.

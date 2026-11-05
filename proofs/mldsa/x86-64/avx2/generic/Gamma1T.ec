@@ -57,7 +57,7 @@ while (0 <= i <= lvec /\ decoded = _a /\
        (z_unflatten encoded).[k] =
        (map (fun (p : poly) => Array_gamma1_enc.of_list witness (BitPack p (gamma1-1) gamma1)) (lifts_wpolylvec (lvec_unflatten256 _a))).[k]);
        last first.
-+ auto => /> &hr *; do split; 1,2: smt(gt0_l).
++ auto => /> &hr *; do split; 1: smt(gt0_l).
   by move => r0 j0 *; rewrite tP => k kb; smt().
 wp; ecall (gamma1_encode_polynomial (Array256.init (fun (i_0 : int) => _a.[i * 256 + i_0]))).
 auto => /> &hr ?? Hrng H ?;do split.
@@ -136,7 +136,7 @@ while (0 <= i <= lvec /\ encoded = _a /\
        (forall k, 0 <= k < i =>
            wpoly_srng (gamma1-1) gamma1 (lvec_unflatten256 decoded).[k]));
        last first.
-+ auto => /> &hr *; do split; 1..3: smt(gt0_l).
++ auto => /> &hr *; do split; 1,2: smt(gt0_l).
   move => r0 k ? r1 i0 Heq Hrng; split; 1: by rewrite tP => /#.
   rewrite /wpolylvec_srng allP => i ib.
   by apply Hrng; smt().

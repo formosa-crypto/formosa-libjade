@@ -764,7 +764,7 @@ while (rho = _rho /\ 0 <= r <= kvec
     case: (i = r{hr} * lvec + s{hr}) => [->> |ne]; last by rewrite hi /#.
     rewrite /expandA KLMatrix.initiE 1:/# /=.
     by rewrite modzMDl pmod_small 1:/# divzMDl 1:/# pdiv_small 1:/#.
-  auto => &hr |> ge0r _ hi ltr; split; 1: smt().
+  auto => &hr |> ge0r _ hi ltr.
   move=> aa0 s0; split; 1: smt().
   move=> ns ge0 les hi'; split; 2: smt().
   split; 1: smt().
@@ -830,8 +830,7 @@ wp; while (rho = _rho /\ 0 <= r <= lvec
 auto => |>; split; 1: smt(gt0_l).
 move=> r1 s1; split; 1: smt().
 move=> nr ge0 ler hi; split.
-- split; 1: smt(gt0_k).
-  split; 2: smt().
+- split; 2: smt().
   by apply LArray.tP => i rgi; rewrite hi /#.
 move=> r2 s2; split; 1: smt().
 move=> nr2 ge02 ler2 hs1 hi2.

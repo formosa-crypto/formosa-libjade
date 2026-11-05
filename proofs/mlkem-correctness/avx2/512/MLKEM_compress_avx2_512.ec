@@ -1,7 +1,7 @@
 (* The compression kernels of ML-KEM-512, by circuit: d_v = 4, d_u = 10 *)
 require import AllCore List Int IntDiv CoreMap Real Number Ring StdOrder BitEncoding.
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array400 Array384 Array256 Array160 Array128 Array64 Array32 Array16
   Array8 Array4 Array2.
 from JazzEC require import WArray512 WArray128 WArray384 WArray32 WArray16.

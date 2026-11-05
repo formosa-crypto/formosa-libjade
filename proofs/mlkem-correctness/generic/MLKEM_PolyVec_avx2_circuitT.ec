@@ -4,7 +4,7 @@
 (* polynomial by polynomial.                                            *)
 (* -------------------------------------------------------------------- *)
 require import AllCore List Int IntDiv CoreMap Real Number Ring StdOrder BitEncoding.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array384 Array256 Array32 Array16.
 from JazzEC require import WArray512 WArray384 WArray32.
 require import AVX2_Ops W16extra.

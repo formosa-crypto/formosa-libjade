@@ -196,7 +196,7 @@ lemma BitUnpack_liftE (bytes : W8.t Array96.t) :
 proof.
 have HEta := Eta_val.
 have Hsz : size (BytesToBits (to_list bytes)) = 768.
-+ rewrite /BytesToBits (EclibExtra.size_flatten' 8); 1: by smt(mapP W8.size_w2bits).
++ rewrite /BytesToBits (EclibExtra.size_flatten' 8); 1: by smt(mapP W8.size_w2bits').
   by rewrite size_map size_to_list.
 move=> @/BitUnpack /=; rewrite tP => i ib.
 rewrite initiE 1:// mapiE //= initiE 1:/# /=.
@@ -212,13 +212,13 @@ move=> ?; have ? : 0 <= p by smt(BS2Int.bs2int_ge0).
 have <- : p = to_uint (W3.init (fun (j : int) => bytes.[(3 * i + j) %/ 8].[(3 * i + j) %% 8])).
 + rewrite /to_uint /p; congr.
   apply (eq_from_nth false).
-  + by rewrite size_take // size_drop 1:/# size_w2bits Hsz /#.
+  + by rewrite size_take // size_drop 1:/# size_w2bits' Hsz /#.
   move=> k kb.
   have ? : size (take 3 (drop (3 * i) (BytesToBits (to_list bytes)))) = 3.
   + by rewrite size_take // size_drop 1:/# Hsz /#.
   rewrite nth_take 1,2:/# nth_drop 1,2:/# /BytesToBits.
   rewrite (nth_flatten false 8).
-  + by rewrite allP => j /=; rewrite mapP => Hx; elim Hx; smt(W8.size_w2bits).
+  + by rewrite allP => j /=; rewrite mapP => Hx; elim Hx; smt(W8.size_w2bits').
   rewrite (nth_map witness) /=; 1: by rewrite size_to_list /#.
   by rewrite initiE 1:/# /=.
 by have /= := W32.to_sintK_small (2 - p); smt().
@@ -307,7 +307,7 @@ proof.
 rewrite /valid_eta_bytes /=.
 have E : forall (f : int -> bool), to_uint (W3.init f) = BS2Int.bs2int (mkseq f 3).
 + move=> f; rewrite W3.to_uintE; congr.
-  apply (eq_from_nth false); rewrite W3.size_w2bits.
+  apply (eq_from_nth false); rewrite W3.size_w2bits'.
   + by rewrite size_mkseq.
   by move=> j hj; rewrite W3.get_w2bits W3.initiE // nth_mkseq.
 by split => H i hi; [rewrite E | rewrite -E]; apply H.

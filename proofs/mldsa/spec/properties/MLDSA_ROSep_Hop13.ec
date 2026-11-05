@@ -159,10 +159,8 @@ lemma vec_of_k_mulmxv (m : polymat) (v : polylvec) :
   vec_of_k (mulmxv m v) = DV.MatRq.Matrices.mulmxv (mat_of m) (vec_of_l v).
 proof.
 apply DV.MatRq.Vectors.eq_vectorP; rewrite size_vec_of_k DV.MatRq.Matrices.size_mulmxv /mat_of /=.
-split; 1: smt(gt0_k).
 move=> i hi; rewrite vec_of_kE // DV.MatRq.Matrices.get_mulmxv DV.MatRq.Vectors.dotpE /mulmxv KArray.initiE //=
         poly2alg_dotp size_vec_of_l /=.
-rewrite (_ : max (max 0 lvec) lvec = lvec); 1: smt(gt0_l).
 apply DV.MatRq.Big.BAdd.eq_big_int => j hj /=.
 rewrite DV.MatRq.Matrices.get_offunm /=; 1: smt(gt0_l gt0_k).
 by rewrite vec_of_lE // /row LArray.initiE.
@@ -170,7 +168,7 @@ qed.
 
 lemma vec_of_l_add (u v : polylvec) : vec_of_l (u + v) = DV.MatRq.Vectors.( + ) (vec_of_l u) (vec_of_l v).
 proof.
-apply DV.MatRq.Vectors.eq_vectorP; rewrite DV.MatRq.Vectors.size_addv !size_vec_of_l /=; split => // i hi.
+apply DV.MatRq.Vectors.eq_vectorP; rewrite DV.MatRq.Vectors.size_addv !size_vec_of_l /= => i hi.
 by rewrite DV.MatRq.Vectors.get_addv !vec_of_lE // polylvec_add_iE // /(&+) poly2algK.
 qed.
 
@@ -183,14 +181,14 @@ qed.
 
 lemma vec_of_k_add (u v : polykvec) : vec_of_k (u + v) = DV.MatRq.Vectors.( + ) (vec_of_k u) (vec_of_k v).
 proof.
-apply DV.MatRq.Vectors.eq_vectorP; rewrite DV.MatRq.Vectors.size_addv !size_vec_of_k /=; split => // i hi.
+apply DV.MatRq.Vectors.eq_vectorP; rewrite DV.MatRq.Vectors.size_addv !size_vec_of_k /= => i hi.
 by rewrite DV.MatRq.Vectors.get_addv !vec_of_kE // polykvec_add_iE // /(&+) poly2algK.
 qed.
 
 lemma vec_of_k_sub (u v : polykvec) : vec_of_k (u - v) = DV.MatRq.Vectors.( - ) (vec_of_k u) (vec_of_k v).
 proof.
 apply DV.MatRq.Vectors.eq_vectorP.
-rewrite DV.MatRq.Vectors.size_addv DV.MatRq.Vectors.size_oppv !size_vec_of_k /=; split => // i hi.
+rewrite DV.MatRq.Vectors.size_addv DV.MatRq.Vectors.size_oppv !size_vec_of_k /= => i hi.
 by rewrite DV.MatRq.Vectors.get_addv DV.MatRq.Vectors.getvN !vec_of_kE // polykvec_sub_iE // /(&+) /(&-) !poly2algK.
 qed.
 

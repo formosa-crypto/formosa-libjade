@@ -39,7 +39,7 @@ export fn ml_dsa_44_keygen(
              && is_arr_init(randomness,0,32)
              && is_mem_init(context[0], (64ui) context[1])
              && is_mem_init((64u) message_pointer, message_size) && message_size <= 0xFFFFFFFFFFFFFF00
-   , ensures = (result != 0 || is_arr_init(signature,0,SIGNATURE_SIZE))
+   , ensures = is_arr_init(signature,0,(result == 0 ? SIGNATURE_SIZE : 0))
    }
  ]
 #[sct="{ptr: transient, val: transient} *

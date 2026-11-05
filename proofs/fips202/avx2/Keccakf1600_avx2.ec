@@ -1,6 +1,6 @@
 require import AllCore IntDiv List.
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 
 
 from CryptoSpecs require import FIPS202_SHA3 FIPS202_Keccakf1600 Keccak1600_arrays.
@@ -164,7 +164,7 @@ case (8%| offset) => /= *; last by smt(W256.get_bits2w).
 rewrite /get256_direct pack32E initiE 1:/# /= initiE 1:/# /= initiE 1:/# /=.
 rewrite nth_take 1,2:/# nth_drop 1,2:/#.
 rewrite (BitEncoding.BitChunking.nth_flatten false 64 _). 
-+ rewrite allP => x /=; rewrite mapP => He; elim He;smt(W64.size_w2bits).
++ rewrite allP => x /=; rewrite mapP => He; elim He;smt(W64.size_w2bits').
 rewrite (nth_map W64.zero []); 1: smt(Array25.size_to_list).
 by rewrite nth_mkseq 1:/# /= bits8E /= initiE /# /=.
 qed.
@@ -227,7 +227,7 @@ move => arr offset bv H /= k kb; rewrite /sliceset25_64_256 /=.
 case (8 %| offset) => /= *; last first.
 + rewrite of_listK.
    rewrite size_map size_chunk 1:// !size_cat size_take. smt().
-    rewrite size_flatten_W64_w2bits size_to_list size_w2bits /= ifT 1:/#.
+    rewrite size_flatten_W64_w2bits size_to_list size_w2bits' /= ifT 1:/#.
     by rewrite size_drop 1:/# size_flatten_W64_w2bits size_to_list /#.
   rewrite -(map_comp W64.w2bits W64.bits2w) /(\o). 
   have := eq_in_map ((fun (x : bool list) => w2bits ((bits2w x))%W64)) idfun (chunk 64
@@ -235,17 +235,17 @@ case (8 %| offset) => /= *; last first.
          drop (offset + 256) (flatten (map W64.w2bits (to_list arr))))).
   rewrite iffE => [#] -> * /=; 1: by smt(in_chunk_size W64.bits2wK).
   rewrite map_id /= chunkK 1://;1: by rewrite !size_cat size_take;
-    by smt(size_take size_drop  W64.size_w2bits size_cat Array25.size_to_list size_flatten_W64_w2bits size_ge0). 
+    by smt(size_take size_drop  W64.size_w2bits' size_cat Array25.size_to_list size_flatten_W64_w2bits size_ge0). 
   by rewrite !nth_cat !size_cat /=;
-     smt(nth_take nth_drop size_take size_drop  W64.size_w2bits size_cat Array25.size_to_list size_flatten_W64_w2bits size_ge0). 
-rewrite (nth_flatten _ 64); 1: by rewrite allP => i;rewrite mapP => He; elim He;smt(W64.size_w2bits).
+     smt(nth_take nth_drop size_take size_drop  W64.size_w2bits' size_cat Array25.size_to_list size_flatten_W64_w2bits size_ge0). 
+rewrite (nth_flatten _ 64); 1: by rewrite allP => i;rewrite mapP => He; elim He;smt(W64.size_w2bits').
 rewrite (nth_map W64.zero []); 1: smt(Array25.size_to_list).
 rewrite nth_mkseq 1:/# /= initiE 1:/# /= get64E pack8E initiE 1:/# /= initiE 1:/# /= /set256_direct.
 rewrite initiE 1:/# /=.
 case (offset <= k && k < offset + 256) => *; 1: by 
   rewrite ifT 1:/#  get_bits8 /= 1,2:/# initiE // initiE //.
 rewrite ifF 1:/# initiE 1:/# /=.
-rewrite (nth_flatten _ 64); 1: by rewrite allP => i;rewrite mapP => He; elim He;smt(W64.size_w2bits).
+rewrite (nth_flatten _ 64); 1: by rewrite allP => i;rewrite mapP => He; elim He;smt(W64.size_w2bits').
 rewrite (nth_map W64.zero []); 1: smt(Array25.size_to_list).
 rewrite nth_mkseq 1:/# /= bits8E /= initiE /# /=.
 qed.

@@ -76,7 +76,7 @@ qed.
 
 lemma BytesToBitsK x : (BitsToBytes (BytesToBits x)) = x.
 rewrite /BitsToBytes /BytesToBits.
-rewrite flattenK;1,2: smt(mapP W8.size_w2bits).
+rewrite flattenK;1,2: smt(mapP W8.size_w2bits').
 rewrite -map_comp /(\o).
 have [H _]:= (eq_in_map (fun (x0 : W8.t) => W8.bits2w (W8.w2bits x0)) idfun x).
 rewrite H;1: by move => x0 memX0 /=.
@@ -133,7 +133,7 @@ lemma size_decode k n l :
  1 <= k <= 4  =>
  1 <= n <= 12 => size l = k*32*n =>  size (ByteDecode n l) = k*256.
 move => Hn Hsize.
-rewrite /ByteDecode size_map size_chunk 1:/# /BytesToBits (EclibExtra.size_flatten' 8);1:smt(mapP W8.size_w2bits).
+rewrite /ByteDecode size_map size_chunk 1:/# /BytesToBits (EclibExtra.size_flatten' 8);1:smt(mapP W8.size_w2bits').
 by rewrite size_map /#.
 qed.
 
@@ -149,7 +149,7 @@ qed.
 lemma size_BytesToBits_list l :
   size (BytesToBits l) = 8*size l.
 rewrite /BytesToBits (EclibExtra.size_flatten' 8).
-+ move => x; rewrite mapP => He; elim He;smt(W8.size_w2bits).
++ move => x; rewrite mapP => He; elim He;smt(W8.size_w2bits').
 by rewrite size_map.
 qed.
 
@@ -163,7 +163,7 @@ have Hsize' : size l = size (BitsToBytes (flatten (map (int2bs n) (map bs2int (c
     smt(size_int2bs).
   rewrite !size_map size_iota /BytesToBits (EclibExtra.size_flatten' 8).
   + move => x; rewrite mapP => He;elim He.
-    smt(W8.size_w2bits).
+    smt(W8.size_w2bits').
   rewrite size_map.
   rewrite /max;case (0 < 8 * size l %/ n);1:smt().
   smt(divz_ge0 size_ge0).

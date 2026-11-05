@@ -5,7 +5,7 @@
 (* a hypothesis here, realized by each set.                             *)
 (* -------------------------------------------------------------------- *)
 require import AllCore List Int IntDiv.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array256.
 from Spec require import GFq Rq Serialization Correctness.
 require import W16extra MLKEMFCLib.

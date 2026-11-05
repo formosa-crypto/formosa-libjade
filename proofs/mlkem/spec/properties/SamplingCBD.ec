@@ -95,7 +95,7 @@ lemma nth_bits128 (b : W8.t Array128.t) n : 0 <= n < 1024 =>
   nth false (BytesToBits (to_list b)) n = b.[n %/ 8].[n %% 8].
 proof.
 move=> hn; rewrite /BytesToBits (BitEncoding.BitChunking.nth_flatten false 8).
-+ by rewrite allP => x /mapP [y [_ ->]]; smt(W8.size_w2bits).
++ by rewrite allP => x /mapP [y [_ ->]]; smt(W8.size_w2bits').
 rewrite (nth_map witness); 1: smt(Array128.size_to_list).
 by rewrite get_to_list w2bitsE /= nth_mkseq /#.
 qed.

@@ -106,7 +106,7 @@ qed.
 lemma BytesToBitsK (x : W8.t list) : BitsToBytes (BytesToBits x) = x.
 proof.
 rewrite /BitsToBytes /BytesToBits BitChunking.flattenK //.
-+ by move=> b /mapP [w [_ ->]]; rewrite W8.size_w2bits.
++ by move=> b /mapP [w [_ ->]]; rewrite W8.size_w2bits'.
 rewrite -map_comp; apply (eq_from_nth witness); rewrite ?size_map // => i hi.
 by rewrite (nth_map witness) // /(\o) W8.w2bitsK.
 qed.

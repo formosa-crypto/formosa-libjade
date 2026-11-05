@@ -3,7 +3,7 @@
 (* at abstract parameters: key generation, encryption, decryption.     *)
 (* -------------------------------------------------------------------- *)
 require import AllCore List Int IntDiv CoreMap Real Number BitEncoding.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array256 Array128 Array64 Array33 Array32 Array16 Array8 Array4.
 from JazzEC require import Array2 Array384 Array1024 Array2144 Array536 Array400.
 from JazzEC require import WArray512 WArray128 WArray64 WArray33 WArray32 WArray16.

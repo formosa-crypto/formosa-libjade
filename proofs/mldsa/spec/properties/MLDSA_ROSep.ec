@@ -333,7 +333,7 @@ qed.
 lemma mu_ct_tr (t : Bytes64.t) :
   mu dbytesCT (fun y => BytesCT.to_list y = Bytes64.to_list t) <= p512.
 proof.
-have hl : 0 <= lambda %/ 4 by have /= H := param_sets; smt().
+have hl := ge0_lambda4.
 rewrite /dbytesCT dmapE /(\o) /=.
 apply (RealOrder.ler_trans (mu (dlist W8.dword (lambda %/ 4)) (pred1 (Bytes64.to_list t)))).
 + apply mu_le => l hl' /= h; rewrite /pred1 -h BytesCT.of_listK //.

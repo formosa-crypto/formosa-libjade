@@ -59,6 +59,8 @@ by have /= := param_sets; case=> [|[|]] [#] h1 h2 h3 h4 h5 h6 h7 h8;
    rewrite ?h1 ?h2 ?h3 ?h4 ?h5 ?h6 ?h7 ?h8 /=.
 qed.
 
+lemma ge128_sk_bytes : 128 <= sk_bytes.
+proof. by have /= := key_sizes; case=> [|[|]] [#] -> _ _. qed.
 clone import JArray.MonoArray as Bytes32 with op size <= 32, type elem <= W8.t, op dfl <= witness.
 clone import JArray.MonoArray as Bytes64 with op size <= 64, type elem <= W8.t, op dfl <= witness.
 clone import JArray.MonoArray as BytesSK with op size <= sk_bytes, type elem <= W8.t, op dfl <= witness.
@@ -66,6 +68,22 @@ clone import JArray.MonoArray as BytesPK with op size <= pk_bytes, type elem <= 
 clone import JArray.MonoArray as BytesSig with op size <= sig_bytes, type elem <= W8.t, op dfl <= witness.
 clone import JArray.MonoArray as BytesCT with op size <= lambda %/ 4, type elem <= W8.t, op dfl <= witness.
 clone import JArray.MonoArray as BytesW1 with op size <= w1_bytes, type elem <= W8.t, op dfl <= witness.
+
+(* the size of BytesCT is nonnegative: `max 0 size` simplifies
+   (MinMaxSimplify); the other sizes contain conditionals, so their
+   nonnegativity cannot be a simplify hint *)
+lemma ge0_lambda4 : 0 <= lambda %/ 4 by have /= := param_sets; smt().
+hint simplify ge0_lambda4.
+
+(* the sizes of the lists of the other arrays *)
+lemma size_BytesSK (t : BytesSK.t) : size (BytesSK.to_list t) = sk_bytes.
+proof. by rewrite BytesSK.size_to_list lez_maxr //; smt(ge128_sk_bytes). qed.
+
+lemma size_BytesPK (t : BytesPK.t) : size (BytesPK.to_list t) = pk_bytes.
+proof. by rewrite BytesPK.size_to_list lez_maxr //; have /= := key_sizes; smt(). qed.
+
+lemma size_BytesW1 (t : BytesW1.t) : size (BytesW1.to_list t) = w1_bytes.
+proof. by rewrite BytesW1.size_to_list lez_maxr //; have /= := param_sets; smt(). qed.
 
 (* Validity predicate on sk: its s2 slice decodes to polynomials in [-Eta, Eta].
    Each of the kvec chunks (of size (n*noise_bits)/8) encodes a polynomial whose
@@ -132,7 +150,7 @@ have /= pars:= param_sets.
 while (0 <= i <= kvec /\ pk = _pk /\
     forall k, 0 <= k < i =>
      t.[k] = SimpleBitUnpack (take ((n * (q_bits-d)) %/ 8) (drop (((n * (q_bits-d)) %/ 8)*k + 32) (to_list _pk))) (2 ^ (q_bits - d) - 1)) (kvec - i); last first.
-+ auto => />; do split;1,2:smt().
++ auto => />; do split; 1:smt().
   + move => i t; do split;1:smt().
   move => ??? H;rewrite tP => k kb.
   by rewrite initiE 1:/# /= /#.
@@ -223,7 +241,7 @@ wp;conseq (: _ ==>
    skbytes =
    to_list _rho ++ to_list _k ++ to_list _tr ++ flatten (map (fun (p : poly) => BitPack p Eta Eta) (to_list _s1)) ++
    flatten (map (fun (p : poly) => BitPack p Eta Eta) (to_list _s2))).
-+ auto => />; do split;1,2:smt(take0 cats0).
++ auto => />; do split; 1:smt(take0 cats0).
   + by rewrite take0 /= flatten_nil cats0.
   move => i; do split;1:smt().
   by move => *;rewrite take_oversize ?size_to_list /#.
@@ -238,7 +256,7 @@ wp; while (0 <= i <= kvec /\ s2 = _s2 /\
   wp;conseq (: _ ==> 
    skbytes =
    to_list _rho ++ to_list _k ++ to_list _tr ++ flatten (map (fun (p : poly) => BitPack p Eta Eta) (to_list _s1))).
-+ auto => />; do split;1,2:smt(take0 cats0).
++ auto => />; do split; 1:smt(take0 cats0).
   + by rewrite take0 /= flatten_nil cats0.
   move => i; do split;1:smt().
   by move => *;rewrite take_oversize ?size_to_list /#.
@@ -249,7 +267,7 @@ wp; while (0 <= i <= kvec /\ s1 = _s1 /\
   rewrite (take_nth witness) /=;1: by rewrite size_to_list /#.
   by rewrite -cats1 map_cat flatten_cat map1 flatten1 /= !catA.
 
-auto => />; do split;1,2:smt(take0 cats0).
+auto => />; do split; 1:smt(take0 cats0).
 move => *; do split;1:smt().
 by move => *;rewrite take_oversize ?size_to_list /#.
 qed.
@@ -298,7 +316,7 @@ wp;conseq (: _ ==>
     (fun (i0 : int) =>
        BitUnpack (take ((n * noise_bits) %/ 8) (drop (128 + s1_bytes + i0 * ((n * noise_bits) %/ 8)) (to_list _sk)))
          Eta Eta)).
-+ auto => /> &hr; do split;1,2:smt().
++ auto => /> &hr; do split; 1:smt().
   move => i t0;do split;1:smt().
   move => *;rewrite tP => k kb.
   by rewrite initiE 1:/# /= /#.
@@ -324,7 +342,7 @@ wp;conseq (: _ ==>
   LArray.init
     (fun (i0 : int) =>
        BitUnpack (take ((n * noise_bits) %/ 8) (drop (128 + i0 * (n * noise_bits) %/ 8) (to_list _sk))) Eta Eta) ).
-+ auto => /> &hr; do split;1,2:smt().
++ auto => /> &hr; do split; 1:smt().
   move => i s2;do split;1:smt().
   move => *;rewrite tP => k kb.
   by rewrite initiE 1:/# /= /#.
@@ -338,7 +356,7 @@ while (0 <= i <= lvec /\ sk = _sk /\
 + move => z;auto => /> &hr *;do split;1,2,4:smt().
   by move => k kbl kbh;rewrite get_setE /#.
 
-auto => /> &hr; do split;1,2:smt().
+auto => /> &hr; do split; 1:smt().
 move => i s1;do split;1:smt().
 move => *;rewrite tP => k kb.
 by rewrite initiE 1:/# /= /#.
@@ -363,7 +381,7 @@ rewrite KArray.initiE 1:/# /=.
 apply BitUnpack_infnorm.
 - rewrite size_take; first smt(param_sets).
   rewrite size_drop; first smt(param_sets).
-  rewrite BytesSK.size_to_list -noise_bits_eq.
+  rewrite size_BytesSK -noise_bits_eq.
   have /= := param_sets; case=> />; smt().
 - by have := Hval ii _; smt().
 qed.
@@ -392,7 +410,7 @@ split.
   apply BitUnpack_infnorm.
   - rewrite size_take; first smt(param_sets).
     rewrite size_drop; first smt(param_sets).
-    rewrite BytesSK.size_to_list -noise_bits_eq.
+    rewrite size_BytesSK -noise_bits_eq.
     have /= := param_sets; case=> />; smt().
   - by have := Hval ii _; smt().
 qed.
@@ -486,14 +504,14 @@ lemma sk_tr (rho k : Bytes32.t) (tr : Bytes64.t) (rest : W8.t list) :
   Bytes64.of_list (take 64 (drop 64 (BytesSK.to_list (BytesSK.of_list
     (Bytes32.to_list rho ++ Bytes32.to_list k ++ Bytes64.to_list tr ++ rest))))) = tr.
 proof.
-have hsk : 128 <= sk_bytes by have /= H := param_sets; smt(ge0_size BytesSK.ge0_size).
+have hsk := ge128_sk_bytes.
 have -> : take 64 (drop 64 (BytesSK.to_list (BytesSK.of_list
             (Bytes32.to_list rho ++ Bytes32.to_list k ++ Bytes64.to_list tr ++ rest)))) =
           Bytes64.to_list tr;
   last by rewrite Bytes64.to_listK.
 apply (eq_from_nth witness);
-  1: by rewrite size_take // size_drop // BytesSK.size_to_list Bytes64.size_to_list /#.
-move=> i; rewrite size_take // size_drop // BytesSK.size_to_list => hi.
+  1: by rewrite size_take // size_drop // size_BytesSK Bytes64.size_to_list /#.
+move=> i; rewrite size_take // size_drop // size_BytesSK => hi.
 rewrite nth_take 1,2:/# nth_drop 1,2:/# BytesSK.get_to_list BytesSK.get_of_list 1:/#.
 rewrite nth_cat.
 by rewrite !size_cat !Bytes32.size_to_list Bytes64.size_to_list (_ : 64 + i < 32 + 32 + 64) 1:/# /=
@@ -504,10 +522,10 @@ lemma sk_K (rho k : Bytes32.t) (rest : W8.t list) :
   take 32 (drop 32 (BytesSK.to_list (BytesSK.of_list (Bytes32.to_list rho ++ Bytes32.to_list k ++ rest)))) =
   Bytes32.to_list k.
 proof.
-have hsk : 128 <= sk_bytes by have /= H := param_sets; smt(ge0_size BytesSK.ge0_size).
+have hsk := ge128_sk_bytes.
 apply (eq_from_nth witness);
-  1: by rewrite size_take // size_drop // BytesSK.size_to_list Bytes32.size_to_list /#.
-move=> i; rewrite size_take // size_drop // BytesSK.size_to_list => hi.
+  1: by rewrite size_take // size_drop // size_BytesSK Bytes32.size_to_list /#.
+move=> i; rewrite size_take // size_drop // size_BytesSK => hi.
 by rewrite nth_take 1,2:/# nth_drop 1,2:/# BytesSK.get_to_list BytesSK.get_of_list 1:/# nth_cat size_cat
      !Bytes32.size_to_list (_ : 32 + i < 64) 1:/# /= nth_cat Bytes32.size_to_list (_ : !(32 + i < 32)) 1:/#.
 qed.

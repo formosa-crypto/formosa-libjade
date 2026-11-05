@@ -166,21 +166,21 @@ rewrite initiE 1:// mapiE //= initiE 1:/# /=.
 pose l1 := List.map _ _.
 have sl1 : size l1 = n.
 +   rewrite /l1;rewrite !size_map size_iota ilog_dpow /= /BytesToBits. 
-  rewrite (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits).
+  rewrite (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits').
   by rewrite size_map size_to_list /= /#.
 rewrite (nth_map []) /=.
 + rewrite size_chunk ilog_dpow //=.
   rewrite /BytesToBits. 
-  rewrite (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits).
+  rewrite (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits').
   by rewrite size_map size_to_list /= /#.
 congr; rewrite  /t0_decode_to_polynomial_lane.
 rewrite ilog_dpow /= /zeroextu32. 
 rewrite nth_chunk // 1:/#.
 + rewrite /BytesToBits. 
-  rewrite (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits).
+  rewrite (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits').
   by rewrite size_map size_to_list /= /#.
 have  := BS2Int.bs2int_le2Xs ((take d (drop (d * i) (BytesToBits (to_list bytes))))).
-+ rewrite size_take // size_drop 1:/# /max /= (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits).
++ rewrite size_take // size_drop 1:/# /max /= (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits').
   rewrite !size_map !size_iota /max /=.
   pose ll := if _ then _ else _.
   have -> /= : ll = 13;1: by smt().
@@ -191,18 +191,18 @@ have ? : 0 <= p by smt(BS2Int.bs2int_ge0).
 have <- : p = to_uint (W13.init (fun (j : int) => bytes.[(d * i + j) %/ 8].[ (d * i + j) %% 8])); last by have /= :=  W32.to_sintK_small (dpow - p); smt().
 rewrite /to_uint /p;congr.
 apply (eq_from_nth false).
-+ rewrite size_take // size_drop 1:/# size_w2bits /BytesToBits. 
-  rewrite (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits).
++ rewrite size_take // size_drop 1:/# size_w2bits' /BytesToBits. 
+  rewrite (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits').
   by rewrite size_map size_to_list /= /#.
 move => k kb.
 have ? : size (take d (drop (d * i) (BytesToBits (to_list bytes)))) = d.
 + rewrite size_take // size_drop 1:/# /BytesToBits. 
-  rewrite (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits).
+  rewrite (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits').
   by rewrite size_map size_to_list /= /#.
 rewrite nth_take 1,2:/# nth_drop 1,2:/# /BytesToBits.
 rewrite (nth_flatten false 8).
 + rewrite allP => j /=.
-  rewrite mapP => Hx;elim Hx;smt(W8.size_w2bits).
+  rewrite mapP => Hx;elim Hx;smt(W8.size_w2bits').
 rewrite (nth_map witness) /=; 1: by rewrite size_to_list /#.
 by rewrite initiE 1:/# /=.
 qed.
@@ -283,7 +283,7 @@ while (0 <= i <= kvec /\ encoded = _a /\
        (map (fun (p : W8.t Array416.t) => BitUnpack (to_list p) (T0T.dpow - 1) T0T.dpow) (t0_unflatten _a)).[k]
        /\ wpoly_srng (dpow-1) dpow (kvec_unflatten256 t0).[k]);
        last first.
-       + auto => /> &hr *;do split;1,2: smt(gt0_k).
+       + auto => /> &hr *;do split;1: smt(gt0_k).
          move => i0 t00 ??? H; do split.
          + rewrite tP => k kb; smt().
          by smt(KArray.allP).
@@ -363,7 +363,7 @@ while (0 <= j <= kvec /\ t0 = _a /\
          (KArray.map (fun (p : poly) => Array416.of_list witness (BitPack p (dpow - 1) dpow))
           (lifts_wpolykvec (kvec_unflatten256 _a))).[k]));
        last first.
-+ auto => /> &hr; rewrite /wpolykvec_srng allP => *;do split; 1..3: smt(gt0_k).
++ auto => /> &hr; rewrite /wpolykvec_srng allP => *;do split; 1,2: smt(gt0_k).
   by move => i0 t00 *;rewrite tP => k kb; smt().
 wp; ecall (t0_encode_polynomial (Array256.init (fun (i : int) => t0.[n * j + i]))).
 auto => /> &hr ?? H H0 ?; split.

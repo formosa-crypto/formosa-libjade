@@ -442,9 +442,9 @@ abstract theory BS_WB_WS.
   - by apply: WS.gt0_size. - by apply: dvd_size.
   apply/eq_sym/(eq_from_nth false).
   - rewrite size_take_condle // size_drop 1:/#.
-    rewrite !size_w2bits lez_maxr 1:/#.
+    rewrite !size_w2bits' lez_maxr 1:/#.
     by rewrite ifT // #smt:(dvd_size).
-  move=> i; rewrite size_w2bits => ?.
+  move=> i; rewrite size_w2bits' => ?.
   rewrite get_w2bits bits'SiE // nth_take ~-1://#.
   by rewrite nth_drop //#.
   qed.
@@ -457,7 +457,7 @@ abstract theory BSA.
   axiom gt0_size : 0 < size.
  
   clone import PolyArray as A with
-    op size <- size proof ge0_size by smt(gt0_size).
+    op size <- size.
 
   bind array A."_.[_]" A."_.[_<-_]" A.to_list A.of_list A.t size.
 
@@ -561,7 +561,7 @@ abstract theory BSWAS.
   proof.
   rewrite /tobits (size_flatten_ctt bsize).
   - by move=> bs /mapP[w] [_ ->].
-  - by rewrite size_map size_to_list.
+  - by rewrite size_map size_to_list lez_maxr // ltzW BSA.gt0_size.
   qed.
 
   hint simplify size_tobits.

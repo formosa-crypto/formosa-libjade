@@ -1,7 +1,7 @@
 (* General EC imports *)
 require import AllCore List.
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 
 from JazzEC require import Array32 Array33 Array64 Array128 Array160 Array168 Array256 Array960 Array1152 Array1408 Array1536.
 

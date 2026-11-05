@@ -202,7 +202,7 @@ lemma pk_encK (p : BytesPK.t) : pk_enc (pk_dec p) = p.
 proof.
 rewrite /pk_enc /pk_dec /= t1_ofK.
 have /= H := param_sets.
-have hsz : size (BytesPK.to_list p) = 32 + 320 * kvec by rewrite BytesPK.size_to_list; smt().
+have hsz : size (BytesPK.to_list p) = 32 + 320 * kvec by rewrite size_BytesPK; smt().
 have hb : RealExp.ilog 2 1023 + 1 = 10 by rewrite (_ : RealExp.ilog 2 1023 = 9) // RealExp.ilog_eq.
 rewrite Bytes32.of_listK; 1: by rewrite size_take // hsz; smt(gt0_k).
 have -> : map (fun (p0 : poly) => SimpleBitPack p0 1023) (KArray.to_list (pk_t1 p)) =

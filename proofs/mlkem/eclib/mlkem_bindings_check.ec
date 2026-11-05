@@ -3,7 +3,7 @@
    Intel's definitions (unpacklo/hi_epi32: a0 b0 a1 b1 / a2 b2 a3 b3 per
    128-bit lane) *)
 require import AllCore.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 require import Mlkem_bindings CircuitBindings.
 
 lemma test_unpackl :

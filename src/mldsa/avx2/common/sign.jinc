@@ -101,7 +101,7 @@ inline fn __compute_signer_response_element(
    , requires = is_arr_init(s1_doubled,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
              && is_arr_init(challenge_positions,0,4 * (ONES_IN_VERIFIER_CHALLENGE + 1))
              && is_arr_init(mask,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
-   , ensures = (infinity_norm_check_result != 0 || is_arr_init(signer_response,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+   , ensures = is_arr_init(signer_response,0,(infinity_norm_check_result == 0 ? 4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL) : 0))
             && (norm_check_result_in == 0 || infinity_norm_check_result != 0)
    }
  ]
@@ -142,7 +142,7 @@ inline fn __compute_z_and_check_norm(
    , requires = is_arr_init(w0,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
              && is_arr_init(s2_doubled,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
              && is_arr_init(challenge_positions,0,4 * (ONES_IN_VERIFIER_CHALLENGE + 1))
-   , ensures = (infinity_norm_check_result != 0 || is_arr_init(w0_minus_cs2,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+   , ensures = is_arr_init(w0_minus_cs2,0,(infinity_norm_check_result == 0 ? 4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL) : 0))
             && (norm_check_result_in == 0 || infinity_norm_check_result != 0)
    }
  ]
@@ -201,8 +201,8 @@ param int CT0_NORM_BOUND =
 #[safety =
    { requires = is_arr_init(t0_doubled,0,4 * (ROWS_IN_MATRIX_A * 2 * COEFFICIENTS_IN_POLYNOMIAL))
              && is_arr_init(challenge_positions,0,4 * (ONES_IN_VERIFIER_CHALLENGE + 1))
-             && (infinity_norm_check_result != 0 || is_arr_init(w0_minus_cs2,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
-   , ensures = (infinity_norm_check_result != 0 || is_arr_init(w0_minus_cs2_plus_ct0,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+             && is_arr_init(w0_minus_cs2,0,(infinity_norm_check_result == 0 ? 4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL) : 0))
+   , ensures = is_arr_init(w0_minus_cs2_plus_ct0,0,(infinity_norm_check_result == 0 ? 4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL) : 0))
    }
  ]
 inline fn __apply_ct0_and_check_norm(
@@ -263,8 +263,8 @@ inline fn __apply_ct0_and_check_norm(
 #[safety =
    { args = { w0_minus_cs2_plus_ct0, w1, hint, norm_check_result_in }
    , requires = is_arr_init(w1,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
-             && (norm_check_result_in != 0 || is_arr_init(w0_minus_cs2_plus_ct0,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
-   , ensures = (infinity_norm_check_result != 0 || is_arr_init(hint,0,4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL)))
+             && is_arr_init(w0_minus_cs2_plus_ct0,0,(norm_check_result_in == 0 ? 4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL) : 0))
+   , ensures = is_arr_init(hint,0,(infinity_norm_check_result == 0 ? 4 * (ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL) : 0))
             && (norm_check_result_in == 0 || infinity_norm_check_result != 0)
    }
  ]

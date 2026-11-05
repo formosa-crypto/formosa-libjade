@@ -55,7 +55,7 @@ rewrite (nth_map witness) 1:size_SHAKE256 1,2:/#.
 rewrite -shake256_sliceE // /shake256_slice /Xof.slice nth_mkseq 1:/# /=.
 have := blk_byteE _ _ 0 (b %/ 8) hb _; 1: smt().
 rewrite /= => ->.
-by rewrite (nth_change_dfl false) ?W8.size_w2bits 1:/# W8.get_w2bits.
+by rewrite (nth_change_dfl false) ?W8.size_w2bits' 1:/# W8.get_w2bits.
 qed.
 
 (* -------------------------------------------------------------------- *)

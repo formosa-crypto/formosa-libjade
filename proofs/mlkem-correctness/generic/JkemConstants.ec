@@ -8,7 +8,7 @@ from JazzEC require import Array1 Array4 Array6 Array8 Array16 Array24 Array32 A
  Array400 Array2048.
 
 abbrev sample_shuffle_table =
-((Array2048.of_list witness)
+((Array2048.of_list witness<:W8.t>)
 [(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
 (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
 (W8.of_int 0); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
@@ -530,7 +530,7 @@ abbrev sample_ones =
 454086624460063511464984254936031011189294057512315937409637584344757371137).
 
 abbrev sample_load_shuffle =
-((Array32.of_list witness)
+((Array32.of_list witness<:W8.t>)
 [(W8.of_int 0); (W8.of_int 1); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3);
 (W8.of_int 4); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
 (W8.of_int 7); (W8.of_int 8); (W8.of_int 9); (W8.of_int 10); (W8.of_int 10);
@@ -540,7 +540,7 @@ abbrev sample_load_shuffle =
 (W8.of_int 14); (W8.of_int 14); (W8.of_int 15)]).
 
 abbrev pvc_shufbidx_s_du11 =
-((Array32.of_list witness)
+((Array32.of_list witness<:W8.t>)
 [(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
 (W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 8); (W8.of_int 9);
 (W8.of_int 10); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
@@ -551,7 +551,7 @@ abbrev pvc_shufbidx_s_du11 =
 (W8.of_int 4)]).
 
 abbrev pvc_srlvqidx_du11 =
-((Array4.of_list witness)
+((Array4.of_list witness<:W64.t>)
 [(W64.of_int 10); (W64.of_int 30); (W64.of_int 10); (W64.of_int 30)]).
 
 abbrev pvc_sllvdidx_s_du11 = (W64.of_int 10).
@@ -567,23 +567,23 @@ abbrev pvc_off_s_du11 = (W16.of_int 36).
 abbrev pvd_mask_s_du11 = (W16.of_int 32752).
 
 abbrev pvd_shift_s_du11 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int 32); (W16.of_int 4); (W16.of_int 1); (W16.of_int 32);
 (W16.of_int 8); (W16.of_int 1); (W16.of_int 32); (W16.of_int 4);
 (W16.of_int 32); (W16.of_int 4); (W16.of_int 1); (W16.of_int 32);
 (W16.of_int 8); (W16.of_int 1); (W16.of_int 32); (W16.of_int 4)]).
 
 abbrev pvd_srlvqidx_s_du11 =
-((Array4.of_list witness)
+((Array4.of_list witness<:W64.t>)
 [(W64.of_int 0); (W64.of_int 2); (W64.of_int 0); (W64.of_int 2)]).
 
 abbrev pvd_srlvdidx_s_du11 =
-((Array8.of_list witness)
+((Array8.of_list witness<:W32.t>)
 [(W32.of_int 0); (W32.of_int 1); (W32.of_int 0); (W32.of_int 0);
 (W32.of_int 0); (W32.of_int 1); (W32.of_int 0); (W32.of_int 0)]).
 
 abbrev pvd_shufbidx_s_du11 =
-((Array32.of_list witness)
+((Array32.of_list witness<:W8.t>)
 [(W8.of_int 0); (W8.of_int 1); (W8.of_int 1); (W8.of_int 2); (W8.of_int 2);
 (W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 5); (W8.of_int 6);
 (W8.of_int 6); (W8.of_int 7); (W8.of_int 8); (W8.of_int 9); (W8.of_int 9);
@@ -593,7 +593,7 @@ abbrev pvd_shufbidx_s_du11 =
 (W8.of_int 12); (W8.of_int 13)]).
 
 abbrev pvc_shufbidx_s_du10 =
-((Array32.of_list witness)
+((Array32.of_list witness<:W8.t>)
 [(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
 (W8.of_int 8); (W8.of_int 9); (W8.of_int 10); (W8.of_int 11); (W8.of_int 12);
 (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
@@ -618,7 +618,7 @@ abbrev pvd_mask_s_du10 = (W32.of_int 2145394680).
 abbrev pvd_sllvdidx_s_du10 = (W64.of_int 4).
 
 abbrev pvd_shufbdidx_s_du10 =
-((Array32.of_list witness)
+((Array32.of_list witness<:W8.t>)
 [(W8.of_int 0); (W8.of_int 1); (W8.of_int 1); (W8.of_int 2); (W8.of_int 2);
 (W8.of_int 3); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6);
 (W8.of_int 6); (W8.of_int 7); (W8.of_int 7); (W8.of_int 8); (W8.of_int 8);
@@ -630,21 +630,21 @@ abbrev pvd_shufbdidx_s_du10 =
 abbrev pvd_q_s_du10 = (W32.of_int 218182660).
 
 abbrev pd_shift_s_dv5 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int 1024); (W16.of_int 32); (W16.of_int 256); (W16.of_int 8);
 (W16.of_int 64); (W16.of_int 512); (W16.of_int 16); (W16.of_int 128);
 (W16.of_int 1024); (W16.of_int 32); (W16.of_int 256); (W16.of_int 8);
 (W16.of_int 64); (W16.of_int 512); (W16.of_int 16); (W16.of_int 128)]).
 
 abbrev pd_mask_s_dv5 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int 31); (W16.of_int 992); (W16.of_int 124); (W16.of_int 3968);
 (W16.of_int 496); (W16.of_int 62); (W16.of_int 1984); (W16.of_int 248);
 (W16.of_int 31); (W16.of_int 992); (W16.of_int 124); (W16.of_int 3968);
 (W16.of_int 496); (W16.of_int 62); (W16.of_int 1984); (W16.of_int 248)]).
 
 abbrev pd_jshufbidx_dv5 =
-((Array32.of_list witness)
+((Array32.of_list witness<:W8.t>)
 [(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1); (W8.of_int 1);
 (W8.of_int 1); (W8.of_int 1); (W8.of_int 2); (W8.of_int 2); (W8.of_int 3);
 (W8.of_int 3); (W8.of_int 3); (W8.of_int 3); (W8.of_int 4); (W8.of_int 4);
@@ -654,7 +654,7 @@ abbrev pd_jshufbidx_dv5 =
 (W8.of_int 9); (W8.of_int 9)]).
 
 abbrev pc_shufbidx_s_dv5 =
-((Array32.of_list witness)
+((Array32.of_list witness<:W8.t>)
 [(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
 (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
 (W8.of_int (-1)); (W8.of_int 8); (W8.of_int 9); (W8.of_int 10);
@@ -679,7 +679,7 @@ abbrev pd_shift_s_dv4 = (W32.of_int 8390656).
 abbrev pd_mask_s_dv4 = (W32.of_int 15728655).
 
 abbrev pd_jshufbidx_dv4 =
-((Array32.of_list witness)
+((Array32.of_list witness<:W8.t>)
 [(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 1);
 (W8.of_int 1); (W8.of_int 1); (W8.of_int 1); (W8.of_int 2); (W8.of_int 2);
 (W8.of_int 2); (W8.of_int 2); (W8.of_int 3); (W8.of_int 3); (W8.of_int 3);
@@ -689,7 +689,7 @@ abbrev pd_jshufbidx_dv4 =
 (W8.of_int 7); (W8.of_int 7)]).
 
 abbrev pc_permidx_s_dv4 =
-((Array8.of_list witness)
+((Array8.of_list witness<:W32.t>)
 [(W32.of_int 0); (W32.of_int 4); (W32.of_int 1); (W32.of_int 5);
 (W32.of_int 2); (W32.of_int 6); (W32.of_int 3); (W32.of_int 7)]).
 
@@ -700,7 +700,7 @@ abbrev pc_mask_s_dv4 = (W16.of_int 15).
 abbrev pc_shift1_s_dv4 = (W16.of_int 512).
 
 abbrev cbd_jshufbidx =
-((Array32.of_list witness)
+((Array32.of_list witness<:W8.t>)
 [(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int (-1));
 (W8.of_int 3); (W8.of_int 4); (W8.of_int 5); (W8.of_int (-1)); (W8.of_int 6);
 (W8.of_int 7); (W8.of_int 8); (W8.of_int (-1)); (W8.of_int 9);
@@ -711,32 +711,32 @@ abbrev cbd_jshufbidx =
 (W8.of_int 15); (W8.of_int (-1))]).
 
 abbrev pfm_idx_s =
-((Array16.of_list witness)
+((Array16.of_list witness<:W8.t>)
 [(W8.of_int 0); (W8.of_int 1); (W8.of_int 4); (W8.of_int 5); (W8.of_int 8);
 (W8.of_int 9); (W8.of_int 12); (W8.of_int 13); (W8.of_int 2); (W8.of_int 3);
 (W8.of_int 6); (W8.of_int 7); (W8.of_int 10); (W8.of_int 11); (W8.of_int 14);
 (W8.of_int 15)]).
 
 abbrev pfm_shift_s =
-((Array4.of_list witness)
+((Array4.of_list witness<:W32.t>)
 [(W32.of_int 3); (W32.of_int 2); (W32.of_int 1); (W32.of_int 0)]).
 
 abbrev rOL8 =
-((Array1.of_list witness)
+((Array1.of_list witness<:W256.t>)
 [(W256.of_int
  13620818001941277694121380808605999856886653716761013959207994299728839901191
  )]
 ).
 
 abbrev rOL56 =
-((Array1.of_list witness)
+((Array1.of_list witness<:W256.t>)
 [(W256.of_int
  10910488462195273559651782724632284871561478246514020268633800075540923875841
  )]
 ).
 
 abbrev kECCAK_RHOTATES_RIGHT =
-((Array6.of_list witness)
+((Array6.of_list witness<:W256.t>)
 [(W256.of_int 144373339913893657577751063007562604548177214458152943091773);
 (W256.of_int 232252764209307188274174373867837442080505530800860351692863);
 (W256.of_int 156927543384667019098616994515559168111335794127330162507795);
@@ -745,7 +745,7 @@ abbrev kECCAK_RHOTATES_RIGHT =
 (W256.of_int 313855086769334038206421612937983674734430261968315659321364)]).
 
 abbrev kECCAK_RHOTATES_LEFT =
-((Array6.of_list witness)
+((Array6.of_list witness<:W256.t>)
 [(W256.of_int 257361171150853911329517531560668107745210100483895842570243);
 (W256.of_int 169481746855440380633094220700393270212881784141188433969153);
 (W256.of_int 244806967680080549808651600052671544182051520814718623154221);
@@ -754,7 +754,7 @@ abbrev kECCAK_RHOTATES_LEFT =
 (W256.of_int 87879424295413530700846981630247037558957052973733126340652)]).
 
 abbrev kECCAK1600_RC =
-((Array24.of_list witness)
+((Array24.of_list witness<:W64.t>)
 [(W64.of_int 1); (W64.of_int 32898); (W64.of_int (-9223372036854742902));
 (W64.of_int (-9223372034707259392)); (W64.of_int 32907);
 (W64.of_int 2147483649); (W64.of_int (-9223372034707259263));
@@ -768,14 +768,14 @@ abbrev kECCAK1600_RC =
 (W64.of_int (-9223372034707259384))]).
 
 abbrev jdmontx16 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int 1353); (W16.of_int 1353); (W16.of_int 1353); (W16.of_int 1353);
 (W16.of_int 1353); (W16.of_int 1353); (W16.of_int 1353); (W16.of_int 1353);
 (W16.of_int 1353); (W16.of_int 1353); (W16.of_int 1353); (W16.of_int 1353);
 (W16.of_int 1353); (W16.of_int 1353); (W16.of_int 1353); (W16.of_int 1353)]).
 
 abbrev mqinvx16 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int 15099); (W16.of_int 15099); (W16.of_int 15099);
 (W16.of_int 15099); (W16.of_int 15099); (W16.of_int 15099);
 (W16.of_int 15099); (W16.of_int 15099); (W16.of_int 15099);
@@ -784,35 +784,35 @@ abbrev mqinvx16 =
 (W16.of_int 15099)]).
 
 abbrev hhqx16 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int 832); (W16.of_int 832); (W16.of_int 832); (W16.of_int 832);
 (W16.of_int 832); (W16.of_int 832); (W16.of_int 832); (W16.of_int 832);
 (W16.of_int 832); (W16.of_int 832); (W16.of_int 832); (W16.of_int 832);
 (W16.of_int 832); (W16.of_int 832); (W16.of_int 832); (W16.of_int 832)]).
 
 abbrev hqx16_m1 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int 1664); (W16.of_int 1664); (W16.of_int 1664); (W16.of_int 1664);
 (W16.of_int 1664); (W16.of_int 1664); (W16.of_int 1664); (W16.of_int 1664);
 (W16.of_int 1664); (W16.of_int 1664); (W16.of_int 1664); (W16.of_int 1664);
 (W16.of_int 1664); (W16.of_int 1664); (W16.of_int 1664); (W16.of_int 1664)]).
 
 abbrev hqx16_p1 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int 1665); (W16.of_int 1665); (W16.of_int 1665); (W16.of_int 1665);
 (W16.of_int 1665); (W16.of_int 1665); (W16.of_int 1665); (W16.of_int 1665);
 (W16.of_int 1665); (W16.of_int 1665); (W16.of_int 1665); (W16.of_int 1665);
 (W16.of_int 1665); (W16.of_int 1665); (W16.of_int 1665); (W16.of_int 1665)]).
 
 abbrev maskx16 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int 4095); (W16.of_int 4095); (W16.of_int 4095); (W16.of_int 4095);
 (W16.of_int 4095); (W16.of_int 4095); (W16.of_int 4095); (W16.of_int 4095);
 (W16.of_int 4095); (W16.of_int 4095); (W16.of_int 4095); (W16.of_int 4095);
 (W16.of_int 4095); (W16.of_int 4095); (W16.of_int 4095); (W16.of_int 4095)]).
 
 abbrev jflox16 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int (-10079)); (W16.of_int (-10079)); (W16.of_int (-10079));
 (W16.of_int (-10079)); (W16.of_int (-10079)); (W16.of_int (-10079));
 (W16.of_int (-10079)); (W16.of_int (-10079)); (W16.of_int (-10079));
@@ -821,14 +821,14 @@ abbrev jflox16 =
 (W16.of_int (-10079))]).
 
 abbrev jfhix16 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int 1441); (W16.of_int 1441); (W16.of_int 1441); (W16.of_int 1441);
 (W16.of_int 1441); (W16.of_int 1441); (W16.of_int 1441); (W16.of_int 1441);
 (W16.of_int 1441); (W16.of_int 1441); (W16.of_int 1441); (W16.of_int 1441);
 (W16.of_int 1441); (W16.of_int 1441); (W16.of_int 1441); (W16.of_int 1441)]).
 
 abbrev jvx16 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int 20159); (W16.of_int 20159); (W16.of_int 20159);
 (W16.of_int 20159); (W16.of_int 20159); (W16.of_int 20159);
 (W16.of_int 20159); (W16.of_int 20159); (W16.of_int 20159);
@@ -837,7 +837,7 @@ abbrev jvx16 =
 (W16.of_int 20159)]).
 
 abbrev jqinvx16 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int (-3327)); (W16.of_int (-3327)); (W16.of_int (-3327));
 (W16.of_int (-3327)); (W16.of_int (-3327)); (W16.of_int (-3327));
 (W16.of_int (-3327)); (W16.of_int (-3327)); (W16.of_int (-3327));
@@ -846,14 +846,14 @@ abbrev jqinvx16 =
 (W16.of_int (-3327))]).
 
 abbrev jqx16 =
-((Array16.of_list witness)
+((Array16.of_list witness<:W16.t>)
 [(W16.of_int 3329); (W16.of_int 3329); (W16.of_int 3329); (W16.of_int 3329);
 (W16.of_int 3329); (W16.of_int 3329); (W16.of_int 3329); (W16.of_int 3329);
 (W16.of_int 3329); (W16.of_int 3329); (W16.of_int 3329); (W16.of_int 3329);
 (W16.of_int 3329); (W16.of_int 3329); (W16.of_int 3329); (W16.of_int 3329)]).
 
 abbrev jzetas_inv_exp =
-((Array400.of_list witness)
+((Array400.of_list witness<:W16.t>)
 [(W16.of_int (-23131)); (W16.of_int (-7756)); (W16.of_int 20258);
 (W16.of_int 23860); (W16.of_int 17443); (W16.of_int (-23210));
 (W16.of_int 20199); (W16.of_int 21498); (W16.of_int (-14469));
@@ -974,7 +974,7 @@ abbrev jzetas_inv_exp =
 (W16.of_int 0)]).
 
 abbrev jzetas_exp =
-((Array400.of_list witness)
+((Array400.of_list witness<:W16.t>)
 [(W16.of_int 31499); (W16.of_int 31499); (W16.of_int 2571);
 (W16.of_int 2571); (W16.of_int 14746); (W16.of_int 14746); (W16.of_int 2970);
 (W16.of_int 2970); (W16.of_int 13525); (W16.of_int 13525);
@@ -1093,7 +1093,7 @@ abbrev jzetas_exp =
 (W16.of_int 0)]).
 
 abbrev jzetas_inv =
-((Array128.of_list witness)
+((Array128.of_list witness<:W16.t>)
 [(W16.of_int 1701); (W16.of_int 1807); (W16.of_int 1460); (W16.of_int 2371);
 (W16.of_int 2338); (W16.of_int 2333); (W16.of_int 308); (W16.of_int 108);
 (W16.of_int 2851); (W16.of_int 870); (W16.of_int 854); (W16.of_int 1510);
@@ -1128,7 +1128,7 @@ abbrev jzetas_inv =
 (W16.of_int 1517); (W16.of_int 359); (W16.of_int 758); (W16.of_int 1441)]).
 
 abbrev jzetas =
-((Array128.of_list witness)
+((Array128.of_list witness<:W16.t>)
 [(W16.of_int 2285); (W16.of_int 2571); (W16.of_int 2970); (W16.of_int 1812);
 (W16.of_int 1493); (W16.of_int 1422); (W16.of_int 287); (W16.of_int 202);
 (W16.of_int 3158); (W16.of_int 622); (W16.of_int 1577); (W16.of_int 182);

@@ -492,7 +492,6 @@ while (
     touch_hint _signature signature{2} /\
     condition_row{2} = (i{2} < kvec)); last first.
 + auto => /> &2 *; split; 1: smt(gt0_k param_sets).
-  split; 1: smt(param_sets).
   by rewrite /count_nonzero_prefix /= !take0 big_nil.
 wp; exlim signature{2}, hints_written{2} => s0 c0.
 (* the groups of 8 coefficients of the implementation *)
@@ -706,12 +705,12 @@ while{1} (#{/~sigbytes{1}}pre /\
 + by smt().
 wp;ecall {2} (gamma1_encode_ph signer_response{2}).
 auto => /> &2 ???Hc?rr1 Hrr1.
-split; 1: by split; [smt(gt0_l) | smt(mkseq0 cats0)].
+split; 1: by smt(mkseq0 cats0).
 move => i1;split;1:smt().
 move => ???? rr2 Hrr2.
 have -> : i1 = lvec by smt().
 pose ll1 := (to_list (BytesCT.init ("_.[_]" _commitment_hash))).
-have ? : size ll1 = ctilde by smt(BytesCT.size_to_list).
+have ? : size ll1 = ctilde by rewrite /ll1 BytesCT.size_to_list /=; smt().
 pose ll2 := (fun (i0 : int) =>
   BitPack (lifts_wpolylvec (lvec_unflatten256 _signer_response)).[i0] (gamma1 - 1) gamma1).
 have Hbp : forall i0, 0 <= i0 < lvec => size (ll2 i0) = gamma1_enc.

@@ -704,7 +704,7 @@ wp; while (={r, s1, s2, rho} /\ 0 <= r{1} <= lvec /\ sfresh_from rho{1} RO_S.RO.
   call (rbp_ro_fresh (Bytes66.to_list (sseed rho0 r0)) m0).
   auto => /> hr hr' hm hl; split; 1: by move=> c; apply hm; smt(gt0_k).
   by move=> _ _ m' hf; split; [smt() | apply (sfresh_from_step _ _ _ _ _ hm hf)].
-auto => /> &2; split; 1: by split; [smt(gt0_l) | move=> r' c _; rewrite mem_empty].
+auto => /> &2; split; 1: by move=> r' c _; rewrite mem_empty.
 by move=> m r _ h1 h2 h3; rewrite (_ : r = lvec) 1:/#.
 qed.
 

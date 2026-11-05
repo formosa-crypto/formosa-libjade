@@ -1,5 +1,6 @@
 (* General EC imports *)
 require import AllCore IntDiv List.
+require MinMaxSimplify.
 
 from Jasmin require import JWord JArray.
 
@@ -40,8 +41,9 @@ clone include VecMat.VecMatT.
 import PolyVec PolyMat.
 
 clone export PolyArray as IPVec with
-  op size <- 256 * kvec
-  proof ge0_size by smt(gt0_k).
+  op size <- 256 * kvec.
+lemma ge0_IPVec_size : 0 <= 256 * kvec by smt(gt0_k).
+hint simplify ge0_IPVec_size.
 
 type ipolyvec = int IPVec.t.
 
@@ -83,24 +85,27 @@ op decompress_polyvec (d : int, p : ipolyvec) : polyvec =
 
 (* poly-level compression encode/decode: width dv (FIPS d_v) *)
 clone export PolyArray as BytesPoly with
-  op size <- 32 * dv
-  proof ge0_size by smt(gt0_dv).
+  op size <- 32 * dv.
+lemma ge0_BytesPoly_size : 0 <= 32 * dv by smt(gt0_dv).
+hint simplify ge0_BytesPoly_size.
 
 op encode_poly (a : ipoly) : W8.t BytesPoly.t = BytesPoly.of_list W8.zero (ByteEncode dv (to_list a)).
 op decode_poly (a : W8.t BytesPoly.t) : ipoly = Array256.of_list 0 (ByteDecode dv (to_list a)).
 
 (* vector compression encode/decode: width du (FIPS d_u) *)
 clone export PolyArray as BytesCtVec with
-  op size <- 32 * du * kvec
-  proof ge0_size by smt(gt0_k gt0_du).
+  op size <- 32 * du * kvec.
+lemma ge0_BytesCtVec_size : 0 <= 32 * du * kvec by smt(gt0_k gt0_du).
+hint simplify ge0_BytesCtVec_size.
 
 op encode_vec (a : ipolyvec) : W8.t BytesCtVec.t = BytesCtVec.of_list W8.zero (ByteEncode du (to_list a)).
 op decode_vec (a : W8.t BytesCtVec.t) : ipolyvec = IPVec.of_list 0 (ByteDecode du (to_list a)).
 
 (* public-key vector encode/decode: fixed width 12 *)
 clone export PolyArray as BytesPKVec with
-  op size <- 384 * kvec
-  proof ge0_size by smt(gt0_k).
+  op size <- 384 * kvec.
+lemma ge0_BytesPKVec_size : 0 <= 384 * kvec by smt(gt0_k).
+hint simplify ge0_BytesPKVec_size.
 
 op encode12_vec (a : ipolyvec) : W8.t BytesPKVec.t = BytesPKVec.of_list W8.zero (ByteEncode 12 (to_list a)).
 op decode12_vec (a : W8.t BytesPKVec.t) : ipolyvec = IPVec.of_list 0 (ByteDecode 12 (to_list a)).

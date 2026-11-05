@@ -11,7 +11,7 @@ require import List Real Int IntDiv CoreMap List.
 require BitEncoding.
 import BitEncoding.BitChunking.
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 
 require import JWordList.
 from CryptoSpecs require export Keccakf1600_Spec Keccak1600_Spec.

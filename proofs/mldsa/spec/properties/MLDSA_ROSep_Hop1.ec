@@ -411,7 +411,7 @@ seq 8 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k /\
          (Squeeze_coll pk0 (BytesPK.to_list pk_) 64 (2%r * p512 + k)).
     + by move=> &hr /=; apply xle_cxr => /> *; apply le_pos; smt().
     skip => &hr /=; apply xle_cxr => /> *.
-    by split; [smt(RealOrder.expr_ge0) | apply le_pos; smt(pk_len_nrel BytesPK.size_to_list)].
+    by split; [smt(RealOrder.expr_ge0) | apply le_pos; have /= := key_sizes; smt(pk_len_nrel)].
   seq 2 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k /\
             ct = BytesCT.init (fun ii => BytesSig."_.[_]" s0 ii)) `|`
            (b2r (coll DS2.RO1.RO.m pk0) + p512 + k)%xr).
@@ -437,7 +437,7 @@ call /(fun y => (0%r <= k /\ ct = ct0 /\
   have hlam : 0 < lambda %/ 4 <= 64 by have /= H := param_sets; smt().
   have [hx hbs] := himp hlam; split => //; split => // -[_ hctbs].
   exists (Bytes64.to_list mu_ ++ BytesW1.to_list (w1Encode w1_), 0).
-  split; 1: by rewrite /rel /= size_cat Bytes64.size_to_list BytesW1.size_to_list.
+  split; 1: by rewrite /rel /= size_cat Bytes64.size_to_list size_BytesW1.
   split => //; rewrite -hct0 -hct hctbs BytesCT.of_listK -?hbs //.
   by move: hinv => [_ hsz]; rewrite hbs size_take; smt().
 by skip => &hr /=; apply xle_cxr => /> *; apply le_pos; smt(RealOrder.expr_ge0).
@@ -590,7 +590,7 @@ seq 10 : ((norel DS2.RO1.RO.m /\ allsize DS2.RO1.RO.m) `|` v).
 wp; exlim pk0 => pk_.
 call /(fun y => (pk0 = pk_) `|` y) (Squeeze_norel (BytesPK.to_list pk_) 64 v).
 + by move=> &hr /=; apply xle_cxr => />.
-by skip => &hr /=; apply xle_cxr => /> *; smt(pk_len_nrel BytesPK.size_to_list).
+by skip => &hr /=; apply xle_cxr => /> *; have /= := key_sizes; smt(pk_len_nrel).
 qed.
 
 (*************** Adversary queries ****************)

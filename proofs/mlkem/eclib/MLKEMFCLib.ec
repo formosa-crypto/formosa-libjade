@@ -1,6 +1,6 @@
 require import AllCore List IntDiv.
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array128 Array160 Array256 Array32 Array16 Array768 Array1024 Array2304 Array4096 Array1536 Array320 Array384 Array960 Array1408 Array1152 WArray512 WArray128.
 
 from Spec require import GFq Rq Serialization Correctness.
@@ -27,7 +27,7 @@ clone SignedReductions as SignedReductions_W16 with
     proof RRinv by (rewrite /R qE  => />)
     proof qinv_bnd by (rewrite /R  => />).
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 
 lemma aux16_0 x :
   16 <= x < 32 =>

@@ -1,12 +1,13 @@
 require import AllCore List IntDiv.
 require import BitEncoding.
 require import StdOrder.
+require MinMaxSimplify.
 
 import Ring.IntID.
 import IntOrder.
 import BS2Int.
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 
 (* misc *)
 

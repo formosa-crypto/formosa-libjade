@@ -211,7 +211,7 @@ have Ht1 : kvec * 10 * n %/ 8 = t1_enc.
 apply (eq_from_nth witness).
 + by rewrite size_cat Bytes32.size_to_list size_kflatten_SimpleBitPack 1:// size_to_list /= Ht1.
 move=> k; rewrite size_cat Bytes32.size_to_list size_kflatten_SimpleBitPack 1:// /= Ht1 => Hk.
-rewrite Array_pk_enc.initiE 1:/# /= nth_cat Bytes32.size_to_list.
+rewrite Array_pk_enc.initiE 1:/# /= nth_cat Bytes32.size_to_list /=.
 case (k < 32) => ?.
 + rewrite ifF 1:/# Array_pk_enc.initiE 1:/# /= WArray_pk_enc.get8_set256_directE 1,2:/#.
   by rewrite ifT 1:/# /= get256_init_32_8 1:/# Ha 1:/#.
@@ -343,7 +343,7 @@ seq 2 2 : (#pre
                   (to_list (lifts_wpolykvec (kvec_unflatten256 t0{2}))))) = t0_enc.
   + by rewrite size_kflatten_BitPack 1:// Ht0.
   apply (eq_from_nth witness).
-  + rewrite !size_cat !Bytes32.size_to_list Bytes64.size_to_list Array_sk_enc.size_to_list.
+  + rewrite !size_cat !Bytes32.size_to_list Bytes64.size_to_list Array_sk_enc.size_to_list /=.
     by rewrite Sz1 Sz2 Sz0 /sk_enc; ring.
   move => i; rewrite !size_cat !Bytes32.size_to_list Bytes64.size_to_list Sz1 Sz2 Sz0 => Hi.
   have Hsk : 0 <= i < sk_enc by rewrite /sk_enc /#.

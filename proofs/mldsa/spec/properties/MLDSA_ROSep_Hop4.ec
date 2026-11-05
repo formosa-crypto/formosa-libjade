@@ -645,7 +645,7 @@ wp; call (: true); 1: by sim.
 wp; call pktr4; call (: true); 1: by sim.
 wp; call expandS4; call (: ={glob DS2.RO2.RO, glob XOFA_O}); 1: by sim.
 wp; call squeezeseed4; wp; rnd; auto => /> &2 _ e _; split; 1: smt(mem_empty).
-by move=> *; rewrite /bad4; smt(mem_empty).
+by move=> *; rewrite /bad4; have /= := key_sizes; smt(mem_empty).
 qed.
 
 (*************** bad4 is kept by G3 ****************)
@@ -1069,6 +1069,7 @@ proc; wp; call /(fun y => (RoutedH.trset /\ DS5.RO4.RO.m = empty /\ DS5.RO5.RO.m
               (skEncode_e v).
 wp; call (pksq_mb v).
 call /(fun y => (!RoutedH.trset /\ DS5.RO4.RO.m = empty /\ DS5.RO5.RO.m = empty) `|` y) (pkEncode_e v).
++ by move=> &hr /=; have /= := key_sizes; smt().
 wp; call /(fun y => (!RoutedH.trset /\ DS5.RO4.RO.m = empty /\ DS5.RO5.RO.m = empty) `|` y)
          (ExpandS_e RO_S.RO v RO_S_e).
 call /(fun y => (!RoutedH.trset /\ DS5.RO4.RO.m = empty /\ DS5.RO5.RO.m = empty) `|` y) (ExpandA_e v).
@@ -1219,6 +1220,7 @@ seq 20 : ((RoutedH.trset /\ DS5.RO4.RO.m = empty /\ DS5.RO5.RO.m = empty) `|`
   wp; call (pksq_mb (qH%r * p512 + qS%r * ((1 + kappa_max)%r * p512) + 2%r * p512)%xr).
   call /(fun y => (!RoutedH.trset /\ DS5.RO4.RO.m = empty /\ DS5.RO5.RO.m = empty) `|` y)
        (pkEncode_e (qH%r * p512 + qS%r * ((1 + kappa_max)%r * p512) + 2%r * p512)%xr).
+  + by move=> &hr /=; have /= := key_sizes; smt().
   wp; call /(fun y => (!RoutedH.trset /\ DS5.RO4.RO.m = empty /\ DS5.RO5.RO.m = empty) `|` y)
            (ExpandS_e RO_S.RO (qH%r * p512 + qS%r * ((1 + kappa_max)%r * p512) +
                                2%r * p512)%xr RO_S_e).

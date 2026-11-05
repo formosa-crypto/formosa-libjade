@@ -126,7 +126,6 @@ while (={r, rho, DST.RO1.RO.m, RO_xr.RO.m} /\ 0 <= r{1} <= kvec /\ size mA{2} = 
     rewrite (_ : r{2} * lvec + (s{2} + 1) = r{2} * lvec + s{2} + 1) 1:/#.
     apply filled_upd => //; smt().
   auto => /> &1 &2 hr0 _ hrow hcol hf hr.
-  split; 1: smt(gt0_l).
   move=> aa mA s hs1 hs0 hs2 hrow' hcol' hf' hf2.
   split; 1: smt().
   by rewrite (_ : (r{2} + 1) * lvec = r{2} * lvec + s) 1:/#.

@@ -1,7 +1,7 @@
 (* The AVX2 implementation of ML-KEM-512 against its specification: the
    compression kernels of the set, then the generic inner PKE and KEM. *)
 require import AllCore List.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Jkem_avx2 Array128 Array256 Array512 Array640 Array768.
 from Spec require import Spec512.
 require import Instances512 MLKEM_compress_avx2_512 Circuit_sem_512.

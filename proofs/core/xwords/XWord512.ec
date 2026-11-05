@@ -6,7 +6,7 @@
 (* from the deleted mlkem_filters_bindings.ec.)                           *)
 (* -------------------------------------------------------------------- *)
 require import AllCore IntDiv List.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 require import CircuitBindings CircuitBindingsExtra.
 
 theory W512.
@@ -31,11 +31,11 @@ proof.
 move=> bv /= @/to_sint @/smod @/msb.
 rewrite (_ : nth _ _ _ = 2 ^ (512 - 1) <= to_uint bv) -1:/#.
 rewrite /to_uint -{2}(cat_take_drop 511 (w2bits bv)).
-rewrite bs2int_cat size_take ~-1:// W512.size_w2bits /=.
+rewrite bs2int_cat size_take ~-1:// W512.size_w2bits' /=.
 rewrite -bs2int_div ~-1:// /= get_to_uint ~-1:// /=.
 rewrite -bs2int_mod ~-1:// /= /to_uint.
 have ?: W512.modulus = 13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084096 by done.
-by smt(bs2int_range mem_range W512.size_w2bits).
+by smt(bs2int_range mem_range W512.size_w2bits').
 qed.
 
 realize gt0_size by auto.
@@ -56,8 +56,8 @@ lemma w2bits_concat_2u256 (w1 w2 : W256.t) :
   w2bits (concat_2u256 w1 w2) = flatten [w2bits w1; w2bits w2].
 proof.
 rewrite flatten_cons flatten1; apply/(eq_from_nth false).
-- by rewrite size_cat !size_w2bits.
-rewrite size_w2bits => i rgi; rewrite nth_cat !get_w2bits !size_w2bits.
+- by rewrite size_cat !size_w2bits'.
+rewrite size_w2bits' => i rgi; rewrite nth_cat !get_w2bits !size_w2bits'.
 by rewrite /concat_2u256 initE /#.
 qed.
 

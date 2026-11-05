@@ -4,7 +4,7 @@
 (* and slices of a vector into polynomials and of a matrix into rows.   *)
 (* -------------------------------------------------------------------- *)
 require import AllCore List Int IntDiv BitEncoding.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array256 Array384.
 from Spec require import GFq Rq Serialization Correctness EncDecCorrectness.
 require import W16extra MLKEMFCLib.

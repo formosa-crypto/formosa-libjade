@@ -1,7 +1,7 @@
 (* The AVX2 implementation of ML-KEM-1024 against its specification: the
    compression kernels of the set, then the generic inner PKE and KEM. *)
 require import AllCore List.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Jkem_avx2 Array160 Array256 Array1024 Array1408 Array1410 Array1568.
 from Spec require import Spec1024.
 require import Instances1024 MLKEM_compress_avx2_1024 Circuit_sem_1024.

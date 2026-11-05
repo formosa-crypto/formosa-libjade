@@ -2864,6 +2864,7 @@ conseq (_ :
   ==> (!(ill_formed_hint = W64.zero) \/ (BArray8192.is_init b_hints 0 (4 * (8 * 256))))
    /\ valid trace_signature____decode_hint).
 + by move=> &hr />; rewrite -!(BI83.is_init_full _ 83) //.
++ by move=> &hr _ ? ? ? ? [h ->] /=; rewrite BI8192.is_init_if /#.
 have h10 : W64.one <> W64.zero by rewrite W64.to_uint_eq.
 (* the hints are decoded row by row: a row is zeroed, then the positions of
    its hints are read from the encoding and set, until the encoding is found
@@ -2949,10 +2950,10 @@ conseq (_ :
    /\ ((result <> (W64.of_int 0)) \/ (BArray8192.is_init b_hints 0 (4 * (8 * 256))))
    /\ valid trace_signature____decode).
 + by move=> &hr />; rewrite -!(BI4627.is_init_full _ 4627) //.
-+ by move=> />.
++ by move=> &hr _ * /=; rewrite BI8192.is_init_if /#.
 auto; ecall (signature____decode_hint_proof param_2 b_param_0 param_1 b_param).
 auto; ecall (gamma1____decode_proof param_0 b_param_2 param b_param_1).
-by auto => /> *.
+by auto => /> *; rewrite -BI8192.is_init_if.
 qed.
 
 lemma s1____encode_proof _encoded _b_encoded _s1 _b_s1 :
@@ -3761,7 +3762,7 @@ while (b_s1_doubled = BArray7168.init_arr (W8.of_int 255)
   rewrite SBI7168_1024.get_sub_init_arr 1,2:/# /=.
   move=> r hr2 hv.
   have hi := hinit (hres hlt).
-  rewrite SBI7168_1024.is_init_set_sub_in 1,2,3,4:/# /= hi /=.
+  rewrite SBI7168_1024.is_init_set_sub_in 1..6:/# /= hi /=.
   smt().
 by auto => /> *; smt().
 qed.
@@ -3811,7 +3812,7 @@ while (b_w0 = BArray8192.init_arr (W8.of_int 255)
   rewrite SBI8192_1024.get_sub_init_arr 1,2:/# /=.
   move=> r0 hb0 hv0 r1 hb1 hv1.
   have hi := hinit (hres hlt).
-  rewrite SBI8192_1024.is_init_set_sub_in 1,2,3,4:/# /= hi /=.
+  rewrite SBI8192_1024.is_init_set_sub_in 1..6:/# /= hi /=.
   smt().
 by auto => /> *; smt().
 qed.
@@ -3867,7 +3868,7 @@ wp; while ((infinity_norm_check_result = W64.of_int 0
   have -> := hw (hres hlt).
   rewrite SBI16384_2048.get_sub_init_arr 1,2:/# SBI8192_1024.get_sub_init_arr 1,2:/# /=.
   move=> r0 hb0 hv0 r1 hb1 hv1.
-  rewrite SBI8192_1024.is_init_set_sub_in 1,2,3,4:/# /=.
+  rewrite SBI8192_1024.is_init_set_sub_in 1..6:/# /=.
   smt().
 by auto => /> *; smt(BI8192.is_init_init_arr).
 qed.
@@ -3886,8 +3887,8 @@ conseq (_ :
   ==> ((infinity_norm_check_result <> (W64.of_int 0)) \/ (BArray8192.is_init b_hint 0 (4 * (8 * 256))))
    /\ ((_infinity_norm_check_result = (W64.of_int 0)) \/ (infinity_norm_check_result <> (W64.of_int 0)))
    /\ valid trace___make_hint_vector).
-+ by move=> &hr />; rewrite -!(BI8192.is_init_full _ 8192) //.
-+ by move=> />.
++ by move=> &hr />; rewrite BI8192.is_init_if -!(BI8192.is_init_full _ 8192).
++ by move=> &hr _ * /=; rewrite BI8192.is_init_if /#.
 (* one row of hints per iteration, at most 256 hints per row; the loop stops
    early when the hint weight exceeds its bound, and the sum it reads is
    needed only then; a failure reported on entry is kept *)
@@ -3906,7 +3907,7 @@ while ((infinity_norm_check_result = W64.of_int 0
   rewrite SBI8192_1024.get_sub_init_arr 1,2:/# /=.
   move=> r hr2 hv.
   have hi := hinit (hres hlt).
-  rewrite SBI8192_1024.is_init_set_sub_in 1,2,3,4:/# /= hi /=.
+  rewrite SBI8192_1024.is_init_set_sub_in 1..6:/# /= hi /=.
   smt().
 by auto => /> *; smt(BI8192.is_init_init_arr).
 qed.

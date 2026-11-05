@@ -1,6 +1,6 @@
 require import AllCore IntDiv List.
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 
 (** This script performs a sanity check to verify if the modules
  used for correctness proofs are in sync. with the Jasmin source code *)

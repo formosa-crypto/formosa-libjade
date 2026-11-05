@@ -139,25 +139,25 @@ proof.
 move=>  @/SimpleBitUnpack /=; rewrite tP => i ib.
 rewrite initiE 1://  /liftu_wpoly mapiE 1:// /= (nth_map []) /=.
 + rewrite size_chunk ilog_b_t1 /= 1:/#.
-+ rewrite /BytesToBits (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits).
++ rewrite /BytesToBits (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits').
   by rewrite size_map size_to_list /= /#.
 congr.
 rewrite initiE 1:/# /= /zeroextu32 of_uintK /= modz_small;1: by have /= /#:=W10.to_uint_cmp.
 rewrite /W10.to_uint /BitsToInteger;congr.
 apply (eq_from_nth false).
 + rewrite size_nth_chunk ilog_b_t1  /= 1:/# 2:/#.
-+ rewrite /BytesToBits (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits).
++ rewrite /BytesToBits (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits').
   by rewrite size_map size_to_list /= /#.
 move => kk.
 rewrite size_nth_chunk ilog_b_t1  /= 1:/#.
-+ rewrite /BytesToBits (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits).
++ rewrite /BytesToBits (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits').
   by rewrite size_map size_to_list /= /#.
 move => kkb.
 rewrite (nth_chunk 10) 1,2:/#.
-+ rewrite /BytesToBits (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits).
++ rewrite /BytesToBits (EclibExtra.size_flatten' 8);1: by smt(mapP W8.size_w2bits').
   by rewrite size_map size_to_list /= /#.
 rewrite initiE 1:/# /= nth_take 1,2:/# /= nth_drop 1,2:/# /= /BytesToBits.
-rewrite (nth_flatten false 8);1: by rewrite allP => x /=; rewrite mapP => Hx;elim Hx;smt(W8.size_w2bits).
+rewrite (nth_flatten false 8);1: by rewrite allP => x /=; rewrite mapP => Hx;elim Hx;smt(W8.size_w2bits').
 rewrite (nth_map witness);1:smt(Array320.size_to_list).
 by rewrite get_w2bits get_to_list /#. 
 qed.
@@ -233,7 +233,7 @@ while (0 <= j <= kvec /\ t1 = _a /\ wpolykvec_urng (kvec_unflatten256 _a) (b_t1 
        (t1_unflatten encoded).[k] =
        (map (fun (p : poly) => Array320.of_list witness (SimpleBitPack  p b_t1)) (liftu_wpolykvec (kvec_unflatten256 _a))).[k]);
        last first.
-+ auto => /> &hr *; do split; 1,2: smt(gt0_k).
++ auto => /> &hr *; do split; 1: smt(gt0_k).
   by move => r0 j0 *; rewrite tP => k kb; smt().
 wp; ecall (t1_encode_polynomial (Array256.init (fun (i_0 : int) => _a.[j * 256 + i_0]))).
 auto => /> &hr ?? Hrng H ?;do split;1:smt().

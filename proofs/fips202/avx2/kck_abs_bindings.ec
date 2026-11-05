@@ -81,7 +81,7 @@ realize ofintP by move => *;rewrite /of_int int2bs_mod //=.
 realize tosintP. move => bv /=;rewrite /to_sint /smod /BVA_Top_JWord_W8_t.msb.
 have -> /=: nth false (w2bits bv) (8 - 1) = 2 ^ (8 - 1) <= to_uint bv; last by smt().
 rewrite (divz_eq (to_uint bv) 128) /= get_to_uint /=.
-by smt(bs2int_range mem_range W8.size_w2bits pow2_8).
+by smt(bs2int_range mem_range W8.size_w2bits' pow2_8).
 qed.
 realize touintP by smt().
 realize gt0_size by done.
@@ -100,8 +100,8 @@ move=> f; apply (eq_from_nth false).
  rewrite (size_flatten' 1).
   move=> x /mkseqP [y [Hy ->]] /=.
   exact BVA_Top_Pervasive_bool.size_tolist.
-  rewrite size_w2bits size_mkseq; smt(W8.gt0_size).
-rewrite size_w2bits => i Hi.
+  rewrite size_w2bits' size_mkseq; smt(W8.gt0_size).
+rewrite size_w2bits' => i Hi.
 rewrite get_w2bits (BitEncoding.BitChunking.nth_flatten false 1 _).
  apply/List.allP => x /mkseqP [y [Hy ->]] /=.
  exact BVA_Top_Pervasive_bool.size_tolist.
@@ -114,13 +114,13 @@ bind op W8.t W8.andw "and".
 realize bvandP.
 proof.
 move=> w1 w2; apply/(eq_from_nth witness).
-- by rewrite size_map size_zip !size_w2bits.
-rewrite size_w2bits => i rg_i; rewrite (nth_map witness) /=.
-- by rewrite size_zip !size_w2bits.
-rewrite nth_zip_cond /= size_zip !size_w2bits lez_minl 1:// /=.
+- by rewrite size_map size_zip !size_w2bits'.
+rewrite size_w2bits' => i rg_i; rewrite (nth_map witness) /=.
+- by rewrite size_zip !size_w2bits'.
+rewrite nth_zip_cond /= size_zip !size_w2bits' lez_minl 1:// /=.
 rewrite 2?iftrue ~-1:/# /=.
-rewrite [nth _ (w2bits w1) _](nth_change_dfl false) ?size_w2bits 1:/#.
-rewrite [nth _ (w2bits w2) _](nth_change_dfl false) ?size_w2bits 1:/#.
+rewrite [nth _ (w2bits w1) _](nth_change_dfl false) ?size_w2bits' 1:/#.
+rewrite [nth _ (w2bits w2) _](nth_change_dfl false) ?size_w2bits' 1:/#.
 by rewrite !get_w2bits w2bitsE nth_mkseq //#.
 qed.
 
@@ -128,9 +128,9 @@ bind op W8.t W8.orw "or".
 
 realize bvorP. 
 move => bv1 bv2. 
-apply (eq_from_nth false); 1: by smt(size_map size_zip W8.size_w2bits).
+apply (eq_from_nth false); 1: by smt(size_map size_zip W8.size_w2bits').
 move => i ib;rewrite !W8.get_w2bits orwE.
-rewrite (nth_map (false,false) false) /=; 1: by smt(size_map size_zip W8.size_w2bits).  
+rewrite (nth_map (false,false) false) /=; 1: by smt(size_map size_zip W8.size_w2bits').  
 rewrite !(nth_zip false false) //=;congr; rewrite -W8.get_w2bits.
 qed.
 
@@ -224,8 +224,8 @@ move=> f; apply (eq_from_nth false).
  rewrite (size_flatten' 1).
   move=> x /mkseqP [y [Hy ->]] /=.
   exact BVA_Top_Pervasive_bool.size_tolist.
-  rewrite size_w2bits size_mkseq; smt(W.gt0_size).
-rewrite size_w2bits => i Hi.
+  rewrite size_w2bits' size_mkseq; smt(W.gt0_size).
+rewrite size_w2bits' => i Hi.
 rewrite get_w2bits (BitEncoding.BitChunking.nth_flatten false 1 _).
  apply/List.allP => x /mkseqP [y [Hy ->]] /=.
  exact BVA_Top_Pervasive_bool.size_tolist.
@@ -235,36 +235,36 @@ qed.
 bind op W.t W.andw "and".
 realize bvandP. 
 rewrite /andw /map2 => bv1 bv2.
-apply (eq_from_nth false);1: rewrite size_map size_zip !size_w2bits /#. 
-move => i; rewrite size_w2bits /= => ib.
-rewrite initiE 1:/# (nth_map (false,false)) /=;1: rewrite size_zip !size_w2bits /#. 
-by rewrite !nth_zip /=;1:smt(W16.size_w2bits).
+apply (eq_from_nth false);1: rewrite size_map size_zip !size_w2bits' /#. 
+move => i; rewrite size_w2bits' /= => ib.
+rewrite initiE 1:/# (nth_map (false,false)) /=;1: rewrite size_zip !size_w2bits' /#. 
+by rewrite !nth_zip /=;1:smt(W16.size_w2bits').
 qed.
 
 
 bind op W.t W.orw "or".
 realize bvorP. 
 rewrite /orw /map2 => bv1 bv2.
-apply (eq_from_nth false);1: rewrite size_map size_zip !size_w2bits /#. 
-move => i; rewrite size_w2bits /= => ib.
-rewrite initiE 1:/# (nth_map (false,false)) /=;1: rewrite size_zip !size_w2bits /#. 
-by rewrite !nth_zip /=;1:smt(W16.size_w2bits).
+apply (eq_from_nth false);1: rewrite size_map size_zip !size_w2bits' /#. 
+move => i; rewrite size_w2bits' /= => ib.
+rewrite initiE 1:/# (nth_map (false,false)) /=;1: rewrite size_zip !size_w2bits' /#. 
+by rewrite !nth_zip /=;1:smt(W16.size_w2bits').
 qed.
 
 bind op W.t W.(+^) "xor".
 realize bvxorP.
 move => bv1 bv2.
-apply (eq_from_nth false); 1: rewrite !size_map size_zip !size_w2bits /#. 
-move => i; rewrite size_w2bits /= => ib.
-rewrite (nth_map (false,false)) /=; 1: rewrite size_zip !size_w2bits /#. 
-by rewrite !nth_zip /=; 1:smt(W64.size_w2bits).
+apply (eq_from_nth false); 1: rewrite !size_map size_zip !size_w2bits' /#. 
+move => i; rewrite size_w2bits' /= => ib.
+rewrite (nth_map (false,false)) /=; 1: rewrite size_zip !size_w2bits' /#. 
+by rewrite !nth_zip /=; 1:smt(W64.size_w2bits').
 qed.
 
 bind op [W.t] W.invw "not".
 realize bvnotP.
 move=> bv1.
-apply (eq_from_nth false); 1: rewrite !size_map size_w2bits /#. 
-move => i; rewrite size_w2bits /= => ib.
+apply (eq_from_nth false); 1: rewrite !size_map !size_w2bits' /#. 
+move => i; rewrite size_w2bits' /= => ib.
 by rewrite (nth_map false) 1:// /= /#.
 qed.
 
@@ -724,6 +724,9 @@ abstract theory JCArraySlice.
     theory JCBV <- JCBVA,
     theory JCA <- JCA.
 
+  lemma size_to_list_arr ['a] (t : 'a A.t) : size (A.to_list t) = size_arr.
+  proof. by rewrite A.size_to_list lez_maxr // ltzW JCA.gt0_size. qed.
+
   op sliceget (arr: BVA.t A.t) (offset: int) : BV.t = 
    (*if 8 %| offset then 
     get256_direct ((init64 (fun (i_0 : int) => arr.[i_0])))%WArray32 (offset %/ 8) 
@@ -742,7 +745,7 @@ lemma size_flatten_BVA_w2bits (a : BVA.t list) :
 proof.
   rewrite size_flatten -map_comp /(\o) /=.
   rewrite StdBigop.Bigint.sumzE /= StdBigop.Bigint.BIA.big_mapT /(\o) /=. 
-  rewrite StdBigop.Bigint.big_constz count_predT /#.
+  by rewrite StdBigop.Bigint.big_constz count_predT lez_maxr // ltzW BVA.gt0_size.
 qed.
 
 
@@ -756,11 +759,11 @@ qed.
   realize bvaslicesetP.
 move => arr offset bv H /= k kb; rewrite /sliceset /=. 
 + rewrite of_listK; 1: rewrite size_map size_chunk 1:// !size_cat size_take 1:/#.
-  rewrite size_flatten_BVA_w2bits A.size_to_list.
+  rewrite size_flatten_BVA_w2bits size_to_list_arr.
   have -> : offset < size_bs_arr * size_arr by smt(BV.gt0_size).
   have -> : (if true then offset else size_bs_arr * size_arr) = offset by auto.
-  rewrite BV.size_w2bits size_drop. smt(BV.gt0_size).
-  rewrite size_flatten_BVA_w2bits A.size_to_list. 
+  rewrite BV.size_w2bits' size_drop. smt(BV.gt0_size).
+  rewrite size_flatten_BVA_w2bits size_to_list_arr. 
   have -> : (offset + size_bs + max 0 (size_bs_arr * size_arr - (offset + size_bs))) = size_bs_arr * size_arr; smt().
   rewrite -(map_comp BVA.w2bits BVA.bits2w) /(\o). 
   have := eq_in_map ((fun (x : bool list) => w2bits ((bits2w x))%BVA)) idfun (chunk size_bs_arr
@@ -776,14 +779,14 @@ move => arr offset bv H /= k kb; rewrite /sliceset /=.
   smt().
   (* rewrite iffE => [#] -> * /=; 1: by smt(in_chunk_size BVA.bits2wK). *)
   rewrite map_id /= chunkK 1://;1: rewrite !size_cat size_take 1:/#.
-  rewrite size_flatten_BVA_w2bits A.size_to_list BV.size_w2bits size_drop. 
+  rewrite size_flatten_BVA_w2bits size_to_list_arr BV.size_w2bits' size_drop. 
   smt(BV.gt0_size).
   have -> : offset < size_bs_arr * size_arr by smt(BV.gt0_size).
   have -> : (if true then offset else size_bs_arr * size_arr) = offset by smt().
-  rewrite size_flatten_BVA_w2bits A.size_to_list.
+  rewrite size_flatten_BVA_w2bits size_to_list_arr.
   have -> : max 0 (size_bs_arr * size_arr - (offset + size_bs)) = (size_bs_arr * size_arr - (offset + size_bs)) by smt(). smt().
   rewrite !nth_cat !size_cat /=.
-  rewrite size_take 1:/# size_flatten_BVA_w2bits A.size_to_list.
+  rewrite size_take 1:/# size_flatten_BVA_w2bits size_to_list_arr.
   have -> : offset < size_bs_arr * size_arr by smt(BV.gt0_size).
   have -> : (if true then offset else size_bs_arr * size_arr) = offset by smt().
   case (k < offset) => k_off.
@@ -791,12 +794,14 @@ move => arr offset bv H /= k kb; rewrite /sliceset /=.
   rewrite (nth_flatten _ size_bs_arr). 
   rewrite all_map /preim. 
   have -> : (fun x => size (BVA.w2bits x) = size_bs_arr) = (fun x => true).
-  smt(BVA.size_w2bits). rewrite allP => /#.
+  + by apply/fun_ext => x /=; rewrite lez_maxr // ltzW BVA.gt0_size.
+  rewrite allP => /#.
   case ( k < offset + size_bs) => k_off2 />.
   have -> : offset <= k = false by smt(). smt(). 
   rewrite nth_drop; smt(BV.gt0_size).
   case ( k < offset + size_bs) => k_off2. smt().
   have -> : (offset <= k && false) = false by trivial.
-  rewrite ifF //= nth_drop; smt(BV.gt0_size). qed.
+  rewrite (lez_maxr 0 size_bs) 1:ltzW 1:BV.gt0_size ifF //= nth_drop; smt(BV.gt0_size).
+  qed.
 end JCArraySlice.
 

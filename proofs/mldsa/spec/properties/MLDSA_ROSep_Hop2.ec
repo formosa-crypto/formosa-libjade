@@ -968,7 +968,8 @@ seq 10 : (!RoutedH.trset /\ !RoutedH.bad /\ DS5.RO3.RO.m = empty /\ pre_ok rhop 
 + by conseq (: _ ==> true) => //.
 + seq 1 : (RoutedH.bad) (2%r * p512) 1%r 1%r 0%r.
   + by conseq />.
-  + by exlim rhop => r0; call (squeeze_flip r0); auto => />.
+  + exlim rhop => r0; call (squeeze_flip r0); auto => /> *.
+    by have /= := key_sizes; smt().
   + by conseq (: _ ==> true) => //.
   + by hoare; wp; call (: true); auto.
   by [].
@@ -1001,7 +1002,7 @@ hoare keygen_trset : MLDSA_RO_DS(RoutedH, DS2.RO2.RO).keygen : true ==> RoutedH.
 proof.
 proc; inline MLDSA_RO(RoutedH, DS2.RO2.RO).keygen_derand; wp; call (: true); 1: by conseq />.
 wp; call squeeze_trset; call (: true); 1: by conseq />.
-by conseq (: _ ==> true) => //= *; rewrite BytesPK.size_to_list.
+by conseq (: _ ==> true) => //= *; have /= := key_sizes; smt().
 qed.
 
 section.

@@ -1,4 +1,5 @@
 require import AllCore List IntDiv.
+require MinMaxSimplify.
 require import Rq.
 require Parameters.
 import Rq.RqTheory.
@@ -38,8 +39,7 @@ clone import Matrix as KMatrix with
     proof ZR.mulrDl by smt(Rq.add_lift Rq.mul_lift Rq.poly2polyrK mulrDl Rq.polyr2polyK)
     proof ZR.mulVr by smt(choicebP)
     proof ZR.unitP by smt()
-    proof ZR.unitout by (move=> x H; rewrite /Rq.invr choiceb_dfl // /#)
-    proof ge0_size by smt(gt0_k).
+    proof ZR.unitout by (move=> x H; rewrite /Rq.invr choiceb_dfl // /#).
 
 (* ------------------------------------------------------------------ *)
 (* Vector/matrix layer over Zq[X]/(X^256+1), dimension k (FIPS ML-KEM).
@@ -48,12 +48,14 @@ clone import Matrix as KMatrix with
 (* ------------------------------------------------------------------ *)
 
 clone export PolyArray as KVec with
-  op size <- kvec
-  proof ge0_size by smt(gt0_k).
+  op size <- kvec.
+lemma ge0_KVec_size : 0 <= kvec by smt(gt0_k).
+hint simplify ge0_KVec_size.
 
 clone export PolyArray as KMat with
-  op size <- kvec * kvec
-  proof ge0_size by smt(gt0_k).
+  op size <- kvec * kvec.
+lemma ge0_KMat_size : 0 <= kvec * kvec by smt(gt0_k).
+hint simplify ge0_KMat_size.
 
 theory PolyVec.
 

@@ -44,7 +44,7 @@ while (0 <= i <= kvec /\ s2 = _a /\ wpolykvec_srng (kvec_unflatten256 _a) Eta Et
        (forall k, 0 <= k < i =>
        valid_eta_bytes (Array_eta_enc.init (fun j => encoded.[k * eta_enc + j]))));
        last first.
-+ auto => /> &hr *; do split; 1..3: smt(gt0_k).
++ auto => /> &hr *; do split; 1,2: smt(gt0_k).
   move => r0 j0 ??? H H1; split.
   + rewrite tP => kk Hkk.
     by rewrite mapiE 1:/# /= H 1:/# mapiE 1:/# /=.
@@ -133,7 +133,7 @@ while (0 <= i <= kvec /\ encoded = _a /\ valid_s2_bytes _a /\
        (map (fun (bytes : W8.t Array_eta_enc.t) => BitUnpack (to_list bytes) Eta Eta) (s2_unflatten _a)).[k]
        /\ wpoly_srng Eta Eta (kvec_unflatten256 s2).[k]);
        last first.
-+ auto => /> &hr *; do split; 1,2: smt(gt0_k).
++ auto => /> &hr *; do split; 1: smt(gt0_k).
   move => r0 j0 ??? H; split.
   + by rewrite tP => k Hk;have := H k _;smt().
   by rewrite /wpolykvec_srng allP => k kb;have := H k _;smt().

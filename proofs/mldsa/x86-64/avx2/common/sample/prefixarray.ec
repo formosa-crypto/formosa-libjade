@@ -109,7 +109,7 @@ theory PrefixArray.
   (* ------------------------------------------------------------------ *)
   (* writing a block into its window extends the byte prefix            *)
   lemma sub_window_catE (b : 'a AS.t) (a : 'a AB.t) (i : int) :
-    0 <= i /\ i * sizeB + sizeB <= sizeS =>
+    0 <= sizeB /\ 0 <= i /\ i * sizeB + sizeB <= sizeS =>
     AS.sub
       (AS.init (fun j =>
          if i * sizeB <= j < i * sizeB + sizeB then a.[j - i * sizeB] else b.[j]))
@@ -117,11 +117,11 @@ theory PrefixArray.
     = AS.sub b 0 (sizeB * i) ++ AB.to_list a.
   proof.
   move=> rgi; apply (eq_from_nth witness).
-  - rewrite AS.size_sub 1:#smt:(AB.ge0_size) size_cat AS.size_sub 1:#smt:(AB.ge0_size).
+  - rewrite AS.size_sub 1:/# size_cat AS.size_sub 1:/#.
     by rewrite AB.size_to_list /#.
-  move=> j; rewrite AS.size_sub 1:#smt:(AB.ge0_size) => rgj.
+  move=> j; rewrite AS.size_sub 1:/# => rgj.
   rewrite AS.nth_sub 1:/# /= AS.initiE 1:/# /=.
-  rewrite nth_cat AS.size_sub 1:#smt:(AB.ge0_size).
+  rewrite nth_cat AS.size_sub 1:/#.
   case: (j < sizeB * i) => hcase.
   - by rewrite ifF 1:/# AS.nth_sub /#.
   by rewrite ifT 1:/# AB.get_to_list /#.

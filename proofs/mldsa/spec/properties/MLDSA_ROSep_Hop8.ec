@@ -165,7 +165,7 @@ have hnb0 : 0 < n * noise_bits %/ 8 by have /= H := param_sets; smt().
 have hnb : i * (n * noise_bits) %/ 8 = n * noise_bits %/ 8 * i by have /= H := param_sets; smt().
 have hF1 : size (flatten (map (fun p => BitPack p Eta Eta) (LArray.to_list sk.`3))) = n * noise_bits %/ 8 * lvec.
 + rewrite (size_flatten_ctt (n * noise_bits %/ 8)); 1: by move=> x /mapP [p [_ ->]]; rewrite size_bp_eta.
-  by rewrite size_map LArray.size_to_list mulzC.
+  by rewrite size_map LArray.size_to_list.
 rewrite hnb addzC -drop_drop; 1,2: smt().
 rewrite skEnc_list -!catA catA catA drop_size_cat ?size_cat ?Bytes32.size_to_list ?Bytes64.size_to_list //.
 rewrite take_drop_cat; 1,2: smt().
@@ -186,7 +186,7 @@ have hF1 : size (flatten (map (fun p => BitPack p Eta Eta) (LArray.to_list sk.`3
   by rewrite size_map LArray.size_to_list; have /= H := param_sets; smt().
 have hF2 : size (flatten (map (fun p => BitPack p Eta Eta) (KArray.to_list sk.`4))) = n * noise_bits %/ 8 * kvec.
 + rewrite (size_flatten_ctt (n * noise_bits %/ 8)); 1: by move=> x /mapP [p [_ ->]]; rewrite size_bp_eta.
-  by rewrite size_map KArray.size_to_list mulzC.
+  by rewrite size_map KArray.size_to_list.
 rewrite (_ : 128 + s1_bytes + i * (n * noise_bits %/ 8) = n * noise_bits %/ 8 * i + (s1_bytes + 128)) 1:/#.
 rewrite -drop_drop; 1,2: by have /= H := param_sets; smt().
 rewrite -drop_drop.

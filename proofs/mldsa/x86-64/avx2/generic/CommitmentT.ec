@@ -48,7 +48,7 @@ while (0 <= i <= kvec /\ commitment = _a /\
        (w1_unflatten encoded_commitment).[k] =
        (map (fun (p : poly) => Array_w1_enc.of_list witness (SimpleBitPack p (hb_range - 1))) (liftu_wpolykvec (kvec_unflatten256 _a))).[k]);
        last first.
-+ auto => /> &hr *; do split; 1,2: smt(gt0_k).
++ auto => /> &hr *; do split; 1: smt(gt0_k).
   by move => r0 j0 *; rewrite tP => k kb; smt().
 wp; ecall (commitment_encode_polynomial (Array256.init (fun (i_0 : int) => _a.[i * 256 + i_0]))).
 auto => /> &hr ?? Hrng H ?;do split.

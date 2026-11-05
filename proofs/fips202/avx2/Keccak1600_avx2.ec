@@ -12,7 +12,7 @@ require BitEncoding.
 import BitEncoding.BitChunking.
 
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 
 require import JWordList.
 from CryptoSpecs require import Keccakf1600_Spec FIPS202_SHA3_Spec.

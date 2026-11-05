@@ -24,7 +24,7 @@ import DV DV.MatRq.Vectors DV.MatRq.Matrices.
 (*************** SampleInBall of FIPS 204 and SampleInBall of the target ****************)
 
 lemma w2bits_int2bs (b : W8.t) : W8.w2bits b = BitEncoding.BS2Int.int2bs 8 (W8.to_uint b).
-proof. by rewrite W8.to_uintE -(W8.size_w2bits b) BitEncoding.BS2Int.bs2intK. qed.
+proof. by rewrite W8.to_uintE -(W8.size_w2bits' b) BitEncoding.BS2Int.bs2intK. qed.
 
 equiv sib_15 : SampleInBall_B(XCw(DST.RO2.RO)).sample ~ MP.T.SIB.SampleInBall(DST.RO2.RO).get :
   rho{1} = x{2} /\ ={DST.RO2.RO.m}

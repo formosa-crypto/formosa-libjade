@@ -52456,7 +52456,7 @@ module M = {
     trace_signature____decode <-
     (trace_signature____decode ++
     [(Assert,
-     ((result_1 <> (W64.of_int 0)) \/ (BArray6144.is_init b_result 0 6144)))]);
+     (BArray6144.is_init b_result 0 ((result_1 = (W64.of_int 0)) ? 6144 : 0)))]);
     b_hints <- b_result;
     hints <- result_2;
     result <- result_1;
@@ -55844,8 +55844,8 @@ module M = {
     [(Assert,
      (((BArray12288.is_init b_t0_doubled 0 12288) /\
       (BArray200.is_init b_challenge_positions 0 200)) /\
-     ((infinity_norm_check_result <> (W64.of_int 0)) \/
-     (BArray6144.is_init b_w0_minus_cs2 0 6144))))]);
+     (BArray6144.is_init b_w0_minus_cs2 0
+     ((infinity_norm_check_result = (W64.of_int 0)) ? 6144 : 0))))]);
     b_ct0 <- (BArray1024.init_arr (W8.of_int 0));
     ct0_norm_check_result <- (W64.of_int 0);
     ct0 <- witness;
@@ -55969,8 +55969,8 @@ module M = {
     (trace___make_hint_vector ++
     [(Assert,
      ((BArray6144.is_init b_w1 0 6144) /\
-     ((infinity_norm_check_result <> (W64.of_int 0)) \/
-     (BArray6144.is_init b_w0_minus_cs2_plus_ct0 0 6144))))]);
+     (BArray6144.is_init b_w0_minus_cs2_plus_ct0 0
+     ((infinity_norm_check_result = (W64.of_int 0)) ? 6144 : 0))))]);
     total_ones_in_hint <- 0;
     base <- 0;
     (* Erased call to declassify *)
@@ -56869,8 +56869,8 @@ module M = {
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert,
-       (((result_21 <> (W64.of_int 0)) \/
-        (BArray5120.is_init b_result_4 0 5120)) /\
+       ((BArray5120.is_init b_result_4 0
+        ((result_21 = (W64.of_int 0)) ? 5120 : 0)) /\
        ((param_37 = (W64.of_int 0)) \/ (result_21 <> (W64.of_int 0)))))]);
       b_signer_response <- b_result_4;
       signer_response <- result_22;
@@ -56893,8 +56893,8 @@ module M = {
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert,
-       (((result_23 <> (W64.of_int 0)) \/
-        (BArray6144.is_init b_result_3 0 6144)) /\
+       ((BArray6144.is_init b_result_3 0
+        ((result_23 = (W64.of_int 0)) ? 6144 : 0)) /\
        ((param_42 = (W64.of_int 0)) \/ (result_23 <> (W64.of_int 0)))))]);
       b_w0_minus_cs2 <- b_result_3;
       w0_minus_cs2 <- result_24;
@@ -56917,8 +56917,8 @@ module M = {
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert,
-       ((param_47 <> (W64.of_int 0)) \/
-       (BArray6144.is_init b_result_2 0 6144)))]);
+       (BArray6144.is_init b_result_2 0
+       ((param_47 = (W64.of_int 0)) ? 6144 : 0)))]);
       b_w0_minus_cs2_plus_ct0 <- b_result_2;
       w0_minus_cs2_plus_ct0 <- result_26;
       ct0_norm_check_result <- result_25;
@@ -56941,8 +56941,8 @@ module M = {
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert,
-       (((result_27 <> (W64.of_int 0)) \/
-        (BArray6144.is_init b_result_1 0 6144)) /\
+       ((BArray6144.is_init b_result_1 0
+        ((result_27 = (W64.of_int 0)) ? 6144 : 0)) /\
        ((param_52 = (W64.of_int 0)) \/ (result_27 <> (W64.of_int 0)))))]);
       b_hint <- b_result_1;
       hint_0 <- result_28;
@@ -57616,7 +57616,8 @@ module M = {
     (trace___verify_internal ++
     [(Assert,
      ((BArray5120.is_init b_result_9 0 5120) /\
-     ((result_0 <> (W64.of_int 0)) \/ (BArray6144.is_init b_result_8 0 6144))))]);
+     (BArray6144.is_init b_result_8 0
+     ((result_0 = (W64.of_int 0)) ? 6144 : 0))))]);
     signer_response <- result_2;
     b_hints <- b_result_8;
     hints <- result_1;
@@ -67121,8 +67122,8 @@ op signature____decode_hint_spec _hints _b_hints _hint_encoded _b_hint_encoded =
     ((_b_hints = b_hints) /\ (_hints = hints)))) /\
    (BArray61.is_init _b_hint_encoded 0 (55 + 6))) ==>
    ((true /\
-    ((res.`3 <> (W64.of_int 0)) \/
-    (BArray6144.is_init res.`2 0 (4 * (6 * 256))))) /\
+    (BArray6144.is_init res.`2 0
+    ((res.`3 = (W64.of_int 0)) ? (4 * (6 * 256)) : 0))) /\
    (valid res.`4))].
 
 op signature____decode_spec _signer_response _b_signer_response _hints _b_hints _signature_encoded _b_signature_encoded =
@@ -67137,8 +67138,8 @@ op signature____decode_spec _signer_response _b_signer_response _hints _b_hints 
    ((48 + (5 * ((20 * 256) %/ 8))) + (55 + 6)))) ==>
    ((true /\
     ((BArray5120.is_init res.`2 0 (4 * (5 * 256))) /\
-    ((res.`5 <> (W64.of_int 0)) \/
-    (BArray6144.is_init res.`4 0 (4 * (6 * 256)))))) /\
+    (BArray6144.is_init res.`4 0
+    ((res.`5 = (W64.of_int 0)) ? (4 * (6 * 256)) : 0)))) /\
    (valid res.`6))].
 
 op s1____encode_spec _encoded _b_encoded _s1 _b_s1 =
@@ -67394,8 +67395,8 @@ op __compute_z_and_check_norm_spec _s1_doubled _b_s1_doubled _challenge_position
    ((true /\
     (true /\
     (true /\
-    (((res.`3 <> (W64.of_int 0)) \/
-     (BArray5120.is_init res.`2 0 (4 * (5 * 256)))) /\
+    ((BArray5120.is_init res.`2 0
+     ((res.`3 = (W64.of_int 0)) ? (4 * (5 * 256)) : 0)) /\
     ((_infinity_norm_check_result = (W64.of_int 0)) \/
     (res.`3 <> (W64.of_int 0))))))) /\
    (valid res.`4))].
@@ -67416,8 +67417,8 @@ op __apply_cs2_and_check_norm_spec _w0_minus_cs2 _b_w0_minus_cs2 _w0 _b_w0 _s2_d
    ((true /\
     (true /\
     (true /\
-    (((res.`3 <> (W64.of_int 0)) \/
-     (BArray6144.is_init res.`2 0 (4 * (6 * 256)))) /\
+    ((BArray6144.is_init res.`2 0
+     ((res.`3 = (W64.of_int 0)) ? (4 * (6 * 256)) : 0)) /\
     ((_infinity_norm_check_result = (W64.of_int 0)) \/
     (res.`3 <> (W64.of_int 0))))))) /\
    (valid res.`4))].
@@ -67436,11 +67437,11 @@ op __apply_ct0_and_check_norm_spec _w0_minus_cs2_plus_ct0 _b_w0_minus_cs2_plus_c
    (true /\
    (((BArray12288.is_init _b_t0_doubled 0 (4 * ((6 * 2) * 256))) /\
     (BArray200.is_init _b_challenge_positions 0 (4 * (49 + 1)))) /\
-   ((_infinity_norm_check_result <> (W64.of_int 0)) \/
-   (BArray6144.is_init _b_w0_minus_cs2 0 (4 * (6 * 256))))))) ==>
+   (BArray6144.is_init _b_w0_minus_cs2 0
+   ((_infinity_norm_check_result = (W64.of_int 0)) ? (4 * (6 * 256)) : 0))))) ==>
    ((true /\
-    ((_infinity_norm_check_result <> (W64.of_int 0)) \/
-    (BArray6144.is_init res.`2 0 (4 * (6 * 256))))) /\
+    (BArray6144.is_init res.`2 0
+    ((_infinity_norm_check_result = (W64.of_int 0)) ? (4 * (6 * 256)) : 0))) /\
    (valid res.`4))].
 
 op __make_hint_vector_spec _w0_minus_cs2_plus_ct0 _b_w0_minus_cs2_plus_ct0 _w1 _b_w1 _hint _b_hint _infinity_norm_check_result =
@@ -67454,13 +67455,13 @@ op __make_hint_vector_spec _w0_minus_cs2_plus_ct0 _b_w0_minus_cs2_plus_ct0 _w1 _
     (_w0_minus_cs2_plus_ct0 = w0_minus_cs2_plus_ct0))))))) /\
    (true /\
    ((BArray6144.is_init _b_w1 0 (4 * (6 * 256))) /\
-   ((_infinity_norm_check_result <> (W64.of_int 0)) \/
-   (BArray6144.is_init _b_w0_minus_cs2_plus_ct0 0 (4 * (6 * 256))))))) ==>
+   (BArray6144.is_init _b_w0_minus_cs2_plus_ct0 0
+   ((_infinity_norm_check_result = (W64.of_int 0)) ? (4 * (6 * 256)) : 0))))) ==>
    ((true /\
     (true /\
     (true /\
-    (((res.`3 <> (W64.of_int 0)) \/
-     (BArray6144.is_init res.`2 0 (4 * (6 * 256)))) /\
+    ((BArray6144.is_init res.`2 0
+     ((res.`3 = (W64.of_int 0)) ? (4 * (6 * 256)) : 0)) /\
     ((_infinity_norm_check_result = (W64.of_int 0)) \/
     (res.`3 <> (W64.of_int 0))))))) /\
    (valid res.`4))].
@@ -67657,8 +67658,9 @@ op ml_dsa_65_sign_spec _signature _b_signature _signing_key _b_signing_key _cont
     (is_valid ptr_modulus Glob.mem_v _message_pointer _message_size)) /\
    (_message_size <= 18446744073709551360)))))))))))))) ==>
    ((true /\
-    ((res.`3 <> (W64.of_int 0)) \/
-    (BArray3309.is_init res.`2 0 ((48 + (5 * ((20 * 256) %/ 8))) + (55 + 6))))) /\
+    (BArray3309.is_init res.`2 0
+    ((res.`3 = (W64.of_int 0)) ? ((48 + (5 * ((20 * 256) %/ 8))) + (55 + 6)) : 0)
+    )) /\
    (valid res.`4))].
 
 op ml_dsa_65_verify_spec _verification_key _b_verification_key _context _b_context _message_pointer _message_size _signature _b_signature =

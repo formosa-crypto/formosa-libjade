@@ -62,11 +62,11 @@ rewrite tP => k kb.
 rewrite wordP => i ib;rewrite initiE 1:/# /=.
 have //= := BSWAS_1410u8_128.BVA_asliceset_Top_CircuitBindings_BSWAS_WB_t_Top_CircuitBindings_BSWAS_WS_t_Top_CircuitBindings_BSWAS_A_t.bvaslicesetP t (o*8) s _ (k*8+i) _;1,2:by smt().
 rewrite (nth_flatten false 8).
-+ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W8.size_w2bits).
++ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W8.size_w2bits').
 rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
 rewrite get_to_list get_w2bits (: (k * 8 + i) %/ 8 = k) 1:/# (: (k * 8 + i) %% 8 = i) 1:/# => -> .
 rewrite (nth_flatten false 8).
-+ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W8.size_w2bits).
++ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W8.size_w2bits').
 rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
 rewrite get_w2bits get_to_list /get8 /set128_direct initiE 1:/# /= /(\bits8) initiE 1:/# /=.
 by smt(W8.initiE).
@@ -82,11 +82,11 @@ rewrite tP => k kb.
 rewrite wordP => i ib;rewrite initiE 1:/# /=.
 have //= := BSWAS_1410u8_64.BVA_asliceset_Top_CircuitBindings_BSWAS_WB_t_Top_CircuitBindings_BSWAS_WS_t_Top_CircuitBindings_BSWAS_A_t.bvaslicesetP t (o*8) s _ (k*8+i) _;1,2:by smt().
 rewrite (nth_flatten false 8).
-+ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W8.size_w2bits).
++ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W8.size_w2bits').
 rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
 rewrite get_to_list get_w2bits (: (k * 8 + i) %/ 8 = k) 1:/# (: (k * 8 + i) %% 8 = i) 1:/# => -> .
 rewrite (nth_flatten false 8).
-+ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W8.size_w2bits).
++ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W8.size_w2bits').
 rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
 rewrite get_w2bits get_to_list /get8 /set64_direct initiE 1:/# /= /(\bits8) initiE 1:/# /=.
 by smt(W8.initiE).

@@ -147,7 +147,7 @@ have Hnb : ilog 2 (Eta + Eta) + 1 = noise_bits.
   by rewrite (: 4 + 4 = 2 ^ 3) 1:// ilog_powK.
 rewrite /valid_s2_bytes /valid_sk_s2 /valid_eta_bytes Hnb => H k kb i ib.
 have := H k kb i ib.
-rewrite BytesSK.of_listK; 1: by rewrite size_to_list sk_encE.
+rewrite BytesSK.of_listK; 1: by rewrite size_to_list /= sk_encE.
 rewrite s1_bytesE eta_encE /BitsToInteger /to_uint.
 have Hnb0 : 0 < noise_bits by smt().
 have Hee : eta_enc = 32 * noise_bits by done.
@@ -185,7 +185,7 @@ rewrite nth_take 1,2:/# nth_drop 1,2:/# nth_mkseq 1:// /=.
 rewrite Array_eta_enc.initiE 1:// /= Array_s2_enc.initiE /=.
 + by rewrite /s2_enc; smt().
 rewrite /BytesToBits (nth_flatten false 8).
-+ by rewrite allP => ii; rewrite mapP => He /=; elim He => x [# ? ->]; rewrite size_w2bits.
++ by rewrite allP => ii; rewrite mapP => He /=; elim He => x [# ? ->]; rewrite size_w2bits'.
 rewrite (nth_map witness); 1: by rewrite HL.
 by rewrite get_w2bits HLn // addzA.
 qed.
@@ -370,8 +370,8 @@ seq 0 1 : (#pre /\
               message_representative{2}
               seed_for_mask{2}).
   wp; skip => |> &1 &2 <- *; rewrite /H_rhopp.
-  rewrite !Bytes64.of_listK ?Keccak1600_Spec.size_SHAKE256 //;1,2: by rewrite size_take // size_drop // BytesSK.size_to_list /#.
-  rewrite Bytes32.of_listK; 1: by rewrite size_take // size_drop // BytesSK.size_to_list /#.
+  rewrite !Bytes64.of_listK ?Keccak1600_Spec.size_SHAKE256 //;1,2: by rewrite size_take // size_drop // size_BytesSK /#.
+  rewrite Bytes32.of_listK; 1: by rewrite size_take // size_drop // size_BytesSK /#.
   rewrite BytesSK.of_listK; 1: by rewrite size_to_list /#.
   congr;congr;congr.
   + congr;apply (eq_from_nth witness); 1: by rewrite size_to_list // size_take // size_drop // size_to_list /#.
@@ -390,7 +390,7 @@ seq 0 1 : (#pre /\
   + rewrite Hfun tP => k kb.
     rewrite initiE 1:/# /= mapiE 1:/# /=;do congr.
     apply (eq_from_nth witness).
-    + by rewrite size_to_list /= size_take 1:/# size_drop 1:/# BytesSK.size_to_list /#.
+    + by rewrite size_to_list /= size_take 1:/# size_drop 1:/# size_BytesSK /#.
     move => i; rewrite size_to_list => ib.
     rewrite get_to_list nth_take 1,2:/# nth_drop 1,2:/#  BytesSK.get_to_list  BytesSK.get_of_list 1:/# get_to_list  initiE 1:/# /= get_of_list 1:/# nth_sub 1:/# /= initiE /#.
     
@@ -403,7 +403,7 @@ seq 0 1 : (#pre /\
   auto => |> &1 &2 12? rr Hfun Hrng.
   + rewrite Hfun tP => k kb.
     rewrite initiE 1:/# /= mapiE 1:/# /=;do congr.
-    rewrite s1_bytesE eta_encE BytesSK.of_listK; 1: by rewrite size_to_list sk_encE.
+    rewrite s1_bytesE eta_encE BytesSK.of_listK; 1: by rewrite size_to_list /= sk_encE.
     have Hk : (k + 1) * eta_enc <= kvec * eta_enc.
     + by apply StdOrder.IntOrder.ler_wpmul2r; smt(ge0_eta_enc).
     have ? := ge0_eta_enc.
@@ -430,7 +430,7 @@ seq 0 1 : (#pre /\
   + rewrite Hfun tP => k kb.
     rewrite initiE 1:/# /= mapiE 1:/# /=;do congr; last 2 by smt().
     rewrite s1_bytesE s2_bytesE (: n * d %/ 8 = 416) // BytesSK.of_listK.
-    + by rewrite size_to_list sk_encE.
+    + by rewrite size_to_list /= sk_encE.
     have Hk : (k + 1) * 416 <= kvec * 416 by smt().
     apply (eq_from_nth witness).
     + by rewrite Array416.size_to_list size_take // size_drop 1:/# size_to_list; smt().

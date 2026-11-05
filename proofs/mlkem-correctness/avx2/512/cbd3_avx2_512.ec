@@ -1,6 +1,6 @@
 (* The eta = 3 noise sampler of ML-KEM-512 against the specification, by circuit *)
 require import AllCore List Int IntDiv BitEncoding StdBigop.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array256 Array200 Array32 WArray512 WArray200 WArray32.
 from JazzEC require import Jkem_avx2.
 require import AVX2_Ops W16extra.
@@ -73,7 +73,7 @@ lemma nth_bits192 (b : W8.t Array200.t) n : 0 <= n < 1536 =>
   nth false (BytesToBits (take 192 (to_list b))) n = b.[n %/ 8].[n %% 8].
 proof.
 move=> hn; rewrite /BytesToBits (BitEncoding.BitChunking.nth_flatten false 8).
-+ by rewrite allP => x /mapP [y [_ ->]]; smt(W8.size_w2bits).
++ by rewrite allP => x /mapP [y [_ ->]]; smt(W8.size_w2bits').
 rewrite (nth_map witness); 1: smt(size_take Array200.size_to_list).
 by rewrite nth_take 1,2:/# get_to_list w2bitsE /= nth_mkseq /#.
 qed.

@@ -99,17 +99,17 @@ lemma setK_list (s : BytesSK.t) (c : Bytes32.t) :
   BytesSK.to_list (setK s c) =
   take 32 (BytesSK.to_list s) ++ Bytes32.to_list c ++ drop 64 (BytesSK.to_list s).
 proof.
-have hsk : 128 <= sk_bytes by have /= H := param_sets; smt(ge0_size BytesSK.ge0_size).
-by rewrite /setK BytesSK.of_listK // !size_cat size_take // size_drop // BytesSK.size_to_list
+have hsk := ge128_sk_bytes.
+by rewrite /setK BytesSK.of_listK // !size_cat size_take // size_drop // size_BytesSK
      Bytes32.size_to_list /#.
 qed.
 
 lemma setK_drop (s : BytesSK.t) (c : Bytes32.t) n :
   64 <= n => drop n (BytesSK.to_list (setK s c)) = drop n (BytesSK.to_list s).
 proof.
-move=> hn; have hsk : 128 <= sk_bytes by have /= H := param_sets; smt(ge0_size BytesSK.ge0_size).
+move=> hn; have hsk := ge128_sk_bytes.
 have hs : size (take 32 (BytesSK.to_list s) ++ Bytes32.to_list c) = 64
-  by rewrite size_cat size_take // BytesSK.size_to_list Bytes32.size_to_list /#.
+  by rewrite size_cat size_take // size_BytesSK Bytes32.size_to_list /#.
 by rewrite setK_list drop_cat hs (_ : !(n < 64)) 1:/# /= drop_drop /#.
 qed.
 
@@ -117,8 +117,8 @@ lemma setK_take (s : BytesSK.t) (c : Bytes32.t) :
   take 32 (BytesSK.to_list (setK s c)) = take 32 (BytesSK.to_list s) /\
   take 32 (drop 32 (BytesSK.to_list (setK s c))) = Bytes32.to_list c.
 proof.
-have hsk : 128 <= sk_bytes by have /= H := param_sets; smt(ge0_size BytesSK.ge0_size).
-have hA : size (take 32 (BytesSK.to_list s)) = 32 by rewrite size_take // BytesSK.size_to_list /#.
+have hsk := ge128_sk_bytes.
+have hA : size (take 32 (BytesSK.to_list s)) = 32 by rewrite size_take // size_BytesSK /#.
 rewrite setK_list -catA; split; 1: by rewrite -{1}hA take_size_cat.
 by rewrite -{1}hA drop_size_cat // take_cat Bytes32.size_to_list hA /= take0 cats0.
 qed.
@@ -132,20 +132,20 @@ proc; do 3! (wp; while (={i, rho, tr, s1, s2, t0} /\ k{2} = cK /\ sk{1} = s /\ s
                         0 <= i{1});
                1: by auto => /> &1 &2 *; rewrite setK_drop; [have /= H := param_sets; smt() | smt()]).
 auto => />; have [h1 h2] := setK_take s cK.
-have hsk : 128 <= sk_bytes by have /= H := param_sets; smt(ge0_size BytesSK.ge0_size).
-by rewrite h1 h2 Bytes32.to_listK setK_drop //= Bytes32.of_listK // size_take // size_drop // BytesSK.size_to_list /#.
+have hsk := ge128_sk_bytes.
+by rewrite h1 h2 Bytes32.to_listK setK_drop //= Bytes32.of_listK // size_take // size_drop // size_BytesSK /#.
 qed.
 
 lemma setK_of_list (l : W8.t list) (c : Bytes32.t) :
   64 <= size l =>
   setK (BytesSK.of_list l) c = BytesSK.of_list (take 32 l ++ Bytes32.to_list c ++ drop 64 l).
 proof.
-move=> hl; have hsk : 128 <= sk_bytes by have /= H := param_sets; smt(ge0_size BytesSK.ge0_size).
+move=> hl; have hsk := ge128_sk_bytes.
 rewrite /setK; apply BytesSK.tP => i hi; rewrite !BytesSK.get_of_list //.
 have hL : forall j, 0 <= j < sk_bytes =>
             nth witness (BytesSK.to_list (BytesSK.of_list l)) j = nth witness l j
   by move=> j hj; rewrite BytesSK.get_to_list BytesSK.get_of_list.
-rewrite !nth_cat !size_cat !size_take // BytesSK.size_to_list Bytes32.size_to_list
+rewrite !nth_cat !size_cat !size_take // size_BytesSK Bytes32.size_to_list
         (_ : 32 < sk_bytes) 1:/# (_ : 32 < size l) 1:/# /=.
 case: (i < 64) => h64 /=; 2: by rewrite !nth_drop 1..4:/# hL /#.
 by case: (i < 32) => h32 //=; rewrite !nth_take // hL /#.
@@ -326,7 +326,7 @@ seq 8 9 : (={glob DS2.RO2.RO, glob XOFA_O, glob RoutedH, RO_v.RO.m, rho} /\
   have hs1 : size r1 = 64 by move: hr1; rewrite /dblock supp_dlist //; smt().
   have -> : take 128 (r0 ++ r1) = r0 ++ r1 by rewrite take_oversize // size_cat /#.
   rewrite take_cat drop_cat drop_cat hs0 /=; split; 1: by move=> x2; rewrite !mem_set mem_empty /= => -[] ->.
-  rewrite take_cat size_drop // hs0 /= (_ : max 0 32 = 32) 1:/# /= Bytes64.of_listK.
+  rewrite take_cat size_drop // hs0 /= Bytes64.of_listK.
   + by rewrite size_cat size_drop // size_take // /#.
   by rewrite drop_size_cat 1:size_drop // 1:/# Bytes32.of_listK // size_drop // /#.
 exlim rhop{1}, _K{1} => rp k0; wp; call (skEncode_setK k0); wp; call (: ={glob RoutedH}); 1: by sim.

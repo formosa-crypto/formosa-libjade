@@ -1220,11 +1220,11 @@ abstract theory KeccakArrayAvx2x4.
 op _ASIZE: int.
 
 axiom _ASIZE_ge0: 0 <= _ASIZE.
+hint simplify _ASIZE_ge0.
 axiom _ASIZE_u64: _ASIZE < W64.modulus.
 
 clone import PolyArray as A
- with op size <- _ASIZE
-      proof ge0_size by exact _ASIZE_ge0.
+ with op size <- _ASIZE.
 
 clone import WArray as WA
  with op size <- _ASIZE.
@@ -1498,7 +1498,7 @@ qed.
 lemma asubwrite_squeeze0 r8 (st: state) a:
  asubwrite a a 0 (squeezeblocks r8 st 0) 0 _ASIZE 0 (_ASIZE - 0).
 proof.
-rewrite /squeezeblocks iota0 //= flatten_nil /asubwrite /=; split; last smt(_ASIZE_ge0).
+rewrite /squeezeblocks iota0 //= flatten_nil /asubwrite /=.
 by rewrite tP => i Hi; rewrite filliE // /#.
 qed.
 

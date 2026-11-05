@@ -50,7 +50,7 @@ have hb : RealExp.ilog 2 1023 + 1 = 10 by rewrite (_ : RealExp.ilog 2 1023 = 9) 
 pose xs := map (fun (p : Rq.poly) => SimpleBitPack p 1023) (KArray.to_list (poly_of_t1 l)).
 have hxs : forall x, x \in xs => size x = 320 by move=> x /mapP [p [_ ->]]; rewrite size_SimpleBitPack // hb.
 have hsz : size (Bytes32.to_list rho ++ flatten xs) = 32 + 320 * kvec
-  by rewrite size_cat Bytes32.size_to_list (size_flatten_ctt 320) // /xs size_map KArray.size_to_list; ring.
+  by rewrite size_cat Bytes32.size_to_list (size_flatten_ctt 320) // /xs size_map KArray.size_to_list.
 rewrite -/xs BytesPK.of_listK; 1: by rewrite hsz; smt().
 split; 1: by rewrite take_cat Bytes32.size_to_list /= ?take0 ?cats0 Bytes32.to_listK.
 have -> : pk_t1 (BytesPK.of_list (Bytes32.to_list rho ++ flatten xs)) = poly_of_t1 l; 2: by apply t1_of_poly.

@@ -3,7 +3,7 @@
 (* parameters: key generation, encapsulation, decapsulation.            *)
 (* -------------------------------------------------------------------- *)
 require import AllCore IntDiv List StdOrder.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array32 Array64 WArray32 WArray64.
 from CryptoSpecs require import FIPS202_SHA3_Spec Keccak1600_Spec Keccakf1600_Spec.
 from Spec require import GFq Rq Sampling Serialization Symmetric Correctness.

@@ -9,7 +9,7 @@
 *)
 
 require import AllCore List Int IntDiv StdOrder.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array16 Array256 Array400 WArray32 WArray512 WArray800.
 require import Montgomery16 MLKEMFCLib NttKem.
 from Spec require import GFq Rq.

@@ -1,7 +1,7 @@
 (* The AVX2 implementation of ML-KEM-768 against its specification: the
    compression kernels of the set, then the generic inner PKE and KEM. *)
 require import AllCore List.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Jkem_avx2 Array128 Array256 Array768 Array960 Array1088.
 from Spec require import Spec768.
 require import Instances768 MLKEM_compress_avx2_768 Circuit_sem_768.

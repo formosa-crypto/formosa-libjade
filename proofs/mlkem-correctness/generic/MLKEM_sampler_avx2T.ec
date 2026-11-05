@@ -5,7 +5,7 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore IntDiv List IntMin.
 
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 
 from JazzEC require import WArray8 WArray32 Array8 Array25 Array32 Array168 Array256 Array536.
 from JazzEC require import Array1024 Array2048 Array2144.

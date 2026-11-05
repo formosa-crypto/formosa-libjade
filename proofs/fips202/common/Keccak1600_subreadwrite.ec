@@ -490,7 +490,7 @@ rewrite size_drop 1:/#.
 case: (i = size lw1) => HHH.
  rewrite HHH /=.
  case: (srat (size lw1) cur at (size l) tb = cur + size lw1) => CC; last smt().
- rewrite CC /= ler_maxl 1:/# /=.
+ rewrite CC /=.
  case: (size l = srincr (size lw1) cur at (size l)) => CCC.
   by rewrite CCC /= ifT 1:/#; smt(nth_out nth_cat).
  by rewrite ifF 1:/# nth_drop; smt(nth_cat).
@@ -503,7 +503,7 @@ rewrite ifF.
  rewrite ler_minl 1:/# ifT 1:/# => ?.
  rewrite (ler_maxr _ (size l)); first smt(size_ge0).
  have ->: at + size l = cur + size lw1 - 1 by smt().
- by rewrite /= ler_maxr /#.
+ by rewrite /= /#.
 by rewrite nth_drop 1..2:/# /srfnsh /srincr; smt(nth_out nth_cat).
 qed.
 
@@ -1425,7 +1425,7 @@ lemma srspec_rlen_u8prefAt w (l: W8.t list) len:
  size l = len => srspec (u64bytes w) 0 0 l len 0 => u8prefAt (u64bytes w) 0 l.
 proof.
 move=> Hs H; have [_ /u8prefAbsorbP P] := H _; first by rewrite /srpre; smt(size_ge0).
-move=> i; rewrite P /= (: max 0 0 = 0) 1:// /=.
+move=> i; rewrite P /=.
 case: (i = size l) => C //.
 by rewrite C; smt(nth_out size_ge0).
 qed.
@@ -2187,11 +2187,11 @@ abstract theory ReadWriteArray.
 op _ASIZE: int.
 
 axiom _ASIZE_ge0: 0 <= _ASIZE.
+hint simplify _ASIZE_ge0.
 axiom _ASIZE_u64: _ASIZE < W64.modulus.
 
 clone import PolyArray as A
- with op size <- _ASIZE
-      proof ge0_size by exact _ASIZE_ge0.
+ with op size <- _ASIZE.
 
 clone import WArray as WA
  with op size <- _ASIZE.
@@ -2960,7 +2960,7 @@ lemma asubwrite_squeeze_last r8 st a0 a1 d1 l1 p:
 proof.
 move=> Hr C -> H; apply (asubwrite_to_list a0 _ _ (d1 + _ASIZE %% r8) (l1 - _ASIZE %% r8)).
  by rewrite size_SQUEEZE1600 //; exact _ASIZE_ge0.
-rewrite (SQUEEZE1600_split r8 _ASIZE st) // 1:_ASIZE_ge0 C /=.
+rewrite (SQUEEZE1600_split r8 _ASIZE st) // C /=.
 have Hsz: size (squeezeblocks r8 st (_ASIZE %/ r8)) = r8 * (_ASIZE %/ r8).
  by rewrite size_squeezeblocks //; smt(divz_ge0 _ASIZE_ge0).
 apply (asubwrite_app_dump _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ H) => //; last smt().
@@ -2972,7 +2972,7 @@ lemma asubwrite_squeeze_fin r8 st a0 a1 d1 l1:
  asubwrite a0 a1 0 (squeezeblocks r8 st (_ASIZE %/ r8)) 0 _ASIZE d1 l1 =>
  to_list a1 = SQUEEZE1600 r8 _ASIZE st.
 proof.
-move=> Hr C; rewrite (SQUEEZE1600_split r8 _ASIZE st) // 1:_ASIZE_ge0 ifF // cats0.
+move=> Hr C; rewrite (SQUEEZE1600_split r8 _ASIZE st) // ifF // cats0.
 apply asubwrite_to_list.
 by rewrite size_squeezeblocks //; smt(divz_ge0 _ASIZE_ge0).
 qed.

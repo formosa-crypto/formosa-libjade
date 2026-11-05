@@ -967,12 +967,12 @@ proof.
 rewrite /bytes2coeffs /bytes_to_bits /flatten /chunk /mkseq size_bytes_to_bits -iotaredE /=.
 split.
  rewrite drop0 cats0 /to_uint.
- rewrite take_cat ifF !size_w2bits //= take_cat.
- by rewrite ifT 1:size_w2bits 1:// bs2int_cat size_w2bits bs2int_take.
-rewrite drop_cat ifF !size_w2bits //= cats0.
-rewrite drop_cat ifT 1:size_w2bits //= /to_uint.
+ rewrite take_cat ifF !size_w2bits' //= take_cat.
+ by rewrite ifT 1:size_w2bits' 1:// bs2int_cat size_w2bits' bs2int_take.
+rewrite drop_cat ifF !size_w2bits' //= cats0.
+rewrite drop_cat ifT 1:size_w2bits' //= /to_uint.
 rewrite take_cat ifF.
- by rewrite size_drop 1:// size_w2bits.
+ by rewrite size_drop 1:// size_w2bits'.
 rewrite bs2int_cat bs2int_drop 1:// size_drop -1:/max //=.
 rewrite bs2int_take 1:// modz_small //.
 split; first by apply bs2int_ge0.

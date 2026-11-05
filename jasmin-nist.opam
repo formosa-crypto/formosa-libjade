@@ -18,7 +18,7 @@ bug-reports: "https://github.com/formosa-crypto/jasmin-nist/issues"
 build: []
 
 depends: [
-  "jasmin" {= "2026.03.1"}
+  "jasmin" {= "2026.09.0"}
 
   # EasyCrypt is not published on the default opam repository; its tip
   # is the current "release" and is pinned via pin-depends below.

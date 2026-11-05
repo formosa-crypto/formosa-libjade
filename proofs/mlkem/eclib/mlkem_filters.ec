@@ -1,5 +1,5 @@
 (* ----- *) require import AllCore IntDiv List StdBigop.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 require import Mlkem_bindings.
 require import CircuitBindingsExtra XWord512 XWord12 XWord64 XWord128 XWord256 XArray16 XArray24 XArray32 XArray40 XArray48 XArray56 XArray2048.
 (* ----- *) (* - *) import W8 W12 W512 BitEncoding BS2Int BitChunking.
@@ -971,14 +971,14 @@ seq 0 : ((forall i, 0 <= i < 2 =>
    rewrite pmap_map size_map size_filter count_map_idfun.
    rewrite [_ %% W64.modulus]pmod_small.
    - rewrite count_ge0 /= &(ltz_trans 9) -1://.
-     rewrite (ltzS _ 8) -{2}(W8.size_w2bits (extract_64_8 good{hr} (perm (8 * i)))).
+     rewrite (ltzS _ 8) -{2}(W8.size_w2bits' (extract_64_8 good{hr} (perm (8 * i)))).
      by rewrite count_size.
    congr; rewrite -map_comp /(\o); apply/(eq_from_nth witness).
-   - by rewrite size_map size_iota lez_maxr 1:// size_w2bits.
+   - by rewrite size_map size_iota lez_maxr 1:// size_w2bits'.
    move=> j; rewrite size_map size_iota lez_maxr 1://.
    move=> rgj; rewrite (nth_map witness) /= 1:size_iota 1:/#.
    rewrite nth_iota 1:// /= rgj /= (fun_if (fun x => x <> None)) /=.
-   by rewrite (nth_change_dfl false) 1:size_w2bits 1:// /= rgj /=.
+   by rewrite (nth_change_dfl false) 1:size_w2bits' 1:// /= rgj /=.
 
 seq 1 : (#pre
   /\ (size (ws 0 8) = W64.to_uint (popcount_64 (zextend_8_64 good0_0)))
@@ -1290,14 +1290,14 @@ seq 0 : ((forall i, 0 <= i < 4 =>
    rewrite pmap_map size_map size_filter count_map_idfun.
    rewrite [_ %% W64.modulus]pmod_small.
    - rewrite count_ge0 /= &(ltz_trans 9) -1://.
-     rewrite (ltzS _ 8) -{2}(W8.size_w2bits (extract_64_8 good{hr} (perm (8 * i)))).
+     rewrite (ltzS _ 8) -{2}(W8.size_w2bits' (extract_64_8 good{hr} (perm (8 * i)))).
      by rewrite count_size.
    congr; rewrite -map_comp /(\o); apply/(eq_from_nth witness).
-   - by rewrite size_map size_iota lez_maxr 1:// size_w2bits.
+   - by rewrite size_map size_iota lez_maxr 1:// size_w2bits'.
    move=> j; rewrite size_map size_iota lez_maxr 1://.
    move=> rgj; rewrite (nth_map witness) /= 1:size_iota 1:/#.
    rewrite nth_iota 1:// /= rgj /= (fun_if (fun x => x <> None)) /predC1 /=.
-   by rewrite (nth_change_dfl false) 1:size_w2bits 1:// /= rgj /=.
+   by rewrite (nth_change_dfl false) 1:size_w2bits' 1:// /= rgj /=.
 
 seq 1 : (#pre
   /\ (size (ws 0 8) = W64.to_uint (popcount_64 (zextend_8_64 good0_0)))

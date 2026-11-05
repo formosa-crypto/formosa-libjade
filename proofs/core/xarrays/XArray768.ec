@@ -80,7 +80,7 @@ lemma BSWAS_768u16_256_slicegetE o (p : W16.t Array768.t):
   have //= := BSWAS_768u16_256.BVA_asliceget_Top_CircuitBindings_BSWAS_WB_t_Top_CircuitBindings_BSWAS_WS_t_Top_CircuitBindings_BSWAS_A_t.bvaslicegetP p (o * 8) _; 1: by smt().
   move => -> //; rewrite initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= /(\bits8) initiE 1:/# /=.
   rewrite nth_take 1,2:/# nth_drop 1,2:/#  (nth_flatten false 16).
-  + rewrite allP /= => x; rewrite mapP => He; elim He;smt(W16.size_w2bits).
+  + rewrite allP /= => x; rewrite mapP => He; elim He;smt(W16.size_w2bits').
   rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
   by rewrite get_to_list get_w2bits /#.
  qed.
@@ -95,11 +95,11 @@ rewrite tP => k kb.
 rewrite wordP => i ib;rewrite initiE 1:/# /=.
 have //= := BSWAS_768u16_256.BVA_asliceset_Top_CircuitBindings_BSWAS_WB_t_Top_CircuitBindings_BSWAS_WS_t_Top_CircuitBindings_BSWAS_A_t.bvaslicesetP t (o*8) s _ (k*16+i) _;1,2:by smt().
 rewrite (nth_flatten false 16).
-+ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W16.size_w2bits).
++ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W16.size_w2bits').
 rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
 rewrite get_to_list get_w2bits (: (k * 16 + i) %/ 16 = k) 1:/# (: (k * 16 + i) %% 16 = i) 1:/# => -> .
 rewrite (nth_flatten false 16).
-+ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W16.size_w2bits).
++ rewrite allP /= => x; rewrite mapP => He; elim He;smt(W16.size_w2bits').
 rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
 rewrite get_w2bits get_to_list get16E pack2E initiE 1:/# /= /set256_direct initiE 1:/# /= /(\bits8) initiE 1:/# /= /init16 initiE 1:/# /=.
 by smt(W8.initiE).
@@ -136,7 +136,7 @@ lemma BSWAS_768u8_256_slicegetE o (p : W8.t Array768.t):
   have //= := BSWAS_768u8_256.BVA_asliceget_Top_CircuitBindings_BSWAS_WB_t_Top_CircuitBindings_BSWAS_WS_t_Top_CircuitBindings_BSWAS_A_t.bvaslicegetP p (o * 8) _; 1: by smt().
   move => -> //; rewrite initiE 1:/# /= initiE 1:/# /= initiE 1:/# /=.
   rewrite nth_take 1,2:/# nth_drop 1,2:/#  (nth_flatten false 8).
-  + rewrite allP /= => x; rewrite mapP => He; elim He;smt(W8.size_w2bits).
+  + rewrite allP /= => x; rewrite mapP => He; elim He;smt(W8.size_w2bits').
   rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
   by rewrite get_to_list get_w2bits /#.
  qed.

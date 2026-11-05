@@ -1,7 +1,7 @@
 (* The Keccak calls of the model, at abstract parameters, against the *)
 (* FIPS 202 specification. *)
 require import AllCore IntDiv List.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 require import JWordList.
 from CryptoSpecs require import FIPS202_Keccakf1600 FIPS202_SHA3_Spec.
 from Keccak require import Keccakf1600.

@@ -25,7 +25,7 @@ from Jasmin require import JWord JModel_x86.
 lemma to_uint_popcnt64 (w : W64.t) : 0 <= to_uint (POPCNT_64 w).`6 <= 64.
 proof.
 have := count_size idfun (W64.w2bits w); have := count_ge0 idfun (W64.w2bits w).
-rewrite W64.size_w2bits /POPCNT_64 /flags_w /rflags_of_popcnt /= => h0 h.
+rewrite W64.size_w2bits' /POPCNT_64 /flags_w /rflags_of_popcnt /= => h0 h.
 by rewrite W64.to_uint_small /ptr_modulus; smt().
 qed.
 
@@ -43,7 +43,7 @@ have hc : count idfun (W64.w2bits w) = count idfun (int2bs 8 (to_uint w)).
     smt(W64.to_uint_cmp).
   have h1 := bs2intK (W64.w2bits w).
   have h2 := bs2intK (int2bs 8 (to_uint w) ++ nseq 56 false).
-  move: h1 h2; rewrite W64.size_w2bits size_cat size_int2bs size_nseq /= e1 => h1 h2.
+  move: h1 h2; rewrite W64.size_w2bits' size_cat size_int2bs size_nseq /= e1 => h1 h2.
   by rewrite -h1 h2 count_cat count_nseq /idfun /=.
 have := count_size idfun (int2bs 8 (to_uint w)).
 have := count_ge0 idfun (int2bs 8 (to_uint w)).
@@ -58,8 +58,8 @@ rewrite /MOVEMASK_8u32 /= W32.to_uintE.
 pose bs := map W32.msb (W8u32.to_list v).
 have hsz : size bs = 8 by rewrite size_map W8u32.size_to_list.
 have -> : W32.w2bits (W32.bits2w bs) = bs ++ nseq 24 false.
-+ apply (eq_from_nth false); 1: by rewrite W32.size_w2bits size_cat size_nseq hsz.
-  move=> i; rewrite W32.size_w2bits => hi.
++ apply (eq_from_nth false); 1: by rewrite W32.size_w2bits' size_cat size_nseq hsz.
+  move=> i; rewrite W32.size_w2bits' => hi.
   rewrite W32.get_w2bits // W32.get_bits2w // nth_cat hsz.
   by case (i < 8) => h //; smt(nth_nseq nth_default).
 rewrite bs2int_cat bs2int_nseq_false hsz /=.
@@ -109,7 +109,7 @@ have hc : count idfun (W64.w2bits w) = count idfun (int2bs k (to_uint w)).
   - by rewrite -W64.to_uintE bs2int_cat bs2int_nseq_false int2bsK //; smt(W64.to_uint_cmp).
   have h1 := bs2intK (W64.w2bits w).
   have h2 := bs2intK (int2bs k (to_uint w) ++ nseq (64 - k) false).
-  move: h1 h2; rewrite W64.size_w2bits size_cat hsz size_nseq.
+  move: h1 h2; rewrite W64.size_w2bits' size_cat hsz size_nseq.
   have -> : k + max 0 (64 - k) = 64 by smt().
   rewrite e1 => h1 h2.
   by rewrite -h1 h2 count_cat count_nseq /idfun /=.

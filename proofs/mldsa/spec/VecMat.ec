@@ -17,16 +17,19 @@ import Round ZModQ Zq MLDSAParams.
 import VM VM.Vectors VM.Matrices.
 
 clone export PolyArray as LArray  with
-        op size <- lvec
-        proof ge0_size by smt(gt0_l).
+        op size <- lvec.
+lemma ge0_LArray_size : 0 <= lvec by smt(gt0_l).
+hint simplify ge0_LArray_size.
 
 clone export PolyArray as KArray  with
-        op size <- kvec
-        proof ge0_size by smt(gt0_k).
+        op size <- kvec.
+lemma ge0_KArray_size : 0 <= kvec by smt(gt0_k).
+hint simplify ge0_KArray_size.
 
 clone export PolyArray as KLMatrix  with
-        op size <- kvec*lvec
-        proof ge0_size by smt(gt0_l gt0_k).
+        op size <- kvec*lvec.
+lemma ge0_KLMatrix_size : 0 <= kvec*lvec by smt(gt0_l gt0_k).
+hint simplify ge0_KLMatrix_size.
 
 theory PolyLVec.
 type polylvec = poly LArray.t.

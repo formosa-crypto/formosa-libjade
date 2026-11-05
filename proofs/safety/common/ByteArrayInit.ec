@@ -42,11 +42,22 @@ proof. by rewrite eqT /is_init => i _ _; apply (init_arrP witness). qed.
 
 hint simplify in safety : is_init_le0, is_init_cell_init_arr, is_init_init_arr.
 
+(* the conditional initialisation of the contracts, `is_arr_init(a, k,
+   (c ? l : 0))`, as the disjunction the proofs state (not a simplify
+   hint: its left-hand side is not first order) *)
+lemma is_init_if t k l (c : bool) :
+  is_init t k (if c then l else 0) = (!c \/ is_init t k l).
+proof.
+case: c => /=.
+- done.
+by rewrite is_init_le0.
+qed.
+
 (* a fully initialised witness is the constant array *)
 lemma is_init_full t l : l = A.size =>
   is_init t 0 l = (t = init_arr (W8.of_int 255)).
 proof.
-move=> ->; apply eq_iff; split=> [h|->] //.
+move=> ->; apply eq_iff; split=> [h|->]; last by rewrite is_init_init_arr.
 apply ext_eq => i hi; rewrite initE hi /=.
 by have := h i _ _; 1,2:smt(); rewrite /is_init_cell hi.
 qed.
@@ -170,13 +181,14 @@ import Asmall Abig.
    inside the range, outside, covers it, or overlaps one of its ends. *)
 
 lemma is_init_set_sub_in t i s k l :
+  0 <= Asmall.size => 0 <= Abig.size =>
   0 <= i => i + Asmall.size <= Abig.size => k <= i => i + Asmall.size <= k + l =>
   Abig.is_init (set_sub t i s) k l =
     (Asmall.is_init s 0 Asmall.size /\
      Abig.is_init t k (i - k) /\
      Abig.is_init t (i + Asmall.size) (k + l - (i + Asmall.size))).
 proof.
-move=> *; have ? := Asmall.ge0_size; have ? := Abig.ge0_size.
+move=> *.
 rewrite /is_init; apply eq_iff; split.
 + move=> h; do! split.
   + by move=> j ??; have := h (i + j) _ _; 1,2:smt(); rewrite is_init_cell_set /#.
@@ -186,32 +198,35 @@ by move=> h j ??; rewrite is_init_cell_set /#.
 qed.
 
 lemma is_init_set_sub_out t i s k l :
+  0 <= Asmall.size => 0 <= Abig.size =>
   k + l <= i \/ i + Asmall.size <= k =>
   Abig.is_init (set_sub t i s) k l = Abig.is_init t k l.
 proof.
-move=> *; have ? := Asmall.ge0_size; have ? := Abig.ge0_size.
+move=> *.
 rewrite /is_init; apply eq_iff; split.
 + by move=> h j ??; have := h j _ _; 1,2:smt(); rewrite is_init_cell_set /#.
 by move=> h j ??; have := h j _ _; 1,2:smt(); rewrite is_init_cell_set /#.
 qed.
 
 lemma is_init_set_sub_sub t i s k l :
+  0 <= Asmall.size => 0 <= Abig.size =>
   0 <= i => i + Asmall.size <= Abig.size => i <= k => k + l <= i + Asmall.size =>
   Abig.is_init (set_sub t i s) k l = Asmall.is_init s (k - i) l.
 proof.
-move=> *; have ? := Asmall.ge0_size; have ? := Abig.ge0_size.
+move=> *.
 rewrite /is_init; apply eq_iff; split.
 + by move=> h j ??; have := h (i + j) _ _; 1,2:smt(); rewrite is_init_cell_set /#.
 by move=> h j ??; have := h (j - i) _ _; 1,2:smt(); rewrite is_init_cell_set /#.
 qed.
 
 lemma is_init_set_sub_left t i s k l :
+  0 <= Asmall.size => 0 <= Abig.size =>
   0 <= i => i + Asmall.size <= Abig.size =>
   k < i => i < k + l => k + l < i + Asmall.size =>
   Abig.is_init (set_sub t i s) k l =
     (Abig.is_init t k (i - k) /\ Asmall.is_init s 0 (k + l - i)).
 proof.
-move=> *; have ? := Asmall.ge0_size; have ? := Abig.ge0_size.
+move=> *.
 rewrite /is_init; apply eq_iff; split.
 + move=> h; split.
   + by move=> j ??; have := h j _ _; 1,2:smt(); rewrite is_init_cell_set /#.
@@ -220,13 +235,14 @@ by move=> h j ??; rewrite is_init_cell_set /#.
 qed.
 
 lemma is_init_set_sub_right t i s k l :
+  0 <= Asmall.size => 0 <= Abig.size =>
   0 <= i => i + Asmall.size <= Abig.size =>
   i < k => k < i + Asmall.size => i + Asmall.size < k + l =>
   Abig.is_init (set_sub t i s) k l =
     (Asmall.is_init s (k - i) (i + Asmall.size - k) /\
      Abig.is_init t (i + Asmall.size) (k + l - (i + Asmall.size))).
 proof.
-move=> *; have ? := Asmall.ge0_size; have ? := Abig.ge0_size.
+move=> *.
 rewrite /is_init; apply eq_iff; split.
 + move=> h; split.
   + by move=> j ??; have := h (i + j) _ _; 1,2:smt(); rewrite is_init_cell_set /#.

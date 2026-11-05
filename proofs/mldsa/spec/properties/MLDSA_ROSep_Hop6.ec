@@ -227,9 +227,9 @@ proof.
 proc; sp; rcondt{1} 1; 1: by auto.
 rcondf{1} 4; 1: by move=> &m; wp; call (: true); auto.
 inline{1} RoutedH.get; sp; rcondf{1} 1; 1: by move=> &m; skip => />.
-rcondf{1} 1; 1: by move=> &m; skip => />; smt(pk_len_nrel BytesPK.size_to_list).
-rcondf{1} 1; 1: by move=> &m; skip => />; have /= H := param_sets; smt(BytesPK.size_to_list).
-rcondt{1} 1; 1: by move=> &m; skip => />; smt(BytesPK.size_to_list).
+rcondf{1} 1; 1: by move=> &m; skip => />; have /= := key_sizes; smt(pk_len_nrel).
+rcondf{1} 1; 1: by move=> &m; skip => />; have /= := key_sizes; have /= := param_sets; smt().
+rcondt{1} 1; 1: by move=> &m; skip => />; have /= := key_sizes; smt().
 rcondt{1} 3; 1: by move=> &m; inline *; auto.
 inline *; auto => />.
 by move=> &1 &2 _ r _; rewrite !take_oversize ?Bytes64.size_to_list // get_set_sameE /=; smt(domE).

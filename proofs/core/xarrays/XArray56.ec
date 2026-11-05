@@ -57,7 +57,7 @@ lemma BSWAS_56u8_256_initE (a : W8.t Array56.t) o :
   have //= := BSWAS_56u8_256.BVA_asliceget_Top_CircuitBindings_BSWAS_WB_t_Top_CircuitBindings_BSWAS_WS_t_Top_CircuitBindings_BSWAS_A_t.bvaslicegetP a o _ k _; 1,2: by smt().
   move => ->.
   rewrite nth_take 1,2:/# nth_drop 1,2:/# (nth_flatten false 8).
-  + rewrite allP /= => x; rewrite mapP => He; elim He; smt(W8.size_w2bits).
+  + rewrite allP /= => x; rewrite mapP => He; elim He; smt(W8.size_w2bits').
   rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
   by rewrite get_to_list get_w2bits /#.
  qed.

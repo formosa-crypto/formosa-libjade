@@ -346,7 +346,7 @@ have HS : forall c, 0 <= c < 256 =>
 split.
 + apply Array256.tP => c hc.
   rewrite /liftm_wpoly scaleE // /lifts_wpoly mapiE //= Hout //.
-  rewrite -dotp_partial_ntt_dotp dotp_partial_lane //; 1: smt(gt0_l).
+  rewrite -dotp_partial_ntt_dotp dotp_partial_lane //.
   have [Hb hS] := HS c hc.
   have := mred_mont (W64.of_int (dot_lane lhs rhs lvec c)) _.
   + by rewrite hS; move: Hb; rewrite /q; smt().

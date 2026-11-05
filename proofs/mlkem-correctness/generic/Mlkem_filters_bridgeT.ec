@@ -127,17 +127,17 @@ lemma poprng w : W64.to_uint w < 256 => 0 <= to_uint (POPCNT_64 w).`6 <= 8.
 move => H.
 rewrite /POPCNT_64 /flags_w /rflags_of_popcnt /= !of_uintK /=.
 split => *;1:smt().
-rewrite modz_small;1: smt(count_ge0 count_size W64.size_w2bits pow2_64).
+rewrite modz_small;1: smt(count_ge0 count_size W64.size_w2bits' pow2_64).
 rewrite -(cat_take_drop 8) count_cat.
 have [->] := (count_eq0 idfun (drop 8 (w2bits w))).
 + rewrite -all_predC /predC /idfun /=; apply (all_nthP _ _ false).
-  move => i; rewrite size_drop 1://   size_w2bits /max /= => ib.
+  move => i; rewrite size_drop 1://   size_w2bits' /max /= => ib.
   rewrite nth_drop 1,2:/# get_w2bits -b2i_eq0 b2i_get 1:/#.
   have : 256 <= 2 ^ (8 + i); last by smt(W64.to_uint_cmp).
   by  smt(pow2_8 StdOrder.IntOrder.ler_weexpn2r ).
 
 move => /= *.
-smt(count_size size_take W64.size_w2bits).
+smt(count_size size_take W64.size_w2bits').
 qed.
 
 lemma get_below (_p : W16.t Array256.t) i _ctr v :
@@ -776,14 +776,14 @@ size
       (take 12
          (drop (12 * i) ((JWordList.Bytes2Bits.bytes_to_bits (take 48 (drop (to_uint _buf_offset) (bufl _buf))))))) = 12 by smt(size_take size_drop).
 
-apply (eq_from_nth witness);1: smt(W12.size_w2bits). 
+apply (eq_from_nth witness);1: smt(W12.size_w2bits'). 
 rewrite Hs3;move => k kb.
 rewrite nth_take 1,2:/# nth_drop 1,2:/# /w2bits nth_mkseq 1:/# /=.
 have h48 : 0 <= 12 * i <= 48*8 - 12 by smt().
 rewrite /bytes_to_bits (BSWAS_48u8_12_initE _ (12 * i) h48) initiE 1:/# /= initiE 1:/#  initiE 1:/# /=.
 have -> := BitEncoding.BitChunking.nth_flatten witness 8 (map W8.w2bits (take 48 (drop (to_uint _buf_offset) (bufl _buf)))) (12*i+k) _.
 + rewrite allP => x.
-  rewrite mapP => He; elim He => vv /=;smt(W8.size_w2bits).
+  rewrite mapP => He; elim He => vv /=;smt(W8.size_w2bits').
   rewrite (nth_map witness);1: by smt(size_take size_drop Array536.size_to_list).
   rewrite /w2bits nth_mkseq 1:/# /= nth_take 1,2:/# nth_drop /#.
  qed.
@@ -1340,14 +1340,14 @@ size
       (take 12
          (drop (12 * i) ((JWordList.Bytes2Bits.bytes_to_bits (take 24 (drop (to_uint _buf_offset) (bufl _buf))))))) = 12 by smt(size_take size_drop).
 
-apply (eq_from_nth witness);1: smt(W12.size_w2bits). 
+apply (eq_from_nth witness);1: smt(W12.size_w2bits'). 
 rewrite Hs3;move => k kb.
 rewrite nth_take 1,2:/# nth_drop 1,2:/# /w2bits nth_mkseq 1:/# /=.
 have h24 : 0 <= 12 * i <= 24*8 - 12 by smt().
 rewrite /bytes_to_bits (BSWAS_24u8_12_initE _ (12 * i) h24) initiE 1:/# /= initiE 1:/# initiE 1:/# /=.
 have -> := BitEncoding.BitChunking.nth_flatten witness 8 (map W8.w2bits (take 24 (drop (to_uint _buf_offset) (bufl _buf)))) (12*i+k) _.
 + rewrite allP => x.
-  rewrite mapP => He; elim He => vv /=;smt(W8.size_w2bits).
+  rewrite mapP => He; elim He => vv /=;smt(W8.size_w2bits').
   rewrite (nth_map witness);1: by smt(size_take size_drop Array536.size_to_list).
   rewrite /w2bits nth_mkseq 1:/# /= nth_take 1,2:/# nth_drop /#.
  qed.

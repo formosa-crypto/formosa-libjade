@@ -662,7 +662,7 @@ have e1 : bs2int (W64.w2bits g) = bs2int (bs ++ nseq 60 false).
 - by rewrite -W64.to_uintE hg bs2int_cat bs2int_nseq_false szb /=.
 have h1 := bs2intK (W64.w2bits g).
 have h2 := bs2intK (bs ++ nseq 60 false).
-move: h1 h2; rewrite W64.size_w2bits size_cat szb size_nseq /= e1 => h1 h2.
+move: h1 h2; rewrite W64.size_w2bits' size_cat szb size_nseq /= e1 => h1 h2.
 rewrite -h1 h2.
 by rewrite count_cat count_nseq /idfun /=.
 qed.
@@ -1022,7 +1022,7 @@ have e1 : bs2int (W64.w2bits g) = bs2int (bs ++ nseq 56 false).
 - by rewrite -W64.to_uintE hg bs2int_cat bs2int_nseq_false szb /=.
 have h1 := bs2intK (W64.w2bits g).
 have h2 := bs2intK (bs ++ nseq 56 false).
-move: h1 h2; rewrite W64.size_w2bits size_cat szb size_nseq /= e1 => h1 h2.
+move: h1 h2; rewrite W64.size_w2bits' size_cat szb size_nseq /= e1 => h1 h2.
 rewrite -h1 h2.
 by rewrite count_cat count_nseq /idfun /=.
 qed.

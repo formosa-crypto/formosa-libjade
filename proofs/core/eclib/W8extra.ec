@@ -1,5 +1,5 @@
 require import AllCore List IntDiv CoreMap IntDiv.
-from Jasmin require  import JModel JMemory.
+from Jasmin require  import JModel_x86 JMemory.
 import W8.
 
 lemma wordP_red (w1 w2 :W8.t) : (forall i, i \in iotared 0 8 => w1.[i] = w2.[i]) => w1 = w2.

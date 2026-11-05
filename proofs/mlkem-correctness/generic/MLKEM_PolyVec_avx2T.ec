@@ -4,7 +4,7 @@
 (* prevec modules, the vector ones polynomial by polynomial.            *)
 (* -------------------------------------------------------------------- *)
 require import AllCore List Int IntDiv CoreMap Real Number.
-from Jasmin require import JModel.
+from Jasmin require import JModel_x86.
 from JazzEC require import Array256.
 from Spec require import GFq Rq Serialization Correctness.
 require import W16extra MLKEMFCLib.
