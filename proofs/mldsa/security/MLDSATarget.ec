@@ -4,8 +4,16 @@ require DParams DRing DVect SampleInBallEquiv PROM.
 (** Target security spec for ML-DSA: the scheme of Dilithium.ec, extended with
     the parts of FIPS 204 whose justification belongs to the security proof:
     - ExpandA: rejection sampling of A from a public seed over a public XOF
+      (with its leakage: every candidate read on the XOF)
     - the challenge: c~ <- Hct(w1, mu), c <- SampleInBall(c~) over a public XOF,
       signatures carry c~
+    - the leakage of the signing loop: once, at the start of signing, the
+      seed [rho], the leakage of ExpandA (for every entry of A, all the
+      candidates read on the XOF, accepted or rejected) and [t0]; then at
+      every iteration (accepted or rejected) [c~], the leakage of
+      SampleInBall (its sign bytes and the pairs (position, byte) of its
+      rejection loop), [c] and the outcomes of the rejection tests that are
+      performed
     - hash-then-sign: mu <- Hmu(tr, m), tr <- Htr(pk)
     - a bounded signing loop and the FIPS 204 range for y
     The file also defines the EF-CMA security game of the scheme (random
@@ -172,11 +180,34 @@ op c_leak (c : Rq) : leakage = [List (map Int (ofRq c))].
 op t0_leak (t0 : vector) : leakage =
   [List (map (fun p => List (map Int (ofRq p))) (tolist t0))].
 
+(* Declassification of the candidates read by ExpandA for one entry of the
+   matrix (the integers of the 3-byte chunks, top bit dropped, accepted or
+   rejected) *)
+op cands_leak (vs : int list) : leakage = [List (map Int vs)].
+
 type M.       (* messages      *)
 type seed.    (* rho           *)
 type tr_t.    (* tr            *)
 type mu_t.    (* mu            *)
 type ctilde.  (* c~            *)
+
+(* Encoding of [c~] as a list of integers (FIPS 204: its bytes), with a left
+   inverse: [c~] can be read back from its declassification. *)
+op ct_enc : ctilde -> int list.
+op ct_dec : int list -> ctilde.
+axiom ct_encK : cancel ct_enc ct_dec.
+
+(* Declassification of [c~] *)
+op ct_leak (ct : ctilde) : leakage = [List (map Int (ct_enc ct))].
+
+(* Encoding of the seed [rho] as a list of integers (FIPS 204: its bytes),
+   with a left inverse, and its declassification ([rho] is part of the
+   public key). *)
+op rho_enc : seed -> int list.
+op rho_dec : int list -> seed.
+axiom rho_encK : cancel rho_enc rho_dec.
+
+op rho_leak (rho : seed) : leakage = [List (map Int (rho_enc rho))].
 
 op [lossless full uniform] dseed : seed distr.
 
@@ -264,32 +295,46 @@ module type Hash_ct = {
 (**** ExpandA                 ********)
 (*************************************)
 
+(* [poly(x)] samples the entry [x = (rho, r, s)] by rejection over the
+   stream of [x], and returns it with the list of all the candidates read
+   (accepted or rejected, in order). [get(rho)] returns the matrix and its
+   leakage: the candidates of every entry, in the order of the loops. *)
 module ExpandA (X : XOF_A) = {
-  proc get(rho : seed) : matrix = {
-    var mA, r, s, cs, ctx, b0, b1, b2, v;
+  proc poly(x : seed * int * int) : Rq * int list = {
+    var cs, vs, ctx, b0, b1, b2, v;
+    cs <- [];
+    vs <- [];
+    ctx <- 0;
+    while (size cs < n) {
+      b0 <@ X.get(x, ctx);
+      b1 <@ X.get(x, ctx + 1);
+      b2 <@ X.get(x, ctx + 2);
+      v <- to_int b0 + 256 * to_int b1 + 65536 * (to_int b2 %% 128);
+      vs <- rcons vs v;
+      if (v < q) {
+        cs <- rcons cs v;
+      }
+      ctx <- ctx + 3;
+    }
+    return (toRq cs, vs);
+  }
+
+  proc get(rho : seed) : matrix * leakage = {
+    var mA, la, r, s, a, vs;
     mA <- zerom k l;
+    la <- Empty;
     r <- 0;
     while (r < k) {
       s <- 0;
       while (s < l) {
-        cs <- [];
-        ctx <- 0;
-        while (size cs < n) {
-          b0 <@ X.get((rho, r, s), ctx);
-          b1 <@ X.get((rho, r, s), ctx + 1);
-          b2 <@ X.get((rho, r, s), ctx + 2);
-          v <- to_int b0 + 256 * to_int b1 + 65536 * (to_int b2 %% 128);
-          if (v < q) {
-            cs <- rcons cs v;
-          }
-          ctx <- ctx + 3;
-        }
-        mA <- updm mA r s (toRq cs);
+        (a, vs) <@ poly((rho, r, s));
+        mA <- updm mA r s a;
+        la <- lcat la (cands_leak vs);
         s <- s + 1;
       }
       r <- r + 1;
     }
-    return mA;
+    return (mA, la);
   }
 }.
 
@@ -299,9 +344,9 @@ module ExpandA (X : XOF_A) = {
 
 module MLDSA (XA : XOF_A, XC : SIB.XOF_t, Htr : Hash_tr, Hmu : Hash_mu, Hct : Hash_ct) = {
   proc keygen() : PK * SK = {
-    var rho, mA, s1, s2, t, pk, tr;
+    var rho, mA, la, s1, s2, t, pk, tr;
     rho <$ dseed;
-    mA  <@ ExpandA(XA).get(rho);
+    (mA, la) <@ ExpandA(XA).get(rho);
     s1  <$ dvector (dRq_ eta_) l;
     s2  <$ dvector (dRq_ eta_) k;
     t   <- mA *^ s1 + s2;
@@ -317,7 +362,7 @@ module MLDSA (XA : XOF_A, XC : SIB.XOF_t, Htr : Hash_tr, Hmu : Hash_mu, Hct : Ha
     var c : Rq;
     var ct : ctilde;
     var ctr : int;
-    var rho, tr, s1, s2, t0, mA, mu, y, w, w0, w1;
+    var rho, tr, s1, s2, t0, mA, la, mu, y, w, w0, w1;
     var lc, leak;
     var ct0_ok : bool;
     var z_fail, r0_fail, hint_fail : int option;
@@ -326,9 +371,11 @@ module MLDSA (XA : XOF_A, XC : SIB.XOF_t, Htr : Hash_tr, Hmu : Hash_mu, Hct : Ha
     hint_fail <- witness;
 
     (rho, tr, s1, s2, t0) <- sk;
-    leak <- t0_leak t0;
-
-    mA <@ ExpandA(XA).get(rho);
+    (* rho, the candidates read by ExpandA, then t0, once *)
+    leak <- rho_leak rho;
+    (mA, la) <@ ExpandA(XA).get(rho);
+    leak <- lcat leak la;
+    leak <- lcat leak (t0_leak t0);
     mu <@ Hmu.get(tr, m);
 
 
@@ -339,6 +386,7 @@ module MLDSA (XA : XOF_A, XC : SIB.XOF_t, Htr : Hash_tr, Hmu : Hash_mu, Hct : Ha
       w  <- mA *^ y;
       w1 <- highBitsV w;
       ct <@ Hct.get(w1, mu);
+      leak <- lcat leak (ct_leak ct);
       (c, lc) <@ SIB.SampleInBall(XC).get(ct);
       leak <- lcat leak lc;
       leak <- lcat leak (c_leak c);
@@ -366,11 +414,11 @@ module MLDSA (XA : XOF_A, XC : SIB.XOF_t, Htr : Hash_tr, Hmu : Hash_mu, Hct : Ha
   }
 
   proc verify(pk : PK, m : M, sig : Sig) : bool = {
-    var rho, t1, ct, ct', response, z, h, mA, tr, mu, c, lc, w1;
+    var rho, t1, ct, ct', response, z, h, mA, la, tr, mu, c, lc, w1;
     (rho, t1) <- pk;
     (ct, response) <- sig;
     (z, h) <- response;
-    mA <@ ExpandA(XA).get(rho);
+    (mA, la) <@ ExpandA(XA).get(rho);
     tr <@ Htr.get(pk);
     mu <@ Hmu.get(tr, m);
     (c, lc) <@ SIB.SampleInBall(XC).get(ct);

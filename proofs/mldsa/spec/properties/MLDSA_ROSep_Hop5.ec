@@ -30,7 +30,7 @@ module St5 = {
 (* The seed blocks are sampled directly; K in the secret key and rho' in ExpandS are constants *)
 module MLDSA_RO_DS4(H : BlockOracle, G : Oracle) = {
   proc keygen() : BytesPK.t * BytesSK.t = {
-    var eps,sk,rho,_A,s1,s2,t,t1,t0,pk,tr,bs,r0,r1;
+    var eps,sk,rho,_A,al,s1,s2,t,t1,t0,pk,tr,bs,r0,r1;
     RO_S.RO.init();
     RO_rhopp.RO.init();
     RO_v.RO.init();
@@ -40,7 +40,7 @@ module MLDSA_RO_DS4(H : BlockOracle, G : Oracle) = {
     r1 <$ dblock;
     St5.r1 <- r1;
     rho <- Bytes32.of_list (take 32 r0);
-    _A <@ ExpandA(XOFA_O(G)).sample(rho);
+    (_A,al) <@ ExpandA(XOFA_O(G)).sample(rho);
     (s1,s2) <@ ExpandS(XOFS_O(RO_S.RO)).sample(cS);
     t <- invnttv (ntt_mulmxv _A (nttv s1)) + s2;
     (t1,t0) <- Power2Round t;
@@ -278,11 +278,11 @@ proc; seq 7 7 : (={m, coins, ct, ctl, sigma, rho, tr, s1, s2, t0, glob DS2.RO2.R
                    glob RoutedH, RO_v.RO.m} /\
                  _K{2} = cK /\ Bytes32.to_list _K{1} = kb /\ renK kb RO_rhopp.RO.m{1} RO_rhopp.RO.m{2}).
 + by exlim sk{1} => s; call (skDecode_cK s); auto => /> &1 &2 *; smt().
-seq 8 8 : (={m, coins, ct, ctl, sigma, leakage, s1h, s2h, t0h, _A, mu, rhopp, glob DS2.RO2.RO,
+seq 10 10 : (={m, coins, ct, ctl, sigma, leakage, s1h, s2h, t0h, _A, mu, rhopp, glob DS2.RO2.RO,
              glob XOFA_O, glob RoutedH, RO_v.RO.m} /\
            renK kb RO_rhopp.RO.m{1} RO_rhopp.RO.m{2}).
 + wp; call (squeezepp5 kb); call (: ={DS5.RO4.RO.m}); 1: by sim.
-  call (: ={glob DS2.RO2.RO, glob XOFA_O}); 1: by sim.
+  wp; call (: ={glob DS2.RO2.RO, glob XOFA_O}); 1: by sim.
   auto => />; move=> &1 &2 _ _ mu0.
   by rewrite /rnd_to_list !size_cat !Bytes32.size_to_list Bytes64.size_to_list /= -!catA take_size_cat
        ?Bytes32.size_to_list // drop_size_cat ?Bytes32.size_to_list.
@@ -432,7 +432,7 @@ module ExpandMask_L(H : BlockOracle) = {
 (* rho'' is still sampled, by O, but no longer used *)
 module MLDSA_RO_DS5(O : RO_lp.RO, H : BlockOracle, G : Oracle) = {
   proc keygen() : BytesPK.t * BytesSK.t = {
-    var eps,sk,rho,_A,s1,s2,t,t1,t0,pk,tr,bs,r0,r1;
+    var eps,sk,rho,_A,al,s1,s2,t,t1,t0,pk,tr,bs,r0,r1;
     RO_S.RO.init();
     O.init();
     RO_v.RO.init();
@@ -443,7 +443,7 @@ module MLDSA_RO_DS5(O : RO_lp.RO, H : BlockOracle, G : Oracle) = {
     r1 <$ dblock;
     St5.r1 <- r1;
     rho <- Bytes32.of_list (take 32 r0);
-    _A <@ ExpandA(XOFA_O(G)).sample(rho);
+    (_A,al) <@ ExpandA(XOFA_O(G)).sample(rho);
     (s1,s2) <@ ExpandS(XOFS_O(RO_S.RO)).sample(cS);
     t <- invnttv (ntt_mulmxv _A (nttv s1)) + s2;
     (t1,t0) <- Power2Round t;
@@ -455,7 +455,7 @@ module MLDSA_RO_DS5(O : RO_lp.RO, H : BlockOracle, G : Oracle) = {
   }
 
   proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * leakage = {
-     var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,kp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
+     var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,al,mu,kp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
          cs2,z,r0,ct0,h,leakage,sigma,bct0,sl;
      var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
@@ -469,8 +469,10 @@ module MLDSA_RO_DS5(O : RO_lp.RO, H : BlockOracle, G : Oracle) = {
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
-     leakage <- kvec_leak t0h;
-     _A <@ ExpandA(XOFA_O(G)).sample(rho);
+     leakage <- rho_leak rho;
+     (_A,al) <@ ExpandA(XOFA_O(G)).sample(rho);
+     leakage <- lcat leakage al;
+     leakage <- lcat leakage (kvec_leak t0h);
      mu <@ DS5.RO4.RO.get(tr, m);
      kp <- Bytes32.to_list _K ++ rnd_to_list coins ++ Bytes64.to_list mu;
      O.sample((kp, 0));
@@ -484,6 +486,7 @@ module MLDSA_RO_DS5(O : RO_lp.RO, H : BlockOracle, G : Oracle) = {
        ct <@ HctPad.get(mu, w1Encode w1);
        (c, sl) <@ SampleInBall_O(DS5.RO2.RO).sample(ct);
        ctl <- ((ct, c), sl);
+       leakage <- lcat leakage (ctilde_leak ct);
        leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
        leakage <- lcat leakage (poly_leak ch);
@@ -638,12 +641,12 @@ equiv sign52 : MLDSA_RO_DS4(RoutedH, DS2.RO2.RO).sign ~ MLDSA_RO_DS5R(RoutedH, D
       ={res, glob DS2.RO2.RO, glob XOFA_O, glob RoutedH} /\ RO_rhopp.RO.m{1} = RO_lp.RO.m{2} /\
       renV RO_lp.RO.m{2} RO_v.RO.m{1} RO_v.RO.m{2}.
 proof.
-proc; seq 13 13 : (={sk, m, coins, ct, ctl, sigma, leakage, rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu,
+proc; seq 15 15 : (={sk, m, coins, ct, ctl, sigma, leakage, rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu,
                      glob DS2.RO2.RO, glob XOFA_O, glob RoutedH} /\
                    RO_rhopp.RO.m{1} = RO_lp.RO.m{2} /\ renV RO_lp.RO.m{2} RO_v.RO.m{1} RO_v.RO.m{2} /\
                    !rcoll RO_lp.RO.m{2}).
 + by call (: ={DS5.RO4.RO.m});
-    [by sim | call (: ={glob DS2.RO2.RO, glob XOFA_O}); [by sim | wp; call (: true); [by sim | auto]]].
+    [by sim | wp; call (: ={glob DS2.RO2.RO, glob XOFA_O}); [by sim | wp; call (: true); [by sim | auto]]].
 seq 2 3 : (={sk, m, coins, ct, ctl, sigma, leakage, s1h, s2h, t0h, _A, mu, glob DS2.RO2.RO, glob XOFA_O,
              glob RoutedH} /\
            RO_rhopp.RO.m{1} = RO_lp.RO.m{2} /\ (kp{2}, 0) \in RO_lp.RO.m{2} /\
@@ -691,13 +694,13 @@ proof. by proc; inline *; auto => />; apply dlist_ll; apply W8.dword_ll. qed.
 
 lemma sign5_ll : islossless MLDSA_RO_DS5R(RoutedH, DS2.RO2.RO).sign.
 proof.
-proc; seq 19 : true => //; last by if; [call sigEncode_ll | ].
+proc; seq 21 : true => //; last by if; [call sigEncode_ll | ].
 while true (kappa_max - kappa).
 + move=> z; wp; call sib_XC_ll; call hctpad_ll; wp; call (emaskL_ll RO_v.RO RO_v_get_ll).
   by auto => /#.
 wp; call RO_lp_sample_ll; wp; call (: true);
   1: by auto => />; rewrite /dbytes64; apply dmap_ll; apply dlist_ll; apply W8.dword_ll.
-call expandA_ll; wp; call (: true).
+wp; call expandA_ll; wp; call (: true).
 + while true (kvec - i); 1: by move=> z; auto => /#.
   wp; while true (kvec - i); 1: by move=> z; auto => /#.
   by wp; while true (lvec - i); [by move=> z; auto => /# | auto => /#].
@@ -712,11 +715,11 @@ qed.
 
 hoare sign5_coll : MLDSA_RO_DS5R(RoutedH, DS2.RO2.RO).sign : rcoll RO_lp.RO.m ==> rcoll RO_lp.RO.m.
 proof.
-proc; seq 19 : (rcoll RO_lp.RO.m); 2: by if; [call (: true); [by conseq /> | auto] | auto].
+proc; seq 21 : (rcoll RO_lp.RO.m); 2: by if; [call (: true); [by conseq /> | auto] | auto].
 while (rcoll RO_lp.RO.m).
 + by wp; call (: true); [by conseq /> | call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]]].
-seq 13 : (rcoll RO_lp.RO.m).
-+ by call (: true); [by conseq /> | call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]]].
+seq 15 : (rcoll RO_lp.RO.m).
++ by call (: true); [by conseq /> | wp; call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]]].
 inline *; auto => />.
 by move=> &hr k1 k2 h1 h2 h12 he r1 _ hk; apply rcoll_set => //; exists k1 k2.
 qed.
@@ -740,12 +743,12 @@ qed.
 hoare sign5_keys : MLDSA_RO_DS5R(RoutedH, DS2.RO2.RO).sign :
   (forall k, k \in RO_lp.RO.m <=> k \in St6.keys) ==> (forall k, k \in RO_lp.RO.m <=> k \in St6.keys).
 proof.
-proc; seq 19 : (forall k, k \in RO_lp.RO.m <=> k \in St6.keys);
+proc; seq 21 : (forall k, k \in RO_lp.RO.m <=> k \in St6.keys);
   2: by if; [call (: true); [by conseq /> | auto] | auto].
 while (forall k, k \in RO_lp.RO.m <=> k \in St6.keys).
 + by wp; call (: true); [by conseq /> | call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]]].
-seq 13 : (forall k, k \in RO_lp.RO.m <=> k \in St6.keys).
-+ by call (: true); [by conseq /> | call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]]].
+seq 15 : (forall k, k \in RO_lp.RO.m <=> k \in St6.keys).
++ by call (: true); [by conseq /> | wp; call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]]].
 by inline *; auto => /> &hr h r _; smt(mem_set).
 qed.
 
@@ -933,7 +936,7 @@ local module D6 (O : RO_lp.RO) = {
   }
 
   proc distinguish() : bool = {
-    var sk,rho,_A,s1,s2,t,t1,t0,pk,tr,bs,r0,m,s,b;
+    var sk,rho,_A,al,s1,s2,t,t1,t0,pk,tr,bs,r0,m,s,b;
     RoutedH.init();
     DS2.RO2.RO.init();
     DS2.EUF_CMA.qs <- [];
@@ -943,7 +946,7 @@ local module D6 (O : RO_lp.RO) = {
     St6.keys <- [];
     r0 <$ dblock;
     rho <- Bytes32.of_list (take 32 r0);
-    _A <@ ExpandA(XOFA_O(DS2.RO2.RO)).sample(rho);
+    (_A,al) <@ ExpandA(XOFA_O(DS2.RO2.RO)).sample(rho);
     (s1,s2) <@ ExpandS(XOFS_O(RO_S.RO)).sample(cS);
     t <- invnttv (ntt_mulmxv _A (nttv s1)) + s2;
     (t1,t0) <- Power2Round t;
@@ -1172,12 +1175,12 @@ local hoare OS6_sign (n : int) : D6(RO_lp.LRO).OS.sign :
 proof.
 proc; call (: size St6.keys = n /\ RO_lp.RO.m = empty ==> size St6.keys = n + 1 /\ RO_lp.RO.m = empty);
   2: by auto.
-proc; seq 19 : (size St6.keys = n + 1 /\ RO_lp.RO.m = empty);
+proc; seq 21 : (size St6.keys = n + 1 /\ RO_lp.RO.m = empty);
   2: by if; [call (: true); [by conseq /> | auto] | auto].
 while (size St6.keys = n + 1 /\ RO_lp.RO.m = empty).
 + by wp; call (: true); [by conseq /> | call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]]].
-seq 13 : (size St6.keys = n /\ RO_lp.RO.m = empty).
-+ by call (: true); [by conseq /> | call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]]].
+seq 15 : (size St6.keys = n /\ RO_lp.RO.m = empty).
++ by call (: true); [by conseq /> | wp; call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]]].
 by inline *; auto => /> /#.
 qed.
 

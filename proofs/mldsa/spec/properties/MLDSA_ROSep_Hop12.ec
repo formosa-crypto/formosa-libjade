@@ -333,10 +333,10 @@ equiv expandA_eq : ExpandA(XOFA_O(DS5.RO1.RO)).sample ~ ExpandA(XOFA_O(XAw(DST.R
   ={rho, glob XOFA_O} /\ rel_xa DS5.RO1.RO.m{1} DST.RO1.RO.m{2} RO_xr.RO.m{2}
   ==> ={res, glob XOFA_O} /\ rel_xa DS5.RO1.RO.m{1} DST.RO1.RO.m{2} RO_xr.RO.m{2}.
 proof.
-proc; while (={r, aa, rho, glob XOFA_O} /\ rel_xa DS5.RO1.RO.m{1} DST.RO1.RO.m{2} RO_xr.RO.m{2}); 2: by auto.
-wp; while (={r, s, aa, rho, glob XOFA_O} /\ rel_xa DS5.RO1.RO.m{1} DST.RO1.RO.m{2} RO_xr.RO.m{2}); 2: by auto.
+proc; while (={r, aa, al, rho, glob XOFA_O} /\ rel_xa DS5.RO1.RO.m{1} DST.RO1.RO.m{2} RO_xr.RO.m{2}); 2: by auto.
+wp; while (={r, s, aa, al, rho, glob XOFA_O} /\ rel_xa DS5.RO1.RO.m{1} DST.RO1.RO.m{2} RO_xr.RO.m{2}); 2: by auto.
 wp; call (: ={glob XOFA_O} /\ rel_xa DS5.RO1.RO.m{1} DST.RO1.RO.m{2} RO_xr.RO.m{2}); 2: by auto.
-while (={j, c, glob XOFA_O} /\ rel_xa DS5.RO1.RO.m{1} DST.RO1.RO.m{2} RO_xr.RO.m{2}); 1: by wp; call xofa_next; auto.
+while (={j, c, vs, glob XOFA_O} /\ rel_xa DS5.RO1.RO.m{1} DST.RO1.RO.m{2} RO_xr.RO.m{2}); 1: by wp; call xofa_next; auto.
 by inline *; auto.
 qed.
 
@@ -377,11 +377,11 @@ equiv sign_12 :
       rel_ct DS10.RO5.RO.m{1} DST.RO5.RO.m{2}.
 proof.
 proc.
-seq 12 12 : (={coins, ct, ctl, sigma, leakage, rho, tr, s1, s2, t0, _A, mu, kappa, zh, glob XOFA_O, RO_y.RO.m} /\
+seq 14 14 : (={coins, ct, ctl, sigma, leakage, rho, tr, s1, s2, t0, _A, mu, kappa, zh, glob XOFA_O, RO_y.RO.m} /\
              DS5.RO4.RO.m{1} = DST.RO4.RO.m{2} /\ rel_xa DS5.RO1.RO.m{1} DST.RO1.RO.m{2} RO_xr.RO.m{2} /\
              rel_xc RO_xc.RO.m{1} DST.RO2.RO.m{2} /\ rel_ct DS10.RO5.RO.m{1} DST.RO5.RO.m{2}).
 + wp; call (: DS5.RO4.RO.m{1} = DST.RO4.RO.m{2}); 1: by auto.
-  by call expandA_eq; auto.
+  by wp; call expandA_eq; auto.
 seq 1 1 : (={zh, ct, sigma, leakage, glob XOFA_O, RO_y.RO.m} /\ DS5.RO4.RO.m{1} = DST.RO4.RO.m{2} /\
            rel_xa DS5.RO1.RO.m{1} DST.RO1.RO.m{2} RO_xr.RO.m{2} /\ rel_xc RO_xc.RO.m{1} DST.RO2.RO.m{2} /\
            rel_ct DS10.RO5.RO.m{1} DST.RO5.RO.m{2}).

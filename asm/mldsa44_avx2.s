@@ -4656,6 +4656,7 @@ ml_dsa_44_keygen:
 	call	.L__derive_commitment_hash$1
 .L__sign_internal$103:
 	leaq	248(%rsp), %rsp
+// declassify_mem 32 [RSP + 32]
 	leaq	8416(%rsp), %rax
 	leaq	32(%rsp), %rcx
 	vpxor	%ymm0, %ymm0, %ymm0

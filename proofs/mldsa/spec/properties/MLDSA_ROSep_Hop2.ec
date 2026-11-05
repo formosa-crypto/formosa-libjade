@@ -603,7 +603,7 @@ equiv sign_set : MLDSA_RO(DS2.RO1.RO, DS2.RO2.RO).sign_derand ~ MLDSA_RO(RoutedH
       inv_view DS2.RO1.RO.m{1} RoutedH.trset{2} RoutedH.tr{2} DS5.RO3.RO.m{2} DS5.RO4.RO.m{2}
                DS5.RO5.RO.m{2} DS5.RO2.RO.m{2} RO_rest.RO.m{2} RO_pad.RO.m{2}.
 proof.
-proc; seq 18 18 : (={sk, m, coins, rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp, kappa,
+proc; seq 20 20 : (={sk, m, coins, rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp, kappa,
                      zh, ct, ctl, sigma, leakage, glob DS2.RO2.RO, glob XOFA_O} /\
                    RoutedH.trset{2} /\
                    inv_view DS2.RO1.RO.m{1} RoutedH.trset{2} RoutedH.tr{2} DS5.RO3.RO.m{2}
@@ -617,7 +617,7 @@ proc; seq 18 18 : (={sk, m, coins, rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, m
                   RO_pad.RO.m{2}).
   + by wp; call sibro_set; wp; call emask_set; auto.
   wp; call squeeze_set; wp; call squeeze_set.
-  call (: ={glob DS2.RO2.RO, glob XOFA_O}); 1: by sim.
+  wp; call (: ={glob DS2.RO2.RO, glob XOFA_O}); 1: by sim.
   by wp; call (: true); [sim | auto].
 if => //.
 by call (: true); [sim | auto].
@@ -673,14 +673,14 @@ qed.
 hoare sign_keep (b : bool) : MLDSA_RO(RoutedH, DS2.RO2.RO).sign_derand :
   RoutedH.trset /\ RoutedH.bad = b ==> RoutedH.trset /\ RoutedH.bad = b.
 proof.
-proc; seq 18 : (RoutedH.trset /\ RoutedH.bad = b);
+proc; seq 20 : (RoutedH.trset /\ RoutedH.bad = b);
   2: by if; [call (: true); [by conseq /> | auto] | auto].
 while (RoutedH.trset /\ RoutedH.bad = b).
 + inline SIB_RO_O(RoutedH).get ExpandMask_O(RoutedH).sample; wp; call (sib_keep b); wp.
   call (squeeze_keep b); wp.
   by while (RoutedH.trset /\ RoutedH.bad = b); [wp; call (squeeze_keep b); auto | auto].
 by wp; call (squeeze_keep b); wp; call (squeeze_keep b);
-   call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]].
+   wp; call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]].
 qed.
 
 hoare verify_keep (b : bool) : MLDSA_RO_DS1(RoutedH, DS2.RO2.RO).verify :
@@ -781,11 +781,11 @@ lemma sign_ll (H <: BlockOracle) :
   islossless H.get => islossless SampleInBall_O(H).sample =>
   islossless MLDSA_RO(H, DS2.RO2.RO).sign_derand.
 proof.
-move=> H_ll S_ll; proc; seq 18 : true => //.
+move=> H_ll S_ll; proc; seq 20 : true => //.
 + while true (kappa_max - kappa);
     1: by move=> z; inline SIB_RO_O(H).get; wp; call S_ll; wp; call (Squeeze_ll H H_ll); wp;
           call (emask_ll H H_ll); auto => /#.
-  wp; call (Squeeze_ll H H_ll); wp; call (Squeeze_ll H H_ll); call expandA_ll; wp; call (: true).
+  wp; call (Squeeze_ll H H_ll); wp; call (Squeeze_ll H H_ll); wp; call expandA_ll; wp; call (: true).
   + while true (kvec - i); 1: by move=> z; auto => /#.
     wp; while true (kvec - i); 1: by move=> z; auto => /#.
     by wp; while true (lvec - i); [by move=> z; auto => /# | auto => /#].

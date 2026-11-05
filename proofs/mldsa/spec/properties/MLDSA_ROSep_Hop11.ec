@@ -128,7 +128,7 @@ module SampleInBall_B(G : DS11.POracle2) = {
           c.[W8.to_uint j] <- if h.[i+tau-256] then incoeff (-1) else incoeff (1);
           i <- i + 1;
       }
-      return (c, pairs_to_leakage leak);
+      return (c, lcat (signs_leak s) (pairs_to_leakage leak));
    }
 }.
 
@@ -192,7 +192,7 @@ module MLDSA_RO_DS11(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DS11.POracle3
 
   proc sign(sk : Bytes32.t * Bytes64.t * polylvec * polykvec * polykvec, m : W8.t list) :
     BytesSig.t option * leakage = {
-     var coins,rho,tr,s1,s2,t0,_A,mu,kappa,y,w,w1,ctl,ct,c,cs1,cs2,z,r0,ct0,h,leakage,sigma,bct0,sl;
+     var coins,rho,tr,s1,s2,t0,_A,al,mu,kappa,y,w,w1,ctl,ct,c,cs1,cs2,z,r0,ct0,h,leakage,sigma,bct0,sl;
      var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
      coins <$ drnd;
@@ -202,8 +202,10 @@ module MLDSA_RO_DS11(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DS11.POracle3
      rf <- witness;
      hf <- witness;
      (rho,tr,s1,s2,t0) <- sk;
-     leakage <- kvec_leak (nttv t0);
-     _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+     leakage <- rho_leak rho;
+     (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
+     leakage <- lcat leakage al;
+     leakage <- lcat leakage (kvec_leak (nttv t0));
      mu <@ Hmu.get(tr, m);
      kappa <- 0;
      zh <- None;
@@ -214,6 +216,7 @@ module MLDSA_RO_DS11(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DS11.POracle3
        ct <@ Hct.get(w1, mu);
        (c, sl) <@ SampleInBall_B(XC).sample(ct);
        ctl <- ((ct, c), sl);
+       leakage <- lcat leakage (ctilde_leak ct);
        leakage <- lcat leakage ctl.`2;
        leakage <- lcat leakage (poly_leak (ntt c));
        cs1 <- psmul c s1;
@@ -244,13 +247,13 @@ module MLDSA_RO_DS11(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DS11.POracle3
   }
 
   proc verify(pk : BytesPK.t, m : W8.t list, sigma : BytesSig.t) : bool = {
-    var rho,t1,c,l,ct,z,h,rb,_A,tr,mu,wapprox,w1,ctp;
+    var rho,t1,c,l,ct,z,h,rb,_A,al,tr,mu,wapprox,w1,ctp;
     w1 <- witness;
     rb <- false;
     (rho,t1) <@ PkEncDec.pkDecode(pk);
     (ct,z,h) <@ SigEncDec.sigDecode(sigma);
     if (h <> None) {
-      _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+      (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
       tr <@ Htr.get(pk);
       mu <@ Hmu.get(tr, m);
       (c,l) <@ SampleInBall_B(XC).sample(ct);
@@ -484,11 +487,11 @@ equiv sign1011 :
       blkrel DS5.RO2.RO.m{1} RO_xc.RO.m{2}.
 proof.
 proc.
-seq 12 12 : (={coins, ct, ctl, sigma, leakage, rho, tr, s1, s2, t0, _A, mu, kappa, zh, glob DS5.RO1.RO,
+seq 14 14 : (={coins, ct, ctl, sigma, leakage, rho, tr, s1, s2, t0, _A, mu, kappa, zh, glob DS5.RO1.RO,
                DS5.RO4.RO.m, DS10.RO5.RO.m, glob XOFA_O, RO_y.RO.m} /\
              blkrel DS5.RO2.RO.m{1} RO_xc.RO.m{2}).
 + wp; call (: ={DS5.RO4.RO.m}); 1: by sim.
-  call (: ={glob DS5.RO1.RO, glob XOFA_O}); 1: by sim.
+  wp; call (: ={glob DS5.RO1.RO, glob XOFA_O}); 1: by sim.
   by auto.
 seq 1 1 : (={zh, ct, sigma, leakage, glob DS5.RO1.RO, DS5.RO4.RO.m, DS10.RO5.RO.m, glob XOFA_O, RO_y.RO.m} /\
            blkrel DS5.RO2.RO.m{1} RO_xc.RO.m{2}).
@@ -536,7 +539,7 @@ equiv sign11b :
   ==> ={res, glob DS5.RO1.RO, RO_xc.RO.m, DS5.RO4.RO.m, DS10.RO5.RO.m, glob XOFA_O, RO_y.RO.m}.
 proof.
 proc.
-seq 13 13 : (={zh, ct, sigma, leakage, glob DS5.RO1.RO, RO_xc.RO.m, DS5.RO4.RO.m, DS10.RO5.RO.m, glob XOFA_O,
+seq 15 15 : (={zh, ct, sigma, leakage, glob DS5.RO1.RO, RO_xc.RO.m, DS5.RO4.RO.m, DS10.RO5.RO.m, glob XOFA_O,
                RO_y.RO.m}); 2: by sim.
 while (={coins, ct, ctl, sigma, leakage, s1, s2, t0, _A, mu, kappa, zh, glob DS5.RO1.RO, RO_xc.RO.m,
          DS5.RO4.RO.m, DS10.RO5.RO.m, glob XOFA_O, RO_y.RO.m}).
@@ -545,7 +548,7 @@ while (={coins, ct, ctl, sigma, leakage, s1, s2, t0, _A, mu, kappa, zh, glob DS5
   wp; call (: ={RO_y.RO.m}); 1: by sim.
   by auto.
 wp; call (: ={DS5.RO4.RO.m}); 1: by sim.
-call (: ={glob DS5.RO1.RO, glob XOFA_O}); 1: by sim.
+wp; call (: ={glob DS5.RO1.RO, glob XOFA_O}); 1: by sim.
 by auto.
 qed.
 

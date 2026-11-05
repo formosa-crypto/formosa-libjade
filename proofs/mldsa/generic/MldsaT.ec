@@ -16625,6 +16625,7 @@ module M = {
       (* Erased call to spill *)
       commitment_hash <@ __derive_commitment_hash (commitment_hash,
       message_representative, commitment_encoded);
+      (* Erased call to declassify *)
       verifier_challenge <@ sample____challenge (verifier_challenge,
       commitment_hash);
       (* Erased call to unspill *)

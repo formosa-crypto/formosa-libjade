@@ -42,7 +42,8 @@ seq 7 6 : (={DST.RO2.RO.m} /\ x{2} = rho{1} /\ r{1} = signs{2} /\ size signs{2} 
   by auto => />; smt().
 seq 5 1 : (={i, DST.RO2.RO.m} /\ x{2} = rho{1} /\ pos{1} = ctx{2} /\
            leak{1} = leak{2} /\ h{1} = MP.T.SIB.to_bool_list signs{2} /\ size challenge{2} = 256 /\
-           (forall k, 0 <= k < 256 => c{1}.[k] = incoeff (nth 0 challenge{2} k)) /\ 0 <= i{1}).
+           (forall k, 0 <= k < 256 => c{1}.[k] = incoeff (nth 0 challenge{2} k)) /\ 0 <= i{1} /\
+           signs{2} = Bytes8.to_list s{1}).
 + auto => />.
   move=> &2 hs.
   rewrite Bytes8.of_listK // /BytesToBits /MP.T.SIB.to_bool_list /(\o) /=.
@@ -52,19 +53,22 @@ seq 5 1 : (={i, DST.RO2.RO.m} /\ x{2} = rho{1} /\ pos{1} = ctx{2} /\
   move=> k hk0 hk; rewrite nth_nseq //= /poly_zero Array256.createiE //; smt(incoeff0).
 while (={i, DST.RO2.RO.m} /\ x{2} = rho{1} /\ pos{1} = ctx{2} /\
        leak{1} = leak{2} /\ h{1} = MP.T.SIB.to_bool_list signs{2} /\ size challenge{2} = 256 /\
-       (forall k, 0 <= k < 256 => c{1}.[k] = incoeff (nth 0 challenge{2} k)) /\ 0 <= i{1}).
+       (forall k, 0 <= k < 256 => c{1}.[k] = incoeff (nth 0 challenge{2} k)) /\ 0 <= i{1} /\
+           signs{2} = Bytes8.to_list s{1}).
 - inline{1} XCw(DST.RO2.RO).get.
   unroll{2} 2.
   rcondt{2} 2; 1: by auto => /> /#.
   seq 5 5 : (={i, DST.RO2.RO.m} /\ x{2} = rho{1} /\ pos{1} = ctx{2} /\ j{2} = to_uint j{1} /\
              leak{1} = leak{2} /\ h{1} = MP.T.SIB.to_bool_list signs{2} /\ size challenge{2} = 256 /\
-             (forall k, 0 <= k < 256 => c{1}.[k] = incoeff (nth 0 challenge{2} k)) /\ 0 <= i{1} < 256).
+             (forall k, 0 <= k < 256 => c{1}.[k] = incoeff (nth 0 challenge{2} k)) /\ 0 <= i{1} < 256 /\
+             signs{2} = Bytes8.to_list s{1}).
   + wp; call (: ={DST.RO2.RO.m}); 1: by sim.
     auto => />; smt(BytesCT.to_listK).
   wp.
   while (={i, DST.RO2.RO.m} /\ x{2} = rho{1} /\ pos{1} = ctx{2} /\ j{2} = to_uint j{1} /\
          leak{1} = leak{2} /\ h{1} = MP.T.SIB.to_bool_list signs{2} /\ size challenge{2} = 256 /\
-         (forall k, 0 <= k < 256 => c{1}.[k] = incoeff (nth 0 challenge{2} k)) /\ 0 <= i{1} < 256).
+         (forall k, 0 <= k < 256 => c{1}.[k] = incoeff (nth 0 challenge{2} k)) /\ 0 <= i{1} < 256 /\
+             signs{2} = Bytes8.to_list s{1}).
   + wp; call (: ={DST.RO2.RO.m}); 1: by sim.
     auto => />; smt(BytesCT.to_listK).
   auto => />.
@@ -76,8 +80,8 @@ while (={i, DST.RO2.RO.m} /\ x{2} = rho{1} /\ pos{1} = ctx{2} /\
   rewrite !Array256.get_setE; 1,2: smt().
   rewrite !nth_put ?size_put ?hsz; 1,2: smt().
   case: (k = to_uint j) => [-> /= | hkj].
-  + have -> : (MP.T.SIB.to_bool_list signs{2}).[i{2} + tau - n] = MP.T.SIB.to_bool signs{2} (i{2} + tau - n) by done.
-    by case: (MP.T.SIB.to_bool signs{2} (i{2} + tau - n)).
+  + have -> : (MP.T.SIB.to_bool_list (Bytes8.to_list s{1})).[i{2} + tau - n] = MP.T.SIB.to_bool (Bytes8.to_list s{1}) (i{2} + tau - n) by done.
+    by case: (MP.T.SIB.to_bool (Bytes8.to_list s{1}) (i{2} + tau - n)).
   rewrite (_ : (to_uint j = k) = false) 1:/# /=.
   case: (k = i{2}) => [-> /= | hki]; 2: by rewrite (_ : (i{2} = k) = false) 1:/# /= hc.
   rewrite hc //; smt(nth_change_dfl).
@@ -93,10 +97,10 @@ qed.
 module MLDSA_RO_DS15(XA : DST.POracle1, XC : DST.POracle2, Htr : DST.POracle3, Hmu : DST.POracle4,
                      Hct : DST.POracle5) = {
   proc keygen() : BytesPK.t * MP.T.SK = {
-    var rho, mA, s1, s2, t, pk, tr;
+    var rho, mA, la, s1, s2, t, pk, tr;
     RO_y.RO.init();
     rho <$ dxi;
-    mA <@ MP.T.ExpandA(XA).get(rho);
+    (mA, la) <@ MP.T.ExpandA(XA).get(rho);
     s1 <$ dvector (DR.dRq_ Eta) lvec;
     s2 <$ dvector (DR.dRq_ Eta) kvec;
     t <- mA *^ s1 + s2;
@@ -106,15 +110,17 @@ module MLDSA_RO_DS15(XA : DST.POracle1, XC : DST.POracle2, Htr : DST.POracle3, H
   }
 
   proc sign(sk : MP.T.SK, m : W8.t list) : BytesSig.t option * leakage = {
-    var coins, rho, tr, s1, s2, t0, mA, mu, kappa, y, w, w1, ct, c, lc, z, h, leakage, sigma, w0, ct0_ok;
+    var coins, rho, tr, s1, s2, t0, mA, la, mu, kappa, y, w, w1, ct, c, lc, z, h, leakage, sigma, w0, ct0_ok;
     var z_fail, r0_fail, hint_fail : int option;
     var zh : (vector * bool list list) option;
     coins <$ drnd;
     ct <- witness;
     sigma <- witness;
     (rho, tr, s1, s2, t0) <- sk;
-    leakage <- MP.T.t0_leak t0;
-    mA <@ MP.T.ExpandA(XA).get(rho);
+    leakage <- MP.T.rho_leak rho;
+    (mA, la) <@ MP.T.ExpandA(XA).get(rho);
+    leakage <- lcat leakage la;
+    leakage <- lcat leakage (MP.T.t0_leak t0);
     mu <@ Hmu.get(tr, m);
     kappa <- 0;
     zh <- None;
@@ -123,6 +129,7 @@ module MLDSA_RO_DS15(XA : DST.POracle1, XC : DST.POracle2, Htr : DST.POracle3, H
       w <- mA *^ vec_of_l y;
       w1 <- highBitsV w;
       ct <@ Hct.get(w1, mu);
+      leakage <- lcat leakage (MP.T.ct_leak ct);
       (c, lc) <@ MP.T.SIB.SampleInBall(XC).get(ct);
       leakage <- lcat leakage lc;
       leakage <- lcat leakage (MP.T.c_leak c);
@@ -151,13 +158,13 @@ module MLDSA_RO_DS15(XA : DST.POracle1, XC : DST.POracle2, Htr : DST.POracle3, H
   }
 
   proc verify(pk : BytesPK.t, m : W8.t list, sigma : BytesSig.t) : bool = {
-    var rho, t1, c, l, ct, z, h, rb, mA, tr, mu, w1, ctp;
+    var rho, t1, c, l, ct, z, h, rb, mA, la, tr, mu, w1, ctp;
     w1 <- witness;
     rb <- false;
     (rho, t1) <@ PkEncDec.pkDecode(pk);
     (ct, z, h) <@ SigEncDec.sigDecode(sigma);
     if (h <> None) {
-      mA <@ MP.T.ExpandA(XA).get(rho);
+      (mA, la) <@ MP.T.ExpandA(XA).get(rho);
       tr <@ Htrw(Htr).get(pk);
       mu <@ Hmu.get(tr, m);
       (c, l) <@ MP.T.SIB.SampleInBall(XC).get(ct);
@@ -185,10 +192,10 @@ equiv sign_15 :
   ==> ={res, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO4.RO, glob DST.RO5.RO, RO_y.RO.m}.
 proof.
 proc.
-seq 10 9 : (={coins, ct, sigma, leakage, rho, tr, s1, s2, t0, mA, mu, kappa, zh, glob DST.RO1.RO, glob DST.RO2.RO,
-              glob DST.RO4.RO, glob DST.RO5.RO, RO_y.RO.m}).
+seq 12 11 : (={coins, ct, sigma, leakage, rho, tr, s1, s2, t0, mA, mu, kappa, zh, glob DST.RO1.RO,
+               glob DST.RO2.RO, glob DST.RO4.RO, glob DST.RO5.RO, RO_y.RO.m}).
 + wp; call (: ={glob DST.RO4.RO}); 1: by sim.
-  call (: ={glob DST.RO1.RO}); 1: by sim.
+  wp; call (: ={glob DST.RO1.RO}); 1: by sim.
   by auto.
 seq 1 1 : (={ct, sigma, leakage, zh, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO4.RO, glob DST.RO5.RO, RO_y.RO.m}).
 + while (={coins, ct, sigma, leakage, s1, s2, t0, mA, mu, kappa, zh, glob DST.RO1.RO, glob DST.RO2.RO,
@@ -197,7 +204,7 @@ seq 1 1 : (={ct, sigma, leakage, zh, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.
   wp; call (: ={glob DST.RO5.RO}); 1: by sim.
   wp; call (: ={RO_y.RO.m}); 1: by sim.
   auto => />.
-  by move=> &2 _ y [c sl] [c' lc] /= <- ->; smt().
+  by move=> &2 _ y ct [c sl] [c' lc] /= <- ->; rewrite ct_leakE -!catA; smt().
 by if => //; wp; call (: true); [by sim | auto].
 qed.
 

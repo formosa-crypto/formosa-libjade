@@ -74,6 +74,23 @@ axiom to_concrete_inj_in (x y : int list) :
 
 type M.
 
+(* The commitment hash [c~ = Hct(w1, mu)] of ML-DSA: an abstract type with a
+   lossless distribution (the outputs of the random oracle [Hct]) and an
+   injective encoding as a list of integers, used to declassify it at every
+   signing iteration ([ct_leak]). *)
+type ctilde.
+op dct : ctilde distr.
+axiom dct_ll : is_lossless dct.
+
+op ct_enc : ctilde -> int list.
+op ct_dec : int list -> ctilde.
+axiom ct_encK : cancel ct_enc ct_dec.
+
+op ct_decl (ct : ctilde) : decl = List (map Int (ct_enc ct)).
+
+(* Declassification of [c~] *)
+op ct_leak (ct : ctilde) : leakage = [ct_decl ct].
+
 type SK = matrix * vector * vector.
 type PK = matrix * vector.
 type commit_t = high list.
@@ -94,26 +111,61 @@ have [szy hy] := SIB.to_challenge_valid y.
 exact (to_concrete_inj_in _ _ szx hx szy hy eq_xy).
 qed.
 
+(* [c~] can be read back from its leakage *)
+op ct_of_leak (l : leakage) : ctilde = ct_dec (SIB.decl_to_ints (head (Int 0) l)).
+
+lemma ct_of_leakK (ct : ctilde) : ct_of_leak (ct_leak ct) = ct.
+proof.
+rewrite /ct_of_leak /ct_leak /ct_decl /= -map_comp -{2}(ct_encK ct); congr.
+by rewrite -{2}(List.map_id (ct_enc ct)); apply List.eq_map.
+qed.
+
 (* The challenges of the simplified scheme are the outputs of the ideal
    challenge oracle [SIB.ROC] of [SampleInBallEquiv]: a pre-image computed
    by [SampleInBall] (sign bytes and accepted index bytes), the ring element
-   being [to_c c], together with the leakage of the rejected bytes.  The
-   leakage of [SampleInBall] ([SIB.full_leak], which interleaves the rejected
-   bytes and the accepted indices in time order) is a function of both, so
-   that it can be leaked by the response (see [resp_leak]). *)
-type challenge_t = SIB.challenge_ir * leakage.
+   being [to_c c], together with the leakage of the rejected bytes, and the
+   commitment hash [c~] (independent, distributed as [dct]).  The leakage of
+   [SampleInBall] ([SIB.sib_leak]: the sign bytes, then the rejected bytes
+   and the accepted indices interleaved in time order) and [c~] are
+   functions of the challenge, so that they can be leaked by the response
+   (see [resp_leak]). *)
+type challenge_t = SIB.challenge_ir * leakage * ctilde.
 
 op to_c (c : challenge_t) : Rq = to_concrete (SIB.to_challenge c.`1).
 
+op flat3 ['a 'b 'c] (p : ('a * 'b) * 'c) : 'a * 'b * 'c = (p.`1.`1, p.`1.`2, p.`2).
+op unflat3 ['a 'b 'c] (p : 'a * 'b * 'c) : ('a * 'b) * 'c = ((p.`1, p.`2), p.`3).
+
+lemma flat3K ['a 'b 'c] : cancel flat3<:'a, 'b, 'c> unflat3.
+proof. by case=> -[]. qed.
+
+lemma unflat3K ['a 'b 'c] : cancel unflat3<:'a, 'b, 'c> flat3.
+proof. by case. qed.
+
 (* The distribution of the challenges: the output distribution of the ideal
-   challenge oracle [SIB.ROC] *)
-op dC_t : challenge_t distr = SIB.dI `*` SIB.dLeakRej.
+   challenge oracle [SIB.ROC], and an independent [c~] *)
+op dC_t : challenge_t distr = dmap ((SIB.dI `*` SIB.dLeakRej) `*` dct) flat3.
 
 lemma dC_t_ll : is_lossless dC_t.
-proof. by apply dprod_ll; split; [exact SIB.dI_ll | exact SIB.dLeakRej_ll]. qed.
+proof.
+apply/dmap_ll/dprod_ll; split; 2: exact dct_ll.
+by apply dprod_ll; split; [exact SIB.dI_ll | exact SIB.dLeakRej_ll].
+qed.
 
-lemma supp_dC_t (c : challenge_t) : c \in dC_t <=> c.`1 \in SIB.dI /\ c.`2 \in SIB.dLeakRej.
-proof. exact supp_dprod. qed.
+lemma supp_dC_t (c : challenge_t) :
+  c \in dC_t <=> c.`1 \in SIB.dI /\ c.`2 \in SIB.dLeakRej /\ c.`3 \in dct.
+proof.
+rewrite /dC_t supp_dmap; split.
+- by case=> -[[ir l] ct] [] /supp_dprod [] /supp_dprod /= [h1 h2] h3 ->.
+case: c => ir l ct /= [#] h1 h2 h3; exists ((ir, l), ct).
+by rewrite /flat3 /= supp_dprod /= supp_dprod.
+qed.
+
+lemma dC_t1E (c : challenge_t) :
+  mu1 dC_t c = mu1 ((SIB.dI `*` SIB.dLeakRej) `*` dct) (unflat3 c).
+proof.
+by rewrite /dC_t (dmap1E_can _ _ unflat3) => [|a _|//]; [exact unflat3K | exact flat3K].
+qed.
 
 (* The efficient sampler of uniform pre-images of a challenge (the
    backward partial Fisher-Yates shuffle of [ChallengeFiber]). *)
@@ -156,7 +208,8 @@ axiom dC_equiv : dC tau = SIB.dC.
 (* The ring challenges are the images by [to_c] of the challenges *)
 lemma dC_t_to_c : dmap dC_t to_c = dmap SIB.dI (to_concrete \o SIB.to_challenge).
 proof.
-rewrite /dC_t (_ : to_c = (to_concrete \o SIB.to_challenge) \o fst) //.
+rewrite /dC_t dmap_comp (_ : to_c \o flat3 = ((to_concrete \o SIB.to_challenge) \o fst) \o fst) //.
+rewrite -dmap_comp (dprod_marginalL _ _ idfun) dct_ll dscalar1 dmap_id.
 by rewrite -dmap_comp (dprod_marginalL _ _ idfun) SIB.dLeakRej_ll dscalar1 dmap_id.
 qed.
 
@@ -234,8 +287,45 @@ proof* by smt(qS_ge0 qH_ge0).
 import FSaCR.
 import FSaCR.DSS.
 
-(* Signatures of the scheme with a XOF: the (ring) challenge and the response *)
-type SigXOF = Rq * response_t.
+(* Signatures of the scheme with a XOF: the commitment hash [c~], the (ring)
+   challenge and the response *)
+type SigXOF = ctilde * Rq * response_t.
+
+(* The random oracle of the scheme with a XOF answers two kinds of queries
+   on the same points [x = (w1, mu)]: the bytes of the XOF ([XB (x, i)], the
+   [i]-th byte of the stream of [x], read by [SampleInBall]) and the
+   commitment hash ([XH x], the [c~] of [x]). *)
+type xin = [ XB of (DID.W * M) * int | XH of DID.W * M ].
+type xout = [ OB of Byte.byte | OH of ctilde ].
+
+op dxout (q : xin) : xout distr =
+  with q = XB _ => dmap Byte.dB OB
+  with q = XH _ => dmap dct OH.
+
+op is_xb (q : xin) : bool =
+  with q = XB _ => true
+  with q = XH _ => false.
+
+op xb_arg (q : xin) : (DID.W * M) * int =
+  with q = XB y => y
+  with q = XH _ => witness.
+
+op xh_arg (q : xin) : DID.W * M =
+  with q = XB _ => witness
+  with q = XH x => x.
+
+(* The point [x] of a query *)
+op xarg (q : xin) : DID.W * M =
+  with q = XB y => y.`1
+  with q = XH x => x.
+
+op ob (o : xout) : Byte.byte =
+  with o = OB b => b
+  with o = OH _ => witness.
+
+op oh (o : xout) : ctilde =
+  with o = OB _ => witness
+  with o = OH c => c.
 
 clone DigitalSignaturesLeakageRO as DSSXOF with
 type DS.pk_t <- PK,
@@ -243,9 +333,9 @@ type DS.sk_t <- SK,
 type DS.msg_t <- M,
 type DS.sig_t <- SigXOF,
 type DS.lkg_t <- leakage,
-type PRO.in_t <= (DID.W * M) * int,
-type PRO.out_t <= Byte.byte,
-op   PRO.dout <= fun _ => Byte.dB,
+type PRO.in_t <= xin,
+type PRO.out_t <= xout,
+op   PRO.dout <= dxout,
 op   EFCMA.q_efcma <= qS
 proof* by smt(qS_ge0).
 
@@ -322,20 +412,23 @@ op t0_leak (t0 : vector) : leakage =
   [List (map (fun p => List (map Int (Rq_enc p))) (tolist t0))].
 
 (* Leakage of the response of one iteration, a flat list of items appended
-   with [lcat]: the leakage of [SampleInBall] (the rejected bytes and the
-   accepted indices of the challenge, in time order), the ring challenge,
-   and the outcomes of the tests that are performed.  The commitment and
+   with [lcat]: the commitment hash [c~], the leakage of [SampleInBall] (the
+   sign bytes, then the rejected bytes and the accepted indices of the
+   challenge in time order, from which the byte stream read on the XOF is
+   decodable: [SIB.leak_to_streamK]), the ring challenge, and the outcomes
+   of the tests that are performed.  The commitment and
    the random oracle of the FS+abort chain leak nothing ([Empty]), so the
    trace of [DilithiumS] is the trace of [DilithiumR] (the format of
    [MLDSATarget]) without its initial item [t0_leak t0]: [t0] is a function
    of the public key, its leakage is prepended by the reduction [RedXOF]. *)
 op resp_leak (c : challenge_t) (z_fail r0_fail hint_fail : int option) : leakage =
-  lcat (SIB.full_leak c.`1 (SIB.leakage_to_rej c.`2))
+  lcat (ct_leak c.`3)
+  (lcat (SIB.sib_leak c.`1 (SIB.leakage_to_rej c.`2))
   (lcat (c_leak (to_c c))
   (lcat (oileak z_fail)
     (if z_fail = None then
        lcat (oileak r0_fail) (if r0_fail = None then oileak hint_fail else Empty)
-     else Empty))).
+     else Empty)))).
 
 module (DilithiumS : SchemeRO)(H: Hash) = {
   proc keygen() : PK * SK = {
@@ -453,7 +546,7 @@ clone import SelfTargetMSISLeakage as RqStMSIS with
   op dR <- dRq,
   op dC <- dC_t,
   op to_R <- to_c,
-  op dfiber <- fun r => CF.dfiber r `*` SIB.dLeakRej,
+  op dfiber <- fun r => dmap ((CF.dfiber r `*` SIB.dLeakRej) `*` dct) flat3,
   op dLkgRO <- dunit Empty,
   op inf_norm <- inf_normv,
   op gamma <- max (gamma1 - beta_) (tau * 2^(d-1) + (2*gamma2+1))
@@ -463,14 +556,21 @@ realize gt0_n by smt(Params.gt0_l).
 realize dC_ll by exact dC_t_ll.
 realize dLkgRO_ll by exact dunit_ll.
 realize dfiber_supp.
-move=> r c; rewrite /dCR dC_t_to_c supp_dprod => hr [hc _]; rewrite -CF_to_c.
-by apply (CF.dfiber_supp r c.`1) => //; rewrite /CF.dCR CF_dI.
+move=> r c; rewrite /dCR dC_t_to_c => hr /supp_dmap [[[ir lr] ct]] [] /supp_dprod [] /supp_dprod /= [hc _] _ ->.
+rewrite -CF_to_c /flat3 /=.
+by apply (CF.dfiber_supp r ir) => //; rewrite /CF.dCR CF_dI.
 qed.
 
 realize dfiber_marginal.
 have -> : dCR = CF.dCR by rewrite /dCR dC_t_to_c /CF.dCR CF_dI /CF.to_c CF_to_challenge.
-rewrite /dC_t (dprod_dlet SIB.dI) -CF_dI -CF.dfiber_marginal (dlet_dlet CF.dCR).
-by apply eq_dlet => // r; exact dprod_dlet.
+have h : SIB.dI `*` SIB.dLeakRej = dlet CF.dCR (fun r => CF.dfiber r `*` SIB.dLeakRej).
+- rewrite (dprod_dlet SIB.dI) -CF_dI -CF.dfiber_marginal (dlet_dlet CF.dCR).
+  by apply eq_dlet => // r; rewrite dprod_dlet.
+have h2 : (SIB.dI `*` SIB.dLeakRej) `*` dct =
+          dlet CF.dCR (fun r => (CF.dfiber r `*` SIB.dLeakRej) `*` dct).
+- rewrite h (dprod_dlet (dlet _ _) dct) (dlet_dlet CF.dCR).
+  by apply eq_dlet => // r; rewrite dprod_dlet.
+by rewrite /dC_t h2 dmap_dlet.
 qed.
 
 module H = DSS.PRO.RO.
@@ -715,29 +815,34 @@ end section PROOF.
    bytes, sampled independently. *)
 module FiberSamplerRej : RqStMSIS.FiberSampler_t = {
   proc sample(r : Rq) : challenge_t = {
-    var ir, lr;
+    var ir, lr, ct;
     ir <@ CF.FiberSampler.sample(r);
     lr <$ SIB.dLeakRej;
-    return (ir, lr);
+    ct <$ dct;
+    return (ir, lr, ct);
   }
 }.
 
 (* The fibre-sampling program [FiberSamplerRej] samples the distribution
-   [RqStMSIS.dfiber r = CF.dfiber r `*` SIB.dLeakRej]. *)
+   [RqStMSIS.dfiber r], [CF.dfiber r `*` SIB.dLeakRej `*` dct] up to the
+   flattening of the triple. *)
 equiv FiberSamplerRej_DFiber :
   FiberSamplerRej.sample ~ RqStMSIS.DFiber.sample : ={r} ==> ={res}.
 proof.
 proc.
-transitivity{1} { ir <@ CF.FiberSamplerD.sample(r); lr <$ SIB.dLeakRej; }
-  (={r} ==> ={ir, lr}) (={r} ==> (ir, lr){1} = c{2}); 1, 2: smt().
-- by rnd; call CF.FiberSampler_dfiber; auto.
+transitivity{1} { ir <@ CF.FiberSamplerD.sample(r); lr <$ SIB.dLeakRej; ct <$ dct; }
+  (={r} ==> ={ir, lr, ct}) (={r} ==> (ir, lr, ct){1} = c{2}); 1, 2: smt().
+- by rnd; rnd; call CF.FiberSampler_dfiber; auto.
 inline *; sp; rndsem*{1} 0; rnd: *0 *0; auto => /> &2.
-have <- : CF.dfiber r{2} `*` SIB.dLeakRej =
-          dlet (CF.dfiber r{2}) (fun x => dmap SIB.dLeakRej (fun lr => (x, lr))).
-- by rewrite -(dmap_id (_ `*` _)) dmap_dprodE.
-have -> : (fun (p : CF.challenge_ir * leakage) => (p.`1, p.`2)) = (fun x => x).
+have <- : dmap ((CF.dfiber r{2} `*` SIB.dLeakRej) `*` dct) flat3 =
+          dlet (CF.dfiber r{2}) (fun x => dlet SIB.dLeakRej (fun lr =>
+            dmap dct (fun ct => (x, lr, ct)))).
+- rewrite dprod_dlet (dprod_dlet (CF.dfiber r{2})) dlet_dlet dmap_dlet.
+  apply eq_dlet => // x /=; rewrite dlet_dmap dmap_dlet; apply eq_dlet => // lr /=.
+  by rewrite /(\o) /= dmap_comp; apply eq_dmap => ct; rewrite /flat3.
+have -> : (fun (p : CF.challenge_ir * leakage * ctilde) => (p.`1, p.`2, p.`3)) = (fun x => x).
 - by apply fun_ext => -[].
-by split => // _ [] ? ?.
+by split => // _ [] ? ? ?.
 qed.
 
 (* Bridge to the standard SelfTargetMSIS assumption, where the random oracle
@@ -2049,22 +2154,24 @@ require import SmtMap.
 
 require import FSet.
 
-(* Counting wrapper for XOF queries. Following the convention of the base
-   game, only distinct [x : IN] arguments are counted: the integer index
-   of a query is ignored. *)
-module CountX(X : SIB.XOF_t) : SIB.XOF_t = {
+(* Counting wrapper for the queries to the random oracle of the scheme with
+   a XOF. Following the convention of the base game, only distinct points
+   [x = xarg q] are counted, over both kinds of queries: the integer index
+   of a byte query is ignored, and a byte query and a hash query on the same
+   point count once. *)
+module CountX(X : DSSXOF.Hash) : DSSXOF.Hash = {
   var qx : int
   var xs : (DID.W * M) fset
 
   proc init() = { qx <- 0; xs <- fset0; }
 
-  proc get(y : (DID.W * M) * int) = {
+  proc get(q : xin) = {
     var r;
-    if (y.`1 \notin xs) {
-      xs <- xs `|` fset1 y.`1;
+    if (xarg q \notin xs) {
+      xs <- xs `|` fset1 (xarg q);
       qx <- qx + 1;
     }
-    r <@ X.get(y);
+    r <@ X.get(q);
     return r;
   }
 }.
@@ -2096,14 +2203,20 @@ module CountH (H : Hash) = {
 (*** The base game: Dilithium where challenges are computed by [SampleInBall]
      on top of an (ideal) XOF ***)
 
+(* Commitment hash oracles *)
+module type HCT_t = {
+  proc get(x : DID.W * M) : ctilde
+}.
+
 (* The scheme on top of a (leaky) challenge oracle [R] returning ring
-   challenges: same computations as [DilithiumS], but the signature contains
-   the ring challenge, [verify] compares ring challenges, and the leakage is
-   the flat trace of [MLDSATarget] (every item is appended with [lcat]):
-   [t0], then, at each iteration, the leakage of the challenge oracle, the
-   challenge, and the outcomes of the tests that are performed.  This is the
-   trace of [DilithiumS] preceded by [t0_leak t0] (see [resp_leak]). *)
-module DilithiumR (R : SIB.SIB_t) = {
+   challenges and of a commitment hash oracle [HC]: same computations as
+   [DilithiumS], but the signature contains [c~] and the ring challenge,
+   [verify] compares both, and the leakage is the flat trace of
+   [MLDSATarget] (every item is appended with [lcat]): [t0], then, at each
+   iteration, [c~], the leakage of the challenge oracle, the challenge, and
+   the outcomes of the tests that are performed.  This is the trace of
+   [DilithiumS] preceded by [t0_leak t0] (see [resp_leak]). *)
+module DilithiumR (R : SIB.SIB_t, HC : HCT_t) = {
   proc keygen() : PK * SK = {
     var pk, sk;
     var mA, s1, s2, t;
@@ -2121,6 +2234,7 @@ module DilithiumR (R : SIB.SIB_t) = {
     var h : hint_t list;
     var response : response_t option;
     var c : Rq;
+    var ct : ctilde;
     var ctr : int;
     var y, w, w1;
     var mA, s1, s2;
@@ -2130,6 +2244,7 @@ module DilithiumR (R : SIB.SIB_t) = {
     var z_fail, r0_fail, hint_fail : int option;
     (* silences unused variable warning *)
     c <- witness;
+    ct <- witness;
     r0_fail <- witness;
     hint_fail <- witness;
 
@@ -2143,7 +2258,9 @@ module DilithiumR (R : SIB.SIB_t) = {
       y <$ dvector dmask l;
       w <- mA *^ y;
       w1 <- highBitsV w;
+      ct <@ HC.get(w1, m);
       (c, lc) <@ R.get(w1, m);
+      leak <- lcat leak (ct_leak ct);
       leak <- lcat leak lc;
       leak <- lcat leak (c_leak c);
       z <- y + c ** s1;
@@ -2166,43 +2283,88 @@ module DilithiumR (R : SIB.SIB_t) = {
       }
       ctr <- ctr + 1;
     }
-    return (omap (fun r => (c, r)) response, leak);
+    return (omap (fun r => (ct, c, r)) response, leak);
   }
 
   proc verify(pk: PK, m : M, sig : SigXOF) = {
-    var w1, c;
+    var w1, c, ct;
     var response;
     var z, h;
-    var cl';
+    var ct', cl';
     var mA, t, t1;
     var result;
     (mA, t) <- pk;
     t1 <- base2highbitsV t; (* t only used to compure t1 *)
 
-    (c, response) <- sig;
+    (ct, c, response) <- sig;
     (z, h) <- response;
     w1 <- useHintV h (mA *^ z - c ** base2shiftV t1);
+    ct' <@ HC.get((w1, m));
     cl' <@ R.get((w1, m));
-    result <- size z = l /\ size h = k /\ inf_normv z < gamma1 - beta_ /\ c = cl'.`1;
+    result <- size z = l /\ size h = k /\ inf_normv z < gamma1 - beta_ /\
+              c = cl'.`1 /\ ct = ct';
 
     return result;
   }
 }.
 
+(* The two oracles of the scheme on top of the random oracle on [xin] *)
+module XofOf(H : DSSXOF.Hash) : SIB.XOF_t = {
+  proc get(y : (DID.W * M) * int) = {
+    var r;
+    r <@ H.get(XB y);
+    return ob r;
+  }
+}.
+
+module HctOf(H : DSSXOF.Hash) : HCT_t = {
+  proc get(x : DID.W * M) = {
+    var r;
+    r <@ H.get(XH x);
+    return oh r;
+  }
+}.
+
+(* Conversely, the random oracle on [xin] built from the two oracles *)
+module SumOf(X : SIB.XOF_t, HC : HCT_t) : DSSXOF.Hash = {
+  proc get(q : xin) = {
+    var r, b, ct;
+    if (is_xb q) {
+      b <@ X.get(xb_arg q);
+      r <- OB b;
+    } else {
+      ct <@ HC.get(xh_arg q);
+      r <- OH ct;
+    }
+    return r;
+  }
+}.
+
 (* The scheme with a XOF, as specified by ML-DSA: the challenge and its
-   leakage are computed by [SampleInBall] on top of the XOF. *)
-module (DilithiumXOF : DSSXOF.SchemeRO)(X : SIB.XOF_t) = DilithiumR(SIB.SampleInBall(X)).
+   leakage are computed by [SampleInBall] on top of the XOF, and [c~] by
+   the commitment hash, both answered by the same random oracle. *)
+module (DilithiumXOF : DSSXOF.SchemeRO)(H : DSSXOF.Hash) =
+  DilithiumR(SIB.SampleInBall(XofOf(H)), HctOf(H)).
 module XOF = DSSXOF.PRO.RO.
 module O_CMA_XOF = DSSXOF.DS.Stateless.O_CMA_Default.
+
+(* A random oracle for the commitment hash alone *)
+clone PROM.FullRO as HctRO with
+  type in_t <- DID.W * M,
+  type out_t <- ctilde,
+  op dout <- fun _ => dct,
+  type d_in_t <- unit,
+  type d_out_t <- bool.
 
 (* The EF-CMA game against [DilithiumXOF] seen as an adversary against
    the XOF, in the sense of [SampleInBallEquiv]: [X] is the XOF given to the
    adversary, [R] the (SampleInBall-based or ideal) challenge oracle used
-   by the scheme. *)
+   by the scheme; the commitment hash is the random oracle [HctRO]. *)
 module (XOFAdv(A : DSSXOF.Adv_EFCMA_RO) : SIB.XOFAdversary)(X : SIB.XOF_t, R : SIB.SIB_t) = {
   proc run(x : unit) : bool = {
     var r;
-    r <@ DSSXOF.EFCMA.EF_CMA(DilithiumR(R), A(X), O_CMA_XOF).main();
+    HctRO.RO.init();
+    r <@ DSSXOF.EFCMA.EF_CMA(DilithiumR(R, HctRO.RO), A(SumOf(X, HctRO.RO)), O_CMA_XOF).main();
     return r;
   }
 }.
@@ -2215,7 +2377,7 @@ op recover_r (pk : PK) (c : Rq) (resp : response_t) : commit_t =
   let (z, h) = resp in
   useHintV h (mA *^ z - c ** base2shiftV (base2highbitsV t)).
 
-op conv_sig (s : Sig) : SigXOF = (to_c s.`1, s.`2).
+op conv_sig (s : Sig) : SigXOF = (s.`1.`3, to_c s.`1, s.`2).
 
 (* Conversion of a signature and of its leakage: the leakage of [t0] (a
    function of the public key [pk = (mA, t)]) is prepended to the leakage of
@@ -2234,13 +2396,38 @@ module OConv (O : SOracle_CMA) : DSSXOF.DS.Stateless.SOracle_CMA = {
   }
 }.
 
-(* The challenge oracle of [SampleInBallEquiv] on top of a random oracle of
-   the simplified scheme (whose leakage is [Empty]) *)
+(* The challenge oracle of [SampleInBallEquiv] and the commitment hash on
+   top of a random oracle of the simplified scheme (whose leakage is
+   [Empty]): the first two components and the last component of the
+   challenge. *)
 module ROCofRO (H : Hash) : SIB.ROC_t = {
   proc get(x : commit_t * M) = {
     var r;
     r <@ H.get(x);
-    return r.`1;
+    return (r.`1.`1, r.`1.`2);
+  }
+}.
+
+module CTofRO (H : Hash) : HCT_t = {
+  proc get(x : commit_t * M) = {
+    var r;
+    r <@ H.get(x);
+    return r.`1.`3;
+  }
+}.
+
+(* A cache in front of a random oracle: the oracle is queried at most once
+   per point. *)
+module CacheRO (H : Hash) : Hash = {
+  var m : (commit_t * M, challenge_t * leakage) fmap
+
+  proc get(x : commit_t * M) = {
+    var r;
+    if (x \notin m) {
+      r <@ H.get(x);
+      m.[x] <- r;
+    }
+    return oget m.[x];
   }
 }.
 
@@ -2262,29 +2449,33 @@ module CountSX (O : DSSXOF.DS.Stateless.SOracle_CMA) = {
 op bad_sig : Sig = (witness, (zerov 0, witness)).
 
 (* Reduction from an adversary against the scheme with a XOF to an adversary
-   against the simplified scheme: the XOF is simulated from the challenge
-   oracle (see [SampleInBallEquiv]; the random oracle of the simplified scheme
-   returns the outputs of the ideal challenge oracle, and an empty leakage),
-   the answers of the signing oracle are converted (the reduction knows [t]
-   hence [t0 = base2lowbitsV t], and prepends its leakage), and the forgery
-   is converted by querying the challenge oracle on the recovered commitment
-   (one additional query).  The counting
-   wrappers [CountX] and [CountSX] do not change the behaviour of the
-   reduction: they are only there so that the query bound of the reduction is
-   a syntactic instance of the query bound of [A] (see [RedA_bound]). *)
+   against the simplified scheme: the byte queries are answered by the XOF
+   simulator of [SampleInBallEquiv] on top of the challenge oracle (the
+   first two components of the random oracle of the simplified scheme), the
+   hash queries by the last component ([c~]), both through a cache so that
+   the random oracle is queried once per point; the answers of the signing
+   oracle are converted (the reduction knows [t] hence
+   [t0 = base2lowbitsV t], and prepends its leakage), and the forgery is
+   converted by querying the random oracle on the recovered commitment (one
+   additional query).  The counting wrappers [CountX] and [CountSX] do not
+   change the behaviour of the reduction: they are only there so that the
+   query bound of the reduction is a syntactic instance of the query bound
+   of [A] (see [RedA_bound]). *)
 module (RedXOF(A : DSSXOF.Adv_EFCMA_RO) : Adv_EFCMA_RO)(RO : Hash, O : SOracle_CMA) = {
   proc forge(pk : PK) : M * Sig = {
-    var m, sig, c, zh, w1, cl;
+    var m, sig, ct, c, zh, w1, cl;
     CountX.qx <- 0;
     CountX.xs <- fset0;
     CountSX.qs <- 0;
     OConv.pk <- pk;
-    SIB.Sim(ROCofRO(RO)).init();
-    (m, sig) <@ A(CountX(SIB.Sim(ROCofRO(RO))), CountSX(OConv(O))).forge(pk);
-    (c, zh) <- sig;
+    CacheRO.m <- empty;
+    SIB.Sim(ROCofRO(CacheRO(RO))).init();
+    (m, sig) <@ A(CountX(SumOf(SIB.Sim(ROCofRO(CacheRO(RO))), CTofRO(CacheRO(RO)))),
+                  CountSX(OConv(O))).forge(pk);
+    (ct, c, zh) <- sig;
     w1 <- recover_r pk c zh;
     cl <@ RO.get(w1, m);
-    return (m, if to_c cl.`1 = c then (cl.`1, zh) else bad_sig);
+    return (m, if to_c cl.`1 = c /\ cl.`1.`3 = ct then (cl.`1, zh) else bad_sig);
   }
 }.
 
@@ -2518,12 +2709,74 @@ end section PROOF.
 
 (*** Step 0 : Reduce to the game with an abstract challenge RO ***)
 
-(* The scheme with an ideal XOF [DilithiumXOF] is reduced to the simplified
-   scheme whose random oracle returns the outputs of the ideal challenge
-   oracle [SIB.ROC] (pre-image and leakage of the rejected bytes) with an
-   empty leakage, by [SampleInBallEquiv].  The leakage traces are then equal,
-   up to the initial item [t0_leak t0] which the reduction [RedXOF]
-   prepends ([conv_sigl], [sign_conv]). *)
+(* The scheme with an ideal XOF [DilithiumXOF] (one random oracle answering
+   the byte queries [XB] and the commitment hash queries [XH]) is reduced to
+   the simplified scheme whose random oracle returns the outputs of the
+   ideal challenge oracle [SIB.ROC] (pre-image and leakage of the rejected
+   bytes) and [c~], with an empty leakage: the random oracle on [xin] is
+   split into the XOF and the commitment hash ([pr_sum]), the XOF is
+   simulated from [SIB.ROC] by [SampleInBallEquiv], the two random oracles
+   [SIB.ROC] and [HctRO] on the points [(w1, mu)] are merged into one random
+   oracle on the product by eager sampling ([pr_eager], with
+   [PROM.FullEager]), which is the random oracle of the simplified scheme
+   behind the cache of [RedXOF] ([pr_merge]).  The leakage traces are then
+   equal, up to the initial item [t0_leak t0] which the reduction [RedXOF]
+   prepends ([conv_sigl], [sign_conv]).  No bound is lost. *)
+
+(* The random oracle on [xin] as a pair of random oracles: the XOF and the
+   commitment hash *)
+op sum_rel (mx : (xin, xout) fmap) (mb : ((DID.W * M) * int, Byte.byte) fmap)
+           (mh : (DID.W * M, ctilde) fmap) =
+  (forall y, mx.[XB y] = omap OB mb.[y]) /\ (forall x, mx.[XH x] = omap OH mh.[x]).
+
+(* Two random oracles on the same points (with the same domain) as one
+   random oracle of the simplified scheme, behind the cache of [RedXOF] *)
+op mrg_at (m1 : (commit_t * M, SIB.challenge_ir * leakage) fmap)
+          (m2 : (commit_t * M, ctilde) fmap) (x : commit_t * M) =
+  omap (fun (v : SIB.challenge_ir * leakage) => ((v.`1, v.`2, oget m2.[x]), Empty)) m1.[x].
+
+op jrel (m1 : (commit_t * M, SIB.challenge_ir * leakage) fmap)
+        (m2 : (commit_t * M, ctilde) fmap)
+        (mr mc : (commit_t * M, challenge_t * leakage) fmap) =
+  (forall x, x \in m1 <=> x \in m2) /\
+  (forall x, mr.[x] = mrg_at m1 m2 x) /\
+  (forall x v, mc.[x] = Some v => mr.[x] = Some v).
+
+lemma jrel_empty : jrel empty empty empty empty.
+proof. by rewrite /jrel /mrg_at; do !split => *; rewrite ?emptyE ?mem_empty. qed.
+
+lemma jrel_dom m1 m2 mr mc x : jrel m1 m2 mr mc => (x \in mr <=> x \in m1).
+proof. by case=> _ [hr _]; rewrite domE hr /mrg_at domE; case: (m1.[x]). qed.
+
+lemma jrel_get m1 m2 mr mc x :
+  jrel m1 m2 mr mc => x \in m1 =>
+  mr.[x] = Some (((oget m1.[x]).`1, (oget m1.[x]).`2, oget m2.[x]), Empty).
+proof. by case=> _ [hr _]; rewrite domE hr /mrg_at; case: (m1.[x]). qed.
+
+lemma jrel_some m1 m2 mr mc x v :
+  jrel m1 m2 mr mc => mr.[x] = Some v =>
+  x \in m1 /\ x \in m2 /\ v = (((oget m1.[x]).`1, (oget m1.[x]).`2, oget m2.[x]), Empty).
+proof.
+case=> hd [hr _]; rewrite hr /mrg_at -hd domE.
+by case: (m1.[x]) => //= w <-.
+qed.
+
+lemma jrel_set m1 m2 mr mc x a b :
+  jrel m1 m2 mr mc => x \notin m1 =>
+  jrel m1.[x <- a] m2.[x <- b] mr.[x <- ((a.`1, a.`2, b), Empty)] mc.
+proof.
+case=> hd [hr hc] hx; split => [z | ]; 1: by rewrite !mem_set hd.
+split => [z | z v]; 1: by rewrite /mrg_at !get_setE; case: (z = x) => //= _; exact hr.
+rewrite get_setE => /hc; case: (z = x) => // ->> h.
+by move: h hx; rewrite hr /mrg_at domE; case: (m1.[x]).
+qed.
+
+lemma jrel_cache m1 m2 mr mc x v :
+  jrel m1 m2 mr mc => mr.[x] = Some v => jrel m1 m2 mr mc.[x <- v].
+proof.
+case=> hd [hr hc] hv; rewrite /jrel; split => //; split => //.
+by move=> z w; rewrite get_setE; case: (z = x) => [-> <- // | _ /hc].
+qed.
 
 section XOF.
 
@@ -2531,18 +2784,20 @@ declare module A <: DSSXOF.Adv_EFCMA_RO{
   -O_CMA_Default, -H, -OpBasedSig,
   -O_CMA_Default_G, -RO_G, -OpBasedSigG,
   -ORedKOA, -CMAtoKOA.CountS, -CMAtoKOA.CountH,
-  -SIB.ORedXOFROC, -SIB.XOF.RO, -SIB.ROC.RO, -XOF, -O_CMA_XOF,
+  -SIB.ORedXOFROC, -SIB.XOF.RO, -SIB.ROC.RO, -SIB.ROC.FRO, -XOF, -O_CMA_XOF,
+  -HctRO.RO, -HctRO.FRO, -CacheRO,
   -CountS, -CountH, -CountX, -CountSX, -OConv,
   -G, -RqStMSIS.Std.PRO.RO, -RqStMSIS.ORed,
   -P, -V, -CG.FSaG.DSS.DS.Stateless.O_CMA_Default, -CG.FSaG.DSS.PRO.RO, -CG.FSaCR.DSS.DS.Stateless.O_CMA_Default, -CG.FSaCR.DSS.PRO.RO,
   -FSaG.DSS.DS.Stateless.O_CMA_Default, -FSaG.DSS.PRO.RO, -OP.P, -OP.V, -RH.RO.RO, -RH.Count, -RH.OSign, -OGame1, -RedOnce
 }.
 
-(* A makes at most qS queries to [sign] and at most [qH - 1] (distinct)
-   queries to the XOF: the reduction [RedXOF] makes one more query to the
-   challenge oracle, to convert the forgery. *)
+(* A makes at most qS queries to [sign] and queries the random oracle on at
+   most [qH - 1] distinct points [x] (byte and hash queries together): the
+   reduction [RedXOF] makes one more query to the random oracle of the
+   simplified scheme, to convert the forgery. *)
 declare axiom A_bound
- (X' <: SIB.XOF_t{-A, -CountX, -CountSX})
+ (X' <: DSSXOF.Hash{-A, -CountX, -CountSX})
  (SO' <: DSSXOF.DS.Stateless.SOracle_CMA{-A, -CountX, -CountSX})
  :
  hoare[ A(CountX(X'), CountSX(SO')).forge :
@@ -2552,17 +2807,59 @@ declare axiom A_bound
 (* The adversary will output a forgery attempt, provided all oracle calls terminate *)
 declare axiom A_ll
  (SO <: DSSXOF.DS.Stateless.SOracle_CMA{-A})
- (X <: SIB.XOF_t{-A}) :
- islossless SO.sign => islossless X.get => islossless SIB.SampleInBall(X).get =>
+ (X <: DSSXOF.Hash{-A}) :
+ islossless SO.sign => islossless X.get => islossless SIB.SampleInBall(XofOf(X)).get =>
  islossless A(X, SO).forge.
 
 local module A' = RedXOF(A).
 
 (*** Query bound for the reduced adversary ***)
 
-(* The simulator queries the challenge oracle exactly once per distinct [x],
-   which is what [CountX] counts; the conversion of the forgery makes one
-   more query. *)
+(* The random oracle of the simplified scheme is only queried through the
+   cache, hence once per point of the cache, and the points of the cache are
+   points queried by [A] (counted by [CountX]); the conversion of the
+   forgery makes one more query. *)
+local lemma Cache_inv (H' <: Hash{-CacheRO, -CountH, -CountX}) :
+  hoare [CacheRO(CountH(H')).get :
+           x \in CountX.xs /\
+           CountH.qh = card (fdom CacheRO.m) /\ fdom CacheRO.m \subset CountX.xs ==>
+           CountH.qh = card (fdom CacheRO.m) /\ fdom CacheRO.m \subset CountX.xs].
+proof.
+proc; if; 2: by auto.
+inline *; wp; call (: true); auto => /> &h hx hs hnin r.
+rewrite fdom_set fcardU1 mem_fdom hnin /b2i /=; split; 1: by ring.
+by move=> z; rewrite in_fsetU in_fset1 => -[/hs | ->].
+qed.
+
+local lemma Sim_inv (H' <: Hash{-CacheRO, -CountH, -CountX, -SIB.RR.F1.Sim, -SIB.RR.F2.Sim}) :
+  hoare [SIB.Sim(ROCofRO(CacheRO(CountH(H')))).get :
+           y.`1 \in CountX.xs /\
+           CountH.qh = card (fdom CacheRO.m) /\ fdom CacheRO.m \subset CountX.xs ==>
+           CountH.qh = card (fdom CacheRO.m) /\ fdom CacheRO.m \subset CountX.xs].
+proof.
+proc; inline *; sp 1; if; 2: by auto.
+wp; rnd; wp; while (CountH.qh = card (fdom CacheRO.m) /\ fdom CacheRO.m \subset CountX.xs); 1: by auto.
+wp; rnd; wp; sp; if; 2: by auto => /#.
+seq 4 : (CountH.qh = card (fdom CacheRO.m) /\ fdom CacheRO.m \subset CountX.xs).
+- sp; if; 2: by auto => /#.
+  wp; call (: true); auto => /> &h _ _ hx hs _ _ hnin r.
+  rewrite fdom_set fcardU1 mem_fdom hnin /b2i /=; split; 1: by ring.
+  by move=> z; rewrite in_fsetU in_fset1 => -[/hs | ->].
+conseq (: _ ==> CountH.qh = card (fdom CacheRO.m) /\ fdom CacheRO.m \subset CountX.xs); 1: smt().
+by sp; if; auto.
+qed.
+
+local lemma SumOf_inv (H' <: Hash{-CacheRO, -CountH, -CountX, -SIB.RR.F1.Sim, -SIB.RR.F2.Sim}) :
+  hoare [SumOf(SIB.Sim(ROCofRO(CacheRO(CountH(H')))), CTofRO(CacheRO(CountH(H')))).get :
+           xarg q \in CountX.xs /\
+           CountH.qh = card (fdom CacheRO.m) /\ fdom CacheRO.m \subset CountX.xs ==>
+           CountH.qh = card (fdom CacheRO.m) /\ fdom CacheRO.m \subset CountX.xs].
+proof.
+proc; if.
+- wp; call (Sim_inv H'); auto => /> &h; by case: (q{h}).
+wp; inline CTofRO; wp; call (Cache_inv H'); auto => /> &h; by case: (q{h}).
+qed.
+
 local lemma RedA_bound
  (H' <: Hash{-A', -CountH, -CountS})
  (SO' <: SOracle_CMA{-A', -CountH, -CountS})
@@ -2572,33 +2869,26 @@ local lemma RedA_bound
         CountH.qh <= qH /\ CountS.qs <= qS].
 proof.
 proc.
-seq 6 : (CountH.qh <= qH - 1 /\ CountS.qs <= qS); last first.
+seq 7 : (CountH.qh <= qH - 1 /\ CountS.qs <= qS); last first.
 - by inline *; wp; call (: true); auto => /#.
 conseq (: _ ==> CountH.qh <= CountX.qx /\ CountS.qs = CountSX.qs)
        (: CountH.qh = 0 /\ CountS.qs = 0 ==> CountX.qx <= qH - 1 /\ CountSX.qs <= qS); 1, 2: smt().
 - (* query bound of [A], syntactic instance of [A_bound] *)
-  by call (A_bound (SIB.Sim(ROCofRO(CountH(H')))) (OConv(CountS(SO')))); inline*; auto.
-call (: CountH.qh = CountX.qx /\ CountS.qs = CountSX.qs /\ CountX.xs = SIB.RR.F2.Sim.reprog /\
-         SIB.RR.F1.Sim.reprog = SIB.RR.F2.Sim.reprog).
+  by call (A_bound (SumOf(SIB.Sim(ROCofRO(CacheRO(CountH(H')))), CTofRO(CacheRO(CountH(H')))))
+                   (OConv(CountS(SO')))); inline*; auto.
+call (: CountS.qs = CountSX.qs /\ CountX.qx = card CountX.xs /\
+        CountH.qh = card (fdom CacheRO.m) /\ fdom CacheRO.m \subset CountX.xs).
 - (* signing oracle *)
   by proc; inline *; wp; call (: true); auto.
-- (* XOF oracle *)
-  proc; inline *; case (y.`1 \in CountX.xs).
-  + (* [x] already known: no query to the challenge oracle, nothing counted *)
-    rcondf 1; 1: by auto. sp. rcondf 1; 1: by auto => /#.
-    by auto.
-  (* new [x]: the simulator queries the challenge oracle exactly once *)
-  rcondt 1; 1: by auto. sp. rcondt 1; 1: by auto => /#. rcondt 4; 1: by auto => /#.
-  seq 8 : (CountH.qh = CountX.qx /\ CountS.qs = CountSX.qs /\ CountX.xs = SIB.RR.F2.Sim.reprog /\
-         SIB.RR.F1.Sim.reprog = SIB.RR.F2.Sim.reprog); 1: by wp; call (: true); auto => /> /#.
-  wp; rnd; wp; while (CountH.qh = CountX.qx /\ CountS.qs = CountSX.qs /\ CountX.xs = SIB.RR.F2.Sim.reprog /\
-         SIB.RR.F1.Sim.reprog = SIB.RR.F2.Sim.reprog); 1: by auto.
-  seq 5 : (CountH.qh = CountX.qx /\ CountS.qs = CountSX.qs /\ CountX.xs = SIB.RR.F2.Sim.reprog /\
-         SIB.RR.F1.Sim.reprog = SIB.RR.F2.Sim.reprog); 1: by auto.
-  seq 1 : (CountH.qh = CountX.qx /\ CountS.qs = CountSX.qs /\ CountX.xs = SIB.RR.F2.Sim.reprog /\
-         SIB.RR.F1.Sim.reprog = SIB.RR.F2.Sim.reprog); 1: by if; auto.
-  by auto.
-by inline*; auto.
+- (* XOF oracle: the point is counted first *)
+  proc; seq 1 : (CountS.qs = CountSX.qs /\ CountX.qx = card CountX.xs /\ xarg q \in CountX.xs /\
+                 CountH.qh = card (fdom CacheRO.m) /\ fdom CacheRO.m \subset CountX.xs).
+  + if; auto => /> &h hs hnin.
+    rewrite fcardU1 hnin /b2i /= in_fsetU in_fset1 /=; split; 1: by ring.
+    by move=> z /hs hz; rewrite in_fsetU hz.
+  by call (SumOf_inv H'); auto.
+inline *; auto => />; rewrite fdom0 fcards0 /=; split => [z | ]; 1: by rewrite in_fset0.
+by move=> _ m0 xs /subset_leq_fcard.
 qed.
 
 (*** Losslessness of the reduced adversary ***)
@@ -2620,6 +2910,9 @@ call (SIB.ReprogChallenge_ll (<: SIB.RR.F2.Sim(SIB.ReprogChallenge, SIB.Sim(H).R
   1: by islossless.
 by call H_ll; auto.
 qed.
+
+(* The byte oracle seen by [SampleInBall] in the reduction *)
+local module XS (H : SIB.ROC_t) (C : HCT_t) = XofOf(CountX(SumOf(SIB.Sim(H), C))).
 
 (* [SampleInBall] on top of the simulated XOF terminates: the first query on
    [x] reprograms the whole (finite) overlay of [x]; afterwards, the inner
@@ -2647,43 +2940,53 @@ apply (ler_trans (mu (drange 0 256) (pred1 0))); 1: by rewrite drange1E.
 by apply mu_le => x /supp_drange hx /= ->; rewrite Byte.tK'.
 qed.
 
-local lemma CSim_get_ll (H <: SIB.ROC_t) :
-  islossless H.get => islossless CountX(SIB.Sim(H)).get.
-proof. by move => H_ll; proc; call (Sim_get_ll H H_ll); auto. qed.
+local lemma CSim_get_ll (H <: SIB.ROC_t) (C <: HCT_t) :
+  islossless H.get => islossless C.get => islossless XS(H, C).get.
+proof.
+move => H_ll C_ll; proc; inline 1; inline 3.
+rcondt 4; 1: by auto.
+by wp; call (Sim_get_ll H H_ll); auto.
+qed.
 
-local lemma CSim_get_reprog (H <: SIB.ROC_t{-SIB.RR.F1.Sim}) xr :
-  hoare [CountX(SIB.Sim(H)).get :
+local lemma CSim_get_reprog (H <: SIB.ROC_t{-SIB.RR.F1.Sim}) (C <: HCT_t{-SIB.RR.F1.Sim}) xr :
+  hoare [XS(H, C).get :
            xr \in SIB.RR.F1.Sim.reprog \/ y.`1 = xr ==> xr \in SIB.RR.F1.Sim.reprog].
 proof.
 proc; inline *.
-seq 4 : (xr \in SIB.RR.F1.Sim.reprog); last by auto.
-seq 3 : (xr \in SIB.RR.F1.Sim.reprog \/ x = xr); 1: by auto.
+seq 3 : ((xr \in SIB.RR.F1.Sim.reprog \/ y.`1 = xr) /\ q0 = XB y); 1: by auto.
+rcondt 1; 1: by auto.
+seq 3 : (xr \in SIB.RR.F1.Sim.reprog); last by auto.
+seq 2 : (xr \in SIB.RR.F1.Sim.reprog \/ x = xr); 1: by auto.
 if; last by auto => /#.
-seq 1 : (xr \in SIB.RR.F1.Sim.reprog).
-- by auto => /> &hr h _; rewrite in_fsetU in_fset1 /#.
+seq 1 : (xr \in SIB.RR.F1.Sim.reprog); 1: by auto => /> &hr h _; rewrite in_fsetU in_fset1 /#.
 by conseq (: _ ==> true).
 qed.
 
-local lemma CSim_get_dom (H <: SIB.ROC_t{-SIB.RR.F1.Sim}) yq mq rq :
-  hoare [CountX(SIB.Sim(H)).get :
+local lemma CSim_get_dom (H <: SIB.ROC_t{-SIB.RR.F1.Sim}) (C <: HCT_t{-SIB.RR.F1.Sim}) yq mq rq :
+  hoare [XS(H, C).get :
            y = yq /\ yq.`1 \in SIB.RR.F1.Sim.reprog /\
            SIB.RR.F1.Sim.Overlay.m = mq /\ SIB.RR.F1.Sim.reprog = rq ==>
            SIB.RR.F1.Sim.reprog = rq /\
            forall z, z \in SIB.RR.F1.Sim.Overlay.m <=> (z \in mq \/ z = yq)].
 proof.
 proc; inline *.
-rcondf 4; 1: by auto.
+seq 3 : (y = yq /\ yq.`1 \in SIB.RR.F1.Sim.reprog /\ SIB.RR.F1.Sim.Overlay.m = mq /\
+         SIB.RR.F1.Sim.reprog = rq /\ q0 = XB y); 1: by auto.
+rcondt 1; 1: by auto.
+rcondf 3; 1: by auto.
 auto => /> _ r1 _; split => [_ z | hin z]; [by rewrite mem_set | by case => // ->].
 qed.
 
-local lemma CSim_get_dom_ph (H <: SIB.ROC_t{-SIB.RR.F1.Sim}) yq mq rq :
-  islossless H.get =>
-  phoare [CountX(SIB.Sim(H)).get :
+local lemma CSim_get_dom_ph (H <: SIB.ROC_t{-SIB.RR.F1.Sim}) (C <: HCT_t{-SIB.RR.F1.Sim}) yq mq rq :
+  islossless H.get => islossless C.get =>
+  phoare [XS(H, C).get :
            y = yq /\ yq.`1 \in SIB.RR.F1.Sim.reprog /\
            SIB.RR.F1.Sim.Overlay.m = mq /\ SIB.RR.F1.Sim.reprog = rq ==>
            SIB.RR.F1.Sim.reprog = rq /\
            forall z, z \in SIB.RR.F1.Sim.Overlay.m <=> (z \in mq \/ z = yq)] = 1%r.
-proof. by move=> H_ll; conseq (CSim_get_ll H H_ll) (CSim_get_dom H yq mq rq). qed.
+proof.
+by move=> H_ll C_ll; conseq (CSim_get_ll H C H_ll C_ll) (CSim_get_dom H C yq mq rq).
+qed.
 
 local lemma ctx_bound_step (m0 m1 : ((DID.W * M) * int, 'b) fmap) x B c0 :
   (forall c, B <= c => (x, c) \in m0 => c < c0) =>
@@ -2691,22 +2994,23 @@ local lemma ctx_bound_step (m0 m1 : ((DID.W * M) * int, 'b) fmap) x B c0 :
   forall c, B <= c => (x, c) \in m1 => c < c0 + 1.
 proof. by move=> h0 h1 c le_Bc /h1 [/(h0 _ le_Bc) | /= ->] /#. qed.
 
-local lemma CSim_get_fresh (H <: SIB.ROC_t{-SIB.RR.F1.Sim}) i0 :
-  phoare [CountX(SIB.Sim(H)).get :
+local lemma CSim_get_fresh (H <: SIB.ROC_t{-SIB.RR.F1.Sim}) (C <: HCT_t{-SIB.RR.F1.Sim}) i0 :
+  phoare [XS(H, C).get :
            y.`1 \in SIB.RR.F1.Sim.reprog /\ y \notin SIB.RR.F1.Sim.Overlay.m /\ 0 <= i0 ==>
            Byte.to_int res <= i0] >= (1%r / 256%r).
 proof.
 proc; inline *.
-rcondf 4; 1: by auto.
-rcondt 6; 1: by auto.
+rcondt 4; 1: by auto.
+rcondf 6; 1: by auto.
+rcondt 8; 1: by auto.
 wp; rnd (fun b => Byte.to_int b <= i0); auto => />.
 by move=> &hr _ _ ge0i; rewrite mu_dB_le //= => v _; rewrite get_set_sameE.
 qed.
 
-local lemma SampleInBall_Sim_ll (H <: SIB.ROC_t{-SIB.RR.F1.Sim}) :
-  islossless H.get => islossless SIB.SampleInBall(CountX(SIB.Sim(H))).get.
+local lemma SampleInBall_Sim_ll (H <: SIB.ROC_t{-SIB.RR.F1.Sim}) (C <: HCT_t{-SIB.RR.F1.Sim}) :
+  islossless H.get => islossless C.get => islossless SIB.SampleInBall(XS(H, C)).get.
 proof.
-move => H_ll; proc.
+move => H_ll C_ll; proc.
 exlim x => xx.
 while (x = xx /\ xx \in SIB.RR.F1.Sim.reprog /\ 8 <= ctx /\ 256 - tau <= i <= 256) (256 - i).
 - move=> z; sp; wp.
@@ -2732,31 +3036,31 @@ while (x = xx /\ xx \in SIB.RR.F1.Sim.reprog /\ 8 <= ctx /\ 256 - tau <= i <= 25
                        256 - i = z /\ (forall c, B <= c => (xx, c) \in SIB.RR.F1.Sim.Overlay.m => c < ctx)).
     * by auto.
     * wp; exlim ctx, SIB.RR.F1.Sim.Overlay.m, SIB.RR.F1.Sim.reprog => c0 m0 r0.
-      call (CSim_get_dom_ph H (xx, c0) m0 r0 H_ll).
+      call (CSim_get_dom_ph H C (xx, c0) m0 r0 H_ll C_ll).
       by auto => /> &hr; smt(ctx_bound_step).
     * exact ih.
     * hoare; wp; exlim ctx, SIB.RR.F1.Sim.Overlay.m, SIB.RR.F1.Sim.reprog => c0 m0 r0.
-      call (CSim_get_dom H (xx, c0) m0 r0).
+      call (CSim_get_dom H C (xx, c0) m0 r0).
       by auto => /> &hr; smt(ctx_bound_step).
     by move=> &hr.
   + wp; exlim ctx, SIB.RR.F1.Sim.Overlay.m, SIB.RR.F1.Sim.reprog => c0 m0 r0.
-    call (CSim_get_dom_ph H (xx, c0) m0 r0 H_ll).
+    call (CSim_get_dom_ph H C (xx, c0) m0 r0 H_ll C_ll).
     by auto => /> &hr; smt(ctx_bound_step).
   split; 1: smt().
   move=> z0; case (ctx < B).
   + (* the context is still in the reprogrammed part: deterministic progress *)
     conseq (: _ ==> _ : = 1%r); 1: smt().
-    by wp; call (CSim_get_ll H H_ll); auto => /> &hr *; smt().
+    by wp; call (CSim_get_ll H C H_ll C_ll); auto => /> &hr *; smt().
   (* fresh context: the byte is accepted with probability at least 1/256 *)
   exlim i => i0; wp.
-  call (CSim_get_fresh H i0).
+  call (CSim_get_fresh H C i0).
   auto => /> &hr _ _ ge_i0 _ hB _ ge_B; split; 2: smt().
   split; 2: smt(tau_bound).
   by apply/negP => h; have := hB ctx{hr} _ h; smt().
 (* the first [8] queries reprogram [x] *)
 wp; while (x = xx /\ 0 <= ctx <= 8 /\ (0 < ctx => xx \in SIB.RR.F1.Sim.reprog)) (8 - ctx).
 - move=> z; wp; call (: xx \in SIB.RR.F1.Sim.reprog \/ y.`1 = xx ==> xx \in SIB.RR.F1.Sim.reprog).
-  + by conseq (CSim_get_ll H H_ll) (CSim_get_reprog H xx).
+  + by conseq (CSim_get_ll H C H_ll C_ll) (CSim_get_reprog H C xx).
   by auto => /#.
 by auto => />; smt(tau_bound).
 qed.
@@ -2768,155 +3072,508 @@ local lemma RedA_ll
 proof.
 move => SO_ll H_ll; proc.
 call H_ll; wp.
-have RH_ll : islossless ROCofRO(H).get by proc; call H_ll.
-call (A_ll (CountSX(OConv(SO))) (CountX(SIB.Sim(ROCofRO(H)))) _
-        (CSim_get_ll (ROCofRO(H)) RH_ll) (SampleInBall_Sim_ll (ROCofRO(H)) RH_ll)).
+have Ca_ll : islossless CacheRO(H).get by proc; if; [wp; call H_ll; auto | auto].
+have RH_ll : islossless ROCofRO(CacheRO(H)).get by proc; call Ca_ll.
+have CH_ll : islossless CTofRO(CacheRO(H)).get by proc; call Ca_ll.
+call (A_ll (CountSX(OConv(SO))) (CountX(SumOf(SIB.Sim(ROCofRO(CacheRO(H))), CTofRO(CacheRO(H))))) _ _
+        (SampleInBall_Sim_ll (ROCofRO(CacheRO(H))) (CTofRO(CacheRO(H))) RH_ll CH_ll)).
 - by proc; inline *; wp; call SO_ll; auto.
+- proc; inline 2; wp; sp; if.
+  + by wp; call (Sim_get_ll (ROCofRO(CacheRO(H))) RH_ll).
+  by wp; call CH_ll.
 by inline*; auto.
 qed.
 
 (*** Step 0 : Reduce to the game with an abstract challenge RO ***)
 
-(* The challenge oracle of [SampleInBallEquiv] and the hash oracle of the
-   FS+abort proof are the same random oracle, up to the (empty) leakage of
-   the latter. *)
-local equiv ROC_RO_get :
-  SIB.ROC.RO.get ~ RO.get :
-  ={arg} /\ RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1} ==>
-  res{2} = (res{1}, Empty) /\ RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1}.
+(** Step 0.a: the random oracle on [xin] is a XOF and an independent
+    commitment hash (two random oracles) *)
+
+local equiv XOF_XB :
+  XOF.get ~ SIB.XOF.RO.get :
+  x{1} = XB x{2} /\ sum_rel XOF.m{1} SIB.XOF.RO.m{2} HctRO.RO.m{2} ==>
+  res{1} = OB res{2} /\ sum_rel XOF.m{1} SIB.XOF.RO.m{2} HctRO.RO.m{2}.
 proof.
-proc; seq 1 1 : (#pre /\ r{2} = (r{1}, Empty)).
-- rnd (fun v => (v, Empty)) (fun (p : challenge_t * leakage) => p.`1); auto => />.
-  split => [[c l] /supp_dprod /= [_ /supp_dunit] -> // | _].
-  split => [[c l] /supp_dprod /= [_ /supp_dunit ->] | _ v hv]; 1: by rewrite dprod1E dunit1E /= /dC_t.
-  by rewrite supp_dprod /= supp_dunit.
-if; 1: by move=> &1 &2 [[-> ->] _]; rewrite mem_map.
-- by auto => /> &1 &2 _; rewrite map_set /= !get_set_sameE.
-by auto => /> &1 &2; rewrite mapE domE; case: (SIB.ROC.RO.m{1}.[x{2}]).
+proc; seq 1 1 : (#pre /\ r{1} = OB r{2}).
+- rnd ob OB; auto => /> &1 &2 _ _; split => [b _ | _ o /supp_dmap [b [hb ->]] //].
+  by rewrite (in_dmap1E_can _ _ ob).
+if.
+- by move=> &1 &2 [#] -> [hb hh] _; rewrite !domE hb; case: (SIB.XOF.RO.m{2}.[x{2}]).
+- auto => /> &1 &2 hb hh _; rewrite !get_set_sameE /=; split => [y | x]; rewrite get_setE.
+  + by case: (y = x{2}) => [-> | ne] /=; [rewrite get_set_sameE | rewrite get_setE ne /= hb].
+  by rewrite /= hh.
+auto => /> &1 &2 hb hh; rewrite domE hb; by case: (SIB.XOF.RO.m{2}.[x{2}]).
 qed.
 
-(* The same, recording that the answer is in the table *)
-local equiv ROC_RO_get_in x0 :
-  SIB.ROC.RO.get ~ RO.get :
-  ={arg} /\ arg{2} = x0 /\ RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1} ==>
-  res{2} = (res{1}, Empty) /\ RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1} /\
-  RO.m{2}.[x0] = Some res{2}.
+local equiv XOF_XH :
+  XOF.get ~ HctRO.RO.get :
+  x{1} = XH x{2} /\ sum_rel XOF.m{1} SIB.XOF.RO.m{2} HctRO.RO.m{2} ==>
+  res{1} = OH res{2} /\ sum_rel XOF.m{1} SIB.XOF.RO.m{2} HctRO.RO.m{2}.
 proof.
-conseq ROC_RO_get _ (: x = x0 ==> RO.m.[x0] = Some res) => //.
-proc; auto => /> &h r _.
-by rewrite get_set_sameE domE /=; case: (RO.m{h}.[x0]).
+proc; seq 1 1 : (#pre /\ r{1} = OH r{2}).
+- rnd oh OH; auto => /> &1 &2 _ _; split => [c _ | _ o /supp_dmap [c [hc ->]] //].
+  by rewrite (in_dmap1E_can _ _ oh).
+if.
+- by move=> &1 &2 [#] -> [hb hh] _; rewrite !domE hh; case: (HctRO.RO.m{2}.[x{2}]).
+- auto => /> &1 &2 hb hh _; rewrite !get_set_sameE /=; split => [y | z]; rewrite get_setE.
+  + by rewrite /= hb.
+  by case: (z = x{2}) => [-> | ne] /=; [rewrite get_set_sameE | rewrite get_setE ne /= hh].
+auto => /> &1 &2 hb hh; rewrite domE hh; by case: (HctRO.RO.m{2}.[x{2}]).
 qed.
 
-local equiv ROC_ROCofRO_get :
-  SIB.ROC.RO.get ~ ROCofRO(RO).get :
-  ={arg} /\ RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1} ==>
-  ={res} /\ RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1}.
-proof. by proc*; inline{2} 1; wp; call ROC_RO_get; auto => /> /#. qed.
+local equiv XofOf_XOF :
+  XofOf(XOF).get ~ SIB.XOF.RO.get :
+  ={arg} /\ sum_rel XOF.m{1} SIB.XOF.RO.m{2} HctRO.RO.m{2} ==>
+  ={res} /\ sum_rel XOF.m{1} SIB.XOF.RO.m{2} HctRO.RO.m{2}.
+proof. by proc*; inline{1} 1; wp; call XOF_XB; auto. qed.
+
+local equiv HctOf_XOF :
+  HctOf(XOF).get ~ HctRO.RO.get :
+  ={arg} /\ sum_rel XOF.m{1} SIB.XOF.RO.m{2} HctRO.RO.m{2} ==>
+  ={res} /\ sum_rel XOF.m{1} SIB.XOF.RO.m{2} HctRO.RO.m{2}.
+proof. by proc*; inline{1} 1; wp; call XOF_XH; auto. qed.
+
+local equiv XOF_SumOf :
+  XOF.get ~ SumOf(SIB.XOF.RO, HctRO.RO).get :
+  ={arg} /\ sum_rel XOF.m{1} SIB.XOF.RO.m{2} HctRO.RO.m{2} ==>
+  ={res} /\ sum_rel XOF.m{1} SIB.XOF.RO.m{2} HctRO.RO.m{2}.
+proof.
+proc*; inline{2} 1; sp; if{2}.
+- by wp; call XOF_XB; auto => /> &1 &2 _ _; case: (q{2}).
+by wp; call XOF_XH; auto => /> &1 &2 _ _; case: (q{2}).
+qed.
+
+local lemma pr_sum &m :
+  Pr[EF_CMA_XOF(DilithiumXOF, A, XOF, O_CMA_XOF).main() @ &m : res] =
+  Pr[SIB.GameReal(XOFAdv(A)).main() @ &m : res].
+proof.
+byequiv => //; proc; inline{2} 2; inline{1} 2; inline{2} 3; inline{2} 4; wp.
+sim (XofOf(XOF).get ~ SIB.XOF.RO.get : true) (HctOf(XOF).get ~ HctRO.RO.get : true)
+    (XOF.get ~ SumOf(SIB.XOF.RO, HctRO.RO).get : true)
+    / (sum_rel XOF.m{1} SIB.XOF.RO.m{2} HctRO.RO.m{2}) : (={is_valid, is_fresh, nrqs}).
+- exact XOF_SumOf.
+- exact HctOf_XOF.
+- exact XofOf_XOF.
+by inline *; auto => />; split => ? /=; rewrite !emptyE.
+qed.
+
+(** Step 0.b: the two random oracles of the ideal world of
+    [SampleInBallEquiv] (the challenge oracle [SIB.ROC] and the commitment
+    hash [HctRO]) are one random oracle on the product (eager sampling of
+    each one at the points of the other). *)
+
+local module GS (R1 : SIB.ROC_t, R2 : HCT_t) = {
+  proc main() : bool = {
+    var r;
+    SIB.Sim(R1).init();
+    r <@ DSSXOF.EFCMA.EF_CMA(DilithiumR(SIB.ToC(R1), R2), A(SumOf(SIB.Sim(R1), R2)), O_CMA_XOF).main();
+    return r;
+  }
+}.
+
+local module S1 (G : HctRO.RO) : SIB.ROC_t = {
+  proc get(x : commit_t * M) = {
+    var r;
+    r <@ SIB.ROC.RO.get(x);
+    G.sample(x);
+    return r;
+  }
+}.
+
+local module D2 (G : HctRO.RO) = {
+  proc distinguish(u : unit) : bool = {
+    var r;
+    r <@ GS(S1(G), G).main();
+    return r;
+  }
+}.
+
+local module S2a (G : SIB.ROC.RO) : SIB.ROC_t = {
+  proc get(x : commit_t * M) = {
+    var r;
+    r <@ G.get(x);
+    HctRO.RO.sample(x);
+    return r;
+  }
+}.
+
+local module S2b (G : SIB.ROC.RO) : HCT_t = {
+  proc get(x : commit_t * M) = {
+    var r;
+    G.sample(x);
+    r <@ HctRO.RO.get(x);
+    return r;
+  }
+}.
+
+local module D1 (G : SIB.ROC.RO) = {
+  proc distinguish(u : unit) : bool = {
+    var r;
+    r <@ GS(S2a(G), S2b(G)).main();
+    return r;
+  }
+}.
+
+local module M2 (G : HctRO.RO) = {
+  proc main() : bool = {
+    var r;
+    SIB.ROC.RO.init();
+    HctRO.RO.init();
+    r <@ D2(G).distinguish();
+    return r;
+  }
+}.
+
+local module M1 (G : SIB.ROC.RO) = {
+  proc main() : bool = {
+    var r;
+    SIB.ROC.RO.init();
+    HctRO.RO.init();
+    r <@ D1(G).distinguish();
+    return r;
+  }
+}.
+
+local lemma pr_eager &m :
+  Pr[SIB.GameROC(SIB.ORedXOFROC(XOFAdv(A))).main() @ &m : res] =
+  Pr[M1(SIB.ROC.RO).main() @ &m : res].
+proof.
+(* the ideal game of [SampleInBallEquiv], with the commitment hash *)
+have e1 : Pr[SIB.GameROC(SIB.ORedXOFROC(XOFAdv(A))).main() @ &m : res] =
+          Pr[M2(HctRO.LRO).main() @ &m : res].
+- byequiv => //; proc.
+  inline{1} SIB.ORedXOFROC(XOFAdv(A), SIB.ROC.RO).run
+            XOFAdv(A, SIB.Sim(SIB.ROC.RO), SIB.ToC(SIB.ROC.RO)).run.
+  inline{2} D2(HctRO.LRO).distinguish GS(S1(HctRO.LRO), HctRO.LRO).main.
+  wp; call (: ={glob A, SIB.ROC.RO.m, HctRO.RO.m, glob SIB.Sim} ==> ={res}).
+  + proc; sim (SIB.ROC.RO.get ~ S1(HctRO.LRO).get : ={SIB.ROC.RO.m, HctRO.RO.m})
+              (HctRO.RO.get ~ HctRO.LRO.get : ={SIB.ROC.RO.m, HctRO.RO.m}).
+    by proc*; inline *; sim.
+  by inline *; auto.
+(* eager sampling of the commitment hash at the points of [SIB.ROC] *)
+have e2 : Pr[M2(HctRO.RO).main() @ &m : res] = Pr[M2(HctRO.LRO).main() @ &m : res].
+- byequiv (_: ={glob A, glob O_CMA_XOF, glob SIB.Sim} ==> ={res}) => //; proc.
+  call (HctRO.FullEager.RO_LRO_D D2 _); [by move=> _; exact dct_ll | by inline *; auto].
+have e3 : Pr[M2(HctRO.RO).main() @ &m : res] = Pr[M1(SIB.ROC.LRO).main() @ &m : res].
+- byequiv => //; proc; inline *.
+  sim (S1(HctRO.RO).get ~ S2a(SIB.ROC.LRO).get : ={SIB.ROC.RO.m, HctRO.RO.m})
+      (HctRO.RO.get ~ S2b(SIB.ROC.LRO).get : ={SIB.ROC.RO.m, HctRO.RO.m}).
+  by proc*; inline *; sim.
+(* eager sampling of [SIB.ROC] at the points of the commitment hash *)
+have e4 : Pr[M1(SIB.ROC.RO).main() @ &m : res] = Pr[M1(SIB.ROC.LRO).main() @ &m : res].
+- byequiv (_: ={glob A, glob O_CMA_XOF, glob SIB.Sim} ==> ={res}) => //; proc.
+  call (SIB.ROC.FullEager.RO_LRO_D D1 _); 2: by inline *; auto.
+  by move=> _; apply dprod_ll; split; [exact SIB.dI_ll | exact SIB.dLeakRej_ll].
+by rewrite e1 -e2 e3 e4.
+qed.
+
+(** Step 0.c: the merged oracle is the random oracle of the simplified
+    scheme, seen through the reduction [RedXOF] *)
+
+local equiv S2a_RO xq :
+  S2a(SIB.ROC.RO).get ~ RO.get :
+  ={x} /\ x{2} = xq /\ jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} ==>
+  res{1} = (res{2}.`1.`1, res{2}.`1.`2) /\
+  jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} /\ RO.m{2}.[xq] = Some res{2}.
+proof.
+proc; inline *; swap{1} 7 -4.
+seq 3 1 : (#pre /\ x0{1} = x{1} /\ r{2} = ((r0.`1, r0.`2, r1), Empty){1}).
+- sp 1 0; rndsem*{1} 0.
+  rnd (fun (p : (SIB.challenge_ir * leakage) * ctilde) => (flat3 p, Empty))
+      (fun (q : challenge_t * leakage) => unflat3 q.`1).
+  skip => /> &1 &2 _ _ _.
+  have <- : (SIB.dI `*` SIB.dLeakRej) `*` dct =
+            dlet (SIB.dI `*` SIB.dLeakRej) (fun r0 => dmap dct (fun r1 => (r0, r1))).
+  + by rewrite -(dmap_id (_ `*` _)) dmap_dprodE.
+  split.
+  + by case=> -[a b c] l /supp_dprod /= [_ /supp_dunit ->].
+  move=> _; split.
+  + by case=> c l /supp_dprod /= [_ /supp_dunit ->]; rewrite dprod1E dunit1xx dC_t1E.
+  move=> _ [[a b] c] h; rewrite flat3K /= supp_dprod /= supp_dunit /= supp_dC_t /flat3 /=.
+  by move: h; rewrite supp_dprod /= supp_dprod.
+if{2}.
+- rcondt{1} 1.
+  + move=> &2; skip => /> &1 _ hr _.
+    by rewrite domE hr /mrg_at domE; case: (SIB.ROC.RO.m{1}.[x{2}]).
+  rcondt{1} 5.
+  + move=> &2; auto => /> &1 hd hr _.
+    by rewrite -hd domE hr /mrg_at domE; case: (SIB.ROC.RO.m{1}.[x{2}]).
+  auto => &1 &2 [#] -> <- hj -> -> hx /=.
+  rewrite !get_set_sameE /=; split; 1: by case: (r0{1}).
+  by apply jrel_set => //; rewrite -(jrel_dom _ _ _ _ _ hj).
+rcondf{1} 1.
+- move=> &2; skip => /> &1 _ hr _.
+  by rewrite domE hr /mrg_at domE; case: (SIB.ROC.RO.m{1}.[x{2}]).
+rcondf{1} 4.
+- move=> &2; auto => /> &1 hd hr _.
+  by rewrite -hd domE hr /mrg_at domE; case: (SIB.ROC.RO.m{1}.[x{2}]).
+auto => &1 &2 [#] -> -> hj -> _ hx /=.
+move: hx; rewrite (jrel_dom _ _ _ _ _ hj) => hx; rewrite (jrel_get _ _ _ _ _ hj hx) /=.
+by case: (oget SIB.ROC.RO.m{1}.[xq]).
+qed.
+
+local equiv S2b_RO xq :
+  S2b(SIB.ROC.RO).get ~ RO.get :
+  ={x} /\ x{2} = xq /\ jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} ==>
+  res{1} = res{2}.`1.`3 /\
+  jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} /\ RO.m{2}.[xq] = Some res{2}.
+proof.
+proc; inline *; swap{1} 6 -2.
+seq 4 1 : (#pre /\ x2{1} = x{1} /\ r{2} = ((r1.`1, r1.`2, r0), Empty){1}).
+- sp 2 0; rndsem*{1} 0.
+  rnd (fun (p : (SIB.challenge_ir * leakage) * ctilde) => (flat3 p, Empty))
+      (fun (q : challenge_t * leakage) => unflat3 q.`1).
+  skip => /> &1 &2 _ _ _.
+  have <- : (SIB.dI `*` SIB.dLeakRej) `*` dct =
+            dlet (SIB.dI `*` SIB.dLeakRej) (fun r0 => dmap dct (fun r1 => (r0, r1))).
+  + by rewrite -(dmap_id (_ `*` _)) dmap_dprodE.
+  split.
+  + by case=> -[a b c] l /supp_dprod /= [_ /supp_dunit ->].
+  move=> _; split.
+  + by case=> c l /supp_dprod /= [_ /supp_dunit ->]; rewrite dprod1E dunit1xx dC_t1E.
+  move=> _ [[a b] c] h; rewrite flat3K /= supp_dprod /= supp_dunit /= supp_dC_t /flat3 /=.
+  by move: h; rewrite supp_dprod /= supp_dprod.
+if{2}.
+- rcondt{1} 1.
+  + move=> &2; skip => /> &1 _ hr _.
+    by rewrite domE hr /mrg_at domE; case: (SIB.ROC.RO.m{1}.[x{2}]).
+  rcondt{1} 3.
+  + move=> &2; auto => /> &1 hd hr _.
+    by rewrite -hd domE hr /mrg_at domE; case: (SIB.ROC.RO.m{1}.[x{2}]).
+  auto => &1 &2 [#] -> <- hj -> -> hx /=; rewrite !get_set_sameE /=.
+  by apply jrel_set => //; rewrite -(jrel_dom _ _ _ _ _ hj).
+rcondf{1} 1.
+- move=> &2; skip => /> &1 _ hr _.
+  by rewrite domE hr /mrg_at domE; case: (SIB.ROC.RO.m{1}.[x{2}]).
+rcondf{1} 2.
+- move=> &2; auto => /> &1 hd hr _.
+  by rewrite -hd domE hr /mrg_at domE; case: (SIB.ROC.RO.m{1}.[x{2}]).
+auto => &1 &2 [#] -> -> hj _ _ hx /=.
+by move: hx; rewrite (jrel_dom _ _ _ _ _ hj) => hx; rewrite (jrel_get _ _ _ _ _ hj hx).
+qed.
+
+local lemma S2a_in m1 m2 xq :
+  phoare [S2a(SIB.ROC.RO).get :
+           x = xq /\ xq \in m1 /\ xq \in m2 /\ SIB.ROC.RO.m = m1 /\ HctRO.RO.m = m2 ==>
+           res = oget m1.[xq] /\ SIB.ROC.RO.m = m1 /\ HctRO.RO.m = m2] = 1%r.
+proof.
+proc; inline *; rcondf 3; 1: by auto.
+rcondf 7; 1: by auto.
+auto => /> _ _; split; 2: by move=> _ v _ _; exact dct_ll.
+by apply dprod_ll; split; [exact SIB.dI_ll | exact SIB.dLeakRej_ll].
+qed.
+
+local lemma S2b_in m1 m2 xq :
+  phoare [S2b(SIB.ROC.RO).get :
+           x = xq /\ xq \in m1 /\ xq \in m2 /\ SIB.ROC.RO.m = m1 /\ HctRO.RO.m = m2 ==>
+           res = oget m2.[xq] /\ SIB.ROC.RO.m = m1 /\ HctRO.RO.m = m2] = 1%r.
+proof.
+proc; inline *; rcondf 4; 1: by auto.
+rcondf 6; 1: by auto.
+auto => /> _ _; split; 2: by move=> _ v _ _; exact dct_ll.
+by apply dprod_ll; split; [exact SIB.dI_ll | exact SIB.dLeakRej_ll].
+qed.
+
+(* The cache of [RedXOF] in front of the random oracle of the simplified
+   scheme answers as the merged oracle *)
+local equiv S2a_Cache :
+  S2a(SIB.ROC.RO).get ~ ROCofRO(CacheRO(RO)).get :
+  ={x} /\ jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} ==>
+  ={res} /\ jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2}.
+proof.
+proc*; inline{2} 1; inline{2} 2; sp.
+if{2}.
+- wp; exlim x{2} => xq; call (S2a_RO xq); auto => &1 &2 [#] -> -> -> -> hj hx /=.
+  split; 1: done.
+  move=> _ rl rr m2 m1 mr [#] -> hj2 hr.
+  by rewrite get_set_sameE /=; apply jrel_cache.
+exlim SIB.ROC.RO.m{1}, HctRO.RO.m{1}, x{1} => m1 m2 xq.
+wp; call{1} (S2a_in m1 m2 xq); auto => &1 &2 [#] -> -> -> -> -> -> hj hx /=.
+have [v hv] : exists v, CacheRO.m{2}.[x{2}] = Some v.
+- by move: hx; rewrite domE; case: (CacheRO.m{2}.[x{2}]) => // v; exists v.
+have hr : RO.m{2}.[x{2}] = Some v by case: hj => _ [_ hc]; exact (hc _ _ hv).
+have h1 : x{2} \in SIB.ROC.RO.m{1} by rewrite -(jrel_dom _ _ _ _ _ hj) domE hr.
+have h2 : x{2} \in HctRO.RO.m{1} by case: hj => hd _; rewrite -hd.
+split => [// | _ _ _ _ [#] -> -> ->]; rewrite hv /=.
+split => //; move: hr; rewrite (jrel_get _ _ _ _ _ hj h1).
+by move=> /someI <- /=; case: (oget SIB.ROC.RO.m{1}.[x{2}]).
+qed.
+
+local equiv S2b_Cache :
+  S2b(SIB.ROC.RO).get ~ CTofRO(CacheRO(RO)).get :
+  ={x} /\ jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} ==>
+  ={res} /\ jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2}.
+proof.
+proc*; inline{2} 1; inline{2} 2; sp.
+if{2}.
+- wp; exlim x{2} => xq; call (S2b_RO xq); auto => &1 &2 [#] -> -> -> -> hj hx /=.
+  split; 1: done.
+  move=> _ rl rr m2 m1 mr [#] -> hj2 hr.
+  by rewrite get_set_sameE /=; apply jrel_cache.
+exlim SIB.ROC.RO.m{1}, HctRO.RO.m{1}, x{1} => m1 m2 xq.
+wp; call{1} (S2b_in m1 m2 xq); auto => &1 &2 [#] -> -> -> -> -> -> hj hx /=.
+have [v hv] : exists v, CacheRO.m{2}.[x{2}] = Some v.
+- by move: hx; rewrite domE; case: (CacheRO.m{2}.[x{2}]) => // v; exists v.
+have hr : RO.m{2}.[x{2}] = Some v by case: hj => _ [_ hc]; exact (hc _ _ hv).
+have h1 : x{2} \in SIB.ROC.RO.m{1} by rewrite -(jrel_dom _ _ _ _ _ hj) domE hr.
+have h2 : x{2} \in HctRO.RO.m{1} by case: hj => hd _; rewrite -hd.
+split => [// | _ _ _ _ [#] -> -> ->]; rewrite hv /=.
+split => //; move: hr; rewrite (jrel_get _ _ _ _ _ hj h1).
+by move=> /someI <- /=.
+qed.
 
 local equiv Sim_get_eq :
-  SIB.Sim(SIB.ROC.RO).get ~ SIB.Sim(ROCofRO(RO)).get :
-  ={arg, glob SIB.Sim} /\ RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1} ==>
-  ={res, glob SIB.Sim} /\ RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1}.
+  SIB.Sim(S2a(SIB.ROC.RO)).get ~ SIB.Sim(ROCofRO(CacheRO(RO))).get :
+  ={arg, glob SIB.Sim} /\ jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} ==>
+  ={res, glob SIB.Sim} /\ jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2}.
 proof.
-by sim (SIB.ROC.RO.get ~ ROCofRO(RO).get : true)
-       / (RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1}) : (={res, glob SIB.Sim});
-  apply ROC_ROCofRO_get.
+by sim (S2a(SIB.ROC.RO).get ~ ROCofRO(CacheRO(RO)).get : true)
+       / (jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2}) : (={res, glob SIB.Sim});
+  apply S2a_Cache.
 qed.
 
-(* Signing with the scheme on top of [ToC(ROC)] is signing with the simplified
-   scheme, up to the conversion of the signature and the leakage of [t0]. *)
+(* Signing with the scheme on top of the merged oracle is signing with the
+   simplified scheme, up to the conversion of the signature and the leakage
+   of [t0]. *)
 local equiv sign_conv (sk0 : SK) :
-  DilithiumR(SIB.ToC(SIB.ROC.RO)).sign ~ DilithiumS(RO).sign :
-  ={sk, m} /\ sk{2} = sk0 /\ RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1} ==>
+  DilithiumR(SIB.ToC(S2a(SIB.ROC.RO)), S2b(SIB.ROC.RO)).sign ~ DilithiumS(RO).sign :
+  ={sk, m} /\ sk{2} = sk0 /\ jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} ==>
   res{1} = conv_sigl (sk0.`1, sk0.`1 *^ sk0.`2 + sk0.`3) res{2} /\
-  RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1}.
+  jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2}.
 proof.
 proc; sp.
 while (={response, ctr, mA, s1, s2, t0, m, r0_fail, hint_fail} /\
-       RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1} /\
+       jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} /\
        leak{1} = lcat (t0_leak t0{2}) leak{2} /\
-       (response{2} <> None => c{1} = to_c c{2})).
-- inline{1} SIB.ToC(SIB.ROC.RO).get.
-  seq 6 4 : (#pre /\ ={y, w, w1} /\ c{1} = to_c c{2} /\ lc{2} = Empty /\
-             lc{1} = SIB.full_leak c{2}.`1 (SIB.leakage_to_rej c{2}.`2)).
-  + by wp; call ROC_RO_get; auto => />.
-  auto => /> &2; rewrite !catFSE !cat0s /resp_leak.
+       (response{2} <> None => c{1} = to_c c{2} /\ ct{1} = c{2}.`3)).
+- inline{1} SIB.ToC(S2a(SIB.ROC.RO)).get.
+  seq 3 3 : (#pre /\ ={y, w, w1}); 1: by auto.
+  (* the commitment hash queries the merged oracle *)
+  seq 1 1 : (#pre /\ ct{1} = c{2}.`3 /\ lc{2} = Empty /\
+             (w1, m){1} \in SIB.ROC.RO.m{1} /\ (w1, m){1} \in HctRO.RO.m{1} /\
+             (c{2}.`1, c{2}.`2) = oget SIB.ROC.RO.m{1}.[(w1, m){1}]).
+  + exlim (w1, m){2} => xq; call (S2b_RO xq).
+    skip => &1 &2 [#] -> hresp hctr hmA hs1 hs2 ht0 hm hr0 hh hj hl hc hr1 hk1 hr2 hk2 hy hw hw1.
+    rewrite hm hw1 /=; split; 1: done.
+    move=> _ rl rr mh mc mr [#] -> hj' hro /=.
+    have [h1 [h2 hrr]] := jrel_some _ _ _ _ _ _ hj' hro.
+    rewrite hrr /= h1 h2 /=.
+    by split; [smt() | case: (oget mc.[w1{2}, m{2}])].
+  (* the challenge oracle then reads the same point *)
+  exlim SIB.ROC.RO.m{1}, HctRO.RO.m{1}, (w1, m){1} => m1 m2 xq.
+  seq 2 0 : (#pre /\ (ir, l){1} = (c{2}.`1, c{2}.`2)).
+  + by call{1} (S2a_in m1 m2 xq); auto => /> &1 &2 _ _ _ _ _ <-.
+  auto => /> &1 &2; rewrite /to_c !catFSE !cat0s /resp_leak.
   move: (check_z _) (check_r0 _) (check_ct0 _) (check_hint _) => zf rf cf hf.
   by case: zf => [|i] /=; [case: rf => [|j] /= |]; case: cf; rewrite ?catA ?cats0.
-auto => /> &2 cL cR ctr lR r _ _ hc.
-by rewrite /conv_sigl /=; case: r hc => [|r] //= ->.
+auto => /> &1 &2 _ _ _ mh mc cL ctL mr cR ctr lR r _ _ _ _ _ hc.
+by rewrite /conv_sigl /=; case: r hc => [|r] //= /(_ _) // [-> ->].
+qed.
+
+local equiv SumOf_eq :
+  SumOf(SIB.Sim(S2a(SIB.ROC.RO)), S2b(SIB.ROC.RO)).get ~
+  SumOf(SIB.Sim(ROCofRO(CacheRO(RO))), CTofRO(CacheRO(RO))).get :
+  ={q, glob SIB.Sim} /\ jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} ==>
+  ={res, glob SIB.Sim} /\ jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2}.
+proof.
+proc; if => //.
+- by wp; call Sim_get_eq; auto.
+by wp; call S2b_Cache; auto.
+qed.
+
+local lemma pr_merge &m :
+  Pr[M1(SIB.ROC.RO).main() @ &m : res] =
+  Pr[EF_CMA_RO(DilithiumS, RedXOF(A), RO, O_CMA_Default).main() @ &m : res].
+proof.
+byequiv => //; proc.
+inline{1} D1(SIB.ROC.RO).distinguish GS(S2a(SIB.ROC.RO), S2b(SIB.ROC.RO)).main
+          DSSXOF.EFCMA.EF_CMA(DilithiumR(SIB.ToC(S2a(SIB.ROC.RO)), S2b(SIB.ROC.RO)),
+            A(SumOf(SIB.Sim(S2a(SIB.ROC.RO)), S2b(SIB.ROC.RO))), O_CMA_XOF).main.
+inline{2} EF_CMA(DilithiumS(RO), RedXOF(A, RO), O_CMA_Default).main
+          RedXOF(A, RO, O_CMA_Default(DilithiumS(RO))).forge.
+swap{2} 10 -7.
+seq 6 10 : (={pk, sk, glob A, glob SIB.Sim} /\ pk0{2} = pk{2} /\
+            jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} /\
+            O_CMA_XOF.sk{1} = O_CMA_Default.sk{2} /\ O_CMA_XOF.qs{1} = O_CMA_Default.qs{2} /\
+            OConv.pk{2} = (O_CMA_Default.sk.`1,
+                           O_CMA_Default.sk.`1 *^ O_CMA_Default.sk.`2 + O_CMA_Default.sk.`3){2}).
++ inline *; auto => />.
+  by move=> *; split => x; rewrite /mrg_at ?mem_empty ?emptyE.
+(* the adversary, in lockstep *)
+seq 1 1 : (={pk, glob A} /\ m{1} = m0{2} /\ sig{1} = sig0{2} /\ pk0{2} = pk{2} /\
+           jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} /\
+           O_CMA_XOF.sk{1} = O_CMA_Default.sk{2} /\ O_CMA_XOF.qs{1} = O_CMA_Default.qs{2}).
++ call (: jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} /\ ={glob SIB.Sim} /\
+          O_CMA_XOF.sk{1} = O_CMA_Default.sk{2} /\ O_CMA_XOF.qs{1} = O_CMA_Default.qs{2} /\
+          OConv.pk{2} = (O_CMA_Default.sk.`1,
+                         O_CMA_Default.sk.`1 *^ O_CMA_Default.sk.`2 + O_CMA_Default.sk.`3){2}).
+  - (* signing oracle *)
+    proc; inline{2} CountSX(OConv(O_CMA_Default(DilithiumS(RO)))).sign
+                    OConv(O_CMA_Default(DilithiumS(RO))).sign O_CMA_Default(DilithiumS(RO)).sign; wp.
+    by exlim O_CMA_Default.sk{2} => sk0; call (sign_conv sk0); auto.
+  - (* random oracle on [xin] *)
+    by proc*; inline{2} 1; wp; call SumOf_eq; auto.
+  by auto.
+(* verification of the forgery and its conversion: the query on the
+   recovered commitment is the query of the verification of the forgery *)
+inline{1} DilithiumR(SIB.ToC(S2a(SIB.ROC.RO)), S2b(SIB.ROC.RO)).verify
+          SIB.ToC(S2a(SIB.ROC.RO)).get.
+inline{2} DilithiumS(RO).verify.
+seq 9 3 : (pk{1} = pk{2} /\ m{1} = m0{2} /\ m0{1} = m0{2} /\ pk0{2} = pk{2} /\
+           (mA, t){1} = pk{2} /\ t1{1} = base2highbitsV t{1} /\ ct{1} = ct{2} /\ c{1} = c{2} /\
+           (z, h){1} = zh{2} /\ w1{1} = w1{2} /\ w1{2} = recover_r pk{2} c{2} zh{2} /\
+           ct'{1} = cl{2}.`1.`3 /\ RO.m{2}.[(w1, m0){2}] = Some cl{2} /\
+           jrel SIB.ROC.RO.m{1} HctRO.RO.m{1} RO.m{2} CacheRO.m{2} /\
+           O_CMA_XOF.sk{1} = O_CMA_Default.sk{2} /\ O_CMA_XOF.qs{1} = O_CMA_Default.qs{2} /\
+           (w1, m0){1} \in SIB.ROC.RO.m{1} /\ (w1, m0){1} \in HctRO.RO.m{1} /\
+           (cl{2}.`1.`1, cl{2}.`1.`2) = oget SIB.ROC.RO.m{1}.[(w1, m0){1}]).
++ sp; exlim (w1, m0){2} => xq; call (S2b_RO xq); skip.
+  move=> &1 &2 H.
+  have [#] hxq hs2 hw2 hpk0 hm0 hsig0 hmt ht1 hs1 hzh hw1 hpk _ hm hsig hpk0' hj hsk hqs := H.
+  have [e1 [e2 e3]] : ct{1} = ct{2} /\ c{1} = c{2} /\ (z{1}, h{1}) = zh{2}.
+  - by move: hs1; rewrite hsig0 hsig -hs2 hzh => -[-> -> ->].
+  have e4 : w1{1} = w1{2}.
+  - by rewrite hw1 hw2 /recover_r hpk0' -hpk -hpk0 -hmt /= -e2 -e3 /= ht1.
+  have e5 : m0{1} = m0{2} by rewrite hm0.
+  rewrite e4 e5 hxq hj /=.
+  move=> rl rr mh mc mr [#] -> hj' hro.
+  have [h1 [h2 hrr]] := jrel_some _ _ _ _ _ _ hj' hro.
+  rewrite hj' /=; do !split => //.
+  - by rewrite hmt hpk0.
+  - by rewrite -hpk0'.
+  by rewrite hrr /=; case: (oget mc.[w1{2}, m0{2}]).
+exlim SIB.ROC.RO.m{1}, HctRO.RO.m{1}, (w1, m0){1} => m1 m2 xq.
+seq 2 0 : (#pre /\ (ir, l){1} = (cl{2}.`1.`1, cl{2}.`1.`2)).
++ by call{1} (S2a_in m1 m2 xq); auto => /> &1 &2 _ _ _ _ _ _ <-.
+inline *.
+case: (to_c cl{2}.`1 = c{2} /\ cl{2}.`1.`3 = ct{2}).
++ (* valid conversion: the verification query is answered by the table *)
+  rcondf{2} 12.
+  - move=> &1; auto => /> &2.
+    by rewrite /recover_r /= => hro *; rewrite domE hro.
+  auto => /> &1 &2.
+  by rewrite /recover_r /= => hro *; rewrite hro /to_c.
+(* invalid conversion: both verifications fail *)
+auto => /> &1 &2 _ _ _ _ _ _ _ hne r _.
+have hz : size bad_sig.`2.`1 = 0 by rewrite /bad_sig.
+have hb : size bad_sig.`2.`1 <> Params.l by rewrite hz; smt(Params.gt0_l).
+have hc : !(c{2} = to_concrete (SIB.to_challenge cl{2}.`1.`1) /\ ct{2} = cl{2}.`1.`3).
+- by move: hne; rewrite /to_c; apply contra => -[-> ->].
+by rewrite hb /=; move: hc; case: (c{2} = to_concrete (SIB.to_challenge cl{2}.`1.`1)) => //= _ ->.
 qed.
 
 lemma pr_xof_ro &m :
   Pr [EF_CMA_XOF(DilithiumXOF, A, XOF, O_CMA_XOF).main() @ &m : res ] =
   Pr [EF_CMA_RO(DilithiumS, RedXOF(A), RO, O_CMA_Default).main() @ &m : res ].
 proof.
-(* The base game is the real game of [SampleInBallEquiv] against [XOFAdv(A)] *)
-have -> : Pr[EF_CMA_XOF(DilithiumXOF, A, XOF, O_CMA_XOF).main() @ &m : res]
-        = Pr[SIB.GameReal(XOFAdv(A)).main() @ &m : res].
-- by byequiv => //; proc; inline{2} 2; wp; sim.
-(* Core argument: simulate the XOF from the challenge oracle *)
-have -> : Pr[SIB.GameReal(XOFAdv(A)).main() @ &m : res]
-        = Pr[SIB.GameROC(SIB.ORedXOFROC(XOFAdv(A))).main() @ &m : res].
-- by byequiv (SIB.adv_xof_roc (XOFAdv(A))).
-(* The ideal game is the EF-CMA game against [RedXOF(A)], up to the
-   position of the simulator initialization, the counting wrappers and the
-   conversions of signatures, leakages and of the forgery *)
-byequiv => //; proc.
-inline{1} SIB.ORedXOFROC(XOFAdv(A), SIB.ROC.RO).run XOFAdv(A, SIB.Sim(SIB.ROC.RO), SIB.ToC(SIB.ROC.RO)).run.
-inline{1} DSSXOF.EFCMA.EF_CMA(DilithiumR(SIB.ToC(SIB.ROC.RO)), A(SIB.Sim(SIB.ROC.RO)), O_CMA_XOF).main.
-inline{2} EF_CMA(DilithiumS(RO), RedXOF(A, RO), O_CMA_Default).main.
-inline{2} RedXOF(A, RO, O_CMA_Default(DilithiumS(RO))).forge.
-swap{2} 9 -7.
-seq 6 9 : (={pk, sk, glob A, glob SIB.Sim} /\ pk0{2} = pk{2} /\ RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1} /\
-           O_CMA_XOF.sk{1} = O_CMA_Default.sk{2} /\ O_CMA_XOF.qs{1} = O_CMA_Default.qs{2} /\
-           OConv.pk{2} = (O_CMA_Default.sk.`1, O_CMA_Default.sk.`1 *^ O_CMA_Default.sk.`2 + O_CMA_Default.sk.`3){2}).
-+ by inline *; auto => />; rewrite map_empty.
-(* the adversary, in lockstep *)
-seq 1 1 : (={pk, glob A} /\ m{1} = m0{2} /\ sig{1} = sig0{2} /\ pk0{2} = pk{2} /\
-           RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1} /\
-           O_CMA_XOF.sk{1} = O_CMA_Default.sk{2} /\ O_CMA_XOF.qs{1} = O_CMA_Default.qs{2}).
-+ call (: RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1} /\ ={glob SIB.Sim} /\
-          O_CMA_XOF.sk{1} = O_CMA_Default.sk{2} /\ O_CMA_XOF.qs{1} = O_CMA_Default.qs{2} /\
-          OConv.pk{2} = (O_CMA_Default.sk.`1, O_CMA_Default.sk.`1 *^ O_CMA_Default.sk.`2 + O_CMA_Default.sk.`3){2}).
-  - (* signing oracle *)
-    proc; inline{2} CountSX(OConv(O_CMA_Default(DilithiumS(RO)))).sign
-                    OConv(O_CMA_Default(DilithiumS(RO))).sign O_CMA_Default(DilithiumS(RO)).sign; wp.
-    by exlim O_CMA_Default.sk{2} => sk0; call (sign_conv sk0); auto.
-  - (* XOF oracle *)
-    proc*; inline{2} CountX(SIB.Sim(ROCofRO(RO))).get; wp.
-    by call Sim_get_eq; auto.
-  by auto.
-(* verification of the forgery and its conversion: the query on the
-   recovered commitment is the query of the verification of the forgery *)
-inline{1} DilithiumR(SIB.ToC(SIB.ROC.RO)).verify SIB.ToC(SIB.ROC.RO).get.
-inline{2} DilithiumS(RO).verify.
-seq 10 3 : (pk0{1} = pk{2} /\ pk0{2} = pk{2} /\ m0{1} = m0{2} /\ m{1} = m0{2} /\ c{1} = c{2} /\
-            (z, h){1} = zh{2} /\ w1{1} = w1{2} /\ w1{2} = recover_r pk{2} c{2} zh{2} /\
-            cl{2} = ((ir, l){1}, Empty) /\ RO.m{2} = map (fun _ v => (v, Empty)) SIB.ROC.RO.m{1} /\ RO.m{2}.[(w1{2}, m0{2})] = Some cl{2} /\
-            O_CMA_XOF.sk{1} = O_CMA_Default.sk{2} /\ O_CMA_XOF.qs{1} = O_CMA_Default.qs{2} /\
-            (mA, t){1} = pk{2} /\ t1{1} = base2highbitsV t{1}).
-+ sp; exlim x2{1} => x0; call (ROC_RO_get_in x0); auto => /> &1 &2.
-  by rewrite /recover_r /= => -[].
-inline *.
-case: (to_c cl{2}.`1 = c{2}).
-+ (* valid conversion: the verification query is answered by the table *)
-  rcondf{2} ^if.
-  - by move=> &1; auto => />; rewrite /recover_r /= domE => ->.
-  auto => />.
-  by move=> &1 &2; rewrite /recover_r /= => -> /= _ _; rewrite /to_c.
-(* invalid conversion: both verifications fail *)
-auto => /> &1 &2 _ hne r _.
-have hz : size bad_sig.`2.`1 = 0 by rewrite /bad_sig.
-have hb : size bad_sig.`2.`1 <> Params.l by rewrite hz; smt(Params.gt0_l).
-have hc : c{2} <> to_concrete (SIB.to_challenge ir{1}) by move: hne; rewrite /to_c eq_sym.
-by rewrite hb hc.
+rewrite pr_sum -pr_merge -pr_eager.
+by byequiv (SIB.adv_xof_roc (XOFAdv(A))).
 qed.
 
 (*** Main theorem for the scheme with an ideal XOF ***)
 
-(* Note: [A] makes at most [qH - 1] (distinct) queries to the XOF
-   ([A_bound]). *)
+(* Note: [A] queries its random oracle on at most [qH - 1] distinct points
+   [(w1, mu)], byte and commitment hash queries together ([A_bound]). *)
 lemma DilithiumXOF_secure &m :
   Pr [EF_CMA_XOF(DilithiumXOF, A, XOF, O_CMA_XOF).main() @ &m : res ] <=
     `|Pr[GameL(RedMLWE(RedNMA(RedXOF(A)), RO)).main() @ &m : res] -

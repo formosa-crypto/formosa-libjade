@@ -110,7 +110,7 @@ clone FullRO as RO_v with
 module MLDSA_ROSep(XA : DS5.POracle1, XC : DS5.POracle2,
                    Htr : DS5.POracle3, Hmu : DS5.POracle4, Hct : DS5.POracle5) = {
   proc keygen() : BytesPK.t * BytesSK.t = {
-    var eps,sk,rho,rhop,_K,_A,s1,s2,t,t1,t0,pk,tr,epsp,bs;
+    var eps,sk,rho,rhop,_K,_A,al,s1,s2,t,t1,t0,pk,tr,epsp,bs;
     RO_seed.RO.init();
     RO_S.RO.init();
     RO_rhopp.RO.init();
@@ -121,7 +121,7 @@ module MLDSA_ROSep(XA : DS5.POracle1, XC : DS5.POracle2,
     (rho,rhop,_K) <- ( Bytes32.of_list (take 32 bs)
                      , Bytes64.of_list (take 64 (drop 32 bs))
                      , Bytes32.of_list (drop 96 bs) );
-    _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+    (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
     (s1,s2) <@ ExpandS(XOFS_O(RO_S.RO)).sample(rhop);
     t <- invnttv (ntt_mulmxv _A (nttv s1)) + s2;
     (t1,t0) <- Power2Round t;
@@ -132,7 +132,7 @@ module MLDSA_ROSep(XA : DS5.POracle1, XC : DS5.POracle2,
   }
 
   proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * leakage = {
-     var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,rhopp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
+     var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,al,mu,rhopp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
          cs2,z,r0,ct0,h,leakage,sigma,bct0,bs,sl;
      var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
@@ -146,8 +146,10 @@ module MLDSA_ROSep(XA : DS5.POracle1, XC : DS5.POracle2,
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
-     leakage <- kvec_leak t0h;
-     _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+     leakage <- rho_leak rho;
+     (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
+     leakage <- lcat leakage al;
+     leakage <- lcat leakage (kvec_leak t0h);
      mu <@ Hmu.get(tr, m);
      bs <@ Squeeze(RO_rhopp.RO).squeeze(Bytes32.to_list _K ++ rnd_to_list coins ++ Bytes64.to_list mu, 64);
      rhopp <- Bytes64.of_list bs;
@@ -160,6 +162,7 @@ module MLDSA_ROSep(XA : DS5.POracle1, XC : DS5.POracle2,
        ct <@ Hct.get(mu, w1Encode w1);
        (c, sl) <@ SampleInBall_O(XC).sample(ct);
        ctl <- ((ct, c), sl);
+       leakage <- lcat leakage (ctilde_leak ct);
        leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
        leakage <- lcat leakage (poly_leak ch);
@@ -191,13 +194,13 @@ module MLDSA_ROSep(XA : DS5.POracle1, XC : DS5.POracle2,
   }
 
   proc verify(pk : BytesPK.t, m : W8.t list, sigma : BytesSig.t) : bool = {
-    var rho,t1,c,l,ct,z,h,rb,_A,tr,mu,wapprox,w1,ctp;
+    var rho,t1,c,l,ct,z,h,rb,_A,al,tr,mu,wapprox,w1,ctp;
     w1 <- witness;
     rb <- false;
     (rho,t1) <@ PkEncDec.pkDecode(pk);
     (ct,z,h) <@ SigEncDec.sigDecode(sigma);
     if (h <> None) {
-      _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+      (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
       tr <@ Htr.get(pk);
       mu <@ Hmu.get(tr, m);
       (c,l) <@ SampleInBall_O(XC).sample(ct);

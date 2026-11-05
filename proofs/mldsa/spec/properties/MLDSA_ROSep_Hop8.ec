@@ -45,10 +45,10 @@ clone DS_ROM.DS_ROM_x5 as DS8 with
 module MLDSA_RO_DS8(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hmu : DS5.POracle4,
                     Hct : DS5.POracle5) = {
   proc keygen() : BytesPK.t * (Bytes32.t * Bytes64.t * polylvec * polykvec * polykvec) = {
-    var rho,_A,s1,s2,t,t1,t0,pk,tr;
+    var rho,_A,al,s1,s2,t,t1,t0,pk,tr;
     RO_y.RO.init();
     rho <$ dxi;
-    _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+    (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
     s1 <$ dpolyl (dpoly (-Eta) Eta);
     s2 <$ dpolyk (dpoly (-Eta) Eta);
     t <- invnttv (ntt_mulmxv _A (nttv s1)) + s2;
@@ -60,7 +60,7 @@ module MLDSA_RO_DS8(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
 
   proc sign(sk : Bytes32.t * Bytes64.t * polylvec * polykvec * polykvec, m : W8.t list) :
     BytesSig.t option * leakage = {
-     var coins,rho,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,kappa,y,w,w1,ctl,ct,c,ch,cs1,
+     var coins,rho,tr,s1,s2,t0,s1h,s2h,t0h,_A,al,mu,kappa,y,w,w1,ctl,ct,c,ch,cs1,
          cs2,z,r0,ct0,h,leakage,sigma,bct0,sl;
      var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
@@ -74,8 +74,10 @@ module MLDSA_RO_DS8(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
-     leakage <- kvec_leak t0h;
-     _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+     leakage <- rho_leak rho;
+     (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
+     leakage <- lcat leakage al;
+     leakage <- lcat leakage (kvec_leak t0h);
      mu <@ Hmu.get(tr, m);
      kappa <- 0;
      zh <- None;
@@ -86,6 +88,7 @@ module MLDSA_RO_DS8(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
        ct <@ Hct.get(mu, w1Encode w1);
        (c, sl) <@ SampleInBall_O(XC).sample(ct);
        ctl <- ((ct, c), sl);
+       leakage <- lcat leakage (ctilde_leak ct);
        leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
        leakage <- lcat leakage (poly_leak ch);

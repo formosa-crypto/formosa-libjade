@@ -86,6 +86,8 @@ fn rejection_sample_multiple_blocks(
         compare_with_field_modulus = #protect_256(compare_with_field_modulus, ms);
 
         good = (64u)#MOVEMASK_8u32(compare_with_field_modulus);
+        // Model item: the candidates of ExpandA (cands_leak); this mask, the
+        // outcome of the rejection test of 8 candidates, is a function of them.
         () = #declassify(good);
 
         // Do the lower 4 coefficients first.
@@ -177,6 +179,7 @@ fn rejection_sample_multiple_blocks(
 
         // Rejection-sample
         coeff &= 0x7F_FF_FF;
+        // Model item: a candidate of ExpandA (cands_leak).
         () = #declassify(coeff);
         coeff = #protect_32(coeff, ms);
         condition = coeff < MODULUS;
@@ -271,6 +274,7 @@ fn rejection_sample_one_block(
 
         // Rejection-sample
         coeff &= 0x7F_FF_FF;
+        // Model item: a candidate of ExpandA (cands_leak).
         () = #declassify(coeff);
         coeff = #protect_32(coeff, ms);
         condition = coeff < MODULUS;

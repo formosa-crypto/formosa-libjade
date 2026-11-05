@@ -29,6 +29,17 @@ op dseed : Bytes32.t distr = dmap (dlist W8.dword 32) Bytes32.of_list.
 op dbytes64 : Bytes64.t distr = dmap (dlist W8.dword 64) Bytes64.of_list.
 op dbytesCT : BytesCT.t distr = dmap (dlist W8.dword (lambda %/ 4)) BytesCT.of_list.
 
+(* The encoding of the seed rho of the target: its bytes *)
+op seed_enc (rho : Bytes32.t) : int list = map W8.to_uint (Bytes32.to_list rho).
+op seed_dec (l : int list) : Bytes32.t = Bytes32.of_list (map W8.of_int l).
+
+lemma seed_encK : cancel seed_enc seed_dec.
+proof.
+move=> rho; rewrite /seed_dec /seed_enc -map_comp.
+rewrite (eq_map _ idfun); 1: by move=> b; rewrite /(\o) W8.to_uintK.
+by rewrite map_id Bytes32.to_listK.
+qed.
+
 (* The probability of one output: 2^-512 for 64 bytes, 2^-(2 lambda) for c~ *)
 op eps_mu : real = (1%r / 256%r) ^ 64.
 op eps_ct : real = (1%r / 256%r) ^ (lambda %/ 4).
@@ -270,6 +281,10 @@ clone MLDSAProof.MLDSAProof as MP with
   type T.tr_t <- Bytes64.t,
   type T.mu_t <- Bytes64.t,
   type T.ctilde <- BytesCT.t,
+  op T.ct_enc <- ctilde_enc,
+  op T.ct_dec <- ctilde_dec,
+  op T.rho_enc <- seed_enc,
+  op T.rho_dec <- seed_dec,
   op T.dseed <- dseed,
   op T.to_concrete <- to_challenge,
   op T.dtr <- dbytes64,
@@ -310,6 +325,8 @@ proof T.Params.prime_q,
       T.check_r0_None,
       T.check_ct0_None,
       T.check_z_shift,
+      T.ct_encK,
+      T.rho_encK,
       T.dseed_ll,
       T.dseed_uni,
       T.dseed_fu,
@@ -392,6 +409,8 @@ by rewrite size_lowBitsV.
 qed.
 realize T.check_ct0_None by done.
 realize T.check_z_shift by exact first_fail_z_shift.
+realize T.ct_encK by exact ctilde_encK.
+realize T.rho_encK by exact seed_encK.
 realize T.dseed_ll by apply dmap_ll; apply dlist_ll; exact W8.dword_ll.
 realize T.dseed_uni.
 apply dmap_uni_in_inj; last by apply dlist_uni; exact W8.dword_uni.
@@ -455,5 +474,29 @@ realize dC_equiv.
 have := dC_equiv_CF; rewrite /ConcreteDRing.DR.dC => ->.
 by rewrite /CF.dCR /T.SIB.dC /CF.to_c /(\o).
 qed.
+
+(* -------------------------------------------------------------------- *)
+(* The leakage of the target and of the specification                    *)
+
+(* The declassification of c~ of the target is the one of the
+   specification (its bytes) *)
+lemma ct_leakE (ct : BytesCT.t) : MP.T.ct_leak ct = ctilde_leak ct.
+proof. by rewrite /MP.T.ct_leak /ctilde_leak. qed.
+
+(* The declassification of rho of the target is the one of the
+   specification (its bytes) *)
+lemma rho_leakE (rho : Bytes32.t) : MP.T.rho_leak rho = rho_leak rho.
+proof. by rewrite /MP.T.rho_leak /rho_leak /bytes_decl /seed_enc -map_comp. qed.
+
+(* The leakage of the candidates of one entry of A is the same in the
+   target and in the specification *)
+lemma cands_leakE (vs : int list) : MP.T.cands_leak vs = rej_leak vs.
+proof. by rewrite /MP.T.cands_leak /rej_leak. qed.
+
+(* The leakage of the sign bytes of the SampleInBall of the target is the
+   one of the specification *)
+lemma bytes_leakE (s : Bytes8.t) :
+  MP.T.SIB.bytes_leak (Bytes8.to_list s) = signs_leak s.
+proof. by rewrite /MP.T.SIB.bytes_leak /signs_leak /bytes_decl /to_int. qed.
 
 end MLDSATargetFIPS.

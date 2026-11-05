@@ -35,10 +35,15 @@ import Params.
      accepted bytes alike), rebuilt from the accepted indices of [ir] and the
      rejected bytes [r] (the contexts are determined: 8 sign bytes first,
      then one context per inner iteration).
+   - [sib_leak ir r = lcat (bytes_leak ir.`1) (full_leak ir r)] is the whole
+     leakage of [SampleInBall]: the 8 sign bytes, then the pairs. It
+     determines the byte stream read on the XOF:
+     [leak_to_streamK : leak_to_stream (sib_leak ir r) = stream (ir, r)].
    - [SampleInBall(X).get(x) : challenge * leakage] (real algorithm, over a
-     XOF [X]), [ROC] the ideal oracle with output [challenge_ir * leakage]
+     XOF [X], leaking [lcat (bytes_leak signs) (pairs_to_leakage pairs)]),
+     [ROC] the ideal oracle with output [challenge_ir * leakage]
      distributed as [dI `*` dLeakRej], [ToC(R)] the challenge oracle built
-     on top of it ([(to_concrete (to_challenge ir), full_leak ir (leakage_to_rej l))]),
+     on top of it ([(to_concrete (to_challenge ir), sib_leak ir (leakage_to_rej l))]),
      and [Sim(R)] the XOF simulator.
    - [adv_xof_roc : GameReal(A).main ~ GameROC(ORedXOFROC(A)).main], where
      [ORedXOFROC(A)(R)] runs [A(Sim(R), ToC(R))]. *)
@@ -58,7 +63,9 @@ clone PROM.FullRO as XOF with
 clone PROM.FullRO as ROC with
   type in_t <- in_t,
   type out_t <- challenge_ir * leakage,
-  op dout <- fun _ => dI `*` dLeakRej.
+  op dout <- fun _ => dI `*` dLeakRej,
+  type d_in_t <- unit,
+  type d_out_t <- bool.
 
 module type XOF_t = {
   include XOF.RO [get]
@@ -104,7 +111,7 @@ module SampleInBall(X : XOF_t) : SIB_t = {
       challenge <- put challenge j coeff;
       i <- i + 1;
     }
-    return (to_concrete challenge, pairs_to_leakage leak);
+    return (to_concrete challenge, lcat (bytes_leak signs) (pairs_to_leakage leak));
   }
 }.
 
@@ -113,7 +120,7 @@ module ToC(R : ROC_t) : SIB_t = {
   proc get(x : in_t) = {
     var ir, l;
     (ir, l) <@ R.get(x);
-    return (to_concrete (to_challenge ir), full_leak ir (leakage_to_rej l));
+    return (to_concrete (to_challenge ir), sib_leak ir (leakage_to_rej l));
   }
 }.
 
@@ -202,6 +209,32 @@ realize F2.ideal_sampler_ll
 op stream (r : challenge_ir * rej_ir) : byte list =
   r.`1.`1 ++ flatten (map (fun (p : byte * int list) => rcons (map from_int p.`2) p.`1)
                           (zip r.`1.`2 r.`2)).
+
+(* The second components of the pairs of [full_pairs] are the bytes read
+   after the signs, in order. *)
+lemma full_pairs_snd (s : (byte * int list) list) (acc : int * (int * int) list) :
+  map snd (foldl (fun (acc : int * (int * int) list) (p : byte * int list) =>
+           (acc.`1 + size p.`2 + 1, acc.`2 ++ seg acc.`1 p.`2 (to_int p.`1))) acc s).`2 =
+  map snd acc.`2 ++ flatten (map (fun (p : byte * int list) => rcons p.`2 (to_int p.`1)) s).
+proof.
+elim: s acc => [|p s ih] acc /=; 1: by rewrite flatten_nil cats0.
+rewrite ih /= map_cat flatten_cons catA; congr; congr.
+by rewrite /seg unzip2_zip // size_iota size_rcons; smt(size_ge0).
+qed.
+
+(* The leakage of [SampleInBall] determines the byte stream it consumed. *)
+lemma leak_to_streamK (ir : challenge_ir) (r : rej_ir) :
+  leak_to_stream (sib_leak ir r) = stream (ir, r).
+proof.
+rewrite /leak_to_stream /sib_leak /bytes_leak /full_leak /pairs_to_leakage /stream /=.
+congr.
+- by rewrite -map_comp -{2}(map_id ir.`1); apply eq_map => b; rewrite /(\o) /= tK.
+rewrite -map_comp (_ : (fun (d : decl) => from_int (nth 0 (decl_to_ints d) 1)) \o
+          (fun (p : int * int) => List [Int p.`1; Int p.`2]) = from_int \o snd).
+- by apply fun_ext => p; rewrite /(\o).
+rewrite map_comp /full_pairs full_pairs_snd /= map_flatten -map_comp.
+by congr; apply eq_map => p; rewrite /(\o) /= map_rcons tK.
+qed.
 
 (* Writing a byte stream in a map, starting at context [c] *)
 op sets (m : (in_t * int, byte) fmap) (x : in_t) (c : int) (bs : byte list) =
@@ -349,7 +382,7 @@ module ToCS(S : F2.Sampler_t) : SIB_t = {
   proc get(x : in_t) = {
     var ir, l;
     (ir, l) <@ S.sample(x);
-    return (to_concrete (to_challenge ir), full_leak ir (leakage_to_rej l));
+    return (to_concrete (to_challenge ir), sib_leak ir (leakage_to_rej l));
   }
 }.
 
@@ -407,7 +440,7 @@ have ->> /= : ctx = 8 by smt().
 split; 1: smt(tau_bound to_challenge_aux0).
 move=> i indices rej h3 _ h4 hsz1 hsz2.
 have ->> : i = 256 by smt().
-by rewrite /to_challenge' /= rej_to_leakageK /to_challenge /full_leak /=; smt().
+by rewrite /to_challenge' /= rej_to_leakageK /to_challenge /sib_leak /full_leak /=; smt().
 qed.
 
 (** Correctness of the reprogramming *)

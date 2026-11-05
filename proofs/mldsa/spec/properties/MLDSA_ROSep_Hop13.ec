@@ -499,10 +499,10 @@ qed.
 module MLDSA_RO_DS13(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DST.POracle3, Hmu : DST.POracle4,
                      Hct : DST.POracle5) = {
   proc keygen() : BytesPK.t * MP.T.SK = {
-    var rho, _A, mA, s1, s2, t, pk, tr;
+    var rho, _A, al, mA, s1, s2, t, pk, tr;
     RO_y.RO.init();
     rho <$ dxi;
-    _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+    (_A, al) <@ ExpandA(XOFA_O(XA)).sample(rho);
     mA <- mat_of (invnttm _A);
     s1 <$ dvector (DR.dRq_ Eta) lvec;
     s2 <$ dvector (DR.dRq_ Eta) kvec;
@@ -513,7 +513,7 @@ module MLDSA_RO_DS13(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DST.POracle3,
   }
 
   proc sign(sk : MP.T.SK, m : W8.t list) : BytesSig.t option * leakage = {
-    var coins, rho, tr, s1, s2, t0, _A, mA, mu, kappa, y, w, w1, ctl, ct, c, cr, z, h, leakage, sigma, w0, ct0_ok, sl;
+    var coins, rho, tr, s1, s2, t0, _A, al, mA, mu, kappa, y, w, w1, ctl, ct, c, cr, z, h, leakage, sigma, w0, ct0_ok, sl;
     var z_fail, r0_fail, hint_fail : int option;
     var zh : (vector * bool list list) option;
     coins <$ drnd;
@@ -521,8 +521,10 @@ module MLDSA_RO_DS13(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DST.POracle3,
     ctl <- witness;
     sigma <- witness;
     (rho, tr, s1, s2, t0) <- sk;
-    leakage <- MP.T.t0_leak t0;
-    _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+    leakage <- MP.T.rho_leak rho;
+    (_A, al) <@ ExpandA(XOFA_O(XA)).sample(rho);
+    leakage <- lcat leakage al;
+    leakage <- lcat leakage (MP.T.t0_leak t0);
     mA <- mat_of (invnttm _A);
     mu <@ Hmu.get(tr, m);
     kappa <- 0;
@@ -534,6 +536,7 @@ module MLDSA_RO_DS13(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DST.POracle3,
       ct <@ Hct.get(w1, mu);
       (c, sl) <@ SampleInBall_B(XC).sample(ct);
       ctl <- ((ct, c), sl);
+      leakage <- lcat leakage (ctilde_leak ct);
       leakage <- lcat leakage ctl.`2;
       cr <- poly2alg c;
       leakage <- lcat leakage (MP.T.c_leak cr);
@@ -562,13 +565,13 @@ module MLDSA_RO_DS13(XA : DS11.POracle1, XC : DS11.POracle2, Htr : DST.POracle3,
   }
 
   proc verify(pk : BytesPK.t, m : W8.t list, sigma : BytesSig.t) : bool = {
-    var rho, t1, c, l, ct, z, h, rb, _A, mA, tr, mu, w1, ctp;
+    var rho, t1, c, l, ct, z, h, rb, _A, al, mA, tr, mu, w1, ctp;
     w1 <- witness;
     rb <- false;
     (rho, t1) <@ PkEncDec.pkDecode(pk);
     (ct, z, h) <@ SigEncDec.sigDecode(sigma);
     if (h <> None) {
-      _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+      (_A, al) <@ ExpandA(XOFA_O(XA)).sample(rho);
       mA <- mat_of (invnttm _A);
       tr <@ Htrw(Htr).get(pk);
       mu <@ Hmu.get(tr, m);
@@ -643,13 +646,13 @@ equiv sign_13 :
         RO_y.RO.m}.
 proof.
 proc.
-seq 12 11 : (={coins, ct, ctl, sigma, leakage, rho, tr, mu, kappa, glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO,
+seq 14 13 : (={coins, ct, ctl, sigma, leakage, rho, tr, mu, kappa, glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO,
                glob DST.RO4.RO, glob DST.RO5.RO, glob XOFA_O, RO_y.RO.m} /\
              s1{2} = vec_of_l s1{1} /\ s2{2} = vec_of_k s2{1} /\ t0{2} = vec_of_k t0{1} /\
              mA{2} = mat_of (invnttm _A{1}) /\ zh{1} = None /\ zh{2} = None).
 + wp; call (: ={glob DST.RO4.RO}); 1: by sim.
   wp; call (: ={glob DST.RO1.RO, glob RO_xr.RO, glob XOFA_O}); 1: by sim.
-  by auto => />; rewrite /sk_rel => &1 &2 -> /=; rewrite t0_leak_E.
+  by auto => />; rewrite /sk_rel => &1 &2 -> /=; rewrite t0_leak_E rho_leakE.
 seq 1 1 : (={ct, sigma, leakage, glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO, glob DST.RO4.RO, glob DST.RO5.RO,
              glob XOFA_O, RO_y.RO.m} /\
            zh{2} = omap (fun (p : polylvec * polykvec) => (vec_of_l p.`1, hints_of p.`2)) zh{1} /\
@@ -666,7 +669,7 @@ seq 1 1 : (={ct, sigma, leakage, glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO
   wp; call (: ={RO_y.RO.m}); 1: by sim.
   auto => /> &1 &2 _ y.
   split; 1: (rewrite w1_key_HighBits vec_of_k_mulmxv; congr).
-  move=> _ c.
+  move=> _ ct' c.
   have [h1 [h2 [h3 [h4 h5]]]] := sign_alg _A{1} y s1{1} c.`1 s2{1} t0{1}.
   rewrite hints_ofK h1 h2 h3 hintfail_idx_E h4 h5 c_leak_E.
   smt().

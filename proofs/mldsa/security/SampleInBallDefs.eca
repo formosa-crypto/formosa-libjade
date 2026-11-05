@@ -134,6 +134,26 @@ op full_pairs (ir : challenge_ir) (r : rej_ir) : int * (int * int) list =
 op full_leak (ir : challenge_ir) (r : rej_ir) : leakage =
   pairs_to_leakage (full_pairs ir r).`2.
 
+(* Leakage of a list of bytes (the 8 sign bytes of [SampleInBall]) *)
+op bytes_leak (bs : byte list) : leakage =
+  [List (map (fun (b : byte) => Int (to_int b)) bs)].
+
+(* The whole leakage of [SampleInBall]: the 8 sign bytes, then the pairs
+   [(ctx, j)] of the inner loop. It contains every byte read on the XOF, in
+   order (see [leak_to_stream] and [SampleInBallEquiv.leak_to_streamK]). *)
+op sib_leak (ir : challenge_ir) (r : rej_ir) : leakage =
+  lcat (bytes_leak ir.`1) (full_leak ir r).
+
+op decl_list (d : decl) : decl list =
+  with d = Int _ => []
+  with d = List l => l.
+
+(* Decoding of the leakage of [SampleInBall]: the byte stream it consumed
+   (the sign bytes, then the second components of the pairs). *)
+op leak_to_stream (l : leakage) : byte list =
+  map (fun (d : decl) => from_int (decl_to_int d)) (decl_list (nth (Int 0) l 0)) ++
+  map (fun (d : decl) => from_int (nth 0 (decl_to_ints d) 1)) (decl_list (nth (Int 0) l 1)).
+
 lemma full_pairs_rcons (s idx : byte list) (r : rej_ir) b rk :
   size idx = size r =>
   full_pairs (s, rcons idx b) (rcons r rk) =

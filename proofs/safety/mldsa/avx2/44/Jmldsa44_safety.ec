@@ -56763,6 +56763,7 @@ module M = {
       [(Assert, (BArray32.is_init b_result_7 0 32))]);
       b_commitment_hash <- (BArray32.init_arr (W8.of_int 255));
       commitment_hash <- result_18;
+      (* Erased call to declassify *)
       b_param_13 <- b_verifier_challenge;
       param_35 <- verifier_challenge;
       param_34 <- commitment_hash;

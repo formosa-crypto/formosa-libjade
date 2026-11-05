@@ -145,29 +145,31 @@ module SampleInBall_O(H : BlockOracle) = {
           c.[W8.to_uint j] <- if h.[i+tau-256] then incoeff (-1) else incoeff (1);
           i <- i + 1;
       }
-      return (c, pairs_to_leakage leak);
+      return (c, lcat (signs_leak s) (pairs_to_leakage leak));
    }
 }.
 
+(* SIB_RO on the block oracle: the leakage is the one of SampleInBall only,
+   the signing loop leaks c~ itself *)
 module SIB_RO_O(H : BlockOracle) = {
    proc get(mu : Bytes64.t, w1 : BytesW1.t): (BytesCT.t * poly) * sib_leakage = {
         var rr, bs, ct;
         bs <@ Squeeze(H).squeeze(Bytes64.to_list mu ++ BytesW1.to_list w1, lambda %/ 4);
         ct <- BytesCT.of_list bs;
         rr <@ SampleInBall_O(H).sample(ct);
-        return ((ct,rr.`1),rr.`2);
+        return ((ct,rr.`1), rr.`2);
    }
 }.
 
 module MLDSA_RO(H : BlockOracle, G : Oracle) = {
    proc keygen_derand(eps : Bytes32.t) : BytesSK.t * BytesPK.t= {
-     var sk,rho,rhop,_K,_A,s1,s2,t,t1,t0,pk,tr,epsp,bs;
+     var sk,rho,rhop,_K,_A,al,s1,s2,t,t1,t0,pk,tr,epsp,bs;
      epsp <- Bytes34.of_list (Bytes32.to_list eps ++ [W8.of_int kvec;W8.of_int lvec]);
      bs <@ Squeeze(H).squeeze(Bytes34.to_list epsp, 128);
      (rho,rhop,_K) <- ( Bytes32.of_list (take 32 bs)
                       , Bytes64.of_list (take 64 (drop 32 bs))
                       , Bytes32.of_list (drop 96 bs) );
-     _A <@ ExpandA(XOFA_O(G)).sample(rho);
+     (_A,al) <@ ExpandA(XOFA_O(G)).sample(rho);
      (s1,s2) <@ ExpandS(XOFS_O(H)).sample(rhop);
      t <- invnttv (ntt_mulmxv _A (nttv s1)) + s2;
      (t1,t0) <- Power2Round t;
@@ -179,7 +181,7 @@ module MLDSA_RO(H : BlockOracle, G : Oracle) = {
   }
 
   proc sign_derand(sk : BytesSK.t, m : W8.t list, coins : rnd_) : BytesSig.t option * leakage= {
-     var rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,rhopp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
+     var rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,al,mu,rhopp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
          cs2,z,r0,ct0,h,leakage,sigma,bct0,bs;
      var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
@@ -192,8 +194,10 @@ module MLDSA_RO(H : BlockOracle, G : Oracle) = {
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
-     leakage <- kvec_leak t0h;
-     _A <@ ExpandA(XOFA_O(G)).sample(rho);
+     leakage <- rho_leak rho;
+     (_A,al) <@ ExpandA(XOFA_O(G)).sample(rho);
+     leakage <- lcat leakage al;
+     leakage <- lcat leakage (kvec_leak t0h);
      bs <@ Squeeze(H).squeeze(Bytes64.to_list tr ++ m, 64);
      mu <- Bytes64.of_list bs;
      bs <@ Squeeze(H).squeeze(Bytes32.to_list _K ++ rnd_to_list coins ++ Bytes64.to_list mu, 64);
@@ -206,6 +210,7 @@ module MLDSA_RO(H : BlockOracle, G : Oracle) = {
        w1 <- polykvec_HighBits w;
        ctl <@ SIB_RO_O(H).get(mu,w1Encode w1);
        (ct,c) <- ctl.`1;
+       leakage <- lcat leakage (ctilde_leak ct);
        leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
        leakage <- lcat leakage (poly_leak ch);
@@ -237,13 +242,13 @@ module MLDSA_RO(H : BlockOracle, G : Oracle) = {
   }
 
   proc verify(pk : BytesPK.t, sigma : BytesSig.t, m : W8.t list) : bool = {
-    var rho,t1,c,l,ct,z,h,rb,_A,tr,mu,wapprox,w1,ctp,bs;
+    var rho,t1,c,l,ct,z,h,rb,_A,al,tr,mu,wapprox,w1,ctp,bs;
     w1 <- witness;
     rb <- false;
     (rho,t1) <@ PkEncDec.pkDecode(pk);
     (ct,z,h) <@ SigEncDec.sigDecode(sigma);
     if (h <> None) {
-      _A <@ ExpandA(XOFA_O(G)).sample(rho);
+      (_A,al) <@ ExpandA(XOFA_O(G)).sample(rho);
       bs <@ Squeeze(H).squeeze(BytesPK.to_list pk, 64);
       tr <- Bytes64.of_list bs;
       bs <@ Squeeze(H).squeeze(Bytes64.to_list tr ++ m, 64);
@@ -325,7 +330,7 @@ equiv RejNTTPoly_equiv :
   ={rho} ==> ={res}.
 proof.
 proc.
-while (={j, c} /\ XOFA_state.seed{1} = Bytes34.to_list XOFA_O.seed{2}
+while (={j, c, vs} /\ XOFA_state.seed{1} = Bytes34.to_list XOFA_O.seed{2}
        /\ XOFA_state.pos{1} = XOFA_O.pos{2} /\ 0 <= XOFA_state.pos{1}).
 + inline *; auto => /> &2 *.
   by rewrite SHAKE128_3 //= /#.
@@ -337,8 +342,8 @@ equiv ExpandA_equiv :
   ={rho} ==> ={res}.
 proof.
 proc.
-while (={r, rho, aa}).
-+ wp; while (={r, s, rho, aa}); 1: by wp; call RejNTTPoly_equiv; auto.
+while (={r, rho, aa, al}).
++ wp; while (={r, s, rho, aa, al}); 1: by wp; call RejNTTPoly_equiv; auto.
   by auto.
 by auto.
 qed.
@@ -423,12 +428,12 @@ lemma sign_derand_equiv :
           ={sk, m, coins} ==> ={res} ].
 proof.
 proc.
-seq 15 17 : (={rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp, rf, hf,
+seq 17 19 : (={rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp, rf, hf,
                kappa, zh, leakage, sigma, ct, ctl}).
 + wp; ecall{2} (Squeeze_SHAKE256_ph
                   (Bytes32.to_list _K{2} ++ rnd_to_list coins{2} ++ Bytes64.to_list mu{2}) 64).
   wp; ecall{2} (Squeeze_SHAKE256_ph (Bytes64.to_list tr{2} ++ m{2}) 64).
-  call ExpandA_equiv.
+  wp; call ExpandA_equiv.
   wp; call (: true); 1: by sim.
   by auto.
 seq 1 1 : (={zh, leakage, sigma, ct}); last by sim.
@@ -768,7 +773,7 @@ while (XOFA_O.seed = s0 /\ 0 <= XOFA_O.pos /\ 0 <= j
   case: (known G0 (Bytes34.to_list s0, pos + 2)) => hk; 2: smt().
   by have := hkb _ hk; smt().
 - move=> hw.
-  seq 3 : (XOFA_O.seed = s0 /\ 0 <= XOFA_O.pos /\ 0 <= j
+  seq 4 : (XOFA_O.seed = s0 /\ 0 <= XOFA_O.pos /\ 0 <= j
            /\ known_before known (glob G) (Bytes34.to_list s0) B XOFA_O.pos).
   + by wp; call (: true); auto.
   + wp; exlim (glob G), XOFA_O.pos => gg pp; call (next_ph gg s0 pp).

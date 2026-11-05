@@ -216,10 +216,10 @@ clone FullRO as RO_y with
 module MLDSA_RO_DS7(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hmu : DS5.POracle4,
                     Hct : DS5.POracle5) = {
   proc keygen() : BytesPK.t * BytesSK.t = {
-    var sk,rho,_A,s1,s2,t,t1,t0,pk,tr;
+    var sk,rho,_A,al,s1,s2,t,t1,t0,pk,tr;
     RO_y.RO.init();
     rho <$ dxi;
-    _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+    (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
     s1 <$ dpolyl (dpoly (-Eta) Eta);
     s2 <$ dpolyk (dpoly (-Eta) Eta);
     t <- invnttv (ntt_mulmxv _A (nttv s1)) + s2;
@@ -231,7 +231,7 @@ module MLDSA_RO_DS7(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
   }
 
   proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * leakage = {
-     var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,kappa,y,w,w1,ctl,ct,c,ch,cs1,
+     var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,al,mu,kappa,y,w,w1,ctl,ct,c,ch,cs1,
          cs2,z,r0,ct0,h,leakage,sigma,bct0,sl;
      var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
@@ -245,8 +245,10 @@ module MLDSA_RO_DS7(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
-     leakage <- kvec_leak t0h;
-     _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+     leakage <- rho_leak rho;
+     (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
+     leakage <- lcat leakage al;
+     leakage <- lcat leakage (kvec_leak t0h);
      mu <@ Hmu.get(tr, m);
      kappa <- 0;
      zh <- None;
@@ -257,6 +259,7 @@ module MLDSA_RO_DS7(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
        ct <@ Hct.get(mu, w1Encode w1);
        (c, sl) <@ SampleInBall_O(XC).sample(ct);
        ctl <- ((ct, c), sl);
+       leakage <- lcat leakage (ctilde_leak ct);
        leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
        leakage <- lcat leakage (poly_leak ch);
@@ -589,12 +592,12 @@ equiv sign67 (s0 : BytesSK.t) :
       inv7 (k_of s0) RO_v.RO.m{1} RO_y.RO.m{2}.
 proof.
 proc.
-seq 14 13 : (={sk, m, coins, ct, ctl, sigma, leakage, s1h, s2h, t0h, _A, mu, glob DS5.RO1.RO, DS5.RO2.RO.m,
+seq 16 15 : (={sk, m, coins, ct, ctl, sigma, leakage, s1h, s2h, t0h, _A, mu, glob DS5.RO1.RO, DS5.RO2.RO.m,
                DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O} /\
              kp{1} = Bytes32.to_list (k_of s0) ++ rnd_to_list coins{1} ++ Bytes64.to_list mu{1} /\
              inv7 (k_of s0) RO_v.RO.m{1} RO_y.RO.m{2}).
 + wp; call (: ={DS5.RO4.RO.m}); 1: by sim.
-  call (: ={glob DS5.RO1.RO, glob XOFA_O}); 1: by sim.
+  wp; call (: ={glob DS5.RO1.RO, glob XOFA_O}); 1: by sim.
   wp; call (skdec_k s0); auto => />.
   by move=> &1 &2 _ _ _ c _ r -> mu.
 seq 3 3 : (={zh, ct, sigma, leakage, glob DS5.RO1.RO, DS5.RO2.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O} /\

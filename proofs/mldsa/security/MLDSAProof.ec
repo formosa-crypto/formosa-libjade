@@ -32,7 +32,8 @@ declare module A <: Adv_EFCMA {
   -SD.FSaCR.DSS.DS.Stateless.O_CMA_Default, -SD.H, -SD.OpBasedSig,
   -SD.O_CMA_Default_G, -SD.RO_G, -SD.OpBasedSigG,
   -SD.CMAtoKOA.ORedKOA, -SD.CMAtoKOA.CountS, -SD.CMAtoKOA.CountH,
-  -SD.SIB.ORedXOFROC, -SD.SIB.XOF.RO, -SD.SIB.ROC.RO, -SD.XOF,
+  -SD.SIB.ORedXOFROC, -SD.SIB.XOF.RO, -SD.SIB.ROC.RO, -SD.SIB.ROC.FRO, -SD.XOF,
+  -SD.HctRO.RO, -SD.HctRO.FRO, -SD.CacheRO,
   -SD.DSSXOF.DS.Stateless.O_CMA_Default,
   -SD.CountS, -SD.CountH, -SD.CountX, -SD.CountSX, -SD.OConv,
   -SD.G, -SD.RqStMSIS.Std.PRO.RO, -SD.RqStMSIS.ORed,
@@ -81,11 +82,12 @@ declare axiom A_ll
 
 (* The bound of [SD.DilithiumXOF_secure] for the reduction [RedMLDSA(A)]
    (MLWE advantage, standard SelfTargetMSIS game with ring challenges, and
-   the FS+abort terms with [qH = qXC + 2]: the reduction makes at most
-   [qXC + 1] distinct XOF queries, the conversion of the forgery in
-   SimplifiedScheme one more), plus the collision bounds of hop_collisions.
-   The leakage of [SampleInBall] is the fine one: the pairs [(ctx, j)] after
-   every inner iteration. *)
+   the FS+abort terms with [qH = qHct + 2]: the reduction queries the
+   random oracle of SimplifiedScheme on at most [qHct] distinct points, the
+   conversion of the forgery in SimplifiedScheme on one more), plus the
+   collision bounds of hop_collisions. The leakage of the signing loop is
+   the one of MLDSATarget: [c~], the sign bytes and the pairs [(ctx, j)] of
+   SampleInBall, [c] and the test outcomes, at every iteration. *)
 
 lemma MLDSA_secure &m :
   Pr[EF_CMA_MLDSA(A).main() @ &m : res] <=
@@ -97,7 +99,7 @@ lemma MLDSA_secure &m :
          SD.RqStMSIS.RedStd(SD.FiberSamplerRej,
                             SD.RedMSIS(SD.RedNMA(SD.RedXOF(RedMLDSA(A))))),
          SD.RqStMSIS.Std.PRO.RO).main() @ &m : res]
-  + ((Mz + Mr0 + Mhint + 2)%r * qS%r * ((qXC + 2) + qS + 1)%r * eps_comm / (1%r - SD.p_rej) +
+  + ((Mz + Mr0 + Mhint + 2)%r * qS%r * ((qHct + 2) + qS + 1)%r * eps_comm / (1%r - SD.p_rej) +
      qS%r * eps_comm * (qS%r + 1%r) / (2%r * (1%r - SD.p_rej) ^ 2))
   + eps_check
   + bound_ct + bound_mu.

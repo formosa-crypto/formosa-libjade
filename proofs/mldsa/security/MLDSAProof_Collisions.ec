@@ -5,14 +5,17 @@ require PROM TableCollision MLDSAProof_ExpandA.
 
 (** Hop G1 -> G2 of [doc/proof_overview.tex] (injective hashes):
     [hop_collisions], up to the collisions on [Hct]/[XC] and on [Hmu]. G1
-    and G2 are related through the intermediate game [D(G)], a distinguisher
-    of the random oracle [G] of [Hct] (PROM eager/lazy): with the eager [G],
-    [D] is G1 up to the bad event [coll] (two inputs of [Hct] with the same
-    output, or an output of [Hct] queried to the local XOF [LX]); with the
-    lazy [G], it is G2. The probabilities of [coll] and of a collision on
-    [Hmu] are bounded by two instances of [TableCollision] ([coll_bound],
-    [mu_bound]). The signing procedures are instances of [MLDSAGen] which
-    only differ by their challenge ([ChalH], [ChalE(G)], [ChalX]). *)
+    and G2 sample [c~] at the same moments (every [Hct] query of the
+    adversary, every iteration of the signing loop, the verification), so
+    that G1 is G2 up to the bad event [HctT.bad] of G2 (a fresh [c~] which is
+    already an output of [Hct], or which was already queried to the local
+    XOF [LX]): an up-to-bad step with the invariant [rel] relating the
+    tables of G1 ([Hct], XOF on [c~]) and of G2 (random oracle of
+    SimplifiedScheme, [LX], [tinv], [leakT]). The probabilities of [HctT.bad]
+    and of a collision on [Hmu] are bounded by two instances of
+    [TableCollision] ([ct_bound], [mu_bound]). The signing procedures are
+    instances of [MLDSAGen] which only differ by their challenge ([ChalH],
+    [ChalX]). *)
 
 abstract theory MLDSAProof_Collisions.
 
@@ -33,7 +36,8 @@ declare module A <: Adv_EFCMA {
   -SD.FSaCR.DSS.DS.Stateless.O_CMA_Default, -SD.H, -SD.OpBasedSig,
   -SD.O_CMA_Default_G, -SD.RO_G, -SD.OpBasedSigG,
   -SD.CMAtoKOA.ORedKOA, -SD.CMAtoKOA.CountS, -SD.CMAtoKOA.CountH,
-  -SD.SIB.ORedXOFROC, -SD.SIB.XOF.RO, -SD.SIB.ROC.RO, -SD.XOF,
+  -SD.SIB.ORedXOFROC, -SD.SIB.XOF.RO, -SD.SIB.ROC.RO, -SD.SIB.ROC.FRO, -SD.XOF,
+  -SD.HctRO.RO, -SD.HctRO.FRO, -SD.CacheRO,
   -SD.DSSXOF.DS.Stateless.O_CMA_Default,
   -SD.CountS, -SD.CountH, -SD.CountX, -SD.CountSX, -SD.OConv,
   -SD.G, -SD.RqStMSIS.Std.PRO.RO, -SD.RqStMSIS.ORed,
@@ -77,203 +81,8 @@ declare axiom A_ll
   islossless A(XA', XC', Htr', Hmu', Hct', O').forge.
 
 (* ==================================================================== *)
-(* G1 -> G2: helpers                                                    *)
-(* ==================================================================== *)
-
-(* Intermediate game [D(G)], a distinguisher for the [Hct] random oracle
-   [G] (PROM eager/lazy): it is [G2] where [Hct] is answered from [G]
-   ([HctE]), and where every iteration of the signing loop calls
-   [G.sample(w1, mu)] ([ChalE]; the loop of [MLDSAGen] has a guard on the
-   counter only, so that both signing procedures run in lockstep even
-   when the bad event occurs in the middle). The [(w1, mu)] of the rejected
-   iterations are recorded in [St.pend]; at the end of the game they are
-   all queried to [G] ([Flush]), so that the bad event [coll] can be read
-   on [St.fl].
-   - with [G = PC.RO] (eager), [D] is [G1] up to [coll];
-   - with [G = PC.LRO] (lazy), [D] is [G2] (plus the final flush). *)
-
-(* The random oracle for [Hct] in the intermediate game (a local clone, so
-   that the adversary cannot access it) *)
-local clone PROM.FullRO as PC with
-  type in_t    <- high list * mu_t,
-  type out_t   <- ctilde,
-  op   dout    <- fun _ => dct,
-  type d_in_t  <- unit,
-  type d_out_t <- bool
-proof *.
-
-local module St = {
-  var pend : (high list * mu_t) list
-  var fl   : (high list * mu_t, ctilde) fmap
-  var win  : bool
-}.
-
-(* The bad event: two inputs of [Hct] with the same output, or an output
-   of [Hct] queried to the local XOF [LX] *)
-local op [opaque] coll (pm : (high list * mu_t, ctilde) fmap)
-              (lm : (ctilde * int, byte) fmap) =
-  (exists x1 x2, x1 <> x2 /\ pm.[x1] <> None /\ pm.[x1] = pm.[x2]) \/
-  (exists x ct i, pm.[x] = Some ct /\ (ct, i) \in lm).
-
-local module HctE (G : PC.RO) : Hash_ct = {
-  proc get(x : high list * mu_t) : ctilde = {
-    var ct;
-    if (x \notin HctT.t) {
-      ct <@ G.get(x);
-      HctT.bad <- HctT.bad \/ ct \in HctT.tinv \/ (exists i, (ct, i) \in LX.RO.m);
-      if (ct \notin HctT.tinv) {
-        HctT.tinv.[ct] <- x;
-      }
-      HctT.t.[x] <- ct;
-    }
-    return oget HctT.t.[x];
-  }
-}.
-
-(* The challenge of [D(G)]: the challenge of G2, where every iteration
-   also calls [G.sample(w1, mu)] and pushes [(w1, mu)] on [St.pend]; the
-   accepted iteration is popped from [St.pend] by [final], which computes
-   its [c~] from [G] *)
-local module ChalE (G : PC.RO) : ChalGen = {
-  proc get(w1 : high list, mu : mu_t) : ctilde * Rq * leakage = {
-    var c, lc;
-    G.sample(w1, mu);
-    St.pend <- (w1, mu) :: St.pend;
-    (c, lc) <@ SD.SIB.SampleInBall(SD.XOF).get(w1, mu);
-    return (witness, c, lc);
-  }
-
-  proc final(w1 : high list, mu : mu_t, ct : ctilde) : ctilde = {
-    var ct';
-    St.pend <- behead St.pend;
-    ct' <@ HctE(G).get(w1, mu);
-    return ct';
-  }
-}.
-
-local module Flush (G : PC.RO) = {
-  proc run() : unit = {
-    var x, ct;
-    St.fl <- HctT.t;
-    while (St.pend <> []) {
-      x <- head witness St.pend;
-      if (x \notin St.fl) {
-        ct <@ G.get(x);
-        St.fl.[x] <- ct;
-      }
-      St.pend <- behead St.pend;
-    }
-  }
-}.
-
-local module D (G : PC.RO) = {
-  module XC = XCSim(SD.XOF)
-  module H  = HctE(G)
-  module S  = MLDSA1(XC, ROtr.RO, HmuB, H)
-  module O  = O_CMA1(MLDSAGen(MatRA, ChalE(G), HmuB))
-
-  proc distinguish(u : unit) : bool = {
-    var pk, sk, m, sig, nrqs;
-    var is_valid, is_fresh;
-
-    G.init();
-    XASim.init();
-    RA.init();
-    SD.XOF.init();
-    LX.RO.init();
-    HctT.init();
-    ROtr.RO.init();
-    HmuB.init();
-    St.pend <- [];
-    (pk, sk) <@ S.keygen();
-    RA.rho <- pk.`1;
-    RA.mA  <- sk.`1;
-    O.init(sk.`2);
-    (m, sig) <@ A(XASim, XC, ROtr.RO, HmuB, H, O).forge(pk);
-    is_valid <@ S.verify(sk.`1, pk, m, sig);
-    is_fresh <@ O.fresh(m);
-    nrqs <@ O.nr_queries();
-    St.win <- nrqs <= qS /\ is_valid /\ is_fresh;
-    Flush(G).run();
-    return St.win;
-  }
-}.
-
-(* -------------------------------------------------------------------- *)
-(* The lazy game is G2 *)
-
-local lemma HctE_LRO_HctT :
-  equiv[HctE(PC.LRO).get ~ HctT.get :
-        ={x, HctT.t, HctT.tinv, HctT.bad, LX.RO.m} /\ PC.RO.m{1} = HctT.t{1} ==>
-        ={res, HctT.t, HctT.tinv, HctT.bad, LX.RO.m} /\ PC.RO.m{1} = HctT.t{1}].
-proof.
-proc; inline *; if => //.
-rcondt{1} 3; 1: by auto.
-by auto => /> &2 _ ct _; rewrite !get_set_sameE.
-qed.
-
-local lemma Sign_LRO_G2 :
-  equiv[MLDSAGen(MatRA, ChalE(PC.LRO), HmuB).sign ~ MLDSAGen(MatRA, ChalX, HmuB).sign :
-        ={sk, m, RA.mA, HctT.t, HctT.tinv, HctT.bad, LX.RO.m, HmuB.m, HmuB.bad,
-          SD.DSSXOF.PRO.RO.m} /\ PC.RO.m{1} = HctT.t{1} ==>
-        ={res, HctT.t, HctT.tinv, HctT.bad, LX.RO.m, HmuB.m, HmuB.bad,
-          SD.DSSXOF.PRO.RO.m} /\ PC.RO.m{1} = HctT.t{1}].
-proof.
-proc; inline MatRA.get.
-seq 12 12 : (={w1, mu, ct, response, leak, HctT.t, HctT.tinv, HctT.bad, LX.RO.m,
-               HmuB.m, HmuB.bad, SD.DSSXOF.PRO.RO.m} /\ PC.RO.m{1} = HctT.t{1}).
-- while (={ctr, w1, mu, ct, response, leak, mA, s1, s2, t0, r0_fail, hint_fail, HctT.t,
-           HctT.tinv, HctT.bad, LX.RO.m, HmuB.m, HmuB.bad, SD.DSSXOF.PRO.RO.m} /\
-         PC.RO.m{1} = HctT.t{1}).
-  + wp; if => //; inline ChalE(PC.LRO).get ChalX.get PC.LRO.sample; wp.
-    call (: ={SD.DSSXOF.PRO.RO.m}); 1: by sim.
-    by auto.
-  wp; call (: ={HmuB.m, HmuB.bad}); 1: by sim.
-  by auto.
-if => //; inline ChalE(PC.LRO).final ChalX.final; wp.
-by call HctE_LRO_HctT; auto.
-qed.
-
-local lemma PC_get_ll : islossless PC.RO.get by islossless.
-
-local lemma Flush_ll (G <: PC.RO{-St}) : islossless G.get => islossless Flush(G).run.
-proof.
-move=> G_ll; proc; while true (size St.pend).
-- move=> z; sp; if.
-  + by wp; call G_ll; auto => /> &hr hne _; smt(size_behead List.size_ge0).
-  by auto => /> &hr hne _; smt(size_behead List.size_ge0).
-by auto => /> pend; case: pend => //= l; smt(List.size_ge0).
-qed.
-
-local lemma D_G2 &m (p : bool -> bool -> bool -> bool) :
-  Pr[D(PC.LRO).distinguish() @ &m : p St.win HctT.bad HmuB.bad] =
-  Pr[G2(A).main() @ &m : p res HctT.bad HmuB.bad].
-proof.
-byequiv => //; proc.
-call{1} (Flush_ll PC.LRO _); 1: by islossless.
-wp; call (: ={O_CMA1.qs}); 1: by sim.
-call (: ={O_CMA1.qs}); 1: by sim.
-call (: ={pk, m, sig, mA, HctT.t, HctT.tinv, HctT.bad, LX.RO.m, HmuB.m, HmuB.bad,
-          SD.DSSXOF.PRO.RO.m, ROtr.RO.m} /\ PC.RO.m{1} = HctT.t{1} ==>
-        ={res, HctT.t, HctT.tinv, HctT.bad, LX.RO.m, HmuB.m, HmuB.bad,
-          SD.DSSXOF.PRO.RO.m, ROtr.RO.m} /\ PC.RO.m{1} = HctT.t{1}).
-- proc; call HctE_LRO_HctT; wp.
-  call (: ={HctT.t, HctT.tinv, LX.RO.m, SD.DSSXOF.PRO.RO.m}); 1: by sim.
-  call (: ={HmuB.m, HmuB.bad}); 1: by sim.
-  by call (: ={ROtr.RO.m}); 1: sim; auto.
-call (: ={HctT.t, HctT.tinv, HctT.bad, LX.RO.m, HmuB.m, HmuB.bad, SD.DSSXOF.PRO.RO.m,
-          ROtr.RO.m, glob XASim, O_CMA1.sk, O_CMA1.qs} /\ PC.RO.m{1} = HctT.t{1}).
-- by proc; wp; call Sign_LRO_G2; auto.
-- by conseq HctE_LRO_HctT.
-- by proc *; call (: ={HmuB.m, HmuB.bad}); [sim | auto].
-- by proc *; call (: ={ROtr.RO.m}); [sim | auto].
-- by proc *; call (: ={HctT.tinv, LX.RO.m, SD.DSSXOF.PRO.RO.m}); [sim | auto].
-- by proc *; call (: ={glob XASim}); [sim | auto].
-by inline *; auto => />.
-qed.
-
-(* -------------------------------------------------------------------- *)
 (* Collisions on [Hmu]: TableCollision on the table [HmuB.m] (no [put]) *)
+(* ==================================================================== *)
 
 local clone TableCollision as TCmu with
   type in_t  <- tr_t * M,
@@ -334,35 +143,34 @@ local lemma G2_Amu &m :
 proof.
 byequiv => //; proc; inline TCmu.Game(Amu).main Amu(TCmu.Count(TCmu.Tab)).main.
 inline{1} G2(A).O.fresh G2(A).O.nr_queries; wp.
-call (: ={arg, glob XASim, SD.DSSXOF.PRO.RO.m, LX.RO.m, HctT.t, HctT.tinv, HctT.bad,
-          ROtr.RO.m} /\
+call (: ={arg, glob XASim, SD.DSSXOF.PRO.RO.m, LX.RO.m, glob HctT, ROtr.RO.m} /\
         tmu HmuB.m{1} HmuB.bad{1} TCmu.Tab.m{2} TCmu.Tab.bad{2} TCmu.Tab.ks{2} ==>
         HmuB.bad{1} = TCmu.Tab.bad{2}).
-- proc; call (: ={HctT.t, HctT.tinv, HctT.bad, LX.RO.m}); 1: by sim.
-  wp; call (: ={HctT.tinv, LX.RO.m, SD.DSSXOF.PRO.RO.m}); 1: by sim.
+- proc; call (: ={glob HctT, LX.RO.m, SD.DSSXOF.PRO.RO.m}); 1: by sim.
+  wp; call (: ={glob HctT, LX.RO.m, SD.DSSXOF.PRO.RO.m}); 1: by sim.
   call HmuB_Tab.
   by call (: ={ROtr.RO.m}); 1: sim; auto.
-call (: ={glob XASim, SD.DSSXOF.PRO.RO.m, LX.RO.m, HctT.t, HctT.tinv, HctT.bad, ROtr.RO.m,
+call (: ={glob XASim, SD.DSSXOF.PRO.RO.m, LX.RO.m, glob HctT, ROtr.RO.m,
           O_CMA1.sk, O_CMA1.qs} /\
         tmu HmuB.m{1} HmuB.bad{1} TCmu.Tab.m{2} TCmu.Tab.bad{2} TCmu.Tab.ks{2}).
 - proc; inline{2} 2; wp.
-  call (: ={sk, m, RA.mA, SD.DSSXOF.PRO.RO.m, LX.RO.m, HctT.t, HctT.tinv, HctT.bad,
-            ROtr.RO.m} /\
+  call (: ={sk, m, glob XASim, SD.DSSXOF.PRO.RO.m, LX.RO.m, glob HctT, ROtr.RO.m} /\
           tmu HmuB.m{1} HmuB.bad{1} TCmu.Tab.m{2} TCmu.Tab.bad{2} TCmu.Tab.ks{2} ==>
-          ={res, SD.DSSXOF.PRO.RO.m, LX.RO.m, HctT.t, HctT.tinv, HctT.bad, ROtr.RO.m} /\
+          ={res, glob XASim, SD.DSSXOF.PRO.RO.m, LX.RO.m, glob HctT, ROtr.RO.m} /\
           tmu HmuB.m{1} HmuB.bad{1} TCmu.Tab.m{2} TCmu.Tab.bad{2} TCmu.Tab.ks{2}).
-  + proc; seq 8 8 : (={ct, w1, r0_fail, hint_fail, mA, leak, rho, tr, s1, s2, t0, mu,
-                       SD.DSSXOF.PRO.RO.m, LX.RO.m, HctT.t, HctT.tinv, HctT.bad, ROtr.RO.m} /\
+  + proc; seq 7 7 : (={ct, r0_fail, hint_fail, mA, la, leak, rho, tr, s1, s2, t0, mu,
+                       glob XASim, SD.DSSXOF.PRO.RO.m, LX.RO.m, glob HctT, ROtr.RO.m} /\
                      tmu HmuB.m{1} HmuB.bad{1} TCmu.Tab.m{2} TCmu.Tab.bad{2} TCmu.Tab.ks{2}).
-    * by call HmuB_Tab; inline MatRA.get; auto.
+    * call HmuB_Tab; inline MatRA.get; wp.
+      by call (: ={glob XASim}); [sim | auto].
     sim / (tmu HmuB.m{1} HmuB.bad{1} TCmu.Tab.m{2} TCmu.Tab.bad{2} TCmu.Tab.ks{2}) :
-          (={ct, response, leak, SD.DSSXOF.PRO.RO.m, LX.RO.m, HctT.t, HctT.tinv, HctT.bad,
+          (={ct, response, leak, rho, la, glob XASim, SD.DSSXOF.PRO.RO.m, LX.RO.m, glob HctT,
              ROtr.RO.m}).
   by auto.
-- by proc *; inline{2} 1; wp; call (: ={HctT.t, HctT.tinv, HctT.bad, LX.RO.m}); [sim | auto].
+- by proc *; inline{2} 1; wp; call (: ={glob HctT, LX.RO.m, SD.DSSXOF.PRO.RO.m}); [sim | auto].
 - by proc *; inline{2} 1; wp; call HmuB_Tab; auto.
 - by proc *; inline{2} 1; wp; call (: ={ROtr.RO.m}); [sim | auto].
-- by proc *; inline{2} 1; wp; call (: ={HctT.tinv, LX.RO.m, SD.DSSXOF.PRO.RO.m}); [sim | auto].
+- by proc *; inline{2} 1; wp; call (: ={glob HctT, LX.RO.m, SD.DSSXOF.PRO.RO.m}); [sim | auto].
 - by proc *; inline{2} 1; wp; call (: ={glob XASim}); [sim | auto].
 by inline *; auto => />.
 qed.
@@ -388,12 +196,11 @@ seq 18 : (TCmu.Count.cp = 0 /\ TCmu.Count.cg <= qHmu + qS).
   call (: TCmu.Count.cp = 0 /\ TCmu.Count.cg <= CountHmu.q + CountS.q).
   + proc; inline O_CMA1(MLDSAGen(MatRA, ChalX, TCmu.Count(T))).sign
                  MLDSAGen(MatRA, ChalX, TCmu.Count(T)).sign; wp.
-    seq 12 : (TCmu.Count.cp = 0 /\ TCmu.Count.cg <= CountHmu.q + CountS.q).
-    * by inline *; wp; call (: true); auto => /> /#.
-    seq 3 : (TCmu.Count.cp = 0 /\ TCmu.Count.cg <= CountHmu.q + CountS.q).
-    * while (TCmu.Count.cp = 0 /\ TCmu.Count.cg <= CountHmu.q + CountS.q); 2: by auto.
-      by wp; if => //; wp; call (: true) => //; auto.
-    by sp; if => //; wp; call (: true) => //; auto.
+    seq 13 : (TCmu.Count.cp = 0 /\ TCmu.Count.cg <= CountHmu.q + CountS.q).
+    * inline TCmu.Count(T).get; wp; call (: true); wp.
+      by call (: true); [conseq (: _ ==> true) | auto => /> /#].
+    while (TCmu.Count.cp = 0 /\ TCmu.Count.cg <= CountHmu.q + CountS.q); 2: by auto.
+    by wp; if => //; wp; call (: true) => //; auto.
   + by proc; call (: true) => //; auto.
   + by proc; inline *; wp; call (: true); auto => /> /#.
   + by proc; call (: true) => //; auto.
@@ -415,11 +222,12 @@ have := TCmu.table_collision Amu 0 (qHmu + qS + 1) _ _ Amu_bound &m.
 by rewrite /bound_mu /= RField.expr2 fromintM.
 qed.
 
-(* -------------------------------------------------------------------- *)
-(* Collisions on [Hct] ([coll] in the lazy game): TableCollision on the
-   table [St.fl] of [Hct] (filled by [HctE] and by [Flush]), the [put]
-   values are the [c~] queried to [LX] (which are not outputs of [Hct]
-   at the time of the query) *)
+(* ==================================================================== *)
+(* Collisions on [Hct] ([HctT.bad]): TableCollision on the table of the  *)
+(* commitment hash (the [XH] entries of the random oracle of            *)
+(* SimplifiedScheme); the [put] values are the [c~] queried to the      *)
+(* challenge XOF                                                        *)
+(* ==================================================================== *)
 
 local clone TableCollision as TCct with
   type in_t  <- high list * mu_t,
@@ -430,45 +238,60 @@ proof *.
 realize dout_ll by exact dct_ll.
 realize dout_max by exact dct_max.
 
-(* [Hct] samples through the [get] oracle of TableCollision *)
-local module GB (T : TCct.Oracle) : PC.RO = {
-  proc init() : unit = { }
-  proc get(x : high list * mu_t) : ctilde = {
-    var r;
-    r <@ T.get(x);
-    return r;
+(* [Hct] samples through the [get] oracle of TableCollision, and copies its
+   answer in the random oracle of SimplifiedScheme *)
+local module HB (T : TCct.Oracle) = {
+  proc sample(x : high list * mu_t) : ctilde = {
+    var ct;
+    ct <@ T.get(x);
+    if (SD.XH x \notin SD.XOF.m) {
+      SD.XOF.m.[SD.XH x] <- SD.OH ct;
+    }
+    return ct;
   }
-  proc set(x : high list * mu_t, y : ctilde) : unit = { }
-  proc rem(x : high list * mu_t) : unit = { }
-  proc sample(x : high list * mu_t) : unit = { }
+
+  proc get(x : high list * mu_t) : ctilde = {
+    var ct;
+    ct <@ sample(x);
+    if (ct \notin HctT.tinv) {
+      HctT.tinv.[ct] <- x;
+    }
+    return ct;
+  }
 }.
 
-(* [XC] puts the [c~] queried to [LX] *)
+local module ChalB (T : TCct.Oracle) : ChalGen = {
+  proc get(w1 : high list, mu : mu_t) : ctilde * Rq * leakage = {
+    var ct, c, lc;
+    ct <@ HB(T).sample(w1, mu);
+    (c, lc) <@ SD.SIB.SampleInBall(SD.XofOf(SD.XOF)).get(w1, mu);
+    HctT.leakT.[ct] <- SD.SIB.leak_to_stream lc;
+    return (ct, c, lc);
+  }
+}.
+
+(* [XC] puts every [c~] queried *)
 local module XCB (T : TCct.Oracle) : SIB.XOF_t = {
   var ps : ctilde fset
 
   proc get(y : ctilde * int) : byte = {
     var r;
-    if (y.`1 \in HctT.tinv) {
-      r <@ SD.XOF.get(oget HctT.tinv.[y.`1], y.`2);
-    } else {
-      if (y.`1 \notin ps) {
-        T.put(y.`1);
-        ps <- ps `|` fset1 y.`1;
-      }
-      r <@ LX.RO.get(y);
+    if (y.`1 \notin ps) {
+      T.put(y.`1);
+      ps <- ps `|` fset1 y.`1;
     }
+    r <@ XCSim(SD.XOF).get(y);
     return r;
   }
 }.
 
-(* The lazy game [D(PC.LRO)] as an adversary of TableCollision (with the
-   query counters of MLDSATarget, to apply [A_bound]) *)
+(* G2 as an adversary of TableCollision (with the query counters of
+   MLDSATarget, to apply [A_bound]) *)
 local module Act (T : TCct.Oracle) = {
   module XC = XCB(T)
-  module H  = HctE(GB(T))
+  module H  = HB(T)
   module S  = MLDSA1(XC, ROtr.RO, HmuB, H)
-  module O1 = O_CMA1(MLDSAGen(MatRA, ChalE(GB(T)), HmuB))
+  module O1 = O_CMA1(MLDSAGen(MatRA, ChalB(T), HmuB))
 
   proc main() : unit = {
     var pk, sk, m, sig, is_valid;
@@ -480,7 +303,6 @@ local module Act (T : TCct.Oracle) = {
     HctT.init();
     ROtr.RO.init();
     HmuB.init();
-    St.pend <- [];
     XCB.ps <- fset0;
     CountXA.q <- 0;
     CountXC.q <- 0;
@@ -496,309 +318,245 @@ local module Act (T : TCct.Oracle) = {
     (m, sig) <@ A(CountXA(XASim), CountXC(XC), CountHtr(ROtr.RO), CountHmu(HmuB),
                   CountHct(H), CountS(O1)).forge(pk);
     is_valid <@ S.verify(sk.`1, pk, m, sig);
-    Flush(GB(T)).run();
   }
 }.
 
-(* Invariant of the reduction: [coll] implies the bad event of the table,
-   the [c~] queried to [LX] are put *)
-local op [opaque] cinv (t : (high list * mu_t, ctilde) fmap) (lm : (ctilde * int, byte) fmap)
-              (ps : ctilde fset) (bad : bool) =
-  (coll t lm => bad) /\
-  (forall ct i, (ct, i) \in lm => ct \in ps).
+(* The table of TableCollision is the [XH] part of the random oracle of
+   SimplifiedScheme, the [put] values contain the [c~] queried to [LX], and
+   the bad event of G2 implies the one of TableCollision (an abbreviation:
+   the tactics see the conjunction) *)
+local op ct_tab (tm : (high list * mu_t, ctilde) fmap) (m : (SD.xin, SD.xout) fmap) =
+  forall x, tm.[x] = omap SD.oh m.[SD.XH x].
 
-local op [opaque] tinv_ok (t : (high list * mu_t, ctilde) fmap)
-                 (tinv : (ctilde, high list * mu_t) fmap) =
-  forall ct, ct \in tinv <=> exists x, t.[x] = Some ct.
+local abbrev crel (tm : (high list * mu_t, ctilde) fmap) (ks : ctilde fset) (bad2 : bool)
+  (m : (SD.xin, SD.xout) fmap) (ps : ctilde fset) (lm : (ctilde * int, byte) fmap) (bad1 : bool) =
+  ct_tab tm m /\ ks = ps /\ (forall ct i, (ct, i) \in lm => ct \in ps) /\ (bad1 => bad2).
 
-(* Invariant of the reduction [Act]: the table of TableCollision is the
-   table [HctT.t], the [put] values are the [c~] queried to [LX], [cinv] and
-   [tinv_ok] hold (an abbreviation: the tactics see the conjunction) *)
-local abbrev tcinv (tm : (high list * mu_t, ctilde) fmap) (ks : ctilde fset) (bad : bool)
-  (t : (high list * mu_t, ctilde) fmap) (tinv : (ctilde, high list * mu_t) fmap)
-  (ps : ctilde fset) (lm : (ctilde * int, byte) fmap) =
-  tm = t /\ ks = ps /\ cinv t lm ps bad /\ tinv_ok t tinv.
-
-local lemma cinv_add t lm ps bad x y :
-  x \notin t => cinv t lm ps bad =>
-  cinv t.[x <- y] lm ps (bad \/ y \in frng t \/ y \in ps).
+local lemma HctT_HB :
+  equiv[HctT.sample ~ HB(TCct.Count(TCct.Tab)).sample :
+        ={x, SD.XOF.m, LX.RO.m} /\
+        crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+             HctT.bad{1} ==>
+        ={res, SD.XOF.m, LX.RO.m} /\
+        crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+             HctT.bad{1}].
 proof.
-rewrite /cinv /coll => hx -[hc hl]; split => //.
-case=> [[x1 x2 [hne [hn heq]]] | [x0 ct i [hx0 hin]]].
-- move: hn heq; rewrite !get_setE.
-  case: (x1 = x) => [->> | hne1] /=.
-  + case: (x2 = x) => [->> // | hne2] /=.
-    by move=> heq; right; left; rewrite mem_frng rngE /=; exists x2; rewrite -heq.
-  case: (x2 = x) => [->> | hne2] /=.
-  + by move=> _ heq; right; left; rewrite mem_frng rngE /=; exists x1.
-  by move=> hn heq; left; apply hc; left; exists x1 x2.
-move: hx0; rewrite get_setE; case: (x0 = x) => [_ /= <<- | hne /= hx0].
-- by right; right; exact (hl _ _ hin).
-by left; apply hc; right; exists x0 ct i.
+proc; inline *; sp.
+case (SD.XH x{1} \in SD.XOF.m{1}).
+- rcondf{1} 2; 1: by auto.
+  rcondf{2} 1.
+  + move=> &1; auto => /> &2 htab _ _ h; rewrite domE htab; move: h; rewrite domE.
+    by case: (SD.XOF.m{2}.[SD.XH x{2}]).
+  rcondf{2} 3; 1: by auto.
+  rcondf{1} 3; 1: by auto.
+  wp; rnd{1}; skip => &1 &2 [[cg h] hin]; move: h => [#] 7!->> htab hps hl hbad hb.
+  rewrite dxout_XH dmap_ll ?dct_ll /= => _ _; rewrite (hps x{2}) /=.
+  by split; [move: hin; rewrite domE; case: (SD.DSSXOF.PRO.RO.m{2}.[SD.XH x{2}]) | ].
+rcondt{1} 2; 1: by auto.
+rcondt{1} 4; 1: by auto.
+rcondt{2} 1.
+- move=> &1; auto => /> &2 htab hl hb hin.
+  by move: hin; rewrite !domE (htab x{2}); case: (SD.DSSXOF.PRO.RO.m{2}.[SD.XH x{2}]).
+rcondt{2} 6; 1: by auto.
+wp; rnd SD.oh SD.OH; skip.
+move=> &1 &2 [[cg h] hin]; move: h => [#] 7!->> htab hps hl hbad hb.
+split => [c _ // | _]; split => [c _ | _]; 1: by rewrite dxout_XH mu1_dOH.
+move=> o; rewrite dxout_XH => ho; rewrite -(supp_dOH _ ho) /= !get_set_sameE /=.
+rewrite -(supp_dOH _ ho) /= htab /=.
+split.
+- move=> x'; rewrite !get_setE /=.
+  by case: (x' = x{2}) => // _; exact (hps x').
+split => //; split => // hb'.
+case: hb' => [/hb -> // | [[x' hx'] | [i hi]]].
+- by right; left; rewrite mem_frng rngE /=; exists x'; rewrite (hps x') hx'.
+by right; right; rewrite hl; apply (hbad _ i).
 qed.
 
-local lemma cinv_put t lm ps bad ct :
-  cinv t lm ps bad => cinv t lm (ps `|` fset1 ct) bad.
-proof. by rewrite /cinv => -[hc hl]; split => // ct' i /hl; rewrite in_fsetU => ->. qed.
+local lemma HctT_HB_get :
+  equiv[HctT.get ~ HB(TCct.Count(TCct.Tab)).get :
+        ={x, SD.XOF.m, LX.RO.m, HctT.tinv} /\
+        crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+             HctT.bad{1} ==>
+        ={res, SD.XOF.m, LX.RO.m, HctT.tinv} /\
+        crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+             HctT.bad{1}].
+proof. by proc; wp; call HctT_HB; auto. qed.
 
-local lemma cinv_lx t lm ps bad ct i b :
-  (forall x, t.[x] <> Some ct) => ct \in ps => cinv t lm ps bad =>
-  cinv t lm.[(ct, i) <- b] ps bad.
-proof.
-rewrite /cinv /coll => ht hps -[hc hl]; split.
-- case=> [h | [x0 ct' i' [hx0 hin]]]; 1: by apply hc; left.
-  move: hin; rewrite mem_set; case=> [hin | [->> _]].
-  + by apply hc; right; exists x0 ct' i'.
-  by move: (ht x0); rewrite hx0.
-move=> ct' i'; rewrite mem_set; case=> [/hl // | [-> _]] //.
-qed.
-
-local lemma tinv_ok_add t tinv x y :
-  x \notin t => tinv_ok t tinv =>
-  tinv_ok t.[x <- y] (if y \notin tinv then tinv.[y <- x] else tinv).
-proof.
-rewrite /tinv_ok => hx ht ct; case: (y \in tinv) => hy /=.
-- rewrite ht; split; case=> x' hx'.
-  + by exists x'; rewrite get_setE; smt().
-  move: hx'; rewrite get_setE; case: (x' = x) => [_ /= <- | _ /= hx'].
-  + by move/ht: hy.
-  by exists x'.
-rewrite mem_set ht; split.
-- case=> [[x' hx'] | ->].
-  + by exists x'; rewrite get_setE; smt().
-  by exists x; rewrite get_set_sameE.
-case=> x'; rewrite get_setE; case: (x' = x) => [_ /= <- | _ /= hx'].
-- by right.
-by left; exists x'.
-qed.
-
-local lemma cinv_coll t lm ps bad : cinv t lm ps bad => coll t lm => bad.
-proof. by rewrite /cinv => -[h _]. qed.
-
-local lemma HctE_B :
-  equiv[HctE(PC.LRO).get ~ HctE(GB(TCct.Count(TCct.Tab))).get :
-        ={x, HctT.t, HctT.tinv, HctT.bad, LX.RO.m} /\ PC.RO.m{1} = HctT.t{1} /\
-        tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-              HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2} ==>
-        ={res, HctT.t, HctT.tinv, HctT.bad, LX.RO.m} /\ PC.RO.m{1} = HctT.t{1} /\
-        tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-              HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2}].
-proof.
-proc; inline *; if => //.
-rcondt{1} 3; 1: by auto.
-rcondt{2} 5; 1: by auto.
-wp; rnd; auto => /> &2 hci htv hx ct _.
-have h1 := tinv_ok_add _ _ _ ct hx htv; have h2 := cinv_add _ _ _ _ _ ct hx hci.
-by case: (ct \in HctT.tinv{2}) => hin /=; rewrite !get_set_sameE /= hin /=;
-  move: h1 h2; rewrite hin.
-qed.
+local lemma ct_tab_XB tm m y o : ct_tab tm m => ct_tab tm m.[SD.XB y <- o].
+proof. by move=> h x; rewrite get_setE /= h. qed.
 
 local lemma XC_B :
   equiv[XCSim(SD.XOF).get ~ XCB(TCct.Count(TCct.Tab)).get :
-        ={y, HctT.t, HctT.tinv, LX.RO.m, SD.DSSXOF.PRO.RO.m} /\
-        tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-              HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2} ==>
-        ={res, HctT.t, HctT.tinv, LX.RO.m, SD.DSSXOF.PRO.RO.m} /\
-        tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-              HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2}].
+        ={y, SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT} /\
+        crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+             HctT.bad{1} ==>
+        ={res, SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT} /\
+        crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+             HctT.bad{1}].
 proof.
-proc; if => //.
-- by call (: ={SD.DSSXOF.PRO.RO.m}); [sim | auto].
-seq 0 1 : (={y, HctT.t, HctT.tinv, LX.RO.m, SD.DSSXOF.PRO.RO.m} /\
-           y{2}.`1 \notin HctT.tinv{2} /\ y{2}.`1 \in XCB.ps{2} /\
-           tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-                 HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2}).
+proc.
+seq 0 1 : (={y, SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT} /\ y{2}.`1 \in XCB.ps{2} /\
+           crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+                HctT.bad{1}).
 - if{2}; 2: by auto.
-  inline *; auto => /> &2 hci htv htin hps; split; 1: smt(in_fsetU in_fset1).
-  by apply cinv_put.
-inline *; auto => /> &2 htin hps hci htv r _.
-case: (y{2} \in LX.RO.m{2}) => //= hy.
-rewrite (pairS y{2}); apply cinv_lx => // x; apply/negP => hx.
-by move: htin; rewrite /tinv_ok in htv; rewrite htv; apply/negP; rewrite negbK; exists x.
+  inline *; auto => /> &1 &2 htab hps _ _; split; 1: by rewrite in_fsetU in_fset1.
+  by move=> ct i /hps; rewrite in_fsetU => ->.
+inline{2} 1; wp; sp 0 1.
+if => //.
+- by inline *; auto.
+if => //; 1: by auto.
+if => //.
+- by inline *; auto => /> &1 &2 _ htab *; apply ct_tab_XB.
+inline *; auto => /> &1 &2 hy htab hps hb _ _ _ r _ ct i.
+by rewrite mem_set => -[/hps // | heq]; move: hy; rewrite -heq.
 qed.
 
 local lemma SIB_B :
   equiv[SIB.SampleInBall(XCSim(SD.XOF)).get ~ SIB.SampleInBall(XCB(TCct.Count(TCct.Tab))).get :
-        ={x, HctT.t, HctT.tinv, LX.RO.m, SD.DSSXOF.PRO.RO.m} /\
-        tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-              HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2} ==>
-        ={res, HctT.t, HctT.tinv, LX.RO.m, SD.DSSXOF.PRO.RO.m} /\
-        tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-              HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2}].
+        ={x, SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT} /\
+        crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+             HctT.bad{1} ==>
+        ={res, SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT} /\
+        crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+             HctT.bad{1}].
 proof.
 proc.
-while (={i, ctx, signs, challenge, leak, x, byte, HctT.t, HctT.tinv, LX.RO.m,
-         SD.DSSXOF.PRO.RO.m} /\
-       tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-             HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2}).
-- wp; while (={i, j, ctx, signs, challenge, leak, x, byte, HctT.t, HctT.tinv, LX.RO.m,
-               SD.DSSXOF.PRO.RO.m} /\
-             tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-                   HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2}).
+while (={i, ctx, signs, challenge, leak, x, byte, SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT} /\
+       crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+            HctT.bad{1}).
+- wp; while (={i, j, ctx, signs, challenge, leak, x, byte, SD.XOF.m, LX.RO.m, HctT.tinv,
+               HctT.leakT} /\
+             crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+                  HctT.bad{1}).
   + by wp; call XC_B; auto.
   by auto.
-wp; while (={ctx, signs, x, byte, HctT.t, HctT.tinv, LX.RO.m, SD.DSSXOF.PRO.RO.m} /\
-           tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-                 HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2}).
+wp; while (={ctx, signs, x, byte, SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT} /\
+           crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+                HctT.bad{1}).
 - by wp; call XC_B; auto.
 by auto.
 qed.
 
-local lemma Sign_B :
-  equiv[MLDSAGen(MatRA, ChalE(PC.LRO), HmuB).sign ~
-        MLDSAGen(MatRA, ChalE(GB(TCct.Count(TCct.Tab))), HmuB).sign :
-        ={sk, m, RA.mA, HctT.t, HctT.tinv, HctT.bad, LX.RO.m, HmuB.m, HmuB.bad,
-          SD.DSSXOF.PRO.RO.m, St.pend} /\ PC.RO.m{1} = HctT.t{1} /\
-        tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-              HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2} ==>
-        ={res, HctT.t, HctT.tinv, HctT.bad, LX.RO.m, HmuB.m, HmuB.bad,
-          SD.DSSXOF.PRO.RO.m, St.pend} /\ PC.RO.m{1} = HctT.t{1} /\
-        tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-              HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2}].
+local lemma XB_tab :
+  equiv[SD.XofOf(SD.XOF).get ~ SD.XofOf(SD.XOF).get :
+        ={y, SD.XOF.m} /\ ct_tab TCct.Tab.m{2} SD.XOF.m{2} ==>
+        ={res, SD.XOF.m} /\ ct_tab TCct.Tab.m{2} SD.XOF.m{2}].
 proof.
-proc; inline MatRA.get.
-seq 12 12 : (={w1, mu, ct, response, leak, HctT.t, HctT.tinv, HctT.bad, LX.RO.m, HmuB.m,
-               HmuB.bad, SD.DSSXOF.PRO.RO.m, St.pend} /\ PC.RO.m{1} = HctT.t{1} /\
-             tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-                   HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2}).
-- while (={ctr, w1, mu, ct, response, leak, mA, s1, s2, t0, r0_fail, hint_fail, HctT.t,
-           HctT.tinv, HctT.bad, LX.RO.m, HmuB.m, HmuB.bad, SD.DSSXOF.PRO.RO.m, St.pend} /\
-         PC.RO.m{1} = HctT.t{1} /\
-         tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-               HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2}).
-  + wp; if => //.
-    inline ChalE(PC.LRO).get ChalE(GB(TCct.Count(TCct.Tab))).get
-           PC.LRO.sample GB(TCct.Count(TCct.Tab)).sample; wp.
-    call (: ={SD.DSSXOF.PRO.RO.m}); 1: by sim.
-    by auto.
-  wp; call (: ={HmuB.m, HmuB.bad}); 1: by sim.
-  by auto.
-if => //; inline ChalE(PC.LRO).final ChalE(GB(TCct.Count(TCct.Tab))).final.
-by wp; call HctE_B; auto.
+proc; inline *; auto => /> &2 htab r _ _.
+exact: ct_tab_XB.
 qed.
 
-local lemma Flush_B :
-  equiv[Flush(PC.LRO).run ~ Flush(GB(TCct.Count(TCct.Tab))).run :
-        ={HctT.t, St.pend, LX.RO.m} /\ PC.RO.m{1} = HctT.t{1} /\
-        TCct.Tab.m{2} = HctT.t{2} /\ TCct.Tab.ks{2} = XCB.ps{2} /\
-        cinv HctT.t{2} LX.RO.m{2} XCB.ps{2} TCct.Tab.bad{2} ==>
-        ={St.fl, LX.RO.m} /\
-        TCct.Tab.m{2} = St.fl{2} /\ TCct.Tab.ks{2} = XCB.ps{2} /\
-        cinv St.fl{2} LX.RO.m{2} XCB.ps{2} TCct.Tab.bad{2}].
+local lemma SDSIB_tab :
+  equiv[SD.SIB.SampleInBall(SD.XofOf(SD.XOF)).get ~ SD.SIB.SampleInBall(SD.XofOf(SD.XOF)).get :
+        ={x, SD.XOF.m} /\ ct_tab TCct.Tab.m{2} SD.XOF.m{2} ==>
+        ={res, SD.XOF.m} /\ ct_tab TCct.Tab.m{2} SD.XOF.m{2}].
 proof.
 proc.
-while (={St.fl, St.pend, LX.RO.m} /\ PC.RO.m{1} = St.fl{1} /\
-       TCct.Tab.m{2} = St.fl{2} /\ TCct.Tab.ks{2} = XCB.ps{2} /\
-        cinv St.fl{2} LX.RO.m{2} XCB.ps{2} TCct.Tab.bad{2}).
-- sp; if => //; last by auto.
-  inline *; rcondt{1} 3; 1: by auto.
-  rcondt{2} 5; 1: by auto.
-  wp; rnd; auto => /> &2 hne hci hx ct _.
-  by rewrite !get_set_sameE /=; apply cinv_add.
-auto => />.
+while (={i, ctx, signs, challenge, leak, x, byte, SD.XOF.m} /\ ct_tab TCct.Tab.m{2} SD.XOF.m{2}).
+- wp; while (={i, j, ctx, signs, challenge, leak, x, byte, SD.XOF.m} /\
+             ct_tab TCct.Tab.m{2} SD.XOF.m{2}).
+  + by wp; call XB_tab; auto.
+  by auto.
+wp; while (={ctx, signs, x, byte, SD.XOF.m} /\ ct_tab TCct.Tab.m{2} SD.XOF.m{2}).
+- by wp; call XB_tab; auto.
+by auto.
 qed.
 
-local lemma cinv0 : cinv empty empty fset0 false.
+local lemma Sign_B :
+  equiv[MLDSAGen(MatRA, ChalX, HmuB).sign ~ MLDSAGen(MatRA, ChalB(TCct.Count(TCct.Tab)), HmuB).sign :
+        ={sk, m, glob XASim, SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT, HmuB.m, HmuB.bad} /\
+        crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+             HctT.bad{1} ==>
+        ={res, glob XASim, SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT, HmuB.m, HmuB.bad} /\
+        crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+             HctT.bad{1}].
 proof.
-rewrite /cinv /coll; split; 2: by move=> ct i; rewrite mem_empty.
-smt(emptyE).
+proc.
+seq 9 9 : (={mA, la, rho, s1, s2, t0, mu, ct, response, leak, r0_fail, hint_fail, ctr, glob XASim,
+               SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT, HmuB.m, HmuB.bad} /\
+           crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+                HctT.bad{1}).
+- wp; call (: ={HmuB.m, HmuB.bad}); 1: by sim.
+  by wp; call (: ={glob XASim}); [sim | auto].
+while (={ctr, mA, s1, s2, t0, mu, ct, response, leak, r0_fail, hint_fail, glob XASim,
+         SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT, HmuB.m, HmuB.bad} /\
+       crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+            HctT.bad{1}); 2: by auto.
+wp; if => //.
+inline ChalX.get ChalB(TCct.Count(TCct.Tab)).get; wp.
+call SDSIB_tab; wp; call HctT_HB; auto => /> /#.
 qed.
 
-local lemma tinv_ok0 : tinv_ok empty empty.
-proof. by rewrite /tinv_ok => ct; rewrite mem_empty /=; smt(emptyE). qed.
-
-local lemma D_Act &m :
-  Pr[D(PC.LRO).distinguish() @ &m : coll St.fl LX.RO.m] <=
-  Pr[TCct.Game(Act).main() @ &m : TCct.Tab.bad].
+local lemma G2_Act &m :
+  Pr[G2(A).main() @ &m : HctT.bad] <= Pr[TCct.Game(Act).main() @ &m : TCct.Tab.bad].
 proof.
-byequiv (_ : ={glob A} ==> coll St.fl{1} LX.RO.m{1} => TCct.Tab.bad{2}) => //.
+byequiv (_ : ={glob A} ==> HctT.bad{1} => TCct.Tab.bad{2}) => //.
 proc; inline TCct.Game(Act).main Act(TCct.Count(TCct.Tab)).main.
-call Flush_B.
-inline{1} D(PC.LRO).O.fresh D(PC.LRO).O.nr_queries; wp.
-call (: ={arg, HctT.t, HctT.tinv, HctT.bad, LX.RO.m, HmuB.m, HmuB.bad,
-          SD.DSSXOF.PRO.RO.m, ROtr.RO.m, St.pend} /\ PC.RO.m{1} = HctT.t{1} /\
-        tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-              HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2} ==>
-        ={HctT.t, St.pend, LX.RO.m} /\ PC.RO.m{1} = HctT.t{1} /\
-        TCct.Tab.m{2} = HctT.t{2} /\ TCct.Tab.ks{2} = XCB.ps{2} /\
-        cinv HctT.t{2} LX.RO.m{2} XCB.ps{2} TCct.Tab.bad{2}).
-- proc; call HctE_B; wp; call SIB_B.
+inline{1} G2(A).O.fresh G2(A).O.nr_queries; wp.
+call (: ={arg, SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT, HmuB.m, HmuB.bad, ROtr.RO.m} /\
+        crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+             HctT.bad{1} ==>
+        HctT.bad{1} => TCct.Tab.bad{2}).
+- proc; call HctT_HB_get; wp; call SIB_B.
   call (: ={HmuB.m, HmuB.bad}); 1: by sim.
   by call (: ={ROtr.RO.m}); 1: sim; auto.
-call (: ={glob XASim, SD.DSSXOF.PRO.RO.m, LX.RO.m, HctT.t, HctT.tinv, HctT.bad,
-          ROtr.RO.m, HmuB.m, HmuB.bad, O_CMA1.sk, O_CMA1.qs, St.pend} /\
-        PC.RO.m{1} = HctT.t{1} /\
-        tcinv TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2}
-              HctT.t{2} HctT.tinv{2} XCB.ps{2} LX.RO.m{2}).
+call (: ={glob XASim, SD.XOF.m, LX.RO.m, HctT.tinv, HctT.leakT, ROtr.RO.m, HmuB.m, HmuB.bad,
+          O_CMA1.sk, O_CMA1.qs} /\
+        crel TCct.Tab.m{2} TCct.Tab.ks{2} TCct.Tab.bad{2} SD.XOF.m{2} XCB.ps{2} LX.RO.m{2}
+             HctT.bad{1}).
 - by proc; inline{2} 2; wp; call Sign_B; auto.
-- by proc *; inline{2} 1; wp; call HctE_B; auto.
+- by proc *; inline{2} 1; wp; call HctT_HB_get; auto.
 - by proc *; inline{2} 1; wp; call (: ={HmuB.m, HmuB.bad}); [sim | auto].
 - by proc *; inline{2} 1; wp; call (: ={ROtr.RO.m}); [sim | auto].
 - by proc *; inline{2} 1; wp; call XC_B; auto.
 - by proc *; inline{2} 1; wp; call (: ={glob XASim}); [sim | auto].
-inline *; auto => />; rewrite cinv0 tinv_ok0 /=; smt(cinv_coll).
+inline *; auto => /> *.
+have h : ct_tab empty<:high list * mu_t, ctilde> empty<:SD.xin, SD.xout>.
+- by move=> x; rewrite !emptyE.
+by rewrite h /=; smt(mem_empty).
 qed.
 
-(* Query counting for [Act] *)
-local lemma HctE_GB_h (T <: TCct.Oracle{-TCct.Count, -Act}) b c :
-  hoare[HctE(GB(TCct.Count(T))).get :
-        (b => forall ct, ct \in CountXC.xs => ct \in XCB.ps \/ ct \in HctT.tinv) /\
-        TCct.Count.cg = c ==>
-        (b => forall ct, ct \in CountXC.xs => ct \in XCB.ps \/ ct \in HctT.tinv) /\
-        TCct.Count.cg <= c + 1].
+(* Query counting for [Act]: every [c~] queried to [XC] is put once *)
+local lemma XCB_h (T <: TCct.Oracle{-TCct.Count, -Act}) (S : ctilde fset) :
+  hoare[XCB(TCct.Count(T)).get :
+        TCct.Count.cp = card XCB.ps /\ XCB.ps \subset S /\ y.`1 \in S ==>
+        TCct.Count.cp = card XCB.ps /\ XCB.ps \subset S].
 proof.
-proc; inline *; sp; if; last by auto => /> /#.
-by wp; call (: true); auto => />; smt(mem_set).
+proc; call (: true) => //.
+if; 2: by auto.
+inline TCct.Count(T).put; wp; call (: true); auto => /> &hr hs hy hn.
+rewrite fcardU1 hn /b2i /=; split; 1: smt().
+by move=> z; rewrite in_fsetU in_fset1 => -[/hs | ->].
 qed.
 
-local lemma Sign_GB_h (T <: TCct.Oracle{-TCct.Count, -Act}) c :
-  hoare[MLDSAGen(MatRA, ChalE(GB(TCct.Count(T))), HmuB).sign :
-        (forall ct, ct \in CountXC.xs => ct \in XCB.ps \/ ct \in HctT.tinv) /\
-        TCct.Count.cg + size St.pend = c ==>
-        (forall ct, ct \in CountXC.xs => ct \in XCB.ps \/ ct \in HctT.tinv) /\
-        TCct.Count.cg + size St.pend <= c + kappa_max].
+local lemma SIB_XCB_h (T <: TCct.Oracle{-TCct.Count, -Act}) (S : ctilde fset) x0 :
+  hoare[SIB.SampleInBall(XCB(TCct.Count(T))).get :
+        x = x0 /\ TCct.Count.cp = card XCB.ps /\ XCB.ps \subset S ==>
+        TCct.Count.cp = card XCB.ps /\ XCB.ps \subset S `|` fset1 x0].
 proof.
 proc.
-seq 11 : ((forall ct, ct \in CountXC.xs => ct \in XCB.ps \/ ct \in HctT.tinv) /\
-          TCct.Count.cg + size St.pend <= c + kappa_max /\
-          (response <> None => St.pend <> [])).
-- while ((forall ct, ct \in CountXC.xs => ct \in XCB.ps \/ ct \in HctT.tinv) /\
-         0 <= ctr <= kappa_max /\ TCct.Count.cg + size St.pend <= c + ctr /\
-         (response <> None => St.pend <> [])).
-  + wp; if; 2: by auto => /> /#.
-    inline ChalE(GB(TCct.Count(T))).get GB(TCct.Count(T)).sample; wp.
-    by call (: true) => //; auto => /> /#.
-  inline MatRA.get; wp; call (: true) => //; auto => />; smt(gt0_kappa_max).
-if; last by auto.
-inline ChalE(GB(TCct.Count(T))).final; wp.
-exlim TCct.Count.cg => c0.
-call (HctE_GB_h T true c0); auto => />; smt(size_behead List.size_ge0).
-qed.
-
-local lemma XCB_h (T <: TCct.Oracle{-TCct.Count, -Act}) c0 x0 :
-  hoare[XCB(TCct.Count(T)).get :
-        y.`1 = x0 /\ TCct.Count.cp <= c0 + 1 /\ (x0 \notin XCB.ps => TCct.Count.cp <= c0) ==>
-        TCct.Count.cp <= c0 + 1 /\ (x0 \notin XCB.ps => TCct.Count.cp <= c0)].
-proof.
-proc; if; 1: by call (: true) => //; auto.
-seq 1 : (TCct.Count.cp <= c0 + 1 /\ (x0 \notin XCB.ps => TCct.Count.cp <= c0)).
-- if; 2: by auto => /> /#.
-  by inline *; wp; call (: true); auto => />; smt(in_fsetU in_fset1).
-by call (: true) => //; auto.
-qed.
-
-local lemma SIB_XCB_h (T <: TCct.Oracle{-TCct.Count, -Act}) c0 :
-  hoare[SIB.SampleInBall(XCB(TCct.Count(T))).get :
-        TCct.Count.cp <= c0 ==> TCct.Count.cp <= c0 + 1].
-proof.
-proc; exlim x => x0.
-while (x = x0 /\ TCct.Count.cp <= c0 + 1 /\ (x0 \notin XCB.ps => TCct.Count.cp <= c0)).
-- wp; while (x = x0 /\ TCct.Count.cp <= c0 + 1 /\ (x0 \notin XCB.ps => TCct.Count.cp <= c0)).
-  + by wp; call (XCB_h T c0 x0); auto.
+while (x = x0 /\ TCct.Count.cp = card XCB.ps /\ XCB.ps \subset S `|` fset1 x0).
+- wp; while (x = x0 /\ TCct.Count.cp = card XCB.ps /\ XCB.ps \subset S `|` fset1 x0).
+  + by wp; call (XCB_h T (S `|` fset1 x0)); auto => />; rewrite in_fsetU in_fset1.
   by auto.
-wp; while (x = x0 /\ TCct.Count.cp <= c0 + 1 /\ (x0 \notin XCB.ps => TCct.Count.cp <= c0)).
-- by wp; call (XCB_h T c0 x0); auto.
-by auto => /> /#.
+wp; while (x = x0 /\ TCct.Count.cp = card XCB.ps /\ XCB.ps \subset S `|` fset1 x0).
+- by wp; call (XCB_h T (S `|` fset1 x0)); auto => />; rewrite in_fsetU in_fset1.
+by auto => /> &hr hs z /hs hz; rewrite in_fsetU hz.
+qed.
+
+local lemma Sign_TB_h (T <: TCct.Oracle{-TCct.Count, -Act}) c :
+  hoare[MLDSAGen(MatRA, ChalB(TCct.Count(T)), HmuB).sign :
+        TCct.Count.cg = c ==> TCct.Count.cg <= c + kappa_max].
+proof.
+proc.
+seq 9 : (TCct.Count.cg = c /\ ctr = 0).
+- wp; call (: true) => //; wp.
+  by call (: true); [conseq (: _ ==> true) | auto].
+while (0 <= ctr <= kappa_max /\ TCct.Count.cg <= c + ctr).
+- wp; if; 2: by auto => /> /#.
+  inline ChalB(TCct.Count(T)).get HB(TCct.Count(T)).sample TCct.Count(T).get; wp.
+  call (: true) => //; wp; call (: true) => //; auto => /> /#.
+by auto => />; smt(gt0_kappa_max).
 qed.
 
 local lemma Act_bound (T <: TCct.Oracle{-TCct.Count, -Act}) :
@@ -807,473 +565,711 @@ local lemma Act_bound (T <: TCct.Oracle{-TCct.Count, -Act}) :
          TCct.Count.cg <= qHct + kappa_max * qS + 1 /\ TCct.Count.cp <= qXC + 1 ].
 proof.
 proc.
-seq 21 : ((forall ct, ct \in CountXC.xs => ct \in XCB.ps \/ ct \in HctT.tinv) /\
-          TCct.Count.cp <= qXC /\ TCct.Count.cg + size St.pend <= qHct + kappa_max * qS).
-- seq 20 : (TCct.Count.cp = 0 /\ TCct.Count.cg = 0 /\ St.pend = [] /\ CountXC.xs = fset0 /\
+seq 20 : (TCct.Count.cg <= qHct + kappa_max * qS /\ TCct.Count.cp = card XCB.ps /\
+          XCB.ps \subset CountXC.xs /\ card CountXC.xs <= qXC).
+- seq 19 : (TCct.Count.cp = 0 /\ TCct.Count.cg = 0 /\ XCB.ps = fset0 /\ CountXC.xs = fset0 /\
             CountXA.q = 0 /\ CountXC.q = 0 /\ CountHtr.q = 0 /\ CountHmu.q = 0 /\
             CountHct.q = 0 /\ CountS.q = 0).
   + by inline *; auto.
-  conseq (: _ ==> (forall ct, ct \in CountXC.xs => ct \in XCB.ps \/ ct \in HctT.tinv) /\
-                  TCct.Count.cp <= CountXC.q /\
-                  TCct.Count.cg + size St.pend <= CountHct.q + kappa_max * CountS.q)
+  conseq (: _ ==> TCct.Count.cg <= CountHct.q + kappa_max * CountS.q /\
+                  TCct.Count.cp = card XCB.ps /\ XCB.ps \subset CountXC.xs /\
+                  CountXC.q = card CountXC.xs)
          (: CountXA.q = 0 /\ CountXC.q = 0 /\ CountHtr.q = 0 /\ CountHmu.q = 0 /\
             CountHct.q = 0 /\ CountS.q = 0 ==>
             CountXC.q <= qXC /\ CountHct.q <= qHct /\ CountS.q <= qS) => //.
-  + move=> &hr _ tinv pend ps qhct qs qxc xs cg cp [#] hxs hcp hcs hqxc hqhct hqs.
-    split => //; split; 1: smt().
+  + move=> &hr _ ps qhct qs qxc xs cg cp [#] hcg hcp hps hq hqxc hqhct hqs.
     have : kappa_max * qs <= kappa_max * qS.
     * by apply StdOrder.IntOrder.ler_wpmul2l; [smt(gt0_kappa_max) | done].
     smt().
-  + by call (A_bound XASim (XCB(TCct.Count(T))) ROtr.RO HmuB (HctE(GB(TCct.Count(T))))
-                     (O_CMA1(MLDSAGen(MatRA, ChalE(GB(TCct.Count(T))), HmuB)))); auto.
-  call (: (forall ct, ct \in CountXC.xs => ct \in XCB.ps \/ ct \in HctT.tinv) /\
-          TCct.Count.cp <= CountXC.q /\
-          TCct.Count.cg + size St.pend <= CountHct.q + kappa_max * CountS.q).
-  + proc; inline O_CMA1(MLDSAGen(MatRA, ChalE(GB(TCct.Count(T))), HmuB)).sign; wp.
-    exlim (TCct.Count.cg + size St.pend) => c.
-    call (Sign_GB_h T c); auto => /> /#.
-  + proc; exlim TCct.Count.cg => c.
-    call (HctE_GB_h T true c); auto => /> /#.
-  + by proc; call (: true) => //; auto.
-  + by proc; call (: true) => //; auto.
-  + proc; inline XCB(TCct.Count(T)).get.
-    seq 1 : (y.`1 \in CountXC.xs /\
-             (forall ct, ct \in CountXC.xs => ct <> y.`1 => ct \in XCB.ps \/ ct \in HctT.tinv) /\
-             (y.`1 \notin XCB.ps => y.`1 \notin HctT.tinv => TCct.Count.cp + 1 <= CountXC.q) /\
-             TCct.Count.cp <= CountXC.q /\
-             TCct.Count.cg + size St.pend <= CountHct.q + kappa_max * CountS.q).
-    * by auto => />; smt(in_fsetU in_fset1).
-    sp; if.
-    * by wp; call (: true) => //; auto => /> /#.
-    seq 1 : (y0.`1 \in CountXC.xs /\ y0.`1 \in XCB.ps /\
-             (forall ct, ct \in CountXC.xs => ct <> y0.`1 => ct \in XCB.ps \/ ct \in HctT.tinv) /\
-             TCct.Count.cp <= CountXC.q /\
-             TCct.Count.cg + size St.pend <= CountHct.q + kappa_max * CountS.q).
-    * if; 2: by auto => /> /#.
-      by inline *; wp; call (: true); auto => />; smt(in_fsetU in_fset1).
+  + by call (A_bound XASim (XCB(TCct.Count(T))) ROtr.RO HmuB (HB(TCct.Count(T)))
+                     (O_CMA1(MLDSAGen(MatRA, ChalB(TCct.Count(T)), HmuB)))); auto.
+  call (: TCct.Count.cg <= CountHct.q + kappa_max * CountS.q /\
+          TCct.Count.cp = card XCB.ps /\ XCB.ps \subset CountXC.xs /\
+          CountXC.q = card CountXC.xs).
+  + proc; inline O_CMA1(MLDSAGen(MatRA, ChalB(TCct.Count(T)), HmuB)).sign; wp.
+    exlim TCct.Count.cg => c.
+    by call (Sign_TB_h T c); auto => /> /#.
+  + proc; inline HB(TCct.Count(T)).get HB(TCct.Count(T)).sample TCct.Count(T).get.
     by wp; call (: true) => //; auto => /> /#.
   + by proc; call (: true) => //; auto.
-  by auto => />; smt(in_fset0).
-seq 1 : (TCct.Count.cp <= qXC + 1 /\
-         TCct.Count.cg + size St.pend <= qHct + kappa_max * qS + 1).
-- inline Act(TCct.Count(T)).S.verify.
-  wp; exlim TCct.Count.cg => c1; call (HctE_GB_h T false c1).
-  wp; exlim TCct.Count.cp => c0; call (SIB_XCB_h T c0).
-  by call (: true) => //; call (: true) => //; auto => /> /#.
-inline Flush(GB(TCct.Count(T))).run.
-while (TCct.Count.cp <= qXC + 1 /\
-       TCct.Count.cg + size St.pend <= qHct + kappa_max * qS + 1).
-- sp; if; 2: by auto => />; smt(size_behead).
-  by inline *; wp; call (: true); auto => />; smt(size_behead).
-by auto => /> /#.
+  + by proc; call (: true) => //; auto.
+  + proc; exlim CountXC.xs => S0.
+    seq 1 : (TCct.Count.cg <= CountHct.q + kappa_max * CountS.q /\
+             TCct.Count.cp = card XCB.ps /\ XCB.ps \subset CountXC.xs /\
+             CountXC.q = card CountXC.xs /\ y.`1 \in CountXC.xs).
+    * if; auto => />.
+      move=> &hr hcg hs hn; rewrite fcardU1 hn /b2i /= in_fsetU in_fset1 /=.
+      by split; [move=> z /hs; rewrite in_fsetU => -> | ring].
+    exlim CountXC.xs => S1.
+    by call (XCB_h T S1); auto => /> &hr hcg hs hq hy cp ps hcp hps.
+  + by proc; call (: true) => //; auto.
+  by auto => />; rewrite fcards0.
+inline Act(TCct.Count(T)).S.verify HB(TCct.Count(T)).get HB(TCct.Count(T)).sample
+       TCct.Count(T).get.
+wp; call (: true) => //; wp.
+exlim sig.`1, CountXC.xs => ct0 S0.
+call (SIB_XCB_h T S0 ct0).
+call (: true) => //; call (: true) => //; auto => /> &hr hcg hs hq ps hps.
+split; 1: smt().
+have := subset_leq_fcard _ _ hps; rewrite fcardU fcard1.
+have := fcard_ge0 (S0 `&` fset1 sig{hr}.`1).
+smt().
 qed.
 
-(* -------------------------------------------------------------------- *)
-(* The eager game is G1 up to [coll] *)
-
-(* Monotonicity of [coll] *)
-local lemma coll_set pm lm x y :
-  x \notin pm => coll pm lm => coll pm.[x <- y] lm.
+local lemma ct_bound &m :
+  Pr[G2(A).main() @ &m : HctT.bad] <= bound_ct.
 proof.
-rewrite /coll => hx [[x1 x2 [hne [hn heq]]] | [x0 ct i [hx0 hin]]].
-- left; exists x1 x2; rewrite !get_setE; smt().
-by right; exists x0 ct i; rewrite get_setE; smt().
+apply (ler_trans _ _ _ (G2_Act &m)).
+have := TCct.table_collision Act (qXC + 1) (qHct + kappa_max * qS + 1) _ _ Act_bound &m.
+- smt(qXC_ge0).
+- have : 0 <= kappa_max * qS by apply StdOrder.IntOrder.mulr_ge0; smt(gt0_kappa_max qS_ge0).
+  smt(qHct_ge0).
+have -> : qXC + 1 + (qHct + kappa_max * qS + 1) = qXC + 1 + qHct + kappa_max * qS + 1 by ring.
+by rewrite /bound_ct fromintM (RField.mulrC (qXC + 1 + qHct + kappa_max * qS + 1)%r).
 qed.
 
-local lemma coll_lx pm lm z b : coll pm lm => coll pm lm.[z <- b].
+(* ==================================================================== *)
+(* G1 -> G2: G1 is G2 up to [HctT.bad]                                  *)
+(* ==================================================================== *)
+
+(* [x] is a preimage of [c~] in the commitment hash part of the random
+   oracle of SimplifiedScheme *)
+local op hm (m : (SD.xin, SD.xout) fmap) x ct = m.[SD.XH x] = Some (SD.OH ct).
+
+(* The stream consumed by SampleInBall: [acc_i] is the index [i] of the
+   rejection loop after reading the bytes following the 8 sign bytes; a
+   complete stream is one after which SampleInBall stops, and only then. *)
+local op step_i (i : int) (b : byte) = if i < to_int b then i else i + 1.
+local op acc_i (bs : byte list) = foldl step_i (256 - tau) bs.
+local op complete (s : byte list) =
+  8 <= size s /\ acc_i (drop 8 s) = 256 /\
+  forall n, 8 <= n < size s => acc_i (drop 8 (take n s)) < 256.
+
+(* Relation between the tables of G1 ([mct]: Hct, [xm1]: XOF on [c~]) and
+   of G2 ([m2]: random oracle of SimplifiedScheme, [lm]: [LX], [ti]: [tinv],
+   [lt]: [leakT]), as long as [HctT.bad] is not set; [pend] is the
+   iteration of the signer in progress (its point, its [c~] and the number
+   of bytes already read). *)
+local op [opaque] rel (mct : (high list * mu_t, ctilde) fmap) (xm1 : (ctilde * int, byte) fmap)
+   (m2 : (SD.xin, SD.xout) fmap) (lm : (ctilde * int, byte) fmap)
+   (ti : (ctilde, high list * mu_t) fmap) (lt : (ctilde, byte list) fmap)
+   (pend : ((high list * mu_t) * ctilde * int) option) =
+  (* Hct of G1 is the XH part of the random oracle *)
+  (forall x, mct.[x] = omap SD.oh m2.[SD.XH x]) /\
+  (forall x o, m2.[SD.XH x] = Some o => o = SD.OH (SD.oh o)) /\
+  (forall y o, m2.[SD.XB y] = Some o => o = SD.OB (SD.ob o)) /\
+  (* injectivity (no collision) *)
+  (forall x1 x2 ct, hm m2 x1 ct => hm m2 x2 ct => x1 = x2) /\
+  (forall ct x, ti.[ct] = Some x => hm m2 x ct) /\
+  (* the streams consumed by the signer are complete and in the oracle *)
+  (forall ct s, lt.[ct] = Some s => complete s /\ exists x, hm m2 x ct /\
+       forall i, 0 <= i < size s => m2.[SD.XB (x, i)] = Some (SD.OB (nth witness s i))) /\
+  (* the bytes of the oracle are read through [tinv] or by the signer *)
+  (forall x i, SD.XB (x, i) \in m2 =>
+       (exists ct n, pend = Some (x, ct, n) /\ 0 <= i < n) \/
+       exists ct, hm m2 x ct /\ (ct \in ti \/ (ct \in lt /\ 0 <= i < size (oget lt.[ct])))) /\
+  (forall x ct, hm m2 x ct => ct \in ti \/ ct \in lt \/ exists n, pend = Some (x, ct, n)) /\
+  (* [LX] is only queried on an output beyond the consumed stream *)
+  (forall x ct i, hm m2 x ct => (ct, i) \in lm => ct \in lt /\ !(0 <= i < size (oget lt.[ct]))) /\
+  (* the XOF of G1 *)
+  (forall ct i, ((ct, i) \in lm \/ forall x, !hm m2 x ct) => xm1.[(ct, i)] = lm.[(ct, i)]) /\
+  (forall x ct i, hm m2 x ct => (ct, i) \notin lm => xm1.[(ct, i)] = omap SD.ob m2.[SD.XB (x, i)]).
+
+local lemma hm_set m x c x' c' :
+  hm m.[SD.XH x <- SD.OH c] x' c' <=> (x' = x /\ c' = c) \/ (x' <> x /\ hm m x' c').
+proof. by rewrite /hm get_setE /=; case: (x' = x). qed.
+
+local lemma hm_setB m y o x' c' : hm m.[SD.XB y <- o] x' c' <=> hm m x' c'.
+proof. by rewrite /hm get_setE. qed.
+
+local lemma hm_in m x c : hm m x c => SD.XH x \in m.
+proof. by rewrite /hm domE => ->. qed.
+
+(* A fresh output [c] of [Hct] (signer or adversary) *)
+local lemma rel_sfresh mct xm1 m2 lm ti lt x c :
+  SD.XH x \notin m2 => !hrng m2 c => (forall i, (c, i) \notin lm) =>
+  rel mct xm1 m2 lm ti lt None =>
+  rel mct.[x <- c] xm1 m2.[SD.XH x <- SD.OH c] lm ti lt (Some (x, c, 0)).
 proof.
-rewrite /coll => -[h | [x0 ct i [hx0 hin]]]; 1: by left.
-by right; exists x0 ct i; rewrite mem_set hin.
+move=> hx hc hl; rewrite /rel => -[#] h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11.
+have hnc : forall x', !hm m2 x' c by move=> x'; apply/negP => h; apply hc; exists x'.
+have hxb : forall i, SD.XB (x, i) \notin m2.
+- move=> i; apply/negP => /h7 [[ct n [] //] | [ct [/hm_in hin _]]].
+  by move: hx; rewrite hin.
+have hold : forall x' c', hm m2 x' c' => x' <> x by move=> x' c' /hm_in; smt().
+do ! split.
+- by move=> x'; rewrite !get_setE /=; case: (x' = x) => // _; apply h1.
+- move=> x' o; rewrite get_setE /=; case: (x' = x) => hx'.
+  + by move=> /someI <-.
+  by apply h2.
+- by move=> y o; rewrite get_setE /=; apply h3.
+- by move=> x1 x2 ct; rewrite !hm_set; smt().
+- by move=> ct x' /h5 h; rewrite hm_set; right; split => //; apply (hold _ _ h).
+- move=> ct s /h6 [hs [x' [hx' hb]]]; split => //; exists x'; split.
+  + by rewrite hm_set; right; split => //; apply (hold _ _ hx').
+  by move=> i hi; rewrite get_setE /=; apply hb.
+- move=> x' i; rewrite mem_set /= => /h7 [[ct n [] //] | [ct [hx' hct]]].
+  right; exists ct; rewrite hm_set.
+  by split => //; right; split => //; apply (hold _ _ hx').
+- move=> x' ct; rewrite hm_set => -[[-> ->] | [_ /h8 [-> // | [-> // | [n []] //]]]].
+  by right; right; exists 0.
+- move=> x' ct i; rewrite hm_set => -[[_ ->] | [_ hx']]; 1: by rewrite hl.
+  by apply (h9 _ _ _ hx').
+- move=> ct i hcase; apply h10; case: hcase => [-> // | hn]; right => x'.
+  by have := hn x'; rewrite hm_set negb_or => -[_]; smt().
+move=> x' ct i; rewrite hm_set => -[[-> ->] hi | [hne hx'] hi].
+- by rewrite get_setE /= (get_none _ _ (hxb i)) /= h10 //; right.
+by rewrite get_setE /=; apply (h11 _ _ _ hx').
 qed.
 
-local lemma coll_inj pm lm x1 x2 ct :
-  !coll pm lm => pm.[x1] = Some ct => pm.[x2] = Some ct => x1 = x2.
+(* An old output of [Hct] *)
+local lemma rel_sold mct xm1 m2 lm ti lt x c :
+  hm m2 x c => rel mct xm1 m2 lm ti lt None => rel mct xm1 m2 lm ti lt (Some (x, c, 0)).
 proof.
-rewrite /coll => hc h1 h2; case: (x1 = x2) => // hne.
-by apply hc; left; exists x1 x2; rewrite h1 h2.
+move=> hxc; rewrite /rel => -[#] h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11.
+do ! split => //.
+- by move=> x' i /h7 [[ct n [] //] | h]; right.
+by move=> x' ct /h8 [-> // | [-> // | [n []] //]].
 qed.
 
-local lemma coll_nolx pm lm x ct i :
-  !coll pm lm => pm.[x] = Some ct => (ct, i) \notin lm.
-proof. rewrite /coll => hc h1; apply/negP => hin; apply hc; right; by exists x ct i. qed.
-
-local lemma coll_lxin pm lm x ct i b :
-  pm.[x] = Some ct => coll pm lm.[(ct, i) <- b].
-proof. by rewrite /coll => h; right; exists x ct i; rewrite mem_set. qed.
-
-local lemma coll_new pm lm x y :
-  x \notin pm => !coll pm.[x <- y] lm =>
-  !coll pm lm /\ (forall x', pm.[x'] <> Some y) /\ (forall i, (y, i) \notin lm).
+(* The registration of [c] in [tinv] by the adversary's [Hct] *)
+local lemma rel_reg mct xm1 m2 lm ti lt x c :
+  hm m2 x c => rel mct xm1 m2 lm ti lt (Some (x, c, 0)) =>
+  rel mct xm1 m2 lm (if c \notin ti then ti.[c <- x] else ti) lt None.
 proof.
-move=> hx hc; split; 1: by apply/negP => h; apply hc; apply coll_set.
+move=> hxc; rewrite /rel => -[#] h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11.
+have hti : forall ct, ct \in ti => ct \in (if c \notin ti then ti.[c <- x] else ti).
+- by move=> ct; case: (c \in ti) => //= _; rewrite mem_set => ->.
+do ! split => //.
+- move=> ct x'; case: (c \in ti) => /= hc; 1: by apply h5.
+  by rewrite get_setE; case: (ct = c) => [-> /someI <- // | _ /h5 //].
+- move=> x' i /h7 [[ct n [h hi]] | [ct [hx' hc']]]; 1: by move: h => /someI /#.
+  by right; exists ct; split => //; case: hc' => [/hti -> // | -> //].
+move=> x' ct /h8 [/hti -> // | [-> // | [n /someI [#] -> ->]]].
+by move=> _; left; case: (ct \in ti) => //=; rewrite mem_set.
+qed.
+
+local lemma hm_fun m x c c' : hm m x c => hm m x c' => c = c'.
+proof. by rewrite /hm => -> /someI /(congr1 SD.oh). qed.
+
+(* [XC] rule 1: a query already answered by [LX] *)
+local lemma rel_x1 mct xm1 m2 lm ti lt ct i :
+  rel mct xm1 m2 lm ti lt None => (ct, i) \in lm => xm1.[(ct, i)] = lm.[(ct, i)].
+proof. by rewrite /rel => -[#] _ _ _ _ _ _ _ _ _ h10 _ hin; apply h10; left. qed.
+
+(* [XC] rule 2: a position of a stream consumed by the signer *)
+local lemma rel_x2 mct xm1 m2 lm ti lt ct i s :
+  rel mct xm1 m2 lm ti lt None => lt.[ct] = Some s => 0 <= i < size s =>
+  (ct, i) \notin lm => xm1.[(ct, i)] = Some (nth witness s i).
+proof.
+rewrite /rel => -[#] _ _ _ _ _ h6 _ _ _ _ h11 hs hi hl.
+have [_ [x [hx hb]]] := h6 _ _ hs.
+by rewrite (h11 _ _ _ hx hl) (hb _ hi).
+qed.
+
+(* [XC] rule 3: an output of [Hct] for the adversary *)
+local lemma rel_x3 mct xm1 m2 lm ti lt ct i x :
+  rel mct xm1 m2 lm ti lt None => ti.[ct] = Some x => (ct, i) \notin lm =>
+  xm1.[(ct, i)] = omap SD.ob m2.[SD.XB (x, i)] /\
+  forall b, SD.XB (x, i) \notin m2 =>
+    rel mct xm1.[(ct, i) <- b] m2.[SD.XB (x, i) <- SD.OB b] lm ti lt None.
+proof.
+rewrite /rel => -[#] h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11 hti hl.
+have hx := h5 _ _ hti.
+split; 1: by apply h11.
+move=> b hxb; do ! split.
+- by move=> x'; rewrite get_setE /=; apply h1.
+- by move=> x' o; rewrite get_setE /=; apply h2.
+- by move=> y o; rewrite get_setE /=; case: (y = (x, i)) => [_ /someI <- // | _ /h3].
+- by move=> x1 x2 c; rewrite !hm_setB; apply h4.
+- by move=> c x'; rewrite hm_setB; apply h5.
+- move=> c s /h6 [hs [x' [hx' hb']]]; split => //; exists x'; rewrite hm_setB hx' /=.
+  move=> k hk; rewrite get_setE; case: (SD.XB (x', k) = SD.XB (x, i)) => heq.
+  + by move: hxb; rewrite -heq domE (hb' _ hk).
+  by apply hb'.
+- move=> x' k; rewrite mem_set => -[/h7 [[c n []] | [c [hc hc']]] | heq] //.
+  + by right; exists c; rewrite hm_setB.
+  have [->> ->>] : x' = x /\ k = i by move: heq => /=.
+  by right; exists ct; rewrite hm_setB hx /= domE hti.
+- by move=> x' c; rewrite hm_setB => /h8.
+- by move=> x' c k; rewrite hm_setB; apply h9.
+- move=> c k hck; rewrite get_setE.
+  case: ((c, k) = (ct, i)) => [[->> ->>] | _] /=.
+  + case: hck => [hin | /(_ x)]; [by move: hl; rewrite hin | by rewrite hm_setB hx].
+  by apply h10; case: hck => [-> // | hn]; right => x'; have := hn x'; rewrite hm_setB.
+move=> x' c k; rewrite hm_setB => hc hk; rewrite !get_setE.
+case: ((c, k) = (ct, i)) => [[->> ->>] | hne] /=.
+- by have -> /= : x' = x by apply (h4 _ _ _ hc hx).
+case: (x' = x /\ k = i) => [[->> ->>] | _]; 2: by apply h11.
+by have := hm_fun _ _ _ _ hc hx => ->>; move: hne.
+qed.
+
+(* [XC] rule 4: a fresh query to [LX] *)
+local lemma rel_x4 mct xm1 m2 lm ti lt ct i :
+  rel mct xm1 m2 lm ti lt None => (ct, i) \notin lm =>
+  !(ct \in lt /\ 0 <= i < size (oget lt.[ct])) => ct \notin ti =>
+  xm1.[(ct, i)] = None /\
+  forall b, rel mct xm1.[(ct, i) <- b] m2 lm.[(ct, i) <- b] ti lt None.
+proof.
+rewrite /rel => -[#] h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11 hl hlt hti.
+have hpre : forall x, hm m2 x ct => ct \in lt.
+- by move=> x /h8 [// | [// | [n []] //]].
 split.
-- move=> x'; apply/negP => hx'.
-  have := coll_inj _ _ x' x y hc; rewrite !get_setE /=; smt().
-by move=> i; apply (coll_nolx _ _ x y i hc); rewrite get_set_sameE.
+- case: (exists x, hm m2 x ct) => [[x hx] | hn].
+  + rewrite (h11 _ _ _ hx hl); case _ : (m2.[SD.XB (x, i)]) => // o ho.
+    have : SD.XB (x, i) \in m2 by rewrite domE ho.
+    move=> /h7 [[c n []] | [c [hc [hc' | hc']]]] //.
+    * by have := hm_fun _ _ _ _ hx hc => ->>; move: hti; rewrite hc'.
+    by have := hm_fun _ _ _ _ hx hc => ->>; move: hlt; rewrite hc'.
+  rewrite h10; 1: by right => x; apply/negP => hx; apply hn; exists x.
+  by apply get_none.
+move=> b; do ! split => //.
+- move=> x c k hc; rewrite mem_set => -[/(h9 _ _ _ hc) // | [->> ->>]].
+  by have := hpre _ hc => hin; move: hlt; rewrite hin.
+- move=> c k; rewrite mem_set !get_setE.
+  by case: ((c, k) = (ct, i)) => //= _ hck; apply h10.
+move=> x c k hc; rewrite mem_set negb_or => -[hk hne]; rewrite get_setE hne /=.
+by apply h11.
 qed.
 
-(* The relation between the XOF of G1 and the XOFs of D, through the
-   eagerly sampled [Hct] *)
-local op [opaque] rel (xm1 : (ctilde * int, byte) fmap)
-             (pm : (high list * mu_t, ctilde) fmap)
-             (t : (high list * mu_t, ctilde) fmap)
-             (tinv : (ctilde, high list * mu_t) fmap)
-             (xm2 : ((high list * mu_t) * int, byte) fmap)
-             (lm : (ctilde * int, byte) fmap) =
-  (forall x, x \in t => t.[x] = pm.[x]) /\
-  (forall ct x, tinv.[ct] = Some x => t.[x] = Some ct) /\
-  (forall x ct, t.[x] = Some ct => ct \in tinv) /\
-  (forall x ct i, pm.[x] = Some ct => xm1.[(ct, i)] = xm2.[(x, i)]) /\
-  (forall ct i, (forall x, pm.[x] <> Some ct) => xm1.[(ct, i)] = lm.[(ct, i)]) /\
-  (forall x i, x \notin pm => (x, i) \notin xm2).
-
-(* The relation between G1 (tables [mmu1], [mct1], [xm1]) and D (tables
-   [mmu2], [pm], [HctT], [xm2], [lm]) on the state that is not syntactically
-   equal (an abbreviation: the tactics see the conjunction) *)
-local abbrev relD (mmu1 : (tr_t * M, mu_t) fmap) (mct1 : (high list * mu_t, ctilde) fmap)
-  (xm1 : (ctilde * int, byte) fmap) (mmu2 : (tr_t * M, mu_t) fmap)
-  (pm : (high list * mu_t, ctilde) fmap) (bad : bool) (t : (high list * mu_t, ctilde) fmap)
-  (tinv : (ctilde, high list * mu_t) fmap) (xm2 : ((high list * mu_t) * int, byte) fmap)
-  (lm : (ctilde * int, byte) fmap) =
-  mmu1 = mmu2 /\ mct1 = pm /\ !bad /\ rel xm1 pm t tinv xm2 lm.
-
-local lemma rel0 : rel empty empty empty empty empty empty.
-proof. by rewrite /rel; smt(emptyE mem_empty). qed.
-
-(* A XOF query on an output [c~ = pm.[x]] *)
-local lemma rel_xof xm1 pm t tinv xm2 lm x ct i b :
-  !coll pm lm => pm.[x] = Some ct => rel xm1 pm t tinv xm2 lm =>
-  xm1.[(ct, i)] = xm2.[(x, i)] /\
-  (xm1.[(ct, i)] = None =>
-   rel xm1.[(ct, i) <- b] pm t tinv xm2.[(x, i) <- b] lm).
+(* A byte read by the signer at position [n] of the iteration in progress *)
+local lemma rel_read mct xm1 m2 lm ti lt x c n :
+  rel mct xm1 m2 lm ti lt (Some (x, c, n)) => hm m2 x c => (c, n) \notin lm => 0 <= n =>
+  xm1.[(c, n)] = omap SD.ob m2.[SD.XB (x, n)] /\
+  (SD.XB (x, n) \in m2 => rel mct xm1 m2 lm ti lt (Some (x, c, n + 1))) /\
+  (forall b, SD.XB (x, n) \notin m2 =>
+     rel mct xm1.[(c, n) <- b] m2.[SD.XB (x, n) <- SD.OB b] lm ti lt (Some (x, c, n + 1))).
 proof.
-rewrite /rel => hc hx [h1 [h2 [h3 [h4 [h5 h6]]]]].
-split; 1: by apply h4.
-move=> hn; split => //; split => //; split => //; split.
-- move=> x' ct' i' hx'; rewrite !get_setE.
-  case: (x' = x) => [->> | hne].
-  + have <<- : ct = ct' by move: hx'; rewrite hx.
-    by have := h4 x ct i' hx; smt().
-  have : ct' <> ct by apply/negP => ->>; apply hne; apply (coll_inj _ _ _ _ _ hc hx' hx).
-  by have := h4 x' ct' i' hx'; smt().
+rewrite /rel => -[#] h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11 hx hl hn.
+split; 1: by apply h11.
 split.
-- move=> ct' i' hct'; rewrite get_setE.
-  have hne : ct' <> ct by apply/negP => ->>; move: (hct' x); rewrite hx.
-  by rewrite (: (ct', i') <> (ct, i)) 1:/# /=; apply h5.
-move=> x' i' hx'; rewrite mem_set negb_or; split; 1: by apply h6.
-by apply/negP => -[] ->> _; move: hx'; rewrite domE hx.
+- move=> _; do ! split => //.
+  + move=> x' k /h7 [[c' n' [/someI [#] <<- <<- <<- hk]] | h]; 2: by right.
+    by left; exists c (n + 1) => /#.
+  by move=> x' c' /h8 [-> // | [-> // | [n' /someI [#] <<- <<- _]]]; right; right; exists (n + 1).
+move=> b hxb; do ! split.
+- by move=> x'; rewrite get_setE /=; apply h1.
+- by move=> x' o; rewrite get_setE /=; apply h2.
+- by move=> y o; rewrite get_setE /=; case: (y = (x, n)) => [_ /someI <- // | _ /h3].
+- by move=> x1 x2 c'; rewrite !hm_setB; apply h4.
+- by move=> c' x'; rewrite hm_setB; apply h5.
+- move=> c' s /h6 [hs [x' [hx' hb']]]; split => //; exists x'; rewrite hm_setB hx' /=.
+  move=> k hk; rewrite get_setE; case: (SD.XB (x', k) = SD.XB (x, n)) => heq.
+  + by move: hxb; rewrite -heq domE (hb' _ hk).
+  by apply hb'.
+- move=> x' k; rewrite mem_set => -[/h7 [[c' n' [/someI [#] <<- <<- <<- hk]] | [c' [hc hc']]] | heq].
+  + by left; exists c (n + 1) => /#.
+  + by right; exists c'; rewrite hm_setB.
+  have [->> ->>] : x' = x /\ k = n by move: heq => /=.
+  by left; exists c (n + 1) => /#.
+- move=> x' c'; rewrite hm_setB => /h8 [-> // | [-> // | [n' /someI [#] <<- <<- _]]].
+  by right; right; exists (n + 1).
+- by move=> x' c' k; rewrite hm_setB; apply h9.
+- move=> c' k hck; rewrite get_setE.
+  case: ((c', k) = (c, n)) => [[->> ->>] | _] /=.
+  + case: hck => [hin | /(_ x)]; [by move: hl; rewrite hin | by rewrite hm_setB hx].
+  by apply h10; case: hck => [-> // | hn']; right => x'; have := hn' x'; rewrite hm_setB.
+move=> x' c' k; rewrite hm_setB => hc hk; rewrite !get_setE.
+case: ((c', k) = (c, n)) => [[->> ->>] | hne] /=.
+- by have -> /= : x' = x by apply (h4 _ _ _ hc hx).
+case: (x' = x /\ k = n) => [[->> ->>] | _]; 2: by apply h11.
+by have := hm_fun _ _ _ _ hc hx => ->>; move: hne.
 qed.
 
-(* A XOF query on a [c~] which is not an output of [Hct] *)
-local lemma rel_lx xm1 pm t tinv xm2 lm ct i b :
-  (forall x, pm.[x] <> Some ct) => rel xm1 pm t tinv xm2 lm =>
-  xm1.[(ct, i)] = lm.[(ct, i)] /\
-  rel xm1.[(ct, i) <- b] pm t tinv xm2 lm.[(ct, i) <- b].
+(* The end of the iteration in progress of the signer: its consumed stream
+   is recorded *)
+local lemma rel_end mct xm1 m2 lm ti lt x c rd :
+  rel mct xm1 m2 lm ti lt (Some (x, c, size rd)) => hm m2 x c => complete rd =>
+  (forall i, 0 <= i < size rd => m2.[SD.XB (x, i)] = Some (SD.OB (nth witness rd i))) =>
+  (c \in lt => oget lt.[c] = rd) =>
+  rel mct xm1 m2 lm ti lt.[c <- rd] None.
 proof.
-rewrite /rel => hct [h1 [h2 [h3 [h4 [h5 h6]]]]].
-split; 1: by apply h5.
-do 3! (split => //); split.
-- move=> x' ct' i' hx'; rewrite get_setE.
-  have hne : ct' <> ct by apply/negP => ->>; move: (hct x'); rewrite hx'.
-  by rewrite (: (ct', i') <> (ct, i)) 1:/# /=; apply h4.
-split => // ct' i' hct'; rewrite !get_setE.
-by case: ((ct', i') = (ct, i)) => // _; apply h5.
+rewrite /rel => -[#] h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11 hx hc hb hlt.
+have hold : forall c', c' \in lt => oget lt.[c'] = oget lt.[c <- rd].[c'].
+- by move=> c' hc'; rewrite get_setE; case: (c' = c) => [->> | //]; rewrite hlt.
+do ! split => //.
+- move=> c' s; rewrite get_setE; case: (c' = c) => [->> /someI <- | _ /h6 //].
+  by split => //; exists x.
+- move=> x' k /h7 [[c' n [/someI [#] <<- <<- <<- hk]] | [c' [hc' [hti | [hl hk]]]]].
+  + by right; exists c; rewrite hx /= mem_set get_set_sameE /=; right.
+  + by right; exists c'; rewrite hc' /= mem_set hti.
+  by right; exists c'; rewrite hc' /= mem_set hl /=; right; rewrite -hold.
+- move=> x' c' /h8 [-> // | [hl | [n /someI [#] _ <<- _]]].
+  + by right; left; rewrite mem_set hl.
+  by right; left; rewrite mem_set.
+move=> x' c' k hc' hk; have [hl hr] := h9 _ _ _ hc' hk.
+by rewrite mem_set hl /= -hold.
 qed.
 
-(* A fresh output [y] of [Hct] for [x] (eager sample) *)
-local lemma rel_fresh xm1 pm t tinv xm2 lm x y :
-  x \notin pm => !coll pm.[x <- y] lm => rel xm1 pm t tinv xm2 lm =>
-  rel xm1 pm.[x <- y] t tinv xm2 lm.
+(* Facts on the iteration in progress *)
+local lemma rel_pend_lx mct xm1 m2 lm ti lt x c n i :
+  rel mct xm1 m2 lm ti lt (Some (x, c, n)) => hm m2 x c => (c, i) \in lm =>
+  c \in lt /\ !(0 <= i < size (oget lt.[c])).
+proof. by rewrite /rel => -[#] _ _ _ _ _ _ _ _ h9 _ _ hx; apply (h9 x). qed.
+
+local lemma rel_pend_lt mct xm1 m2 lm ti lt x c n s :
+  rel mct xm1 m2 lm ti lt (Some (x, c, n)) => hm m2 x c => lt.[c] = Some s =>
+  complete s /\ forall i, 0 <= i < size s => m2.[SD.XB (x, i)] = Some (SD.OB (nth witness s i)).
 proof.
-move=> hx hc; have [hc0 [hy hyl]] := coll_new _ _ _ _ hx hc.
-rewrite /rel => -[h1 [h2 [h3 [h4 [h5 h6]]]]].
-split.
-- move=> x' hx'; rewrite get_setE; case: (x' = x) => [->> | _]; 2: by apply h1.
-  by move: (h1 x hx'); rewrite (get_none _ _ hx) => /#.
-do 2! (split => //); split.
-- move=> x' ct i; rewrite get_setE; case: (x' = x) => [->> /= <<- | _ hx']; 2: by apply h4.
-  rewrite h5 // (get_none _ (x, i)) 1:/#.
-  by apply/get_none/hyl.
-split.
-- by move=> ct i hct; apply h5 => x'; move: (hct x'); rewrite get_setE /#.
-move=> x' i; rewrite mem_set negb_or => -[hx' _]; exact h6.
+rewrite /rel => -[#] _ _ _ h4 _ h6 _ _ _ _ _ hx hs.
+have [hc [x' [hx' hb]]] := h6 _ _ hs.
+by have <<- := h4 _ _ _ hx hx'.
 qed.
 
-(* [x] (already in [pm]) is added to [t] *)
-local lemma rel_reveal xm1 pm t tinv xm2 lm x ct :
-  !coll pm lm => x \notin t => pm.[x] = Some ct => rel xm1 pm t tinv xm2 lm =>
-  ct \notin tinv /\ rel xm1 pm t.[x <- ct] tinv.[ct <- x] xm2 lm.
+local lemma rel_xbshape mct xm1 m2 lm ti lt p y o :
+  rel mct xm1 m2 lm ti lt p => m2.[SD.XB y] = Some o => o = SD.OB (SD.ob o).
+proof. by rewrite /rel => -[#] _ _ h3 *; apply (h3 y). qed.
+
+local lemma rel_h1 mct xm1 m2 lm ti lt p x :
+  rel mct xm1 m2 lm ti lt p => mct.[x] = omap SD.oh m2.[SD.XH x].
+proof. by rewrite /rel => -[#] h1 *; apply h1. qed.
+
+local lemma rel_hm mct xm1 m2 lm ti lt p x o :
+  rel mct xm1 m2 lm ti lt p => m2.[SD.XH x] = Some o => hm m2 x (SD.oh o).
+proof. by rewrite /rel /hm => -[#] _ h2 _ _ _ _ _ _ _ _ _ ho; rewrite ho -(h2 _ _ ho). qed.
+
+(* The relation between the state of G1 and the one of G2 (an
+   abbreviation: the tactics see the conjunction) *)
+local abbrev relD (mmu1 : (tr_t * M, mu_t) fmap) (mct : (high list * mu_t, ctilde) fmap)
+  (xm1 : (ctilde * int, byte) fmap) (mmu2 : (tr_t * M, mu_t) fmap) (bad : bool)
+  (m2 : (SD.xin, SD.xout) fmap) (lm : (ctilde * int, byte) fmap)
+  (ti : (ctilde, high list * mu_t) fmap) (lt : (ctilde, byte list) fmap) =
+  mmu1 = mmu2 /\ !bad /\ rel mct xm1 m2 lm ti lt None.
+
+(* A query to [Hct] of the signer: G1 samples [c~] in its table, G2 in the
+   random oracle of SimplifiedScheme *)
+local lemma E_sample x0 :
+  equiv[ROct.RO.get ~ HctT.sample :
+        ={x} /\ x{2} = x0 /\ !HctT.bad{2} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None ==>
+        !HctT.bad{2} =>
+        ={res} /\ hm SD.XOF.m{2} x0 res{2} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+            (Some (x0, res{2}, 0))].
 proof.
-rewrite /rel => hc hxt hx [h1 [h2 [h3 [h4 [h5 h6]]]]].
-have hct : ct \notin tinv.
-- apply/negP; rewrite domE; case _: (tinv.[ct]) => // x' hx' _.
-  have ht := h2 _ _ hx'; have := h1 x'; rewrite domE ht /=; apply/negP => hp.
-  have hp' : pm.[x'] = Some ct by rewrite -hp.
-  have ->> := coll_inj _ _ _ _ _ hc hp' hx.
-  by move: hxt; rewrite domE ht.
-split => //; split.
-- move=> x'; rewrite mem_set get_setE; case: (x' = x) => [->> | _ /= hx'] /=; 1: by rewrite hx.
-  by apply h1.
-split.
-- move=> ct' x'; rewrite !get_setE; case: (ct' = ct) => [->> /= <<- | hne hx'] /=; 1: done.
-  rewrite (h2 _ _ hx'); case: (x' = x) => // ->>.
-  by move: hxt; rewrite domE (h2 _ _ hx').
-split.
-- move=> x' ct'; rewrite get_setE mem_set; case: (x' = x) => [_ /= <- | _ hx'] /=; 1: done.
-  by left; exact (h3 _ _ hx').
-by do 2! (split => //).
+proc; inline *; sp.
+case (SD.XH x{2} \in SD.XOF.m{2}).
+- rcondf{2} 2; 1: by auto.
+  rcondf{2} 3; 1: by auto.
+  rcondf{1} 2.
+  + move=> &2; auto => /> &1 hb hr hin r _.
+    by rewrite domE (rel_h1 _ _ _ _ _ _ _ _ hr); move: hin; rewrite domE; case: (SD.DSSXOF.PRO.RO.m{2}.[SD.XH x{2}]).
+  wp; rnd{2}; rnd{1}; skip => /> &1 &2 hb hr hin _ _.
+  rewrite dmap_ll ?dct_ll //= => _ _.
+  have [o' ho'] : exists o', SD.XOF.m{2}.[SD.XH x0] = Some o'.
+  + by move: hin; rewrite domE; case: (SD.XOF.m{2}.[SD.XH x0]) => // o' _; exists o'.
+  rewrite (rel_h1 _ _ _ _ _ _ _ _ hr) ho' /=.
+  have hm' := rel_hm _ _ _ _ _ _ _ _ _ hr ho'.
+  by rewrite hm' /=; apply rel_sold.
+rcondt{2} 2; 1: by auto.
+rcondt{2} 4; 1: by auto.
+rcondt{1} 2.
+- move=> &2; auto => /> &1 hb hr hin r _.
+  by rewrite domE (rel_h1 _ _ _ _ _ _ _ _ hr); move: hin; rewrite domE; case: (SD.DSSXOF.PRO.RO.m{2}.[SD.XH x{2}]).
+wp; rnd SD.OH SD.oh; auto => /> &1 &2 hb hr hin.
+split => [o ho | _]; 1: by apply supp_dOH.
+split => [o ho | _]; 1: by rewrite (supp_dOH _ ho) mu1_dOH.
+move=> c hc0; rewrite supp_dmap; split => [| _]; 1: by exists c.
+rewrite !get_set_sameE /= negb_or => -[hc hl].
+split; 1: by rewrite /hm get_set_sameE.
+by apply rel_sfresh => // i; apply/negP => hi; apply hl; exists i.
 qed.
 
-local lemma rel_tinv xm1 pm t tinv xm2 lm ct x :
-  rel xm1 pm t tinv xm2 lm => tinv.[ct] = Some x => pm.[x] = Some ct.
+(* A query to [Hct] of the adversary *)
+local lemma E_Hct :
+  equiv[ROct.RO.get ~ HctT.get :
+        ={x} /\ !HctT.bad{2} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None ==>
+        !HctT.bad{2} => ={res} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None].
 proof.
-rewrite /rel => -[h1 [h2 _]] hx; have ht := h2 _ _ hx.
-by rewrite -h1 ?domE ht.
+proc *; inline{2} HctT.get; wp; sp.
+exlim x0{2} => x1; call (E_sample x1); auto => /> &1 &2 hb hr r b mct bad m hrel.
+split => hn hb'; have [-> [hm' hr']] := hrel hb'; split => //;
+  have := rel_reg _ _ _ _ _ _ _ _ hm' hr'; by rewrite /= hn.
 qed.
 
-local lemma rel_t xm1 pm t tinv xm2 lm x :
-  rel xm1 pm t tinv xm2 lm => x \in t => t.[x] = pm.[x].
-proof. by rewrite /rel => -[h1 _]; apply h1. qed.
-
+(* A query to the challenge XOF *)
 local lemma E_XC :
   equiv[SIB.XOF.RO.get ~ XCSim(SD.XOF).get :
-        !coll PC.RO.m{2} LX.RO.m{2} /\ ={arg} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2}) ==>
-        !coll PC.RO.m{2} LX.RO.m{2} =>
-        ={res} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})].
+        ={arg} /\ !HctT.bad{2} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None ==>
+        ={res} /\ !HctT.bad{2} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None].
 proof.
 proc; inline *; sp.
 if{2}.
-- sp 0 1; wp; rnd; skip => /> &1 &2 hc hbad hrel hin r _.
-  have [x0 hx0] : exists x0, HctT.tinv{2}.[y{2}.`1] = Some x0.
-  - by move: hin; rewrite domE; case: (HctT.tinv{2}.[y{2}.`1]) => // x0 _; exists x0.
-  have hpm := rel_tinv _ _ _ _ _ _ _ _ hrel hx0.
-  have [heq hset] := rel_xof _ _ _ _ _ _ x0 y{2}.`1 y{2}.`2 r hc hpm hrel.
-  move: heq hset; rewrite -pairS hx0 /= => heq hset.
-  rewrite !get_set_sameE /= !domE heq /=.
-  by case: (SD.DSSXOF.PRO.RO.m{2}.[x0, y{2}.`2]) heq hset => //= heq hset; apply hset.
-sp 0 1; wp; rnd; skip => /> &1 &2 hc hbad hrel hin r _.
-case: (exists x, PC.RO.m{2}.[x] = Some y{2}.`1) => [[x hx] | hnx].
-- have hn : y{2} \notin LX.RO.m{2} by rewrite (pairS y{2}); apply (coll_nolx _ _ x _ _ hc hx).
-  have hcl := coll_lxin PC.RO.m{2} LX.RO.m{2} x y{2}.`1 y{2}.`2 r hx.
-  by move: hcl; rewrite -pairS => hcl; rewrite hn /= hcl.
-have hnx' : forall x, PC.RO.m{2}.[x] <> Some y{2}.`1.
-- by move=> x; apply/negP => h; apply hnx; exists x.
-have [heq hrel'] := rel_lx _ _ _ _ _ _ y{2}.`1 y{2}.`2 r hnx' hrel.
-move: heq hrel'; rewrite -pairS => heq hrel'.
-rewrite !get_set_sameE !domE heq /=.
-by case: (LX.RO.m{2}.[y{2}]) => [|b] //=.
+- rcondf{2} 3; 1: by auto.
+  rcondf{1} 2.
+  + move=> &2; auto => /> &1 hb hr hin r _.
+    have := rel_x1 _ _ _ _ _ _ y{2}.`1 y{2}.`2 hr; rewrite -pairS => /(_ hin) h.
+    by rewrite domE h; move: hin; rewrite domE.
+  auto => /> &1 &2 hb hr hin r _.
+  by have := rel_x1 _ _ _ _ _ _ y{2}.`1 y{2}.`2 hr; rewrite -pairS => /(_ hin) ->.
+if{2}.
+- rcondf{1} 2.
+  + move=> &2; auto => /> &1 hb hr hnin hlt hi1 hi2 r _.
+    have [s hs] : exists s, HctT.leakT{2}.[y{2}.`1] = Some s.
+    * by move: hlt; rewrite domE; case: (HctT.leakT{2}.[y{2}.`1]) => // s _; exists s.
+    have hi : 0 <= y{2}.`2 < size s by move: hi2; rewrite hs /#.
+    have := rel_x2 _ _ _ _ _ _ y{2}.`1 y{2}.`2 s hr hs hi; rewrite -pairS => /(_ hnin) h.
+    by rewrite domE h.
+  wp; rnd{1}; skip => /> &1 &2 hb hr hnin hlt hi1 hi2; split => [|_ r _]; 1: exact dB_ll.
+  have [s hs] : exists s, HctT.leakT{2}.[y{2}.`1] = Some s.
+  + by move: hlt; rewrite domE; case: (HctT.leakT{2}.[y{2}.`1]) => // s _; exists s.
+  have hi : 0 <= y{2}.`2 < size s by move: hi2; rewrite hs /#.
+  have := rel_x2 _ _ _ _ _ _ y{2}.`1 y{2}.`2 s hr hs hi; rewrite -pairS => /(_ hnin) h.
+  by rewrite h hs.
+if{2}.
+- wp; rnd SD.OB SD.ob; auto => /> &1 &2 hb hr hnin hlt hti.
+  have [x hx] : exists x, HctT.tinv{2}.[y{2}.`1] = Some x.
+  + by move: hti; rewrite domE; case: (HctT.tinv{2}.[y{2}.`1]) => // x _; exists x.
+  have := rel_x3 _ _ _ _ _ _ y{2}.`1 y{2}.`2 x hr hx; rewrite -pairS => /(_ hnin) [hv hset].
+  rewrite hx /=.
+  split => [o ho | _]; 1: by apply supp_dOB.
+  split => [o ho | _]; 1: by rewrite (supp_dOB _ ho) mu1_dOB.
+  move=> b hb0; rewrite supp_dmap; split => [| _]; 1: by exists b.
+  rewrite !domE hv.
+  case _ : (SD.XOF.m{2}.[SD.XB (x, y{2}.`2)]) => [hn | o ho] //=.
+  by rewrite !get_set_sameE /=; apply hset; rewrite domE hn.
+rcondt{1} 2.
+- move=> &2; auto => /> &1 hb hr hnin hlt hti r _.
+  have := rel_x4 _ _ _ _ _ _ y{2}.`1 y{2}.`2 hr; rewrite -pairS => /(_ hnin hlt hti) [hv _].
+  by rewrite domE hv.
+rcondt{2} 3; 1: by auto.
+auto => /> &1 &2 hb hr hnin hlt hti r _.
+have := rel_x4 _ _ _ _ _ _ y{2}.`1 y{2}.`2 hr; rewrite -pairS => /(_ hnin hlt hti) [hv hset].
+by rewrite !get_set_sameE /=; apply hset.
 qed.
 
-local lemma E_Hct :
-  equiv[ROct.RO.get ~ HctE(PC.RO).get :
-        !coll PC.RO.m{2} LX.RO.m{2} /\ ={arg} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2}) ==>
-        !coll PC.RO.m{2} LX.RO.m{2} => ={res} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})].
+(* The stream read so far by SampleInBall *)
+local op rdof (signs : byte list) (leak : (int * int) list) : byte list =
+  signs ++ map (fun (p : int * int) => from_int p.`2) leak.
+
+local lemma lts_eq signs leak :
+  SD.SIB.leak_to_stream (lcat (SD.SIB.bytes_leak signs) (pairs_to_leakage leak)) = rdof signs leak.
 proof.
-proc; inline *.
-if{2}; last first.
-- rcondf{1} 2; 1: by auto => /> &hr _ _ hrel hx; rewrite domE -(rel_t _ _ _ _ _ _ _ hrel hx) -domE.
-  rnd{1}; skip => /> &1 &2 hc hbad hrel hx _ _.
-  by rewrite (rel_t _ _ _ _ _ _ _ hrel hx).
-sp 0 1; wp; rnd; skip => /> &1 &2 hc hbad hrel hxt r _.
-rewrite !get_set_sameE /=.
-case: (x{2} \in PC.RO.m{2}) => hxp /=.
-- have [ct hct] : exists ct, PC.RO.m{2}.[x{2}] = Some ct.
-  + by move: hxp; rewrite domE; case: (PC.RO.m{2}.[x{2}]) => // ct _; exists ct.
-  have [hnt hrel'] := rel_reveal _ _ _ _ _ _ _ _ hc hxt hct hrel.
-  rewrite hct /= hnt /=.
-  split => //; apply/negP => -[i hi]; move: hi; apply (coll_nolx _ _ _ _ i hc hct).
-case: (coll PC.RO.m{2}.[x{2} <- r] LX.RO.m{2}) => [// | hc'] /=.
-have hrel1 := rel_fresh _ _ _ _ _ _ _ r hxp hc' hrel.
-have [hnt hrel'] := rel_reveal _ _ _ _ _ _ x{2} r hc' hxt _ hrel1; 1: by rewrite get_set_sameE.
-rewrite hnt /=; split => //; apply/negP => -[i hi]; move: hi.
-by apply (coll_nolx _ _ x{2} _ i hc'); rewrite get_set_sameE.
+rewrite /SD.SIB.leak_to_stream /SD.SIB.bytes_leak /pairs_to_leakage /rdof /=; congr.
+- by rewrite -map_comp -{2}(map_id signs); apply eq_map => b; rewrite /(\o) /= tK.
+by rewrite -map_comp; apply eq_map.
 qed.
 
-(* Losslessness of the oracles of G1, preservation of [coll] by the
-   oracles of D *)
-local lemma ROct_get_ll : islossless ROct.RO.get by islossless.
+local lemma rdof_s signs b : rdof (rcons signs b) [] = rcons (rdof signs []) b.
+proof. by rewrite /rdof /= !cats0. qed.
 
-local lemma ROmu_get_ll : islossless ROmu.RO.get by islossless.
+local lemma rdof_l signs leak c b :
+  rdof signs (rcons leak (c, to_int b)) = rcons (rdof signs leak) b.
+proof. by rewrite /rdof map_rcons /= tK rcons_cat. qed.
 
-local lemma ROtr_get_ll : islossless ROtr.RO.get by islossless.
+local lemma acc_rcons bs b : acc_i (rcons bs b) = step_i (acc_i bs) b.
+proof. by rewrite /acc_i foldl_rcons. qed.
 
-(* Termination of the signing procedure *)
-local lemma MLDSAGen_ll (MG <: MatGen) (CG <: ChalGen) (Hmu <: Hash_mu) :
-  islossless MG.get => islossless CG.get => islossless CG.final =>
-  islossless Hmu.get => islossless MLDSAGen(MG, CG, Hmu).sign.
+(* Invariant of SampleInBall in the signer: [rd] is the stream read so far,
+   on the point [x0] of [c~ = c0] *)
+local op [opaque] sbinv mct xm1 m2 lm ti (lt : (ctilde, byte list) fmap) x0 c0 (rd : byte list) =
+  hm m2 x0 c0 /\ rel mct xm1 m2 lm ti lt (Some (x0, c0, size rd)) /\
+  (forall q, 0 <= q < size rd => m2.[SD.XB (x0, q)] = Some (SD.OB (nth witness rd q))) /\
+  (forall n, 8 <= n < size rd => acc_i (drop 8 (take n rd)) < 256) /\
+  (c0 \in lt => size rd <= size (oget lt.[c0]) /\ rd = take (size rd) (oget lt.[c0])).
+
+local lemma sb_lt8 mct xm1 m2 lm ti lt x0 c0 rd :
+  sbinv mct xm1 m2 lm ti lt x0 c0 rd => size rd < 8 =>
+  c0 \in lt => size rd < size (oget lt.[c0]).
 proof.
-move=> MG_ll get_ll final_ll Hmu_ll; proc.
-seq 11 : true => //.
-- while true (kappa_max - ctr).
-  + move=> z; wp; if; 2: by auto => /> /#.
-    wp; call get_ll; auto => /> &hr _; split; 2: smt().
-    by apply dvector_ll; exact dRq_mask_ll.
-  by wp; call Hmu_ll; call MG_ll; auto => /> /#.
-by if; [call final_ll | ].
+rewrite /sbinv => -[#] hx hr _ _ _ h8 /domE hc; move: hc; case _ : (lt.[c0]) => // s hs _ /=.
+by have [[hs8 _] _] := rel_pend_lt _ _ _ _ _ _ _ _ _ _ hr hx hs; smt().
 qed.
 
-local lemma ChalH_ll : islossless ChalH(SIB.XOF.RO, ROct.RO).get.
-proof. by proc; call SIB_ll; call ROct_get_ll. qed.
-
-local lemma Sign1_ll : islossless MLDSAGen(MatRA, ChalH(SIB.XOF.RO, ROct.RO), ROmu.RO).sign.
+local lemma sb_ltacc mct xm1 m2 lm ti lt x0 c0 rd :
+  sbinv mct xm1 m2 lm ti lt x0 c0 rd => 8 <= size rd => acc_i (drop 8 rd) < 256 =>
+  c0 \in lt => size rd < size (oget lt.[c0]).
 proof.
-apply (MLDSAGen_ll MatRA (ChalH(SIB.XOF.RO, ROct.RO)) ROmu.RO).
-- by proc; auto.
-- exact ChalH_ll.
-- by proc; auto.
-exact ROmu_get_ll.
+rewrite /sbinv => -[#] hx hr _ _ hlt h8 hacc hc; have [hle heq] := hlt hc.
+move: hc => /domE; case _ : (lt.[c0]) => // s hs _ /=.
+have [[_ [hs256 _]] _] := rel_pend_lt _ _ _ _ _ _ _ _ _ _ hr hx hs.
+move: hle heq; rewrite hs /= => hle heq.
+case: (size rd = size s) => [heqs | /#].
+by move: hacc; rewrite heq heqs take_size hs256.
 qed.
 
-local lemma PC_sample_coll :
-  phoare[PC.RO.sample : coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m] = 1%r.
+local lemma sb_pre mct xm1 m2 lm ti lt x0 c0 rd :
+  sbinv mct xm1 m2 lm ti lt x0 c0 rd => (c0 \in lt => size rd < size (oget lt.[c0])) =>
+  (c0, size rd) \notin lm /\
+  (c0 \in lt => m2.[SD.XB (x0, size rd)] = Some (SD.OB (nth witness (oget lt.[c0]) (size rd)))).
 proof.
-proc; inline *; auto => /> &hr hc; split; 1: exact dct_ll.
-by move=> _ r _ _ hx; apply coll_set.
+rewrite /sbinv => -[#] hx hr _ _ hlt hsz; split.
+- apply/negP => hin; have [hc hn] := rel_pend_lx _ _ _ _ _ _ _ _ _ _ hr hx hin.
+  by apply hn; rewrite size_ge0 /= hsz.
+move=> hc; move: (hc) => /domE; case _ : (lt.[c0]) => // s hs _ /=.
+have [_ hb] := rel_pend_lt _ _ _ _ _ _ _ _ _ _ hr hx hs.
+by apply hb; rewrite size_ge0 /=; move: (hsz hc); rewrite hs.
 qed.
 
-local lemma HctE_coll :
-  phoare[HctE(PC.RO).get : coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m] = 1%r.
+local lemma sb_step mct xm1 m2 m2' xm1' lm ti lt x0 c0 rd b :
+  sbinv mct xm1 m2 lm ti lt x0 c0 rd =>
+  rel mct xm1' m2' lm ti lt (Some (x0, c0, size rd + 1)) => hm m2' x0 c0 =>
+  m2'.[SD.XB (x0, size rd)] = Some (SD.OB b) =>
+  (forall q, q <> size rd => m2'.[SD.XB (x0, q)] = m2.[SD.XB (x0, q)]) =>
+  (c0 \in lt => size rd < size (oget lt.[c0])) =>
+  (c0 \in lt => b = nth witness (oget lt.[c0]) (size rd)) =>
+  (8 <= size rd => acc_i (drop 8 rd) < 256) =>
+  sbinv mct xm1' m2' lm ti lt x0 c0 (rcons rd b).
 proof.
-proc; inline *; sp; if; 2: by auto.
-auto => /> &hr hc _; split; 1: exact dct_ll.
-by move=> _ r _ _ hx; apply coll_set.
+rewrite /sbinv => -[#] hx hr hb hpre hlt hr' hx' hn hq hsz hbs hacc; rewrite /sbinv size_rcons.
+do ! split => //.
+- move=> q hq'; rewrite nth_rcons; case: (q < size rd) => hlt'.
+  + by rewrite hq 1:/#; apply hb => /#.
+  by have -> : q = size rd by smt().
+- move=> n hn'; case: (n < size rd) => hlt'.
+  + by rewrite -cats1 take_cat hlt' /=; apply hpre => /#.
+  have -> : n = size rd by smt().
+  by rewrite -cats1 take_cat /= ?take0 ?cats0; apply hacc => /#.
+move=> hc; have [hle heq] := hlt hc; split; 1: smt().
+rewrite (take_nth witness); 1: by rewrite size_ge0 /= hsz.
+by rewrite -heq hbs.
 qed.
 
-local lemma XC_coll_h :
-  hoare[XCSim(SD.XOF).get : coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m].
-proof. by proc; inline *; sp; if; auto => />; smt(coll_lx). qed.
-
-local lemma XC_coll :
-  phoare[XCSim(SD.XOF).get : coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m] = 1%r.
+local lemma sb_end mct xm1 m2 lm ti lt x0 c0 rd :
+  sbinv mct xm1 m2 lm ti lt x0 c0 rd => 8 <= size rd => acc_i (drop 8 rd) = 256 =>
+  complete rd /\ (c0 \in lt => oget lt.[c0] = rd).
 proof.
-conseq (: true ==> true) XC_coll_h => //.
-by proc; inline *; if; auto; smt(dB_ll).
+rewrite /sbinv => -[#] hx hr hb hpre hlt h8 hacc; split; 1: by rewrite /complete h8 hacc.
+move=> hc; have [hle heq] := hlt hc.
+move: (hc) => /domE; case _ : (lt.[c0]) => // s hs _.
+have [[_ [_ hp]] _] := rel_pend_lt _ _ _ _ _ _ _ _ _ _ hr hx hs.
+move: hle heq; rewrite hs /= => hle heq.
+case: (size rd = size s) => [heqs | hne]; 1: by rewrite heq heqs take_size.
+by have := hp (size rd) _; [smt() | rewrite -heq hacc].
 qed.
 
-local lemma SDSIB_coll :
-  phoare[SD.SIB.SampleInBall(SD.XOF).get :
-         coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m] = 1%r.
-proof.
-conseq SDSIB_ll (: coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m) => //.
-proc; while (coll PC.RO.m LX.RO.m).
-- by wp; while (coll PC.RO.m LX.RO.m); [wp; call (: true) => //; auto | auto].
-by wp; while (coll PC.RO.m LX.RO.m); [wp; call (: true) => //; auto | auto].
-qed.
-
-local lemma HctE_ll : islossless HctE(PC.RO).get.
-proof. by proc; inline *; sp; if; auto => />; smt(dct_ll). qed.
-
-local lemma ChalE_ll : islossless ChalE(PC.RO).get.
-proof. by proc; call SDSIB_ll; inline *; auto => />; exact dct_ll. qed.
-
-local lemma ChalE_final_ll : islossless ChalE(PC.RO).final.
-proof. by proc; call HctE_ll; auto. qed.
-
-local lemma SignD_ll : islossless MLDSAGen(MatRA, ChalE(PC.RO), HmuB).sign.
-proof.
-apply (MLDSAGen_ll MatRA (ChalE(PC.RO)) HmuB).
-- by proc; auto.
-- exact ChalE_ll.
-- exact ChalE_final_ll.
-by proc; sp; if; auto => />; smt(dmu_ll).
-qed.
-
-local lemma ChalE_coll :
-  phoare[ChalE(PC.RO).get : coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m] = 1%r.
-proof. by proc; call SDSIB_coll; wp; call PC_sample_coll; auto. qed.
-
-local lemma SignD_coll_h :
-  hoare[MLDSAGen(MatRA, ChalE(PC.RO), HmuB).sign :
-        coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m].
-proof.
-proc; seq 11 : (coll PC.RO.m LX.RO.m).
-- wp; while (coll PC.RO.m LX.RO.m).
-  + wp; if; 2: by auto.
-    inline ChalE(PC.RO).get; wp; call (: true) => //.
-    by inline *; auto => />; smt(coll_set).
-  by inline MatRA.get; wp; call (: true) => //; auto.
-if; 2: by auto.
-by inline *; sp; if; auto => />; smt(coll_set).
-qed.
-
-local lemma SignD_coll :
-  phoare[MLDSAGen(MatRA, ChalE(PC.RO), HmuB).sign :
-         coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m] = 1%r.
-proof. by conseq SignD_ll SignD_coll_h. qed.
-
-(* The challenge of the signing loop: [SampleInBall] on [c~ = Hct(w1, mu)]
-   in G1, on [(w1, mu)] in D *)
-local lemma E_XOF :
-  equiv[SIB.XOF.RO.get ~ SD.XOF.get :
-        x{1}.`2 = x{2}.`2 /\ PC.RO.m{2}.[x{2}.`1] = Some x{1}.`1 /\
-        !coll PC.RO.m{2} LX.RO.m{2} /\
-        rel SIB.XOF.RO.m{1} PC.RO.m{2} HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2}
-            LX.RO.m{2} ==>
+(* A byte read by the signer *)
+local lemma E_read x0 c0 rd :
+  equiv[SIB.XOF.RO.get ~ SD.XofOf(SD.XOF).get :
+        x{1} = (c0, size rd) /\ y{2} = (x0, size rd) /\
+        sbinv ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+              x0 c0 rd /\
+        (c0 \in HctT.leakT{2} => size rd < size (oget HctT.leakT{2}.[c0])) /\
+        (8 <= size rd => acc_i (drop 8 rd) < 256) ==>
         ={res} /\
-        rel SIB.XOF.RO.m{1} PC.RO.m{2} HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2}
-            LX.RO.m{2}].
+        sbinv ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+              x0 c0 (rcons rd res{2})].
 proof.
-proc; auto => /> &1 &2 hi hx hc hrel r _.
-have [heq hset] := rel_xof _ _ _ _ _ _ x{2}.`1 x{1}.`1 x{1}.`2 r hc hx hrel.
-move: heq hset; rewrite -pairS hi -pairS => heq hset.
-rewrite !get_set_sameE /= !domE heq /=.
-by case: (SD.DSSXOF.PRO.RO.m{2}.[x{2}]) heq hset => //= heq hset; apply hset.
+proc; inline *; wp.
+sp; rnd SD.OB SD.ob; skip => /> &1 &2 hinv hsz hacc.
+have [hl hlt] := sb_pre _ _ _ _ _ _ _ _ _ hinv hsz.
+have := hinv; rewrite {1}/sbinv => -[#] hx hr _ _ _.
+have [hv [hold hnew]] := rel_read _ _ _ _ _ _ _ _ _ hr hx hl (List.size_ge0 rd).
+split => [o ho | _]; 1: by apply supp_dOB.
+split => [o ho | _]; 1: by rewrite (supp_dOB _ ho) mu1_dOB.
+move=> b hb0; rewrite supp_dmap; split => [| _]; 1: by exists b.
+split => hin; rewrite !domE hv.
+- rewrite (get_none _ _ hin) /= !get_set_sameE /=.
+  apply (sb_step _ _ _ _ _ _ _ _ _ _ _ _ hinv (hnew _ hin)) => //.
+  + by rewrite hm_setB.
+  + by rewrite get_set_sameE.
+  + by move=> q hq; rewrite get_setE /= hq.
+  by move=> hc; move: (hlt hc); rewrite (get_none _ _ hin).
+have [v hv'] : exists v, SD.XOF.m{2}.[SD.XB (x0, size rd)] = Some v.
+- by move: hin; rewrite domE; case: (SD.XOF.m{2}.[_]) => // v _; exists v.
+rewrite hv' /=.
+have hvs := rel_xbshape _ _ _ _ _ _ _ _ _ hr hv'.
+apply (sb_step _ _ _ _ _ _ _ _ _ _ _ _ hinv (hold hin) hx) => //.
+- by rewrite hv' {1}hvs.
+by move=> hc; have := hlt hc; rewrite hv' => /someI ->.
 qed.
 
-local lemma SB_eq :
-  equiv[SIB.SampleInBall(SIB.XOF.RO).get ~ SD.SIB.SampleInBall(SD.XOF).get :
-        PC.RO.m{2}.[x{2}] = Some x{1} /\ !coll PC.RO.m{2} LX.RO.m{2} /\
-        rel SIB.XOF.RO.m{1} PC.RO.m{2} HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2}
-            LX.RO.m{2} ==>
+local lemma drop8_rcons (rd : byte list) b :
+  8 <= size rd => drop 8 (rcons rd b) = rcons (drop 8 rd) b.
+proof. by move=> h; rewrite -!cats1 drop_cat_le h. qed.
+
+(* SampleInBall in the signer: on [c~ = c0] in G1, on its preimage [x0] in
+   G2, in lockstep; the stream read is complete *)
+local lemma SB_eq x0 c0 :
+  equiv[SIB.SampleInBall(SIB.XOF.RO).get ~ SD.SIB.SampleInBall(SD.XofOf(SD.XOF)).get :
+        x{1} = c0 /\ x{2} = x0 /\
+        sbinv ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+              x0 c0 [] ==>
         ={res} /\
-        rel SIB.XOF.RO.m{1} PC.RO.m{2} HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2}
-            LX.RO.m{2}].
+        sbinv ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+              x0 c0 (SD.SIB.leak_to_stream res{2}.`2) /\
+        8 <= size (SD.SIB.leak_to_stream res{2}.`2) /\
+        acc_i (drop 8 (SD.SIB.leak_to_stream res{2}.`2)) = 256].
 proof.
 proc.
-while (={i, ctx, signs, challenge, leak, byte} /\ PC.RO.m{2}.[x{2}] = Some x{1} /\
-       !coll PC.RO.m{2} LX.RO.m{2} /\
-       rel SIB.XOF.RO.m{1} PC.RO.m{2} HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2}
-           LX.RO.m{2}).
-- wp; while (={i, j, ctx, signs, challenge, leak, byte} /\ PC.RO.m{2}.[x{2}] = Some x{1} /\
-             !coll PC.RO.m{2} LX.RO.m{2} /\
-             rel SIB.XOF.RO.m{1} PC.RO.m{2} HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2}
-                 LX.RO.m{2}).
-  + by wp; call E_XOF; auto.
-  by auto.
-wp; while (={ctx, signs, byte} /\ PC.RO.m{2}.[x{2}] = Some x{1} /\
-           !coll PC.RO.m{2} LX.RO.m{2} /\
-           rel SIB.XOF.RO.m{1} PC.RO.m{2} HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2}
-               LX.RO.m{2}).
-- by wp; call E_XOF; auto.
-by auto.
+while (={i, ctx, signs, challenge, leak, byte} /\ x{1} = c0 /\ x{2} = x0 /\
+       sbinv ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+             x0 c0 (rdof signs{2} leak{2}) /\
+       ctx{2} = size (rdof signs{2} leak{2}) /\ 8 <= ctx{2} /\ i{2} <= 256 /\
+       acc_i (drop 8 (rdof signs{2} leak{2})) = i{2}).
+- wp.
+  while (={i, j, ctx, signs, challenge, leak, byte} /\ x{1} = c0 /\ x{2} = x0 /\
+         sbinv ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+               x0 c0 (rdof signs{2} leak{2}) /\
+         ctx{2} = size (rdof signs{2} leak{2}) /\ 8 <= ctx{2} /\ i{2} < 256 /\
+         (i{2} < j{2} => acc_i (drop 8 (rdof signs{2} leak{2})) = i{2}) /\
+         (j{2} <= i{2} => acc_i (drop 8 (rdof signs{2} leak{2})) = i{2} + 1)).
+  + wp; exlim (rdof signs{2} leak{2}) => rd.
+    call (E_read x0 c0 rd); auto => /> &1 &2 hinv h8 hi hj1 _ hij.
+    have hacc := hj1 hij.
+    split; 1: by split; [apply (sb_ltacc _ _ _ _ _ _ _ _ _ hinv) => // /# | rewrite hacc].
+    move=> _ _ b m1 m2 hinv'; rewrite rdof_l size_rcons hinv' /=; split; 1: smt().
+    rewrite drop8_rcons // acc_rcons hacc /step_i.
+    by case: (i{2} < to_int b) => /#.
+  auto => /> &1 &2 hinv h8 hle hlt; split; 1: smt().
+  by move=> m1 m2 j leak' hj _ hinv' h8' hacc'; smt().
+wp.
+while (={ctx, signs, byte, leak} /\ x{1} = c0 /\ x{2} = x0 /\ leak{2} = [] /\
+       sbinv ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+             x0 c0 (rdof signs{2} []) /\
+       ctx{2} = size (rdof signs{2} []) /\ ctx{2} <= 8).
+- wp; exlim (rdof signs{2} []) => rd.
+  call (E_read x0 c0 rd); auto => /> &1 &2 hinv h8 hlt.
+  split; 1: by split => [| /#]; apply (sb_lt8 _ _ _ _ _ _ _ _ _ hinv).
+  by move=> _ _ b m1 m2 hinv'; rewrite rdof_s size_rcons hinv' /= /#.
+auto => /> &1 &2 hinv0 m1 m2 signs hs _ hinv h8.
+split.
+- split; 1: smt(); split; 1: smt(tau_bound).
+  by rewrite drop_oversize 1:/# /acc_i.
+move=> m1' m2' leak ha _ hinv' h8' hle.
+by rewrite lts_eq hinv' h8' /=; smt().
 qed.
 
-local lemma HctE_rev xm1v pm0 ct0 xa :
-  phoare[HctE(PC.RO).get :
-         x = xa /\ PC.RO.m = pm0 /\ pm0.[xa] = Some ct0 /\ !coll pm0 LX.RO.m /\
-         !HctT.bad /\ rel xm1v pm0 HctT.t HctT.tinv SD.DSSXOF.PRO.RO.m LX.RO.m ==>
-         res = ct0 /\ PC.RO.m = pm0 /\ !HctT.bad /\
-         rel xm1v pm0 HctT.t HctT.tinv SD.DSSXOF.PRO.RO.m LX.RO.m] = 1%r.
+local lemma sb_init mct xm1 m2 lm ti lt x0 c0 :
+  hm m2 x0 c0 => rel mct xm1 m2 lm ti lt (Some (x0, c0, 0)) =>
+  sbinv mct xm1 m2 lm ti lt x0 c0 [].
+proof. by rewrite /sbinv /= => -> -> /=; smt(List.size_ge0 take0). qed.
+
+local lemma sb_fin mct xm1 m2 lm ti lt x0 c0 rd :
+  sbinv mct xm1 m2 lm ti lt x0 c0 rd => 8 <= size rd => acc_i (drop 8 rd) = 256 =>
+  rel mct xm1 m2 lm ti lt.[c0 <- rd] None.
 proof.
-proc; inline *; sp; if.
-- rcondf 3; 1: by auto => /> &hr hx _ _ _ _; rewrite domE hx.
-  auto => /> &hr hx hc hbad hrel hxt; split; 1: exact dct_ll.
-  move=> _ r _; have [hnt hrel'] := rel_reveal _ _ _ _ _ _ _ _ hc hxt hx hrel.
-  rewrite hx /= hnt /= get_set_sameE /=; split => //.
-  by apply/negP => -[i hi]; move: hi; apply (coll_nolx _ _ _ _ i hc hx).
-by auto => /> &hr hx hc hbad hrel hxt; rewrite (rel_t _ _ _ _ _ _ _ hrel hxt) hx.
+move=> hinv h8 hacc; have [hc hlt] := sb_end _ _ _ _ _ _ _ _ _ hinv h8 hacc.
+move: hinv; rewrite /sbinv => -[#] hx hr hb _ _.
+exact (rel_end _ _ _ _ _ _ _ _ _ hr hx hc hb hlt).
+qed.
+
+(* The challenge of an iteration of the signer, up to [HctT.bad] *)
+local lemma Chal_G1_G2 :
+  equiv[ChalH(SIB.XOF.RO, ROct.RO).get ~ ChalX.get :
+        ={w1, mu} /\ !HctT.bad{2} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None ==>
+        !HctT.bad{2} => ={res} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None].
+proof.
+proc.
+seq 1 1 : (={w1, mu} /\
+           (!HctT.bad{2} => ={ct} /\ hm SD.XOF.m{2} (w1, mu){2} ct{2} /\
+             rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+                 (Some ((w1, mu){2}, ct{2}, 0)))).
+- by exlim (w1, mu){2} => x0; call (E_sample x0); auto => /> /#.
+case (HctT.bad{2}).
+- conseq (: HctT.bad{2} ==> HctT.bad{2}) => //.
+  by wp; call{1} SIB_ll; call{2} SDSIB_ll; auto.
+exlim ct{2}, (w1, mu){2} => c0 x0.
+wp; call (SB_eq x0 c0); auto => /> &1 &2 hrel hb.
+have [hc [hx hr]] := hrel hb; rewrite hc /=; split; 1: by apply sb_init.
+move=> _ r m1 m2 hinv h8 hacc.
+exact (sb_fin _ _ _ _ _ _ _ _ _ hinv h8 hacc).
 qed.
 
 local lemma Hmu_eq :
@@ -1287,540 +1283,213 @@ rcondf{1} 2; 1: by auto => />.
 by wp; rnd{1}; auto => />; smt(dmu_ll).
 qed.
 
-(* The challenge of an iteration, up to [coll]: in G1 it is [SampleInBall]
-   on [c~ = Hct(w1, mu)], in D it is [SampleInBall] on [(w1, mu)], and
-   [Hct(w1, mu)] is sampled (eagerly) by [G.sample] *)
-local lemma Chal_G1_D x0 :
-  equiv[ChalH(SIB.XOF.RO, ROct.RO).get ~ ChalE(PC.RO).get :
-        ={w1, mu} /\ (w1, mu){2} = x0 /\ !coll PC.RO.m{2} LX.RO.m{2} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2}) ==>
-        !coll PC.RO.m{2} LX.RO.m{2} =>
-        res{1}.`2 = res{2}.`2 /\ res{1}.`3 = res{2}.`3 /\
-        PC.RO.m{2}.[x0] = Some res{1}.`1 /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})].
+(* Termination of the oracles of G1 and G2, monotonicity of [HctT.bad] *)
+local lemma MLDSAGen_ll (MG <: MatGen) (CG <: ChalGen) (Hmu <: Hash_mu) :
+  islossless MG.get => islossless CG.get => islossless Hmu.get =>
+  islossless MLDSAGen(MG, CG, Hmu).sign.
 proof.
-proc.
-seq 1 2 : (={w1, mu} /\ (w1, mu){2} = x0 /\
-           (!coll PC.RO.m{2} LX.RO.m{2} =>
-            (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-             relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-                  HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2}) /\
-            PC.RO.m{2}.[(w1{2}, mu{2})] = Some ct{1})).
-- inline ROct.RO.get PC.RO.sample PC.RO.get; auto => />.
-  move=> &1 &2 hc hbad hrel r _; split => hx.
-  + by move=> hc'; rewrite get_set_sameE /=; apply (rel_fresh _ _ _ _ _ _ _ _ hx hc' hrel).
-  by move: hx; rewrite domE; case: (PC.RO.m{2}.[w1{2}, mu{2}]).
-case (coll PC.RO.m{2} LX.RO.m{2}).
-- conseq (: coll PC.RO.m{2} LX.RO.m{2} ==> coll PC.RO.m{2} LX.RO.m{2}) => //.
-  by wp; call{2} SDSIB_coll; call{1} SIB_ll; auto.
-by wp; call SB_eq; auto => /> /#.
+move=> MG_ll get_ll Hmu_ll; proc.
+while true (kappa_max - ctr).
+- move=> z; wp; if; 2: by auto => /> /#.
+  wp; call get_ll; auto => /> &hr _; split; 2: smt().
+  by apply dvector_ll; exact dRq_mask_ll.
+by wp; call Hmu_ll; wp; call MG_ll; auto => /> /#.
 qed.
 
-(* The signing procedures of G1 and D, up to [coll] (they run in
-   lockstep: [MLDSAGen] has a guard on the counter only) *)
-local lemma Sign_G1_D :
-  equiv[MLDSAGen(MatRA, ChalH(SIB.XOF.RO, ROct.RO), ROmu.RO).sign ~
-        MLDSAGen(MatRA, ChalE(PC.RO), HmuB).sign :
-        !coll PC.RO.m{2} LX.RO.m{2} /\ ={sk, m} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2}) ==>
-        !coll PC.RO.m{2} LX.RO.m{2} => ={res} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})].
+local lemma ChalH_ll : islossless ChalH(SIB.XOF.RO, ROct.RO).get.
+proof. by proc; call SIB_ll; inline *; auto => />; smt(dct_ll). qed.
+
+local lemma Sign1_ll : islossless MLDSAGen(MatRA, ChalH(SIB.XOF.RO, ROct.RO), ROmu.RO).sign.
 proof.
-proc; inline MatRA.get.
-seq 11 11 : (!coll PC.RO.m{2} LX.RO.m{2} /\ ={mA, s1, s2, t0, mu, leak, response, ctr} /\
-             response{1} = None /\
-             (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-              relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-                   HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})).
-- by wp; call Hmu_eq; auto.
-seq 1 1 : (={ctr, mA, s1, s2, t0, mu} /\
-           (!coll PC.RO.m{2} LX.RO.m{2} =>
-            ={response, leak} /\
-            (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-             relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-                  HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2}) /\
-            (response{1} <> None => PC.RO.m{2}.[(w1{2}, mu{2})] = Some ct{1}))).
-- while (={ctr, mA, s1, s2, t0, mu} /\
-         (!coll PC.RO.m{2} LX.RO.m{2} =>
-          ={response, leak} /\
-          (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-           relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-                HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2}) /\
-          (response{1} <> None => PC.RO.m{2}.[(w1{2}, mu{2})] = Some ct{1}))).
-  + wp; case (coll PC.RO.m{2} LX.RO.m{2}).
-    * conseq (: coll PC.RO.m{2} LX.RO.m{2} /\ ={ctr, mA, s1, s2, t0, mu} ==>
-                coll PC.RO.m{2} LX.RO.m{2} /\ ={ctr, mA, s1, s2, t0, mu}).
-      - smt().
-      - by move=> /> &1 &2 *; smt().
-      seq 1 0 : (coll PC.RO.m{2} LX.RO.m{2} /\ ={ctr, mA, s1, s2, t0, mu}).
-      - if{1}; 2: by auto.
-        wp; call{1} ChalH_ll; auto => />.
-        by move=> *; apply dvector_ll; exact dRq_mask_ll.
-      if{2}; 2: by auto.
-      wp; call{2} ChalE_coll; auto => />.
-      by move=> *; apply dvector_ll; exact dRq_mask_ll.
-    if; 1: smt(); last by skip => />; smt().
-    seq 3 3 : (={y, w, w1, ctr, mA, s1, s2, t0, mu, response, leak} /\ response{1} = None /\
-               !coll PC.RO.m{2} LX.RO.m{2} /\
-               (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-                relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-                     HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})).
-    * by auto => /> /#.
-    seq 1 1 : (={y, w, w1, ctr, mA, s1, s2, t0, mu, response, leak} /\ response{1} = None /\
-               (!coll PC.RO.m{2} LX.RO.m{2} =>
-                ={c, lc} /\ PC.RO.m{2}.[(w1{2}, mu{2})] = Some ct{1} /\
-                (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-                 relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-                      HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2}))).
-    * by exlim (w1, mu){2} => x0; call (Chal_G1_D x0); auto => /> /#.
-    case (coll PC.RO.m{2} LX.RO.m{2}).
-    * conseq (: coll PC.RO.m{2} LX.RO.m{2} /\ ={ctr, mA, s1, s2, t0, mu} ==>
-                coll PC.RO.m{2} LX.RO.m{2} /\ ={ctr, mA, s1, s2, t0, mu}); 1,2: smt().
-      by auto.
-    by auto => /> /#.
-  by skip => />.
-case (coll PC.RO.m{2} LX.RO.m{2}).
-- conseq (: coll PC.RO.m{2} LX.RO.m{2} ==> coll PC.RO.m{2} LX.RO.m{2}) => //.
-  seq 1 0 : (coll PC.RO.m{2} LX.RO.m{2}); 1: by if{1}; [inline *; auto | auto].
-  seq 0 1 : (coll PC.RO.m{2} LX.RO.m{2}); 2: by auto.
-  by if{2}; [inline ChalE(PC.RO).final; wp; call{2} HctE_coll; auto | auto].
-if; 1: smt().
-- inline ChalH(SIB.XOF.RO, ROct.RO).final ChalE(PC.RO).final.
-  exlim SIB.XOF.RO.m{1}, PC.RO.m{2}, ct{1}, w1{2}, mu{2} => xm1v pm0 ct0 w10 mu0.
-  wp; call{2} (HctE_rev xm1v pm0 ct0 (w10, mu0)).
-  by auto => /> /#.
+apply (MLDSAGen_ll MatRA (ChalH(SIB.XOF.RO, ROct.RO)) ROmu.RO).
+- by proc; call ExpandA_XASim_ll.
+- exact ChalH_ll.
+by proc; auto; smt(dmu_ll).
+qed.
+
+local lemma HctT_sample_bad :
+  phoare[HctT.sample : HctT.bad ==> HctT.bad] = 1%r.
+proof. by proc; inline *; auto => /> &hr hb; apply/dmap_ll/dct_ll. qed.
+
+local lemma HctT_get_bad :
+  phoare[HctT.get : HctT.bad ==> HctT.bad] = 1%r.
+proof. by proc; wp; call HctT_sample_bad; auto. qed.
+
+local lemma ChalX_bad :
+  phoare[ChalX.get : HctT.bad ==> HctT.bad] = 1%r.
+proof. by proc; wp; call SDSIB_ll; call HctT_sample_bad; auto. qed.
+
+local lemma SignX_bad :
+  phoare[MLDSAGen(MatRA, ChalX, HmuB).sign : HctT.bad ==> HctT.bad] = 1%r.
+proof.
+proc; while (HctT.bad) (kappa_max - ctr).
+- move=> z; wp; if; 2: by auto => /> /#.
+  wp; call ChalX_bad; auto => /> &hr _ _; split; 2: smt().
+  by apply dvector_ll; exact dRq_mask_ll.
+wp; call (: HctT.bad ==> HctT.bad); 1: by proc; sp; if; auto => />; smt(dmu_ll).
+by inline MatRA.get; wp; call ExpandA_XASim_ll; auto => /> /#.
+qed.
+
+local lemma XC_bad :
+  phoare[XCSim(SD.XOF).get : HctT.bad ==> HctT.bad] = 1%r.
+proof.
+proc; inline *; if; 1: by auto; smt(dB_ll).
+if; 1: by auto.
+by if; auto => />; smt(dB_ll dmap_ll).
+qed.
+
+(* The signing procedures of G1 and G2, up to [HctT.bad] (they run in
+   lockstep: [MLDSAGen] has a guard on the counter only) *)
+local lemma Sign_G1_G2 :
+  equiv[MLDSAGen(MatRA, ChalH(SIB.XOF.RO, ROct.RO), ROmu.RO).sign ~
+        MLDSAGen(MatRA, ChalX, HmuB).sign :
+        ={sk, m, glob XASim} /\ ROmu.RO.m{1} = HmuB.m{2} /\ !HctT.bad{2} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None ==>
+        ={glob XASim} /\ (!HctT.bad{2} => ={res} /\ ROmu.RO.m{1} = HmuB.m{2} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None)].
+proof.
+proc.
+seq 9 9 : (={mA, la, rho, s1, s2, t0, mu, ct, response, leak, ctr, r0_fail, hint_fail, glob XASim} /\
+             ROmu.RO.m{1} = HmuB.m{2} /\ !HctT.bad{2} /\
+             rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+                 None).
+- wp; call Hmu_eq; wp.
+  by call (: ={glob XASim}); [sim | auto].
+while (={ctr, mA, s1, s2, t0, mu, glob XASim} /\
+       (!HctT.bad{2} =>
+        ={ct, response, leak, r0_fail, hint_fail} /\ ROmu.RO.m{1} = HmuB.m{2} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+            None)); 2: by auto => /> /#.
+wp; case (HctT.bad{2}).
+- conseq (: HctT.bad{2} /\ ={ctr, mA, s1, s2, t0, mu, glob XASim} ==>
+            HctT.bad{2} /\ ={ctr, mA, s1, s2, t0, mu, glob XASim}); 1, 2: smt().
+  seq 1 0 : (HctT.bad{2} /\ ={ctr, mA, s1, s2, t0, mu, glob XASim}).
+  + if{1}; 2: by auto.
+    wp; call{1} ChalH_ll; auto => />.
+    by move=> *; apply dvector_ll; exact dRq_mask_ll.
+  if{2}; 2: by auto.
+  wp; call{2} ChalX_bad; auto => />.
+  by move=> *; apply dvector_ll; exact dRq_mask_ll.
+if; 1: smt(); last by skip => />; smt().
+seq 3 3 : (={y, w, w1, ctr, mA, s1, s2, t0, mu, glob XASim, ct, response, leak, r0_fail, hint_fail} /\
+           ROmu.RO.m{1} = HmuB.m{2} /\ !HctT.bad{2} /\
+           rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+               None).
+- by auto => /> /#.
+seq 1 1 : (={y, w, w1, ctr, mA, s1, s2, t0, mu, glob XASim, response, leak, r0_fail, hint_fail} /\
+           (!HctT.bad{2} => ={ct, c, lc} /\ ROmu.RO.m{1} = HmuB.m{2} /\
+             rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+                 None)).
+- by call Chal_G1_G2; auto => /> /#.
+case (HctT.bad{2}).
+- conseq (: HctT.bad{2} /\ ={ctr, mA, s1, s2, t0, mu, glob XASim} ==>
+            HctT.bad{2} /\ ={ctr, mA, s1, s2, t0, mu, glob XASim}); 1, 2: smt().
+  by auto.
 by auto => /> /#.
 qed.
 
 (* The verification of the forgery *)
-local lemma coll_lx_safe pm lm ct i b :
-  (forall x, pm.[x] <> Some ct) => !coll pm lm => !coll pm lm.[(ct, i) <- b].
-proof.
-rewrite /coll => hct hc; apply/negP => -[h | [x0 ct' i' [hx0 hin]]]; 1: by apply hc; left.
-move: hin; rewrite mem_set => -[hin | [] <<- _]; 1: by apply hc; right; exists x0 ct' i'.
-by move: (hct x0); rewrite hx0.
-qed.
-
-local lemma coll_of_in pm lm x ct i : pm.[x] = Some ct => (ct, i) \in lm => coll pm lm.
-proof. by rewrite /coll => hx hin; right; exists x ct i. qed.
-
-local lemma XC_safe_h :
-  hoare[XCSim(SD.XOF).get :
-        (y.`1 \in HctT.tinv \/ forall x, PC.RO.m.[x] <> Some y.`1) /\ !coll PC.RO.m LX.RO.m ==>
-        !coll PC.RO.m LX.RO.m].
-proof.
-proc; inline *; sp; if; 1: by auto.
-auto => /> &hr hs hc hnt r _ hy.
-have hs' : forall x, PC.RO.m{hr}.[x] <> Some y{hr}.`1 by case: hs.
-by rewrite (pairS y{hr}); apply coll_lx_safe.
-qed.
-
-local lemma E_XC_safe :
-  equiv[SIB.XOF.RO.get ~ XCSim(SD.XOF).get :
-        ={arg} /\ (y{2}.`1 \in HctT.tinv{2} \/ forall x', PC.RO.m{2}.[x'] <> Some y{2}.`1) /\
-        !coll PC.RO.m{2} LX.RO.m{2} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2}) ==>
-        ={res} /\ !coll PC.RO.m{2} LX.RO.m{2} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})].
-proof.
-by conseq E_XC _ XC_safe_h => /> /#.
-qed.
-
 local lemma SBX_eq :
   equiv[SIB.SampleInBall(SIB.XOF.RO).get ~ SIB.SampleInBall(XCSim(SD.XOF)).get :
-        ={x} /\ (x{2} \in HctT.tinv{2} \/ forall x', PC.RO.m{2}.[x'] <> Some x{2}) /\
-        !coll PC.RO.m{2} LX.RO.m{2} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2}) ==>
-        ={res} /\ !coll PC.RO.m{2} LX.RO.m{2} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})].
+        ={x} /\ !HctT.bad{2} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None ==>
+        ={res} /\ !HctT.bad{2} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None].
 proof.
 proc.
-while (={i, ctx, signs, challenge, leak, x, byte} /\
-       (x{2} \in HctT.tinv{2} \/ forall x', PC.RO.m{2}.[x'] <> Some x{2}) /\
-       !coll PC.RO.m{2} LX.RO.m{2} /\
-       (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-        relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-             HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})).
-- wp; while (={i, j, ctx, signs, challenge, leak, x, byte} /\
-             (x{2} \in HctT.tinv{2} \/ forall x', PC.RO.m{2}.[x'] <> Some x{2}) /\
-             !coll PC.RO.m{2} LX.RO.m{2} /\
-             (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-              relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-                   HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})).
-  + by wp; call E_XC_safe; auto => /> /#.
+while (={i, ctx, signs, challenge, leak, x, byte} /\ !HctT.bad{2} /\
+       rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None).
+- wp; while (={i, j, ctx, signs, challenge, leak, x, byte} /\ !HctT.bad{2} /\
+             rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+                 None).
+  + by wp; call E_XC; auto.
   by auto.
-wp; while (={ctx, signs, x, byte} /\
-           (x{2} \in HctT.tinv{2} \/ forall x', PC.RO.m{2}.[x'] <> Some x{2}) /\
-           !coll PC.RO.m{2} LX.RO.m{2} /\
-           (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-            relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-                 HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})).
-- by wp; call E_XC_safe; auto => /> /#.
+wp; while (={ctx, signs, x, byte} /\ !HctT.bad{2} /\
+           rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None).
+- by wp; call E_XC; auto.
 by auto.
 qed.
 
-local lemma SIBX_pend_h :
-  hoare[SIB.SampleInBall(XCSim(SD.XOF)).get :
-        x \notin HctT.tinv /\ (exists x', PC.RO.m.[x'] = Some x) ==> coll PC.RO.m LX.RO.m].
-proof.
-proc.
-while (x \notin HctT.tinv /\ (exists x', PC.RO.m.[x'] = Some x) /\ 0 < ctx /\
-       coll PC.RO.m LX.RO.m).
-- wp; while (x \notin HctT.tinv /\ (exists x', PC.RO.m.[x'] = Some x) /\ 0 < ctx /\
-             coll PC.RO.m LX.RO.m).
-  + inline *; sp; rcondf 1; 1: by auto.
-    by auto => /> &hr *; smt(coll_lx).
-  by auto => />.
-wp; while (x \notin HctT.tinv /\ (exists x', PC.RO.m.[x'] = Some x) /\
-           (0 < ctx => coll PC.RO.m LX.RO.m) /\ 0 <= ctx).
-- inline *; sp; rcondf 1; 1: by auto.
-  by auto => /> &hr *; smt(coll_of_in mem_set).
-by auto => />; smt().
-qed.
-
-local lemma SIBX_pend :
-  phoare[SIB.SampleInBall(XCSim(SD.XOF)).get :
-         x \notin HctT.tinv /\ (exists x', PC.RO.m.[x'] = Some x) ==>
-         coll PC.RO.m LX.RO.m] = 1%r.
-proof. by conseq SIBX_ll SIBX_pend_h. qed.
-
-local lemma SIBX_coll :
-  phoare[SIB.SampleInBall(XCSim(SD.XOF)).get :
-         coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m] = 1%r.
-proof.
-conseq SIBX_ll (: coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m) => //.
-proc; while (coll PC.RO.m LX.RO.m).
-- by wp; while (coll PC.RO.m LX.RO.m); [wp; call XC_coll_h; auto | auto].
-by wp; while (coll PC.RO.m LX.RO.m); [wp; call XC_coll_h; auto | auto].
-qed.
-
-local lemma HmuB_coll :
-  phoare[HmuB.get : coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m] = 1%r.
-proof. by proc; sp; if; auto => />; smt(dmu_ll). qed.
-
-local lemma ROtr_coll :
-  phoare[ROtr.RO.get : coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m] = 1%r.
-proof. by proc; auto => />; smt(dtr_ll). qed.
-
-local lemma Verify1_ll :
-  islossless MLDSA1(SIB.XOF.RO, ROtr.RO, ROmu.RO, ROct.RO).verify.
-proof.
-by proc; call ROct_get_ll; wp; call SIB_ll; call ROmu_get_ll; call ROtr_get_ll; auto.
-qed.
-
-local lemma VerifyD_coll :
-  phoare[MLDSA1(XCSim(SD.XOF), ROtr.RO, HmuB, HctE(PC.RO)).verify :
-         coll PC.RO.m LX.RO.m ==> coll PC.RO.m LX.RO.m] = 1%r.
-proof.
-by proc; call HctE_coll; wp; call SIBX_coll; call HmuB_coll; call ROtr_coll; auto.
-qed.
-
-local lemma Verify_G1_D :
+local lemma Verify_G1_G2 :
   equiv[MLDSA1(SIB.XOF.RO, ROtr.RO, ROmu.RO, ROct.RO).verify ~
-        MLDSA1(XCSim(SD.XOF), ROtr.RO, HmuB, HctE(PC.RO)).verify :
-        !coll PC.RO.m{2} LX.RO.m{2} /\ ={arg} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2}) ==>
-        !coll PC.RO.m{2} LX.RO.m{2} => ={res} /\
-        (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-         relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-              HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})].
+        MLDSA1(XCSim(SD.XOF), ROtr.RO, HmuB, HctT).verify :
+        ={arg, ROtr.RO.m} /\ ROmu.RO.m{1} = HmuB.m{2} /\ !HctT.bad{2} /\
+        rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2} None ==>
+        !HctT.bad{2} => ={res}].
 proof.
 proc.
-seq 5 5 : (!coll PC.RO.m{2} LX.RO.m{2} /\
-           ={pk, m, sig, mA, rho, t1, ct, response, z, h, tr, mu} /\
-           (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-            relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-                 HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})).
-- call Hmu_eq; call (: ={ROtr.RO.m}); 1: by sim.
-  by auto => />.
-case ((exists x', PC.RO.m{2}.[x'] = Some ct{2}) /\ ct{2} \notin HctT.tinv{2}).
-- seq 1 1 : (coll PC.RO.m{2} LX.RO.m{2}).
-  + by call{1} SIB_ll; call{2} SIBX_pend; auto => /> /#.
-  by wp; call{1} ROct_get_ll; call{2} HctE_coll; auto.
-seq 1 1 : (!coll PC.RO.m{2} LX.RO.m{2} /\
-           ={pk, m, sig, mA, rho, t1, ct, response, z, h, tr, mu, c, lc} /\
-           (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-            relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-                 HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})).
-- by call SBX_eq; auto => /> /#.
+seq 5 5 : (={pk, m, sig, mA, rho, t1, ct, response, z, h, tr, mu} /\ !HctT.bad{2} /\
+           rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+               None).
+- by call Hmu_eq; call (: ={ROtr.RO.m}); [sim | auto].
+seq 1 1 : (={pk, m, sig, mA, rho, t1, ct, response, z, h, tr, mu, c, lc} /\ !HctT.bad{2} /\
+           rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+               None).
+- by call SBX_eq; auto.
 by wp; call E_Hct; auto => /> /#.
 qed.
 
-(* The final flush *)
-local lemma Flush_P w :
-  phoare[Flush(PC.RO).run :
-         coll PC.RO.m LX.RO.m \/ (St.win = w /\ !HctT.bad) ==>
-         coll PC.RO.m LX.RO.m \/ (St.win = w /\ !HctT.bad)] = 1%r.
+local lemma Verify1_ll : islossless MLDSA1(SIB.XOF.RO, ROtr.RO, ROmu.RO, ROct.RO).verify.
 proof.
-conseq (Flush_ll PC.RO PC_get_ll) (: coll PC.RO.m LX.RO.m \/ (St.win = w /\ !HctT.bad) ==>
-                      coll PC.RO.m LX.RO.m \/ (St.win = w /\ !HctT.bad)) => //.
-proc; while (coll PC.RO.m LX.RO.m \/ (St.win = w /\ !HctT.bad)); 2: by auto.
-sp; if; 2: by auto.
-by inline *; auto => />; smt(coll_set).
+proc; call (: true); 1: by islossless.
+wp; call SIB_ll; call (: true); 1: by islossless.
+by call (: true); [islossless | auto].
 qed.
 
-local lemma G1_D_eq :
-  equiv[G1(A).main ~ D(PC.RO).distinguish :
-        ={glob A} ==> !coll PC.RO.m{2} LX.RO.m{2} => res{1} = St.win{2} /\ !HctT.bad{2}].
+local lemma Hmu_bad : phoare[HmuB.get : HctT.bad ==> HctT.bad] = 1%r.
+proof. by proc; sp; if; auto => />; smt(dmu_ll). qed.
+
+local lemma Htr_bad : phoare[ROtr.RO.get : HctT.bad ==> HctT.bad] = 1%r.
+proof. by proc; auto => />; smt(dtr_ll). qed.
+
+local lemma VerifyX_bad :
+  phoare[MLDSA1(XCSim(SD.XOF), ROtr.RO, HmuB, HctT).verify : HctT.bad ==> HctT.bad] = 1%r.
+proof.
+proc; call HctT_get_bad; wp.
+call (: HctT.bad ==> HctT.bad); 1: by conseq SIBX_ll.
+by call Hmu_bad; call Htr_bad; auto.
+qed.
+
+local lemma rel0 : rel empty empty empty empty empty empty None.
+proof. by rewrite /rel /hm; smt(emptyE mem_empty). qed.
+
+local lemma G1_G2 :
+  equiv[G1(A).main ~ G2(A).main : ={glob A} ==> !HctT.bad{2} => ={res}].
 proof.
 proc.
-seq 14 18 : (!coll PC.RO.m{2} LX.RO.m{2} =>
-             (nrqs <= qS /\ is_valid /\ is_fresh){1} = St.win{2} /\ !HctT.bad{2}).
-- seq 11 14 : (={pk, sk} /\ (!coll PC.RO.m{2} LX.RO.m{2} => ={m, sig} /\
-(={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
- relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-      HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2}))).
-  + call (: coll PC.RO.m LX.RO.m,
-  (={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\
-   relD ROmu.RO.m{1} ROct.RO.m{1} SIB.XOF.RO.m{1} HmuB.m{2} PC.RO.m{2} HctT.bad{2}
-        HctT.t{2} HctT.tinv{2} SD.DSSXOF.PRO.RO.m{2} LX.RO.m{2})).
-    * move=> XA XC Htr Hmu Hct O h1 h2 h3 h4 h5 h6.
-      exact (A_ll XA XC Htr Hmu Hct O h6 h5 h4 h3 h2 h1).
-    * by proc; wp; call Sign_G1_D; auto => /> /#.
-    * by move=> &2 _; proc; wp; call Sign1_ll; auto.
-    * by move=> _; proc; wp; call SignD_coll; auto.
-    * by conseq E_Hct.
-    * by move=> &2 _; exact ROct_get_ll.
-    * by move=> _; conseq HctE_coll.
-    * by proc *; call Hmu_eq; auto => /> /#.
-    * by move=> &2 _; exact ROmu_get_ll.
-    * by move=> _; conseq HmuB_coll.
-    * by proc *; call (: ={ROtr.RO.m}); [sim | auto => /> /#].
-    * by move=> &2 _; exact ROtr_get_ll.
-    * by move=> _; conseq ROtr_coll.
-    * by conseq E_XC.
-    * by move=> &2 _; proc; auto => />; exact dB_ll.
-    * by move=> _; conseq XC_coll.
-    * by proc *; call (: ={glob XASim}); [sim | auto => /> /#].
-    * by move=> &2 _; exact XASim_ll.
-    * by move=> _; proc *; call XASim_ll; auto.
-    inline *; auto => />.
-    by move=> *; rewrite rel0 /=; smt().
-  inline G1(A).O.fresh G1(A).O.nr_queries D(PC.RO).O.fresh D(PC.RO).O.nr_queries.
-  case (coll PC.RO.m{2} LX.RO.m{2}).
-  + wp; call{1} Verify1_ll; call{2} VerifyD_coll; auto => />.
-  by wp; call Verify_G1_D; auto => /> /#.
-exlim (nrqs{1} <= qS /\ is_valid{1} /\ is_fresh{1}) => w.
-call{2} (Flush_P w).
-by auto => /> /#.
-qed.
-
-(* Structural invariant of the eager game: the domain of [PC.RO.m] is the
-   domain of [HctT.t] (or [St.fl]) plus the pending inputs *)
-local op [opaque] si (pm t : (high list * mu_t, ctilde) fmap) (pend : (high list * mu_t) list)
-                     (x0 : (high list * mu_t) option) =
-  (forall x, x \in pm <=> x \in t \/ x \in pend \/ Some x = x0) /\
-  (forall x, x \in t => t.[x] = pm.[x]).
-
-local lemma si_known pm t pend x :
-  x \notin t => x \in pm => si pm t pend None => si pm t.[x <- oget pm.[x]] pend None.
-proof.
-rewrite /si => hxt hx /= [h1 h2]; split => y; rewrite mem_set.
-- case: (y = x) => [->> | hne]; 1: by rewrite hx.
-  by have := h1 y; smt().
-rewrite get_setE; case: (y = x) => [->> _ /= | hne /= hy]; 2: by apply h2.
-by move: hx; rewrite domE; case: (pm.[x]).
-qed.
-
-local lemma si_new pm t pend x r :
-  x \notin t => x \notin pm => si pm t pend None => si pm.[x <- r] t.[x <- r] pend None.
-proof.
-rewrite /si => hxt hx /= [h1 h2]; split => y; rewrite !mem_set.
-- by rewrite h1; smt().
-rewrite !get_setE; case: (y = x) => [-> // | hne /= hy]; by apply h2.
-qed.
-
-local lemma si_sample pm t pend x r :
-  si pm t pend None =>
-  si (if x \in pm then pm else pm.[x <- r]) t pend (Some x).
-proof.
-rewrite /si => /= -[h1 h2]; case: (x \in pm) => hx /=.
-- split => y; 2: by apply h2.
-  case: (y = x) => [->> | hne]; 1: by rewrite hx.
-  by have := h1 y; smt().
-split => y.
-- by rewrite mem_set h1; smt().
-move=> hy; rewrite get_setE; case: (y = x) => [->> | _]; 2: by apply h2.
-by move: hx; rewrite h1 hy.
-qed.
-
-local lemma si_push pm t pend x :
-  si pm t pend (Some x) => si pm t (x :: pend) None.
-proof. by rewrite /si => -[h1 h2]; split => // y; rewrite h1 /=; smt(). qed.
-
-local lemma si_pop pm t pend x :
-  si pm t (x :: pend) None => si pm t pend (Some x).
-proof. by rewrite /si => -[h1 h2]; split => // y; rewrite h1 /=; smt(). qed.
-
-local lemma si_acc pm t pend x :
-  si pm t pend (Some x) => x \notin t => si pm t.[x <- oget pm.[x]] pend None.
-proof.
-rewrite /si => -[h1 h2] hxt; split => y; rewrite mem_set.
-- by rewrite h1 /=; smt().
-rewrite get_setE; case: (y = x) => [->> _ /= | hne /= hy]; 2: by apply h2.
-by have := h1 x; rewrite /= domE; case: (pm.[x]).
-qed.
-
-local lemma si_acc_in pm t pend x :
-  si pm t pend (Some x) => x \in t => si pm t pend None.
-proof. by rewrite /si => -[h1 h2] hxt; split => // y; rewrite h1 /=; smt(). qed.
-
-local lemma si_fl_mem pm fl pend :
-  pend <> [] => si pm fl pend None => head witness pend \in pm.
-proof.
-rewrite /si => hne [h1 _]; rewrite h1; right; left.
-by case: pend hne h1 => //= y l.
-qed.
-
-local lemma si_fl_step pm fl pend :
-  pend <> [] => si pm fl pend None =>
-  si pm (if head witness pend \in fl then fl else fl.[head witness pend <- oget pm.[head witness pend]])
-     (behead pend) None.
-proof.
-rewrite /si => hne [h1 h2] /=.
-have hpe : pend = head witness pend :: behead pend by rewrite head_behead.
-case: (head witness pend \in fl) => hx /=.
-- split => // y; have := h1 y; rewrite {1}hpe /=; smt().
-split => y.
-- have := h1 y; rewrite mem_set {1}hpe /=; smt().
-rewrite mem_set get_setE; case: (y = head witness pend) => [->> /= | hne' /= hy]; 2: by apply h2.
-have : head witness pend \in pm by apply (si_fl_mem pm fl pend hne); rewrite /si; split.
-by rewrite domE; case: (pm.[head witness pend]).
-qed.
-
-local lemma si_fl_end pm fl : si pm fl [] None => fl = pm.
-proof.
-rewrite /si => -[h1 h2]; apply fmap_eqP => y.
-case: (y \in fl) => hy; 1: by apply h2.
-by rewrite !get_none //; move: (h1 y); rewrite hy.
-qed.
-
-(* In the eager game, [St.fl] is [PC.RO.m] at the end *)
-local lemma HctE_SI xx o :
-  hoare[HctE(PC.RO).get : x = xx /\ si PC.RO.m HctT.t St.pend o /\ (o = None \/ o = Some xx) ==>
-        si PC.RO.m HctT.t St.pend None].
-proof.
-proc; inline *; sp; if.
-- case (x \in PC.RO.m).
-  + rcondf 3; 1: by auto.
-    auto => /> &hr hsi ho hxt hx r _.
-    case: ho hsi => -> hsi; [exact si_known | exact si_acc].
-  rcondt 3; 1: by auto.
-  auto => /> &hr hsi ho hxt hx r _; rewrite get_set_sameE /=.
-  case: ho hsi => -> hsi; 1: exact si_new.
-  by move: hsi; rewrite /si /= => -[h1 _]; move: hx; rewrite h1.
-by auto => /> &hr hsi ho hxt; case: ho hsi => -> hsi //; apply (si_acc_in _ _ _ xx).
-qed.
-
-local lemma SignD_SI :
-  hoare[MLDSAGen(MatRA, ChalE(PC.RO), HmuB).sign :
-        si PC.RO.m HctT.t St.pend None ==> si PC.RO.m HctT.t St.pend None].
-proof.
-proc; inline MatRA.get.
-seq 11 : (si PC.RO.m HctT.t St.pend None /\ response = None).
-- by wp; call (: true) => //; auto.
-seq 1 : (si PC.RO.m HctT.t St.pend None /\
-         (response <> None => St.pend = (w1, mu) :: behead St.pend)).
-- while (si PC.RO.m HctT.t St.pend None /\
-         (response <> None => St.pend = (w1, mu) :: behead St.pend)).
-  + wp; if; 2: by auto.
-    seq 4 : (si PC.RO.m HctT.t St.pend None /\ St.pend = (w1, mu) :: behead St.pend).
-    * inline ChalE(PC.RO).get PC.RO.sample PC.RO.get; wp.
-      call (: true) => //; auto => /> &hr hsi _ y _ r _.
-      have := si_sample _ _ _ (highBitsV (mA{hr} *^ y), mu{hr}) r hsi.
-      by case: ((highBitsV (mA{hr} *^ y), mu{hr}) \in PC.RO.m{hr}) => /= _ /si_push.
-    by auto => />.
-  by auto => />.
-if; 2: by auto.
-inline ChalE(PC.RO).final.
-exlim w1, mu => w10 mu0.
-wp; call (HctE_SI (w10, mu0) (Some (w10, mu0))); auto => /> &hr hsi hp hr.
-by move: hsi; rewrite (hp hr) => /si_pop.
-qed.
-
-local lemma HctE_SI0 :
-  hoare[HctE(PC.RO).get : si PC.RO.m HctT.t St.pend None ==> si PC.RO.m HctT.t St.pend None].
-proof. by proc *; exlim x => xx; call (HctE_SI xx None); auto. qed.
-
-local lemma si0 : si empty empty [] None.
-proof. by rewrite /si; smt(mem_empty). qed.
-
-local lemma D_fl : hoare[D(PC.RO).distinguish : true ==> St.fl = PC.RO.m].
-proof.
-proc.
-seq 18 : (si PC.RO.m HctT.t St.pend None).
-- wp; call (: true) => //; call (: true) => //.
-  inline D(PC.RO).S.verify; wp.
-  call HctE_SI0; wp; call (: true) => //.
-  call (: true) => //; call (: true) => //; wp.
-  call (: si PC.RO.m HctT.t St.pend None).
-  + by proc; wp; call SignD_SI; auto.
-  + by conseq HctE_SI0.
-  + by proc *; call (: true) => //; auto.
-  + by proc *; call (: true) => //; auto.
-  + by proc *; call (: true) => //; auto.
-  + by proc *; call (: true) => //; auto.
-  by inline *; auto => />; rewrite si0.
-inline Flush(PC.RO).run.
-while (si PC.RO.m St.fl St.pend None).
-- sp; if.
-  + inline *; rcondf 3.
-    * by auto => /> &hr hsi hne _ r _; apply (si_fl_mem _ _ _ hne hsi).
-    by auto => /> &hr hsi hne hx r _; have := si_fl_step _ _ _ hne hsi; rewrite hx.
-  by auto => /> &hr hsi hne hx; have := si_fl_step _ _ _ hne hsi; rewrite hx.
-by auto => /> &hr hsi fl m0; exact si_fl_end.
-qed.
-
-(* -------------------------------------------------------------------- *)
-(* The steps *)
-
-local lemma G1_D &m :
-  Pr[G1(A).main() @ &m : res] <=
-  Pr[D(PC.RO).distinguish() @ &m :
-       (St.win /\ !HctT.bad) \/ coll St.fl LX.RO.m].
-proof.
-byequiv (_ : ={glob A} ==> res{1} => (St.win{2} /\ !HctT.bad{2}) \/ coll St.fl{2} LX.RO.m{2}) => //.
-by conseq G1_D_eq _ D_fl => /> /#.
-qed.
-
-local lemma D_RO_LRO &m :
-  Pr[D(PC.RO).distinguish() @ &m :
-       (St.win /\ !HctT.bad) \/ coll St.fl LX.RO.m] =
-  Pr[D(PC.LRO).distinguish() @ &m :
-       (St.win /\ !HctT.bad) \/ coll St.fl LX.RO.m].
-proof.
-byequiv (PC.FullEager.RO_LRO_D D _) => //.
-by move=> _; exact dct_ll.
-qed.
-
-local lemma coll_bound &m :
-  Pr[D(PC.LRO).distinguish() @ &m : coll St.fl LX.RO.m] <= bound_ct.
-proof.
-apply (ler_trans _ _ _ (D_Act &m)).
-have := TCct.table_collision Act (qXC + 1) (qHct + kappa_max * qS + 1) _ _ Act_bound &m.
-- smt(qXC_ge0).
-- have : 0 <= kappa_max * qS by apply StdOrder.IntOrder.mulr_ge0; smt(gt0_kappa_max qS_ge0).
-  smt(qHct_ge0).
-have -> : qXC + 1 + (qHct + kappa_max * qS + 1) = qXC + 1 + qHct + kappa_max * qS + 1 by ring.
-by rewrite /bound_ct fromintM (RField.mulrC (qXC + 1 + qHct + kappa_max * qS + 1)%r).
+seq 11 12 : (!HctT.bad{2} =>
+             ={m, sig, pk, sk, O_CMA1.qs, ROtr.RO.m, RA.mA} /\ ROmu.RO.m{1} = HmuB.m{2} /\
+             rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+                 None).
+- call (: HctT.bad,
+          ={glob XASim, ROtr.RO.m, O_CMA1.sk, O_CMA1.qs} /\ ROmu.RO.m{1} = HmuB.m{2} /\
+          rel ROct.RO.m{1} SIB.XOF.RO.m{1} SD.XOF.m{2} LX.RO.m{2} HctT.tinv{2} HctT.leakT{2}
+              None).
+  + move=> XA XC Htr Hmu Hct O h1 h2 h3 h4 h5 h6.
+    exact (A_ll XA XC Htr Hmu Hct O h6 h5 h4 h3 h2 h1).
+  + by proc; wp; call Sign_G1_G2; auto => /> /#.
+  + by move=> &2 _; proc; wp; call Sign1_ll; auto.
+  + by move=> _; proc; wp; call SignX_bad; auto.
+  + by proc *; call E_Hct; auto => /> /#.
+  + by move=> &2 _; islossless.
+  + by move=> _; conseq HctT_get_bad.
+  + by proc *; call Hmu_eq; auto => /> /#.
+  + by move=> &2 _; islossless.
+  + by move=> _; conseq Hmu_bad.
+  + by proc *; call (: ={ROtr.RO.m}); [sim | auto => /> /#].
+  + by move=> &2 _; islossless.
+  + by move=> _; conseq Htr_bad.
+  + by proc *; call E_XC; auto => /> /#.
+  + by move=> &2 _; proc; auto => />; exact dB_ll.
+  + by move=> _; conseq XC_bad.
+  + by proc *; call (: ={glob XASim}); [sim | auto => /> /#].
+  + by move=> &2 _; exact XASim_ll.
+  + by move=> _; proc *; call XASim_ll; auto.
+  by inline *; auto => />; smt(rel0).
+inline G1(A).O.fresh G1(A).O.nr_queries G2(A).O.fresh G2(A).O.nr_queries.
+case (HctT.bad{2}).
+- by wp; call{1} Verify1_ll; call{2} VerifyX_bad; auto => /> /#.
+by wp; call Verify_G1_G2; auto => /> /#.
 qed.
 
 (* ---- end of the G1 -> G2 helpers ---- *)
@@ -1832,17 +1501,11 @@ lemma hop_collisions &m :
   Pr[G1(A).main() @ &m : res] <=
   Pr[G2(A).main() @ &m : res /\ !HctT.bad /\ !HmuB.bad] + bound_ct + bound_mu.
 proof.
-apply (ler_trans _ _ _ (G1_D &m)); rewrite D_RO_LRO.
-have h1 := D_G2 &m (fun w b mb => w /\ !b /\ !mb).
-have h2 := D_G2 &m (fun w b mb => mb).
-have hct := coll_bound &m.
-have hmu := mu_bound &m.
-have hle : Pr[D(PC.LRO).distinguish() @ &m :
-                (St.win /\ !HctT.bad) \/ coll St.fl LX.RO.m] <=
-           Pr[D(PC.LRO).distinguish() @ &m :
-                (St.win /\ !HctT.bad /\ !HmuB.bad) \/ (HmuB.bad \/ coll St.fl LX.RO.m)].
-- by rewrite Pr[mu_sub] => // /#.
-apply (ler_trans _ _ _ hle); rewrite Pr[mu_or] Pr[mu_or] /=.
+have h1 : Pr[G1(A).main() @ &m : res] <=
+          Pr[G2(A).main() @ &m : (res /\ !HctT.bad /\ !HmuB.bad) \/ (HmuB.bad \/ HctT.bad)].
+- by byequiv G1_G2 => // /#.
+apply (ler_trans _ _ _ h1); rewrite Pr[mu_or] Pr[mu_or].
+have hct := ct_bound &m; have hmu := mu_bound &m.
 smt(mu_bounded).
 qed.
 

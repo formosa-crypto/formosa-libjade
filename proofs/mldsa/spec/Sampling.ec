@@ -17,10 +17,67 @@ import Round ZModQ Zq MLDSAParams.
 
 op "_.[_]" : 'a list -> int -> 'a = nth witness.
 
-(* The leakage of SampleInBall: the pairs (stream position after the read,
-   byte read) of the rejection loop, declassified (flat leakage model) *)
+(* The leakage of SampleInBall: the 8 sign bytes, then the pairs (stream
+   position after the read, byte read) of the rejection loop, declassified
+   (flat leakage model); every byte read on the stream is in it, in order *)
 type sib_leakage = leakage.
 
+(* Declassification of a list of bytes *)
+op bytes_decl (bs : W8.t list) : decl = List (map (fun (b : W8.t) => Int (W8.to_uint b)) bs).
+
+(* Leakage of the sign bytes of SampleInBall *)
+op signs_leak (s : Bytes8.t) : leakage = [bytes_decl (Bytes8.to_list s)].
+
+(* Leakage of c~ (its bytes): c~ is declassified at every signing
+   iteration, before SampleInBall; [ctilde_enc] is the encoding of the
+   target ([MLDSATarget.ct_enc]) *)
+op ctilde_enc (ct : BytesCT.t) : int list = map W8.to_uint (BytesCT.to_list ct).
+op ctilde_dec (l : int list) : BytesCT.t = BytesCT.of_list (map W8.of_int l).
+op ctilde_leak (ct : BytesCT.t) : leakage = [List (map Int (ctilde_enc ct))].
+
+lemma ctilde_encK : cancel ctilde_enc ctilde_dec.
+proof.
+move=> ct; rewrite /ctilde_dec /ctilde_enc -map_comp.
+rewrite (eq_map _ idfun); 1: by move=> b; rewrite /(\o) W8.to_uintK.
+by rewrite map_id BytesCT.to_listK.
+qed.
+
+lemma ctilde_leakE (ct : BytesCT.t) : ctilde_leak ct = [bytes_decl (BytesCT.to_list ct)].
+proof. by rewrite /ctilde_leak /bytes_decl /ctilde_enc -map_comp. qed.
+
+(* Leakage of the seed rho of A (its bytes), once at the start of signing;
+   [rho] is part of the public key *)
+op rho_leak (rho : Bytes32.t) : leakage = [bytes_decl (Bytes32.to_list rho)].
+
+(* The candidate of RejNTTPoly read from a group of 3 bytes: the 23-bit
+   integer, top bit dropped (accepted when below q) *)
+op rej_cand (b0 b1 b2 : W8.t) : int =
+  to_uint b0 + 256 * to_uint b1 + 65536 * (to_uint b2 %% 128).
+
+lemma cftb_E (b0 b1 b2 : W8.t) :
+  CoeffFromThreeBytes b0 b1 b2 =
+  if rej_cand b0 b1 b2 < q then Some (rej_cand b0 b1 b2) else None.
+proof.
+rewrite /CoeffFromThreeBytes /rej_cand /=.
+have -> : to_uint (if 127 < to_uint b2 then b2 - W8.of_int 128 else b2) = to_uint b2 %% 128.
++ have /= hx := W8.to_uint_cmp b2.
+  case: (127 < to_uint b2) => h /=; 2: smt().
+  rewrite W8.to_uintB; 1: by rewrite W8.uleE W8.of_uintK /#.
+  rewrite (W8.of_uintK 128) /=.
+  have -> : to_uint b2 %% 128 = (to_uint b2 - 128 + 128) %% 128 by smt().
+  rewrite modzDr modz_small; smt().
+by rewrite (_ : 65536 * (to_uint b2 %% 128) + 256 * to_uint b1 + to_uint b0 =
+                to_uint b0 + 256 * to_uint b1 + 65536 * (to_uint b2 %% 128)) 1:#ring.
+qed.
+
+(* Leakage of RejNTTPoly: all the candidates read on the stream, accepted
+   or rejected, in order (declassified by the implementation before the
+   test against q) *)
+op rej_leak (vs : int list) : leakage = [List (map Int vs)].
+
+(* The challenge oracle (LeakyRO): c~ and the challenge c, with the leakage
+   of SampleInBall on c~ (the leakage of c~ itself is added by the signing
+   loop, spec/MLDSA.ec) *)
 module type LeakyRO(XOF : XOF_SIB) = {
    proc init() : unit
    proc get(mu : Bytes64.t, w1 : BytesW1.t) : (BytesCT.t * poly) * sib_leakage
@@ -54,7 +111,7 @@ module SampleInBall(XOF : XOF_SIB) = {
           c.[W8.to_uint j] <- if h.[i+tau-256] then incoeff (-1) else incoeff (1);
           i <- i + 1;
       }
-      return (c, pairs_to_leakage leak);
+      return (c, lcat (signs_leak s) (pairs_to_leakage leak));
    }
 }.
 
@@ -89,7 +146,7 @@ op sib_iter (ct : BytesCT.t) (n : int) : poly * (int * int) list * int =
   foldl (sib_step ct) (poly_zero, [], 8) (iota_ (256 - tau) n).
 
 op sampleInBall (ct : BytesCT.t) : poly * sib_leakage =
-  ((sib_iter ct tau).`1, pairs_to_leakage (sib_iter ct tau).`2).
+  ((sib_iter ct tau).`1, lcat (signs_leak (H_sib ct)) (pairs_to_leakage (sib_iter ct tau).`2)).
 
 (* the termination criterion of Alg. 29: every index finds an
    acceptable byte after the current stream position *)
@@ -364,27 +421,32 @@ module (SIB_RO : LeakyRO) (XOF : XOF_SIB) = {
         var rr;
         var ct <- H_ct mu w1;
         rr <@ SampleInBall(XOF).sample(ct);
-        return ((ct,rr.`1),rr.`2);
+        return ((ct,rr.`1), rr.`2);
    }
 }.
 
 import Bytes3.
+(* RejNTTPoly returns the polynomial and the list of all the candidates
+   read (its leakage, [rej_leak]) *)
 module RejNTTPoly(XOF : XOF_RejNTTPoly) = {
-  proc sample(rho : Bytes34.t) : poly = {
+  proc sample(rho : Bytes34.t) : poly * int list = {
     var j, b3, co;
     var c : poly;
+    var vs : int list;
     c <- witness;
+    vs <- [];
     XOF.init(rho);
     j <- 0;
     while (j < 256) {
       b3 <@ XOF.next();
+      vs <- rcons vs (rej_cand b3.[0] b3.[1] b3.[2]);
       co <- CoeffFromThreeBytes b3.[0] b3.[1] b3.[2];
       if (co <> None) {
          c.[j] <- incoeff (oget co);
          j <- j + 1;
       }
     }
-    return c;
+    return (c, vs);
   }
 }.
 
@@ -406,6 +468,15 @@ op ntt_cand (rho : Bytes34.t) (t : int) : int option =
 op ntt_accepted (rho : Bytes34.t) (t : int) : int list =
   pmap (ntt_cand rho) (iota_ 0 t).
 
+(* the candidate of group t (accepted or not), and the candidates of the
+   first t groups: the leakage of Alg. 30 *)
+op ntt_candv (rho : Bytes34.t) (t : int) : int =
+  let s = SHAKE128 (Bytes34.to_list rho) (3 * t + 3) in
+  rej_cand (nth witness s (3 * t)) (nth witness s (3 * t + 1)) (nth witness s (3 * t + 2)).
+
+op ntt_cands (rho : Bytes34.t) (t : int) : int list =
+  map (ntt_candv rho) (iota_ 0 t).
+
 (* the termination criterion of Alg. 30 *)
 op rejNTT_ok (rho : Bytes34.t) : bool =
   exists t, 0 <= t /\ 256 <= size (ntt_accepted rho t).
@@ -415,6 +486,13 @@ op rejNTT_fuel (rho : Bytes34.t) : int =
 
 op rejNTTPoly (rho : Bytes34.t) : poly =
   Array256.init (fun i => incoeff (nth 0 (ntt_accepted rho (rejNTT_fuel rho)) i)).
+
+(* all the candidates read by Alg. 30 *)
+op rejNTT_cands (rho : Bytes34.t) : int list = ntt_cands rho (rejNTT_fuel rho).
+
+lemma ntt_candsS (rho : Bytes34.t) (t : int) : 0 <= t =>
+  ntt_cands rho (t + 1) = rcons (ntt_cands rho t) (ntt_candv rho t).
+proof. by move=> ge0t; rewrite /ntt_cands iotaSr // map_rcons. qed.
 
 lemma ntt_acceptedS (rho : Bytes34.t) (t : int) : 0 <= t =>
   ntt_accepted rho (t + 1)
@@ -459,22 +537,36 @@ move=> ge0t; rewrite /ntt_cand /=.
 by congr; rewrite nth_take // nth_drop //#.
 qed.
 
+lemma ntt_candv_next (rho : Bytes34.t) (t : int) : 0 <= t =>
+  rej_cand
+    (nth witness (take 3 (drop (3 * t) (SHAKE128 (Bytes34.to_list rho) (3 * t + 3)))) 0)
+    (nth witness (take 3 (drop (3 * t) (SHAKE128 (Bytes34.to_list rho) (3 * t + 3)))) 1)
+    (nth witness (take 3 (drop (3 * t) (SHAKE128 (Bytes34.to_list rho) (3 * t + 3)))) 2)
+  = ntt_candv rho t.
+proof.
+move=> ge0t; rewrite /ntt_candv /=.
+by congr; rewrite nth_take // nth_drop //#.
+qed.
+
 (* partial correctness: after t groups, the XOF is at position 3t, j is
    the number of accepted candidates, c holds them; the loop stops at the
    least t with 256 accepted, i.e. at rejNTT_fuel *)
 lemma RejNTTPoly_h (_rho : Bytes34.t) :
-  hoare [ RejNTTPoly(MLDSA_XOFA).sample : rho = _rho ==> res = rejNTTPoly _rho ].
+  hoare [ RejNTTPoly(MLDSA_XOFA).sample : rho = _rho ==>
+          res = (rejNTTPoly _rho, rejNTT_cands _rho) ].
 proof.
 proc; inline MLDSA_XOFA.init.
 while (XOFA_state.seed = Bytes34.to_list _rho /\ 0 <= XOFA_state.pos /\ XOFA_state.pos %% 3 = 0
   /\ j = size (ntt_accepted _rho (XOFA_state.pos %/ 3)) /\ j <= 256
+  /\ vs = ntt_cands _rho (XOFA_state.pos %/ 3)
   /\ (forall i, 0 <= i < j => c.[i] = incoeff (nth 0 (ntt_accepted _rho (XOFA_state.pos %/ 3)) i))
   /\ (forall t, 0 <= t < XOFA_state.pos %/ 3 => size (ntt_accepted _rho t) < 256)).
-- inline MLDSA_XOFA.next; wp; skip => &hr [#] -> ge0p hp3 -> hj hc hmin ltj /=.
+- inline MLDSA_XOFA.next; wp; skip => &hr [#] -> ge0p hp3 -> hj -> hc hmin ltj /=.
   pose t := XOFA_state.pos{hr} %/ 3.
   have hpt : XOFA_state.pos{hr} = 3 * t by smt().
   have hnt : (XOFA_state.pos{hr} + 3) %/ 3 = t + 1 by smt().
-  rewrite hnt hpt (ntt_cand_next _ t) 1:/# ntt_acceptedS 1:/#.
+  rewrite hnt hpt (ntt_cand_next _ t) 1:/# (ntt_candv_next _ t) 1:/# ntt_acceptedS 1:/#.
+  rewrite -(ntt_candsS _ t) 1:/# /=.
   move: hj hc hmin ltj; rewrite -/t => hj hc hmin ltj.
   have hminS : forall t0, 0 <= t0 < t + 1 => size (ntt_accepted _rho t0) < 256.
   + by move=> t0 rgt0; case: (t0 = t) => [->> //|ne]; apply hmin; smt().
@@ -485,10 +577,11 @@ while (XOFA_state.seed = Bytes34.to_list _rho /\ 0 <= XOFA_state.pos /\ XOFA_sta
   move=> i rgi; rewrite Array256.get_setE 1:/# nth_cat.
   case: (i = size (ntt_accepted _rho t)) => [->> /=|ne]; 1: done.
   by rewrite ifT 1:/# hc /#.
-auto => />; split; first by rewrite /ntt_accepted iota0 //=; smt().
+auto => />; split; first by rewrite /ntt_accepted /ntt_cands iota0 //=; smt().
 move=> pos c0 ge256 ge0p hp3 le256 hc hmin.
 have hf : rejNTT_fuel _rho = pos %/ 3.
 - by rewrite /rejNTT_fuel (argmin_eq idfun _ (pos %/ 3)) //= /#.
+rewrite /rejNTT_cands hf /=.
 by apply Array256.tP => i rgi; rewrite hc 1:/# /rejNTTPoly Array256.initiE //= hf.
 qed.
 
@@ -545,7 +638,8 @@ by move=> /= h; exists (56 * L * 256); split => //; smt().
 qed.
 
 phoare RejNTTPoly_correct _rho :
-   [ RejNTTPoly(MLDSA_XOFA).sample : arg = _rho ==> res = rejNTTPoly _rho] = 1%r.
+   [ RejNTTPoly(MLDSA_XOFA).sample : arg = _rho ==>
+     res = (rejNTTPoly _rho, rejNTT_cands _rho)] = 1%r.
 proof. by conseq (RejNTTPoly_ll _rho (rejNTT_terminates _rho)) (RejNTTPoly_h _rho). qed.
    
 (*************** End RejNTTPoly CORRECTNESS BRIDGE ****************)
@@ -716,23 +810,28 @@ proof. by conseq (RejBoundedPoly_ll _rho (rejBounded_terminates _rho)) (RejBound
    
 (*************** End RejBoundedPoly CORRECTNESS BRIDGE ****************)
 
+(* ExpandA returns the matrix and its leakage: the candidates read by
+   RejNTTPoly for every entry, in the order of the loops *)
 module ExpandA(XOF : XOF_RejNTTPoly) = {
-   proc sample(rho : Bytes32.t) : polymat = {
-      var r,s,rhop,ars;
+   proc sample(rho : Bytes32.t) : polymat * leakage = {
+      var r,s,rhop,ars,vs;
       var aa : polymat;
+      var al : leakage;
       aa <- witness;
+      al <- Empty;
       r <- 0;
       while (r < kvec) {
           s <- 0;
           while (s < lvec) {
             rhop <- Bytes34.of_list (Bytes32.to_list rho ++ [W8.of_int s; W8.of_int r]);
-            ars <@ RejNTTPoly(XOF).sample(rhop);
+            (ars, vs) <@ RejNTTPoly(XOF).sample(rhop);
             aa <- aa.[(r,s) <- ars];
+            al <- lcat al (rej_leak vs);
             s <- s + 1;
           }
           r <- r + 1;
       }
-      return aa;
+      return (aa, al);
    }
 }.
 
@@ -743,23 +842,40 @@ op expandA (rho : Bytes32.t) : polymat =
   KLMatrix.init (fun i => rejNTTPoly
     (Bytes34.of_list (Bytes32.to_list rho ++ [W8.of_int (i %% lvec); W8.of_int (i %/ lvec)]))).
 
+(* the seed of entry i = r * lvec + s, and the leakage of the first p
+   entries *)
+op expandA_seed (rho : Bytes32.t) (i : int) : Bytes34.t =
+  Bytes34.of_list (Bytes32.to_list rho ++ [W8.of_int (i %% lvec); W8.of_int (i %/ lvec)]).
+
+op expandA_leak_n (rho : Bytes32.t) (p : int) : leakage =
+  map (fun i => List (map Int (rejNTT_cands (expandA_seed rho i)))) (iota_ 0 p).
+
+op expandA_leak (rho : Bytes32.t) : leakage = expandA_leak_n rho (kvec * lvec).
+
 phoare ExpandA_correct _rho :
-   [ ExpandA(MLDSA_XOFA).sample : arg = _rho ==> res = expandA _rho] = 1%r.
+   [ ExpandA(MLDSA_XOFA).sample : arg = _rho ==>
+     res = (expandA _rho, expandA_leak _rho)] = 1%r.
 proof.
 have gt0l : 0 < lvec by smt(gt0_l).
 have gt0k : 0 < kvec by smt(gt0_k).
 proc.
-while (rho = _rho /\ 0 <= r <= kvec
+while (rho = _rho /\ 0 <= r <= kvec /\ al = expandA_leak_n _rho (r * lvec)
   /\ forall i, 0 <= i < r * lvec => aa.[i] = (expandA _rho).[i]) (kvec - r).
 - move=> z; wp.
   while (rho = _rho /\ 0 <= r < kvec /\ 0 <= s <= lvec /\ kvec - r = z
+    /\ al = expandA_leak_n _rho (r * lvec + s)
     /\ forall i, 0 <= i < r * lvec + s => aa.[i] = (expandA _rho).[i]) (lvec - s).
   + move=> z'; wp.
     ecall (RejNTTPoly_correct rhop); auto => &hr |> ge0r ltr ge0s _ hi lts.
     have hb : r{hr} * lvec + s{hr} < kvec * lvec.
     * have : (r{hr} + 1) * lvec <= kvec * lvec by apply StdOrder.IntOrder.ler_wpmul2r; smt().
       smt().
-    do! split; 1..2, 4: smt().
+    have hseed : expandA_seed rho{hr} (r{hr} * lvec + s{hr}) =
+                 Bytes34.of_list (Bytes32.to_list rho{hr} ++ [W8.of_int s{hr}; W8.of_int r{hr}]).
+    * by rewrite /expandA_seed modzMDl pmod_small 1:/# divzMDl 1:/# pdiv_small 1:/#.
+    do! split; 1..2, 5: smt().
+    * rewrite /rej_leak /expandA_leak_n (_ : r{hr} * lvec + (s{hr} + 1) = r{hr} * lvec + s{hr} + 1) 1:/#.
+      by rewrite iotaSr 1:/# map_rcons -cats1 /= hseed.
     move=> i ge0i lti; rewrite /PolyMat."_.[_<-_]" KLMatrix.get_setE; 1: smt(StdOrder.IntOrder.mulr_ge0).
     case: (i = r{hr} * lvec + s{hr}) => [->> |ne]; last by rewrite hi /#.
     rewrite /expandA KLMatrix.initiE 1:/# /=.
@@ -768,10 +884,14 @@ while (rho = _rho /\ 0 <= r <= kvec
   move=> aa0 s0; split; 1: smt().
   move=> ns ge0 les hi'; split; 2: smt().
   split; 1: smt().
+  split; 1: by congr; smt().
   by move=> i ge0i lti; apply hi'; smt().
-auto => |>; split; 1: smt().
+auto => |>; split.
++ by do! split; [rewrite /expandA_leak_n /= iota0 | smt()].
 move=> aa0 r0; split; 1: smt().
-move=> nr ge0 ler hi; apply KLMatrix.tP => i rgi.
+move=> nr ge0 ler hi; have ->> : r0 = kvec by smt().
+split; 2: by [].
+apply KLMatrix.tP => i rgi.
 by rewrite hi; smt().
 qed.
    

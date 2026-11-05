@@ -10,8 +10,13 @@ require MLDSAProof_Games.
     the [k * l] entries of the honest matrix with fresh samples: the matrix
     is then uniform ([dmatrix_loop]) and the game is G1. The signing
     procedures of the three games are instances of [MLDSAGen] which only
-    differ by how the matrix is obtained ([ExpandA(XA)], [ExpandAS(S)],
-    [MatRA]). *)
+    differ by how the matrix and the leakage of ExpandA are obtained
+    ([ExpandA(XA)], [ExpandASL(S, R)], [MatRA]). In the distinguisher, the
+    signer computes each entry with the sampler [S] and its candidates by
+    a second run of the inner loop of ExpandA on the XOF [R] of the
+    adversary; on the real side this run reads the bytes that the sampler
+    has just read ([poly_rerun]), on the ideal side it is the run of
+    [MatRA] on the simulated XOF. *)
 
 abstract theory MLDSAProof_ExpandA.
 
@@ -46,7 +51,8 @@ declare module A <: Adv_EFCMA {
   -SD.FSaCR.DSS.DS.Stateless.O_CMA_Default, -SD.H, -SD.OpBasedSig,
   -SD.O_CMA_Default_G, -SD.RO_G, -SD.OpBasedSigG,
   -SD.CMAtoKOA.ORedKOA, -SD.CMAtoKOA.CountS, -SD.CMAtoKOA.CountH,
-  -SD.SIB.ORedXOFROC, -SD.SIB.XOF.RO, -SD.SIB.ROC.RO, -SD.XOF,
+  -SD.SIB.ORedXOFROC, -SD.SIB.XOF.RO, -SD.SIB.ROC.RO, -SD.SIB.ROC.FRO, -SD.XOF,
+  -SD.HctRO.RO, -SD.HctRO.FRO, -SD.CacheRO,
   -SD.DSSXOF.DS.Stateless.O_CMA_Default,
   -SD.CountS, -SD.CountH, -SD.CountX, -SD.CountSX, -SD.OConv,
   -SD.G, -SD.RqStMSIS.Std.PRO.RO, -SD.RqStMSIS.ORed,
@@ -108,6 +114,29 @@ local module ExpandAS (S : EA.RS.Sampler_t) = {
   }
 }.
 
+(* [ExpandA] where each entry is computed by a sampler [S], and its
+   candidates (the leakage) by the inner loop of [ExpandA] on the XOF [R] *)
+local module ExpandASL (S : EA.RS.Sampler_t, R : XOF_A) = {
+  proc get(rho : seed) : matrix * leakage = {
+    var mA, la, r, s, a, a', vs;
+    mA <- zerom k l;
+    la <- Empty;
+    r <- 0;
+    while (r < k) {
+      s <- 0;
+      while (s < l) {
+        a <@ S.sample((rho, r, s));
+        (a', vs) <@ ExpandA(R).poly((rho, r, s));
+        mA <- updm mA r s a;
+        la <- lcat la (cands_leak vs);
+        s <- s + 1;
+      }
+      r <- r + 1;
+    }
+    return (mA, la);
+  }
+}.
+
 (* Key generation and verification of [MLDSA] with [ExpandAS(S)] instead of
    [ExpandA(XA)] (the signing procedure is [MLDSAGen(ExpandAS(S), ...)]) *)
 local module MLDSAS (S : EA.RS.Sampler_t, XC : SIB.XOF_t, Htr : Hash_tr, Hmu : Hash_mu, Hct : Hash_ct) = {
@@ -139,10 +168,10 @@ local module MLDSAS (S : EA.RS.Sampler_t, XC : SIB.XOF_t, Htr : Hash_tr, Hmu : H
 }.
 
 (* Signing oracle of the distinguisher (state of [O_CMA]) *)
-local module OS (S : EA.RS.Sampler_t) = {
+local module OS (S : EA.RS.Sampler_t, R : XOF_A) = {
   proc sign(m : M) : Sig option * leakage = {
     var r;
-    r <@ MLDSAGen(ExpandAS(S), ChalH(SIB.XOF.RO, ROct.RO), ROmu.RO).sign(O_CMA.sk, m);
+    r <@ MLDSAGen(ExpandASL(S, R), ChalH(SIB.XOF.RO, ROct.RO), ROmu.RO).sign(O_CMA.sk, m);
     O_CMA.qs <- rcons O_CMA.qs m;
     return r;
   }
@@ -165,7 +194,7 @@ local module (DA (A : Adv_EFCMA) : EA.RS.Distinguisher) (R : EA.RS.RO_t) (S : EA
     (pk, sk) <@ MLDSAS(S, SIB.XOF.RO, ROtr.RO, ROmu.RO, ROct.RO).keygen();
     O_CMA.sk <- sk;
     O_CMA.qs <- [];
-    (m, sig) <@ A(R, SIB.XOF.RO, ROtr.RO, ROmu.RO, ROct.RO, OS(S)).forge(pk);
+    (m, sig) <@ A(R, SIB.XOF.RO, ROtr.RO, ROmu.RO, ROct.RO, OS(S, R)).forge(pk);
     is_valid <@ MLDSAS(S, SIB.XOF.RO, ROtr.RO, ROmu.RO, ROct.RO).verify(pk, m, sig);
     DRes.b <- size O_CMA.qs <= qS /\ is_valid /\ ! (m \in O_CMA.qs);
     return witness;
@@ -209,24 +238,25 @@ local equiv sign_G0 (XA <: XOF_A) (XC <: SIB.XOF_t {-XA}) (Htr <: Hash_tr)
   ={res, glob XA, glob XC, glob Hmu, glob Hct}.
 proof.
 proc.
-splitwhile{2} 11 : (response = None).
-seq 10 11 : (={ct, response, leak, glob XA, glob XC, glob Hmu, glob Hct} /\
+splitwhile{2} 10 : (response = None).
+seq 12 10 : (={ct, response, glob XA, glob XC, glob Hmu, glob Hct} /\
+             leak{1} = lcat (lcat (rho_leak rho{2}) la{2}) leak{2} /\
              (ctr{2} < kappa_max => response{2} <> None)).
-- while (={ctr, ct, mu, response, leak, mA, s1, s2, t0, r0_fail, hint_fail,
-           glob XA, glob XC, glob Hmu, glob Hct}).
+- while (={ctr, ct, mu, response, mA, s1, s2, t0, r0_fail, hint_fail,
+           glob XA, glob XC, glob Hmu, glob Hct} /\
+         leak{1} = lcat (lcat (rho_leak rho{2}) la{2}) leak{2}).
   + rcondt{2} 1; 1: by auto.
-    inline{2} ChalH(XC, Hct).get.
+    inline{2} ChalH(XC, Hct).get; swap{1} 5 1.
     wp; call (: ={glob XC}); 1: by sim.
-    by call (: true); auto.
-  wp; call (: true); call (: ={glob XA}); 1: by sim.
+    by call (: true); auto => /> *; rewrite !catA.
+  wp; call (: true); wp; call (: ={glob XA}); 1: by sim.
   by auto => /> /#.
-seq 0 1 : (={ct, response, leak, glob XA, glob XC, glob Hmu, glob Hct}).
-- while{2} ((ctr{2} < kappa_max => response{2} <> None) /\
-            ={ct, response, leak, glob XA, glob XC, glob Hmu, glob Hct})
-           (kappa_max - ctr{2}).
-  + by move=> &m z; rcondf 1; auto => /> /#.
-  by auto => /> /#.
-by if{2}; [inline *; auto | auto].
+while{2} ((ctr{2} < kappa_max => response{2} <> None) /\
+          ={ct, response, glob XA, glob XC, glob Hmu, glob Hct} /\
+          leak{1} = lcat (lcat (rho_leak rho{2}) la{2}) leak{2})
+         (kappa_max - ctr{2}).
+- by move=> &m z; rcondf 1; auto => /> /#.
+by auto => /> /#.
 qed.
 
 (* ==================================================================== *)
@@ -398,15 +428,187 @@ local lemma XA_RS_get : equiv [XA.RO.get ~ EA.RS.RO.get :
   ={arg} /\ XA.RO.m{1} = EA.RS.RO.m{2} ==> ={res} /\ XA.RO.m{1} = EA.RS.RO.m{2}].
 proof. by proc; auto. qed.
 
-local lemma ExpandA_ExpandAS : equiv [ExpandA(XA.RO).get ~ ExpandAS(EA.SampleRq(EA.RS.RO)).get :
-  ={rho} /\ XA.RO.m{1} = EA.RS.RO.m{2} ==> ={res} /\ XA.RO.m{1} = EA.RS.RO.m{2}].
+local lemma poly_sample : equiv [ExpandA(XA.RO).poly ~ EA.SampleRq(EA.RS.RO).sample :
+  ={x} /\ XA.RO.m{1} = EA.RS.RO.m{2} ==> res{1}.`1 = res{2} /\ XA.RO.m{1} = EA.RS.RO.m{2}].
 proof.
-proc; inline EA.SampleRq(EA.RS.RO).sample.
+proc; wp; while (={x, cs, ctx} /\ XA.RO.m{1} = EA.RS.RO.m{2}); 2: by auto.
+by wp; do 3! call XA_RS_get; auto => />.
+qed.
+
+local lemma ExpandA_ExpandAS : equiv [ExpandA(XA.RO).get ~ ExpandAS(EA.SampleRq(EA.RS.RO)).get :
+  ={rho} /\ XA.RO.m{1} = EA.RS.RO.m{2} ==> res{1}.`1 = res{2} /\ XA.RO.m{1} = EA.RS.RO.m{2}].
+proof.
+proc.
 while (={rho, r, mA} /\ XA.RO.m{1} = EA.RS.RO.m{2}); last by auto.
 wp; while (={rho, r, s, mA} /\ XA.RO.m{1} = EA.RS.RO.m{2}); last by auto.
-wp; while (={cs, ctx} /\ x{2} = (rho, r, s){1} /\ XA.RO.m{1} = EA.RS.RO.m{2}).
-+ wp; do 3! call XA_RS_get; auto => />.
-by auto.
+by wp; call poly_sample; auto.
+qed.
+
+(* The inner loop of [ExpandA] on a lazy random oracle, as a function of
+   its map: [cand m x j] is the [j]-th candidate of the stream of [x], and
+   [pdone m x rv] says that [rv] is the result of the loop on [x] and
+   that [m] contains all the bytes that the loop reads. *)
+local op cand (m : ((seed * int * int) * int, byte) fmap) (x : seed * int * int) (j : int) =
+  EA.v_of (oget m.[(x, 3 * j)]) (oget m.[(x, 3 * j + 1)]) (oget m.[(x, 3 * j + 2)]).
+
+local op cands m x j = mkseq (cand m x) j.
+local op accs m x j = filter (fun v => v < q) (cands m x j).
+
+local op pdone (m : ((seed * int * int) * int, byte) fmap) x (rv : Rq * int list) =
+  let j = size rv.`2 in
+  rv = (toRq (accs m x j), cands m x j) /\ n <= size (accs m x j) /\
+  (forall j', 0 <= j' < j => size (accs m x j') < n) /\
+  (forall i, 0 <= i < 3 * j => (x, i) \in m).
+
+(* [m'] extends [m] *)
+local op ext (m m' : ((seed * int * int) * int, byte) fmap) =
+  forall z, z \in m => m'.[z] = m.[z].
+
+local lemma ext_mem m m' z : ext m m' => z \in m => z \in m'.
+proof. by move=> h hz; rewrite domE h // -domE. qed.
+
+local lemma ext_some m m' z b : ext m m' => m.[z] = Some b => m'.[z] = Some b.
+proof. by move=> h hz; rewrite h // domE hz. qed.
+
+local lemma ext_trans m1 m2 m3 : ext m1 m2 => ext m2 m3 => ext m1 m3.
+proof. by move=> h12 h23 z hz; rewrite h23 1:(ext_mem m1) // h12. qed.
+
+local lemma cands_ext m m' x j :
+  (forall i, 0 <= i < 3 * j => (x, i) \in m) => ext m m' =>
+  cands m' x j = cands m x j.
+proof.
+move=> hin hext; apply eq_in_mkseq => t ht /=; rewrite /cand.
+by rewrite !hext ?hin //; smt().
+qed.
+
+local lemma accs_ext m m' x j :
+  (forall i, 0 <= i < 3 * j => (x, i) \in m) => ext m m' =>
+  accs m' x j = accs m x j.
+proof. by move=> hin hext; rewrite /accs (cands_ext m m'). qed.
+
+local lemma cands_S m x j : 0 <= j => cands m x (j + 1) = rcons (cands m x j) (cand m x j).
+proof. by move=> hj; rewrite /cands mkseqS. qed.
+
+local lemma accs_S m x j : 0 <= j =>
+  accs m x (j + 1) =
+  if cand m x j < q then rcons (accs m x j) (cand m x j) else accs m x j.
+proof. by move=> hj; rewrite /accs cands_S // filter_rcons. qed.
+
+local lemma XA_get_ext m0 y0 : hoare [XA.RO.get : XA.RO.m = m0 /\ x = y0 ==>
+  XA.RO.m.[y0] = Some res /\ ext m0 XA.RO.m].
+proof.
+proc; auto => /> r _; case: (y0 \in m0) => hy /=.
+- by move: hy; rewrite domE; case: (m0.[y0]).
+rewrite get_set_sameE /= => z hz; rewrite get_setE.
+by case: (z = y0) => // ->>; move: hy; rewrite hz.
+qed.
+
+local lemma RS_get_in m0 y0 : phoare [EA.RS.RO.get :
+  EA.RS.RO.m = m0 /\ x = y0 /\ y0 \in m0 ==> res = oget m0.[y0] /\ EA.RS.RO.m = m0] = 1%r.
+proof. by proc; auto => /> h; exact dB_ll. qed.
+
+(* One iteration of the inner loop: the map [m3] extends [m] with the
+   three bytes of the next chunk *)
+local lemma step_inv m m3 x0 (vs : int list) b0 b1 b2 :
+  vs = cands m x0 (size vs) =>
+  (forall j', 0 <= j' < size vs => size (accs m x0 j') < n) =>
+  (forall i, 0 <= i < 3 * size vs => (x0, i) \in m) =>
+  size (accs m x0 (size vs)) < n =>
+  ext m m3 =>
+  m3.[(x0, 3 * size vs)] = Some b0 => m3.[(x0, 3 * size vs + 1)] = Some b1 =>
+  m3.[(x0, 3 * size vs + 2)] = Some b2 =>
+  let v = to_int b0 + 256 * to_int b1 + 65536 * (to_int b2 %% 128) in
+  rcons vs v = cands m3 x0 (size vs + 1) /\
+  (if v < q then rcons (accs m x0 (size vs)) v else accs m x0 (size vs)) =
+    accs m3 x0 (size vs + 1) /\
+  (forall j', 0 <= j' < size vs + 1 => size (accs m3 x0 j') < n) /\
+  (forall i, 0 <= i < 3 * size vs + 3 => (x0, i) \in m3).
+proof.
+move=> hvs hlt hin hn he h0 h1 h2 /=.
+have hj := List.size_ge0 vs.
+have hc : cand m3 x0 (size vs) = to_int b0 + 256 * to_int b1 + 65536 * (to_int b2 %% 128).
+- by rewrite /cand h0 h1 h2.
+split; 1: by rewrite cands_S // (cands_ext m) // -hvs hc.
+split; 1: by rewrite accs_S // (accs_ext m m3) // hc.
+split.
+- move=> j' hj'; case: (j' = size vs) => [->> | hne]; 1: by rewrite (accs_ext m).
+  by rewrite (accs_ext m) 2:// 2:hlt; smt().
+move=> i hi; case: (i < 3 * size vs) => hlt3; 1: by apply (ext_mem m); [| apply hin; smt()].
+by rewrite domE; smt().
+qed.
+
+(* The first run of the inner loop on [x0] *)
+local lemma poly_done x0 : hoare [ExpandA(XA.RO).poly : x = x0 ==> pdone XA.RO.m x0 res].
+proof.
+proc.
+while (x = x0 /\ ctx = 3 * size vs /\ vs = cands XA.RO.m x0 (size vs) /\
+       cs = accs XA.RO.m x0 (size vs) /\
+       (forall j', 0 <= j' < size vs => size (accs XA.RO.m x0 j') < n) /\
+       (forall i, 0 <= i < ctx => (x0, i) \in XA.RO.m)).
+- wp; ecall (XA_get_ext XA.RO.m (x, ctx + 2)); ecall (XA_get_ext XA.RO.m (x, ctx + 1)).
+  ecall (XA_get_ext XA.RO.m (x, ctx)).
+  skip => &hr [#] -> -> hvs hcs hlt hin hn b0 m1 [h1 e1] b1 m2 [h2 e2] b2 m3 [h3 e3].
+  have := step_inv XA.RO.m{hr} m3 x0 vs{hr} b0 b1 b2 hvs hlt hin _
+            (ext_trans _ _ _ (ext_trans _ _ _ e1 e2) e3)
+            (ext_some _ _ _ _ e3 (ext_some _ _ _ _ e2 h1)) (ext_some _ _ _ _ e3 h2) h3.
+  + by rewrite -hcs.
+  move=> /= [H1 [H2 [H3 H4]]]; rewrite size_rcons /=.
+  by case: (to_int b0 + 256 * to_int b1 + 65536 * (to_int b2 %% 128) < q) => hv;
+    move: H2; rewrite hv /= -hcs => H2; smt().
+auto => /> &hr; split; 1: by rewrite /accs /cands mkseq0 /=; smt().
+by move=> m vs hn hvs hlt hin; rewrite /pdone /=; smt().
+qed.
+
+(* The second run reads the same bytes *)
+local lemma poly_rerun x0 m0 r0 : phoare [ExpandA(EA.RS.RO).poly :
+  x = x0 /\ EA.RS.RO.m = m0 /\ pdone m0 x0 r0 ==> res = r0 /\ EA.RS.RO.m = m0] = 1%r.
+proof.
+proc; sp.
+while (x = x0 /\ EA.RS.RO.m = m0 /\ pdone m0 x0 r0 /\ ctx = 3 * size vs /\
+       vs = cands m0 x0 (size vs) /\ cs = accs m0 x0 (size vs) /\ size vs <= size r0.`2)
+      (size r0.`2 - size vs).
+- move=> z; exlim vs => vs0.
+  wp; call (RS_get_in m0 (x0, 3 * size vs0 + 2)).
+  call (RS_get_in m0 (x0, 3 * size vs0 + 1)); call (RS_get_in m0 (x0, 3 * size vs0)).
+  skip => &hr /> hr0 hn0 hlt0 hin hvs hle hn.
+  have hlt : size vs{hr} < size r0.`2.
+  - by case: (size vs{hr} = size r0.`2) => heq; [move: hn; rewrite heq; smt() | smt()].
+  have h0 : (x{hr}, 3 * size vs{hr}) \in EA.RS.RO.m{hr} by apply hin; smt(List.size_ge0).
+  have h1 : (x{hr}, 3 * size vs{hr} + 1) \in EA.RS.RO.m{hr} by apply hin; smt(List.size_ge0).
+  have h2 : (x{hr}, 3 * size vs{hr} + 2) \in EA.RS.RO.m{hr} by apply hin; smt(List.size_ge0).
+  rewrite h0 h1 h2 /= size_rcons.
+  rewrite cands_S ?List.size_ge0 accs_S ?List.size_ge0 -hvs /cand /EA.v_of /=.
+  by split => hv; rewrite hv /=; smt().
+skip => &hr /> hr0 hn0 hlt0 hin.
+split; 1: by rewrite /accs /cands mkseq0 /=; smt(List.size_ge0).
+move=> vs; split => [hvs hle hv | hn hvs hle].
+- by rewrite (: size vs = size r0.`2) 1:/#; smt().
+have heq : size vs = size r0.`2.
+- case: (size vs < size r0.`2) => hlt; 2: smt().
+  by have := hlt0 (size vs) _; [smt(List.size_ge0) | smt()].
+by rewrite hr0 -heq -hvs.
+qed.
+
+(* ExpandA with its leakage, against the sampler and a second run of the
+   inner loop for the leakage *)
+local lemma ExpandA_ExpandASL : equiv [ExpandA(XA.RO).get ~
+  ExpandASL(EA.SampleRq(EA.RS.RO), EA.RS.RO).get :
+  ={rho} /\ XA.RO.m{1} = EA.RS.RO.m{2} ==> ={res} /\ XA.RO.m{1} = EA.RS.RO.m{2}].
+proof.
+proc.
+while (={rho, r, mA, la} /\ XA.RO.m{1} = EA.RS.RO.m{2}); last by auto.
+wp; while (={rho, r, s, mA, la} /\ XA.RO.m{1} = EA.RS.RO.m{2}); last by auto.
+exlim rho{1}, r{1}, s{1} => rho0 r0 s0.
+seq 1 1 : (={rho, r, s, mA, la, a} /\ XA.RO.m{1} = EA.RS.RO.m{2} /\
+           (rho, r, s){1} = (rho0, r0, s0) /\ pdone XA.RO.m{1} (rho0, r0, s0) (a, vs){1}).
+- call (: ={x} /\ x{1} = (rho0, r0, s0) /\ XA.RO.m{1} = EA.RS.RO.m{2} ==>
+          res{1}.`1 = res{2} /\ XA.RO.m{1} = EA.RS.RO.m{2} /\
+          pdone XA.RO.m{1} (rho0, r0, s0) res{1}).
+  + by conseq poly_sample (poly_done (rho0, r0, s0)) _ => /> /#.
+  by auto => /> _ [a vs] m /= h _ h1 h2; rewrite h /= => /#.
+exlim XA.RO.m{1}, a{1}, vs{1} => m0 a0 vs0.
+wp; call{2} (poly_rerun (rho0, r0, s0) m0 (a0, vs0)).
+by auto => />.
 qed.
 
 local lemma verify_real : equiv [MLDSA(XA.RO, SIB.XOF.RO, ROtr.RO, ROmu.RO, ROct.RO).verify ~
@@ -421,7 +623,7 @@ by sim (: XA.RO.m{1} = EA.RS.RO.m{2}).
 qed.
 
 local lemma sign_real : equiv [MLDSA(XA.RO, SIB.XOF.RO, ROtr.RO, ROmu.RO, ROct.RO).sign ~
-  MLDSAGen(ExpandAS(EA.SampleRq(EA.RS.RO)), ChalH(SIB.XOF.RO, ROct.RO), ROmu.RO).sign :
+  MLDSAGen(ExpandASL(EA.SampleRq(EA.RS.RO), EA.RS.RO), ChalH(SIB.XOF.RO, ROct.RO), ROmu.RO).sign :
   ={arg} /\ XA.RO.m{1} = EA.RS.RO.m{2} /\ ={SIB.XOF.RO.m, ROmu.RO.m, ROct.RO.m} ==>
   ={res} /\ XA.RO.m{1} = EA.RS.RO.m{2} /\ ={SIB.XOF.RO.m, ROmu.RO.m, ROct.RO.m}].
 proof.
@@ -432,9 +634,9 @@ transitivity MLDSAGen(ExpandA(XA.RO), ChalH(SIB.XOF.RO, ROct.RO), ROmu.RO).sign
    ={res} /\ XA.RO.m{1} = EA.RS.RO.m{2} /\ ={SIB.XOF.RO.m, ROmu.RO.m, ROct.RO.m}) => //.
 - by move=> &1 &2 h; exists ROct.RO.m{1} ROmu.RO.m{1} XA.RO.m{1} SIB.XOF.RO.m{1} arg{1}; move: h.
 - by proc*; call (sign_G0 XA.RO SIB.XOF.RO ROtr.RO ROmu.RO ROct.RO); auto.
-proc; seq 7 7 : (={sk, m, ct, w1, r0_fail, hint_fail, leak, rho, tr, s1, s2, t0, mA} /\
+proc; seq 5 5 : (={sk, m, ct, r0_fail, hint_fail, rho, tr, s1, s2, t0, mA, la} /\
   XA.RO.m{1} = EA.RS.RO.m{2} /\ ={SIB.XOF.RO.m, ROmu.RO.m, ROct.RO.m}).
-+ by call ExpandA_ExpandAS; auto.
++ by call ExpandA_ExpandASL; auto.
 by sim (: XA.RO.m{1} = EA.RS.RO.m{2}).
 qed.
 
@@ -638,24 +840,79 @@ proc; seq 2 2 : (={rho, mA, ROtr.RO.m} /\ size mA{2} = (k, l) /\
 by wp; call (: ={ROtr.RO.m}); [sim | auto].
 qed.
 
+local lemma ISR_read x0 a0 m0 : phoare [EA.RS.ISR.sample :
+  arg = x0 /\ EA.RS.IS.RO.m = m0 /\ m0.[x0] = Some a0 ==> res = a0 /\ EA.RS.IS.RO.m = m0] = 1%r.
+proof. by proc; auto => /> h; rewrite dRq_ll /= domE h. qed.
+
+(* The leakage of ExpandA: the same run on the two simulated XOFs *)
+local lemma poly_ideal : equiv [ExpandA(EA.RS.Sim(EA.ReprogRq, EA.RS.ISR)).poly ~
+  ExpandA(XASim).poly :
+  ={x, EA.RS.Sim.Overlay.m, EA.RS.Sim.reprog} /\
+  ra_inv EA.RS.IS.RO.m{1} RA.rho{2} RA.mA{2} RA.m{2} ==>
+  ={res, EA.RS.Sim.Overlay.m, EA.RS.Sim.reprog} /\
+  ra_inv EA.RS.IS.RO.m{1} RA.rho{2} RA.mA{2} RA.m{2}].
+proof.
+proc; wp; while (={x, cs, vs, ctx, EA.RS.Sim.Overlay.m, EA.RS.Sim.reprog} /\
+                 ra_inv EA.RS.IS.RO.m{1} RA.rho{2} RA.mA{2} RA.m{2}); 2: by auto.
+by wp; do 3! call Sim_get; auto.
+qed.
+
+local lemma ExpandASL_ideal : equiv [
+  ExpandASL(EA.RS.ISR, EA.RS.Sim(EA.ReprogRq, EA.RS.ISR)).get ~ ExpandA(XASim).get :
+  ={rho, EA.RS.Sim.Overlay.m, EA.RS.Sim.reprog} /\ rho{1} = RA.rho{2} /\
+  size RA.mA{2} = (k, l) /\ ra_inv EA.RS.IS.RO.m{1} RA.rho{2} RA.mA{2} RA.m{2} ==>
+  res{1} = (RA.mA{2}, res{2}.`2) /\ ={EA.RS.Sim.Overlay.m, EA.RS.Sim.reprog} /\
+  ra_inv EA.RS.IS.RO.m{1} RA.rho{2} RA.mA{2} RA.m{2}].
+proof.
+proc.
+while (={rho, r, la, EA.RS.Sim.Overlay.m, EA.RS.Sim.reprog} /\ rho{1} = RA.rho{2} /\
+       size RA.mA{2} = (k, l) /\ ra_inv EA.RS.IS.RO.m{1} RA.rho{2} RA.mA{2} RA.m{2} /\
+       size mA{1} = (k, l) /\ 0 <= r{1} <= k /\
+       (forall i j, 0 <= i < r{1} => 0 <= j < l => mA{1}.[i, j] = RA.mA{2}.[i, j])).
+- wp; while (={rho, r, s, la, EA.RS.Sim.Overlay.m, EA.RS.Sim.reprog} /\ rho{1} = RA.rho{2} /\
+             size RA.mA{2} = (k, l) /\ ra_inv EA.RS.IS.RO.m{1} RA.rho{2} RA.mA{2} RA.m{2} /\
+             size mA{1} = (k, l) /\ 0 <= r{1} < k /\ 0 <= s{1} <= l /\
+             (forall i j, 0 <= i < k => 0 <= j < l => (i < r{1} \/ i = r{1} /\ j < s{1}) =>
+                mA{1}.[i, j] = RA.mA{2}.[i, j])).
+  + wp; call poly_ideal.
+    exlim EA.RS.IS.RO.m{1}, rho{1}, r{1}, s{1}, RA.mA{2} => m0 rho0 r0 s0 mA0.
+    call{1} (ISR_read (rho0, r0, s0) mA0.[r0, s0] m0).
+    auto => /> &1 &2 hr hc hinv hrm hc' hr0 hrk hs0 _ hmA hsl.
+    split; 1: by rewrite hinv /honest /= hr0 hrk hs0 hsl.
+    move=> _ _ m1 mr _.
+    rewrite rows_updm cols_updm hrm hc' /=; split; 1: smt().
+    move=> i j hi0 hi hj0 hj hij; rewrite get_updm 1,2:/#.
+    case: ((i, j) = (r0, s0)) => [[-> ->] // | hne].
+    by apply hmA => //; smt().
+  auto => /> &1 &2 hr hc hinv hrm hcm hr0 _ hmA hrk.
+  split; 1: by split; [smt(gt0_l) | move=> i j *; apply hmA => /#].
+  move=> m1 mA s m2 hs _ _ _ _ hs0 hsl hmA'; split; 1: smt().
+  by move=> i j *; apply hmA' => /#.
+auto => /> &1 &2 hr hc hinv; split; 1: smt(gt0_k gt0_l).
+move=> m1 mA r m2 hr1 _ _ hrA hcA hr0 hrk hmA; apply eq_matrixP; split; 1: smt().
+by move=> i j hij; apply hmA; smt().
+qed.
+
 local lemma sign_ideal : equiv [
-  MLDSAGen(ExpandAS(EA.RS.ISR), ChalH(SIB.XOF.RO, ROct.RO), ROmu.RO).sign ~
+  MLDSAGen(ExpandASL(EA.RS.ISR, EA.RS.Sim(EA.ReprogRq, EA.RS.ISR)),
+           ChalH(SIB.XOF.RO, ROct.RO), ROmu.RO).sign ~
   MLDSAGen(MatRA, ChalH(SIB.XOF.RO, ROct.RO), ROmu.RO).sign :
-  ={sk, m} /\ sk{1}.`1 = RA.rho{2} /\
+  ={sk, m, EA.RS.Sim.Overlay.m, EA.RS.Sim.reprog} /\ sk{1}.`1 = RA.rho{2} /\
   size RA.mA{2} = (k, l) /\ ra_inv EA.RS.IS.RO.m{1} RA.rho{2} RA.mA{2} RA.m{2} /\
   ={SIB.XOF.RO.m, ROtr.RO.m, ROmu.RO.m, ROct.RO.m} ==>
-  ={res} /\ ra_inv EA.RS.IS.RO.m{1} RA.rho{2} RA.mA{2} RA.m{2} /\
+  ={res, EA.RS.Sim.Overlay.m, EA.RS.Sim.reprog} /\
+  ra_inv EA.RS.IS.RO.m{1} RA.rho{2} RA.mA{2} RA.m{2} /\
   ={SIB.XOF.RO.m, ROtr.RO.m, ROmu.RO.m, ROct.RO.m}].
 proof.
-proc; seq 7 7 : (={sk, m, ct, w1, r0_fail, hint_fail, leak, rho, tr, s1, s2, t0, mA} /\
+proc; seq 5 5 : (={sk, m, ct, r0_fail, hint_fail, rho, tr, s1, s2, t0, mA, la} /\
+  ={EA.RS.Sim.Overlay.m, EA.RS.Sim.reprog} /\
   ra_inv EA.RS.IS.RO.m{1} RA.rho{2} RA.mA{2} RA.m{2} /\
   ={SIB.XOF.RO.m, ROtr.RO.m, ROmu.RO.m, ROct.RO.m}).
 + inline{2} MatRA.get; wp.
-  exlim sk{1}.`1, RA.mA{2}, EA.RS.IS.RO.m{1} => rho0 mA0 m0.
-  call{1} (ExpandAS_read rho0 mA0 m0); auto => /> &2 hr hc hinv x h1 h2 h3 h4 h5.
-  by rewrite hinv /honest h1 h2 h3 h4 h5.
+  by call ExpandASL_ideal; auto => />.
 by sim / (ra_inv EA.RS.IS.RO.m{1} RA.rho{2} RA.mA{2} RA.m{2}) :
-  (={ct, response, leak, SIB.XOF.RO.m, ROtr.RO.m, ROmu.RO.m, ROct.RO.m}).
+  (={ct, response, leak, rho, la, EA.RS.Sim.Overlay.m, EA.RS.Sim.reprog,
+     SIB.XOF.RO.m, ROtr.RO.m, ROmu.RO.m, ROct.RO.m}).
 qed.
 
 local lemma verify_ideal : equiv [MLDSAS(EA.RS.ISR, SIB.XOF.RO, ROtr.RO, ROmu.RO, ROct.RO).verify ~

@@ -21,10 +21,10 @@ import Round ZModQ Zq MLDSAParams.
 module MLDSA_RO_DS9(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hmu : DS5.POracle4,
                     Hct : DS5.POracle5) = {
   proc keygen() : BytesPK.t * (Bytes32.t * Bytes64.t * polylvec * polykvec * polykvec) = {
-    var rho,_A,s1,s2,t,t1,t0,pk,tr;
+    var rho,_A,al,s1,s2,t,t1,t0,pk,tr;
     RO_y.RO.init();
     rho <$ dxi;
-    _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+    (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
     s1 <$ dpolyl (dpoly (-Eta) Eta);
     s2 <$ dpolyk (dpoly (-Eta) Eta);
     t <- mulmxv (invnttm _A) s1 + s2;
@@ -36,7 +36,7 @@ module MLDSA_RO_DS9(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
 
   proc sign(sk : Bytes32.t * Bytes64.t * polylvec * polykvec * polykvec, m : W8.t list) :
     BytesSig.t option * leakage = {
-     var coins,rho,tr,s1,s2,t0,_A,mu,kappa,y,w,w1,ctl,ct,c,cs1,cs2,z,r0,ct0,h,leakage,sigma,bct0,sl;
+     var coins,rho,tr,s1,s2,t0,_A,al,mu,kappa,y,w,w1,ctl,ct,c,cs1,cs2,z,r0,ct0,h,leakage,sigma,bct0,sl;
      var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
      coins <$ drnd;
@@ -46,8 +46,10 @@ module MLDSA_RO_DS9(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
      rf <- witness;
      hf <- witness;
      (rho,tr,s1,s2,t0) <- sk;
-     leakage <- kvec_leak (nttv t0);
-     _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+     leakage <- rho_leak rho;
+     (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
+     leakage <- lcat leakage al;
+     leakage <- lcat leakage (kvec_leak (nttv t0));
      mu <@ Hmu.get(tr, m);
      kappa <- 0;
      zh <- None;
@@ -58,6 +60,7 @@ module MLDSA_RO_DS9(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
        ct <@ Hct.get(mu, w1Encode w1);
        (c, sl) <@ SampleInBall_O(XC).sample(ct);
        ctl <- ((ct, c), sl);
+       leakage <- lcat leakage (ctilde_leak ct);
        leakage <- lcat leakage ctl.`2;
        leakage <- lcat leakage (poly_leak (ntt c));
        cs1 <- psmul c s1;
@@ -88,13 +91,13 @@ module MLDSA_RO_DS9(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
   }
 
   proc verify(pk : BytesPK.t, m : W8.t list, sigma : BytesSig.t) : bool = {
-    var rho,t1,c,l,ct,z,h,rb,_A,tr,mu,wapprox,w1,ctp;
+    var rho,t1,c,l,ct,z,h,rb,_A,al,tr,mu,wapprox,w1,ctp;
     w1 <- witness;
     rb <- false;
     (rho,t1) <@ PkEncDec.pkDecode(pk);
     (ct,z,h) <@ SigEncDec.sigDecode(sigma);
     if (h <> None) {
-      _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+      (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
       tr <@ Htr.get(pk);
       mu <@ Hmu.get(tr, m);
       (c,l) <@ SampleInBall_O(XC).sample(ct);
@@ -130,11 +133,11 @@ equiv sign89 :
   ==> ={res, glob DS5.RO1.RO, DS5.RO2.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O, RO_y.RO.m}.
 proof.
 proc.
-seq 15 12 : (={coins, ct, ctl, sigma, leakage, rho, tr, s1, s2, t0, _A, mu, kappa, zh, glob DS5.RO1.RO,
+seq 17 14 : (={coins, ct, ctl, sigma, leakage, rho, tr, s1, s2, t0, _A, mu, kappa, zh, glob DS5.RO1.RO,
                DS5.RO2.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O, RO_y.RO.m} /\
              s1h{1} = PolyLVec.nttv s1{1} /\ s2h{1} = PolyKVec.nttv s2{1} /\ t0h{1} = PolyKVec.nttv t0{1}).
 + wp; call (: ={DS5.RO4.RO.m}); 1: by sim.
-  call (: ={glob DS5.RO1.RO, glob XOFA_O}); 1: by sim.
+  wp; call (: ={glob DS5.RO1.RO, glob XOFA_O}); 1: by sim.
   by auto.
 seq 1 1 : (={zh, ct, sigma, leakage, glob DS5.RO1.RO, DS5.RO2.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O,
              RO_y.RO.m}).
@@ -144,7 +147,7 @@ seq 1 1 : (={zh, ct, sigma, leakage, glob DS5.RO1.RO, DS5.RO2.RO.m, DS5.RO4.RO.m
   - wp; call (: ={DS5.RO2.RO.m}); 1: by sim.
     wp; call (: ={DS5.RO5.RO.m}); 1: by sim.
     wp; call (: ={RO_y.RO.m}); 1: by sim.
-    auto => /> &2 _ y; rewrite !invnttv_ntt_mulmxv /= => cl.
+    auto => /> &2 _ y; rewrite !invnttv_ntt_mulmxv /= => ct c.
     by rewrite !PolyLVec.invnttv_ntt_smul !PolyKVec.invnttv_ntt_smul /=; smt().
   by auto => />.
 by if => //; wp; call (: true); [by sim | auto].

@@ -13,11 +13,28 @@ of the hash functions.
 
 The specification and the hops use the flat leakage model of
 `security/utils/Leakage.ec`: the trace of a signing is the `lcat` of the
-declassified values (the NTT representation of t0, then per iteration the
-pairs (position, byte) of the SampleInBall rejection loop, the NTT
-representation of c, and the index of the first failing polynomial of each
-rejection test, see spec/MLDSA.ec). The target's trace is the same, so
-hops 15 and 16 are plain equalities of leakage.
+declassified values (once, the bytes of rho (`rho_leak`), the leakage of
+ExpandA (for each entry of A, `rej_leak` of all the candidates read by
+RejNTTPoly, accepted or rejected) and the NTT representation of t0; then
+per iteration the bytes of c~ (`ctilde_leak`), the leakage of SampleInBall
+(its 8 sign bytes (`signs_leak`) and the pairs (position, byte) of its
+rejection loop), the NTT representation of c, and the index of the first
+failing polynomial of each rejection test, see spec/MLDSA.ec). ExpandA
+returns its leakage with the matrix, and the signing procedure appends the
+three first items explicitly, in every hop; keygen and verify ignore the
+leakage of ExpandA. From hop 13 on the items of rho and t0 are the ones of
+the target (`MP.T.rho_leak`, `MP.T.t0_leak`; `rho_leakE`, `t0_leak_E`),
+and from hop 14 on ExpandA is the one of the target, whose leakage
+(`MP.T.cands_leak`) is the same list of integers (`expandA_14`). In the
+specification and in every hop, the leakage of c~ is an explicit item of
+the signing loop, right after the challenge oracle
+(`leakage <- lcat leakage (ctilde_leak ct)`), and the challenge oracle (`SIB_RO`, `SIB_RO_O`, `ctl <- ((ct, c), sl)` in hops 1 to
+14) returns the leakage of SampleInBall only; from hop 15 on the item is
+`ct_leak ct`, right after the query to Hct, as in the target. The target's
+trace is the same (`ct_enc` and `rho_enc` are instantiated by the bytes of
+c~ and of rho in MLDSATargetFIPS, `ct_leakE`, `rho_leakE`, `bytes_leakE`),
+so hops 15 and 16 are plain
+equalities of leakage, up to the associativity of `lcat`.
 
 The proof is generic in the parameter set. Every file is an abstract theory
 and the files form a single chain of `clone include`:

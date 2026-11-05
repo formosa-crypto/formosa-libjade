@@ -77,19 +77,19 @@ split; 1: smt().
 apply/List.allP => x /mkseqP [j [hj ->]] /=; smt(highbits2_rng).
 qed.
 
-lemma expandA_size : hoare [MP.T.ExpandA(DST.RO1.RO).get : true ==> rows res = kvec /\ cols res = lvec].
+lemma expandA_size : hoare [MP.T.ExpandA(DST.RO1.RO).get : true ==> rows res.`1 = kvec /\ cols res.`1 = lvec].
 proof.
 proc.
 while (rows mA = kvec /\ cols mA = lvec).
 + wp; while (rows mA = kvec /\ cols mA = lvec).
-  * wp; while (rows mA = kvec /\ cols mA = lvec); 1: by inline *; auto.
+  * wp; call (: true); 1: by while true; [inline *; auto | auto].
     by auto => /> *; smt(size_updm).
   by auto.
 by auto => />; smt(gt0_k gt0_l).
 qed.
 
 equiv expandA_eq_size : MP.T.ExpandA(DST.RO1.RO).get ~ MP.T.ExpandA(DST.RO1.RO).get :
-  ={rho, DST.RO1.RO.m} ==> ={res, DST.RO1.RO.m} /\ rows res{1} = kvec /\ cols res{1} = lvec.
+  ={rho, DST.RO1.RO.m} ==> ={res, DST.RO1.RO.m} /\ rows res{1}.`1 = kvec /\ cols res{1}.`1 = lvec.
 proof. by conseq (_ : ={rho, DST.RO1.RO.m} ==> ={res, DST.RO1.RO.m}) expandA_size _; sim. qed.
 
 (*************** G16: the scheme of the target, with y from the table ****************)
@@ -105,7 +105,7 @@ module MLDSA_Y(XA : MP.T.XOF_A, XC : MP.T.SIB.XOF_t, Htr : MP.T.Hash_tr, Hmu : M
     var c : polyXnD1;
     var ct : BytesCT.t;
     var ctr : int;
-    var rho, tr, s1, s2, t0, mA, mu, y, yv, w, w0, w1;
+    var rho, tr, s1, s2, t0, mA, la, mu, y, yv, w, w0, w1;
     var lc, leak;
     var ct0_ok : bool;
     var z_fail, r0_fail, hint_fail : int option;
@@ -113,8 +113,10 @@ module MLDSA_Y(XA : MP.T.XOF_A, XC : MP.T.SIB.XOF_t, Htr : MP.T.Hash_tr, Hmu : M
     r0_fail <- witness;
     hint_fail <- witness;
     (rho, tr, s1, s2, t0) <- sk;
-    leak <- MP.T.t0_leak t0;
-    mA <@ MP.T.ExpandA(XA).get(rho);
+    leak <- MP.T.rho_leak rho;
+    (mA, la) <@ MP.T.ExpandA(XA).get(rho);
+    leak <- lcat leak la;
+    leak <- lcat leak (MP.T.t0_leak t0);
     mu <@ Hmu.get(tr, m);
     response <- None;
     ctr <- 0;
@@ -124,6 +126,7 @@ module MLDSA_Y(XA : MP.T.XOF_A, XC : MP.T.SIB.XOF_t, Htr : MP.T.Hash_tr, Hmu : M
       w <- mA *^ y;
       w1 <- highBitsV w;
       ct <@ Hct.get(w1, mu);
+      leak <- lcat leak (MP.T.ct_leak ct);
       (c, lc) <@ MP.T.SIB.SampleInBall(XC).get(ct);
       leak <- lcat leak lc;
       leak <- lcat leak (MP.T.c_leak c);
@@ -208,7 +211,7 @@ call expandA_eq_size.
 rnd.
 inline RO_y.RO.init.
 auto => />.
-move=> rho _ mA hrow hcol _ s1 _ hs1 _ s2 _ hs2 [r1 r2] /= -> ->.
+move=> rho _ [mA la] /= hrow hcol _ s1 _ hs1 _ s2 _ hs2 [r1 r2] /= -> ->.
 have hsz2 : size s2 = kvec by move: hs2 => /size_dvector; smt(gt0_k).
 have hsz : size (mA *^ s1 + s2) = kvec by rewrite size_addv size_mulmxv hrow hsz2; smt().
 have hv := b2hb_valid _ hsz.
@@ -224,10 +227,10 @@ equiv sign_16 :
 proof.
 proc.
 inline{2} MLDSA_Y(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign.
-seq 9 13 : (coins{1} = coins0{2} /\ ={ct, mA, mu, s1, s2, t0, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO4.RO,
-               glob DST.RO5.RO, RO_y.RO.m} /\ kappa{1} = ctr{2} /\ zh{1} = response{2} /\ leakage{1} = leak{2}).
+seq 11 15 : (coins{1} = coins0{2} /\ ={ct, mA, mu, s1, s2, t0, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO4.RO,
+                glob DST.RO5.RO, RO_y.RO.m} /\ kappa{1} = ctr{2} /\ zh{1} = response{2} /\ leakage{1} = leak{2}).
 + wp; call (: ={glob DST.RO4.RO}); 1: by sim.
-  call (: ={glob DST.RO1.RO}); 1: by sim.
+  wp; call (: ={glob DST.RO1.RO}); 1: by sim.
   by auto.
 seq 1 1 : (coins{1} = coins0{2} /\ ={ct, mA, mu, s1, s2, t0, glob DST.RO1.RO, glob DST.RO2.RO, glob DST.RO4.RO,
                glob DST.RO5.RO, RO_y.RO.m} /\ kappa{1} = ctr{2} /\ zh{1} = response{2} /\ leakage{1} = leak{2}).

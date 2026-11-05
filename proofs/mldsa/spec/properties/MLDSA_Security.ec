@@ -138,9 +138,11 @@ proof. by proc; auto. qed.
 equiv expandA_T : MP.T.ExpandA(DST.RO1.RO).get ~ MP.T.ExpandA(MP.T.XA.RO).get :
   ={rho} /\ DST.RO1.RO.m{1} = MP.T.XA.RO.m{2} ==> ={res} /\ DST.RO1.RO.m{1} = MP.T.XA.RO.m{2}.
 proof.
-proc; while (={mA, r, rho} /\ DST.RO1.RO.m{1} = MP.T.XA.RO.m{2}); 2: by auto.
-wp; while (={mA, r, s, rho} /\ DST.RO1.RO.m{1} = MP.T.XA.RO.m{2}); 2: by auto.
-wp; while (={mA, r, s, rho, cs, ctx} /\ DST.RO1.RO.m{1} = MP.T.XA.RO.m{2}); 2: by auto.
+proc; while (={mA, la, r, rho} /\ DST.RO1.RO.m{1} = MP.T.XA.RO.m{2}); 2: by auto.
+wp; while (={mA, la, r, s, rho} /\ DST.RO1.RO.m{1} = MP.T.XA.RO.m{2}); 2: by auto.
+wp; call (: ={x} /\ DST.RO1.RO.m{1} = MP.T.XA.RO.m{2} ==> ={res} /\ DST.RO1.RO.m{1} = MP.T.XA.RO.m{2});
+  2: by auto.
+proc; while (={x, cs, vs, ctx} /\ DST.RO1.RO.m{1} = MP.T.XA.RO.m{2}); 2: by auto.
 by wp; call ro1_T; call ro1_T; call ro1_T; auto.
 qed.
 
@@ -186,8 +188,8 @@ while (={response, ctr, leak, ct, mA, mu, s1, s2, t0} /\
        DST.RO1.RO.m{1} = MP.T.XA.RO.m{2} /\ DST.RO2.RO.m{1} = MP.T.SIB.XOF.RO.m{2} /\
        DST.RO3.RO.m{1} = MP.T.ROtr.RO.m{2} /\ DST.RO4.RO.m{1} = MP.T.ROmu.RO.m{2} /\
        DST.RO5.RO.m{1} = MP.T.ROct.RO.m{2}).
-+ wp; call sib_T; call ro5_T; auto.
-wp; call ro4_T; call expandA_T; auto.
++ wp; call sib_T; wp; call ro5_T; auto.
+wp; call ro4_T; wp; call expandA_T; auto.
 qed.
 
 equiv verify_T :
@@ -259,7 +261,8 @@ declare module A <: DS2.Adversary {
   -MP.SD.FSaCR.DSS.DS.Stateless.O_CMA_Default, -MP.SD.H, -MP.SD.OpBasedSig,
   -MP.SD.O_CMA_Default_G, -MP.SD.RO_G, -MP.SD.OpBasedSigG,
   -MP.SD.CMAtoKOA.ORedKOA, -MP.SD.CMAtoKOA.CountS, -MP.SD.CMAtoKOA.CountH,
-  -MP.SD.SIB.ORedXOFROC, -MP.SD.SIB.XOF.RO, -MP.SD.SIB.ROC.RO, -MP.SD.XOF,
+  -MP.SD.SIB.ORedXOFROC, -MP.SD.SIB.XOF.RO, -MP.SD.SIB.ROC.RO, -MP.SD.SIB.ROC.FRO, -MP.SD.XOF,
+  -MP.SD.HctRO.RO, -MP.SD.HctRO.FRO, -MP.SD.CacheRO,
   -MP.SD.DSSXOF.DS.Stateless.O_CMA_Default,
   -MP.SD.CountS, -MP.SD.CountH, -MP.SD.CountX, -MP.SD.CountSX, -MP.SD.OConv,
   -MP.SD.G, -MP.SD.RqStMSIS.Std.PRO.RO, -MP.SD.RqStMSIS.ORed,
@@ -548,8 +551,11 @@ lemma mldsa_secure (eps : real) &m :
          MP.SD.RqStMSIS.RedStd(MP.SD.FiberSamplerRej,
                                MP.SD.RedMSIS(MP.SD.RedNMA(MP.SD.RedXOF(MP.RedMLDSA(B(A)))))),
          MP.SD.RqStMSIS.Std.PRO.RO).main() @ &m : res]
-    (* Fiat-Shamir with aborts: the leakage of the rejected iterations *)
-  + ((lvec + kvec + kvec + 2)%r * MP.T.qS%r * ((MP.T.qXC + 2) + MP.T.qS + 1)%r * MP.eps_comm / (1%r - MP.SD.p_rej) +
+    (* Fiat-Shamir with aborts: the leakage of the rejected iterations
+       (with c~ leaked at every iteration, the Hct queries are the queries
+       to the oracle of the chain: [MP.T.qHct], which, like [MP.T.qXC]
+       before, only has to dominate the SHAKE256 bound [qH], [qHct_dom]) *)
+  + ((lvec + kvec + kvec + 2)%r * MP.T.qS%r * ((MP.T.qHct + 2) + MP.T.qS + 1)%r * MP.eps_comm / (1%r - MP.SD.p_rej) +
      MP.T.qS%r * MP.eps_comm * (MP.T.qS%r + 1%r) / (2%r * (1%r - MP.SD.p_rej) ^ 2))
   + MP.eps_check
     (* collisions of the hash functions of the target *)

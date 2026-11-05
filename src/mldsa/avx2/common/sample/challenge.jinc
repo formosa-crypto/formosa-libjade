@@ -52,6 +52,13 @@ namespace sample {
                     ms = #update_msf(!condition_refill, ms);
                 }
                 sample_at = (64u) xof_block[xof_offset];
+                // Model item (signing): the SampleInBall leakage, the bytes
+                // read as positions. A public function of the seed (the
+                // declassified c~ when signing, the signature when
+                // verifying), but the checker types xof_block secret: an
+                // array is typed from its uninitialised content joined with
+                // its writes (here, and in the Keccak state of the SHAKE256
+                // wrappers).
                 () = #declassify(sample_at);
                 sample_at = #protect(sample_at, ms);
 

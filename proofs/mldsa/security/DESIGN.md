@@ -403,9 +403,9 @@ presentation (`../doc/proof_overview.tex`).
 3. **One signing loop in `MLDSAProof`.** `MLDSAGen(MG, CG, Hmu)`
    (`MLDSAProof_Games.ec`) is the signing procedure of every game: `MatGen`
    says how the matrix is obtained from `rho`, `ChalGen` how the challenge is
-   obtained from `(w1, mu)` (`get` at every iteration, `final` once after
-   the loop on acceptance, so that G2 computes `c~` only for the accepted
-   iteration, as `bound_ct` requires). The loop is guarded by the counter
+   obtained from `(w1, mu)` (`get` at every iteration; since `c~` is leaked
+   at every iteration, branch `mldsa-leak-ctilde`, `get` also returns `c~`
+   and the former `final` is gone). The loop is guarded by the counter
    only (the body is skipped once a response exists) so that two instances
    run in lockstep in the up-to-bad step; `sign_G0` relates it to the loop
    of `MLDSATarget.MLDSA`. The hops are oracle swaps (`sim`/`call` on the
@@ -461,3 +461,150 @@ strengthens `lazy_eager`. The restriction propagates to `RejectionRO.ec`
 (`S`, `S1`, `S2` declared `{+Empty}`, the distinguisher of `TwoSteps` also
 excluded from `SRaw1`/`SRaw2`); the concrete samplers of `SampleInBallEquiv`
 and `ExpandAEquiv` are stateless, so their instantiations are unchanged.
+
+# Leaking the commitment hash `c~` (branch `mldsa-leak-ctilde`)
+
+Every signing iteration may declassify `c~ = Hct(w1, mu)`. The bottom of the
+stack is changed as follows (the chain `FSabort`, `ReprogHybrid`,
+`FSa_CMAtoKOA`, `FSa_CRtoGen`, `IDSabort` is unchanged: it is generic in the
+challenge type and only needs `dC` lossless).
+
+- `SampleInBallEquiv`: the leakage of `SampleInBall` also contains the 8 sign
+  bytes: `sib_leak ir r = lcat (bytes_leak ir.1) (full_leak ir r)` (and the
+  same in the real algorithm). With the pairs `(ctx, j)` it contains every
+  byte read on the XOF, in order: `leak_to_streamK : leak_to_stream
+  (sib_leak ir r) = stream (ir, r)`. A reduction can therefore rebuild the
+  whole consumed XOF stream of a rejected iteration from its leakage.
+- `SimplifiedScheme`: abstract `type ctilde`, lossless `dct`, injective
+  encoding `ct_enc` (`ct_encK`), `ct_leak ct = [ct_decl ct]` with the
+  decoding `ct_of_leak` (`ct_of_leakK`). The challenge of the chain is the
+  triple `challenge_t = SIB.challenge_ir * leakage * ctilde`, distributed as
+  `dC_t = dmap ((SIB.dI `*` SIB.dLeakRej) `*` dct) flat3`; `c~` is
+  independent of the rest, so the fibre of the SelfTargetMSIS reduction is
+  `dmap ((CF.dfiber r `*` SIB.dLeakRej) `*` dct) flat3` and
+  `FiberSamplerRej` also samples `c~ <$ dct`. The per-iteration leakage
+  (`resp_leak`, `DilithiumR.sign`) is the flat target format:
+  `ct_leak c~`, the SampleInBall leakage `sib_leak`, `c_leak c`, the test
+  outcomes (`t0_leak t0` first, prepended by `RedXOF`).
+- The XOF world has one random oracle on a sum type, `xin = XB ((w1, mu), i)
+  | XH (w1, mu)` with outputs `OB byte | OH ctilde`; `DilithiumXOF(H) =
+  DilithiumR(SampleInBall(XofOf(H)), HctOf(H))`, signatures `SigXOF = ctilde *
+  Rq * response_t`, `verify` checks both `c` and `c~`. `CountX` counts the
+  distinct points `(w1, mu)` over both kinds of queries. `RedXOF` answers the
+  byte queries with `Sim` on the first two components of its random oracle
+  and the hash queries with the third, both through a cache (`CacheRO`) so
+  that the random oracle of the simplified scheme is queried once per point
+  (query bound unchanged).
+- `pr_xof_ro` (no bound lost): split of the sum oracle into the XOF and the
+  commitment hash `HctRO` (`pr_sum`, an invariant), `adv_xof_roc`, merge of
+  the two lazy random oracles `SIB.ROC` and `HctRO` on the same points into
+  one random oracle on the product by eager sampling of each at the points
+  of the other (`pr_eager`, `PROM.FullEager.RO_LRO_D` twice), and the
+  invariant `jrel` with the random oracle of the simplified scheme behind
+  the cache (`pr_merge`). This is done inside `SimplifiedScheme` rather than
+  in a generic `ROProduct` theory: the eager steps need the distinguisher to
+  be the whole game, and the oracles are the existing PROM clones
+  (`SIB.ROC`, `HctRO`).
+
+Layers C and D (target model and `MLDSAProof_*`):
+
+- `MLDSATarget`: abstract encoding `ct_enc`/`ct_dec` (`ct_encK`) of `c~`,
+  `ct_leak ct = [List (map Int (ct_enc ct))]`; `MLDSA.sign` leaks
+  `ct_leak ct` right after `ct <@ Hct.get(w1, mu)`, at every iteration, then
+  the SampleInBall leakage (with the sign bytes), `c_leak c` and the
+  outcomes. `MLDSAGen` (all the games) does the same, and so does the FIPS
+  specification (`spec/MLDSA.ec`: `ctilde_leak ct` right after the
+  challenge oracle, which returns the SampleInBall leakage only).
+- G2 (`MLDSAProof_Games`): `Hct` is the `XH` part of the random oracle
+  `SD.XOF` of `SimplifiedScheme` (`HctT.sample` for the signer, `HctT.get`
+  for the adversary, which also records `c~ -> (w1, mu)` in `tinv`); the
+  signer (`ChalX`) computes `c~` and `SampleInBall` on `(w1, mu)` at every
+  iteration and records the consumed stream in `leakT`; `XCSim(c~, i)`
+  answers from `LX` if already asked there, else from the stream of
+  `leakT`, else from `SD.XOF` on `tinv[c~]`, else from `LX`. The bad event
+  `HctT.bad` is set when a fresh `c~` is already an output or was already
+  queried to `LX`. The reduction fills `leakT` by decoding the leakage
+  (`upd_leakT`, a state machine `pstep` over the items) and takes `c~` from
+  the signature of `SimplifiedScheme`; its query bound is `qHct` points
+  (`SD.qH = qHct + 2`).
+- G1 -> G2 (`MLDSAProof_Collisions`): both games sample `c~` at the same
+  moments, so the step is a direct up-to-bad step on `HctT.bad` (the eager
+  sampling and the final flush of the former proof are gone). The invariant
+  `rel` relates `Hct` of G1 to the `XH` entries, the XOF of G1 to `LX` and
+  the `XB` entries (an `LX` entry on an output of `Hct` is only beyond the
+  consumed stream of a `c~` of the signer), and the consumed streams are
+  complete (`complete`: SampleInBall stops exactly at their end). When the
+  signer runs again on a point already signed, its reads stay inside the
+  recorded stream (`sbinv`, `SB_eq`), which replaces a determinism lemma.
+  `bound_ct` is obtained by `TableCollision` on G2 directly (`Act`: the
+  table is the `XH` part, every `c~` queried to `XC` is put). No new term.
+- G2 -> G3 (`MLDSAProof_Reduction`): an exact step up to the bad flags. The
+  shared state is equal on both sides (`SD.XOF.m`, `LX`, `tinv`, `leakT`,
+  `HmuB`, `ROtr`, `XASim`, `RA`), the reduction returns the leakage of
+  `SimplifiedScheme` unchanged (same format), and under `!HctT.bad` the
+  invariant `ginv` holds: every output of `Hct` is in `tinv` or `leakT`,
+  every `c~` of `leakT` has a preimage whose `mu` was signed, an `LX` entry
+  on an output belongs to a `c~` of `leakT`. Hence a fresh forgery has its
+  `c~` in `tinv` and no `LX` entry, and `XCSim` on it is the XOF of
+  `SimplifiedScheme` on `tinv[c~]` (determinism of SampleInBall, `sib_det`).
+  The byte queries of the reduction are on points of `tinv`, already queried
+  through `XH`: the reduction queries at most `qHct + 1` points (`B_bound`).
+- Bound of `MLDSA_secure`: unchanged except `(qXC + 2)` -> `(qHct + 2)` in the
+  FS+abort term (a query to `Hct` alone now tests a candidate `w1` against a
+  leaked `c~`). At the FIPS level (`MLDSA_Security`) both `qXC` and `qHct`
+  are bounded by the SHAKE query bound `qH`, so the final bound is the same.
+
+# Leaking `rho` and the candidates of ExpandA (branch `mldsa-leak-ctilde`)
+
+The signing procedure of the implementation also declassifies the seed
+`rho` of the matrix (`sign.jinc`) and, in ExpandA, every candidate read on
+the XOF of ExpandA before the test `v < q` (`rejection_sample.jinc`: the
+scalar loops declassify the 23-bit candidate, the AVX2 loop the mask of the
+tests on 8 candidates, a function of the candidates). The trace of
+`MLDSATarget.MLDSA.sign` starts with these items, once, before `t0`:
+
+```
+leak <- rho_leak rho;                  (* [List (map Int (rho_enc rho))] *)
+(mA, la) <@ ExpandA(XA).get(rho);      (* la: per entry (r, s), in loop order, *)
+leak <- lcat leak la;                  (*   cands_leak vs = [List (map Int vs)] *)
+leak <- lcat leak (t0_leak t0);
+```
+
+`ExpandA.poly(x)` returns the entry with the list `vs` of all its candidates
+(accepted and rejected), `ExpandA.get` the matrix with the `lcat` of the
+`cands_leak vs`. `rho_enc` is abstract with a left inverse (`rho_encK`,
+realized by the bytes of `rho` in `MLDSATargetFIPS`); the proof does not use
+the inverse (the reduction knows `rho`). The leakage is a function of `rho`
+(public) and of the XOF of ExpandA, to which the adversary has access, so
+no term of the bound changes and `qXA` is unchanged (the signer's queries to
+the XOF of ExpandA are not queries of the adversary, and the reduction
+answers them without querying SimplifiedScheme).
+
+- `MLDSAGen` (all the games): `MatGen.get` returns the matrix and the
+  leakage of ExpandA; the leakage of `rho` and of ExpandA is prepended to the
+  trace at the end (`lcat (lcat (rho_leak rho) la) leak`), so that the
+  variable `leak` of the loop is still the trace of `SD.DilithiumR`, relayed
+  unchanged by the reduction; `sign_G0` relates the two forms (`catA`).
+- G1, G2: `MatRA.get` returns `RA.mA` and the leakage of a run of
+  `ExpandA(XASim)` on `RA.rho`, the simulated XOF of the adversary.
+  `ExpandA_XASim_ll` (MLDSAProof_Games): the first query on an entry
+  reprograms its stream, the loop then reads a lazy random oracle on which
+  it terminates (`EA.SampleRq_ll`); it gives the termination of the signers
+  of G1/G2 and of the reduction.
+- G0 -> G1 (MLDSAProof_ExpandA): in the distinguisher of `EA.RS`, the
+  signer computes each entry with the sampler and its candidates by a
+  second run of the inner loop of ExpandA on the XOF `R` of the adversary
+  (`ExpandASL`). On the real side the second run reads the bytes that the
+  sampler has just read: `poly_done` (the first run leaves in the map all
+  the bytes it read, `pdone`) and `poly_rerun` (a run on such a map returns
+  the same result without sampling); no eager or determinism argument on
+  the whole game is needed. On the ideal side the second run is the run of
+  `MatRA` on the simulated XOF (`poly_ideal`, from `Sim_get`), and the
+  entries of the sampler are those of `RA.mA` (`ExpandASL_ideal`).
+- G1 -> G2: the signers call `ExpandA(XASim)` in lockstep (`glob XASim` is
+  in the invariants).
+- G2 -> G3: `SignRed` computes `ExpandA(XASim).get(RA.rho)` (the reduction
+  runs `XASim` on `RA.rho` and the matrix of SimplifiedScheme) and returns
+  `lcat (lcat (rho_leak RA.rho) la) lk`; `sign_red` carries `la{1} = la{2}`
+  and `rho{1} = RA.rho{2}` to the end. `B_bound`, `B_ll`: no new query.
+- Bound of `MLDSA_secure`: unchanged.

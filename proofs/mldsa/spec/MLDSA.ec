@@ -12,19 +12,33 @@ clone include Sampling.SamplingT.
 import PolyLVec PolyKVec PolyMat.
 import Round ZModQ Zq MLDSAParams.
 
-(* Flat leakage model (Leakage.ec): the trace of a signing is the
-   concatenation, with [lcat], of the declassified values, in the order in
-   which they are declassified:
-   - the NTT representation of t0, once, at the decoding of the key;
-   - per iteration: the leakage of SampleInBall (pairs (position, byte) of
-     the rejection loop), the NTT representation of c, then the outcome of
-     the rejection tests as short-circuit cascades over the polynomials:
-     the index of the first polynomial of z out of range (or -1), then,
-     when z passed, the same for w0 - c s2, then, when it passed, the first
-     polynomial at which the weight of the hint exceeds w_hint (or -1).
+(* Flat leakage model (Leakage.ec): the trace of a signing ([sign_derand],
+   [sign_eager]) is the concatenation, with [lcat], of the declassified
+   values, one item each, in the order in which they are declassified:
+   - once, at the start of signing, after the decoding of the key:
+     - [rho_leak rho]: the bytes of the seed rho of A (spec/Sampling.ec);
+     - the leakage of [ExpandA] (spec/Sampling.ec): for each entry of A, in
+       the order of ExpandA, [rej_leak vs], the list [vs] of all the
+       candidates read by RejNTTPoly on the XOF (the 23-bit integers
+       [rej_cand] of the 3-byte groups, accepted or rejected);
+     - [kvec_leak t0h]: the NTT representation of t0;
+   - per iteration of the loop:
+     - [ctilde_leak ct]: the bytes of c~, right after the challenge oracle
+       [RO.get] (c~ = H(mu, w1Encode w1));
+     - the leakage of the challenge oracle [RO.get] (for [SIB_RO]: the
+       leakage of [SampleInBall] on c~, spec/Sampling.ec): [signs_leak s],
+       its 8 sign bytes, then [pairs_to_leakage leak], the pairs (stream
+       position, byte) of its rejection loop;
+     - [poly_leak ch]: the NTT representation of c;
+     - [oileak zf]: the index of the first polynomial of z out of range
+       (or -1);
+     - when z passed, [oileak rf]: the same for w0 - c s2;
+     - when w0 - c s2 passed, [oileak hf]: the first polynomial at which
+       the weight of the hint exceeds w_hint (or -1).
    The test ||c t0|| < gamma2 is a public computation (c and t0 are leaked)
-   and is not in the trace. Nothing else is leaked: the control flow of the
-   loop is a function of the trace. *)
+   and is not in the trace. Nothing else is leaked: the control flow of
+   ExpandA and of the loop is a function of the trace. Key generation and
+   verification return no trace (they ignore the leakage of ExpandA). *)
 
 op poly_decl (p : poly) : decl = List (map (fun (c : coeff) => Int (asint c)) (Array256.to_list p)).
 op poly_leak (p : poly) : leakage = [poly_decl p].
@@ -127,10 +141,10 @@ qed.
 
 module MLDSA(XOFA : XOF_RejNTTPoly, XOFS : XOF_RejBPoly, XOFSIB : XOF_SIB, RO : LeakyRO) = {
    proc keygen_derand(eps : Bytes32.t) : BytesSK.t * BytesPK.t= {
-     var sk,rho,rhop,_K,_A,s1,s2,t,t1,t0,pk,tr,epsp;
+     var sk,rho,rhop,_K,_A,al,s1,s2,t,t1,t0,pk,tr,epsp;
      epsp <- Bytes34.of_list (Bytes32.to_list eps ++ [W8.of_int kvec;W8.of_int lvec]);
      (rho,rhop,_K) <- H_seed epsp;
-     _A <@ ExpandA(XOFA).sample(rho);
+     (_A,al) <@ ExpandA(XOFA).sample(rho);
      (s1,s2) <@ ExpandS(XOFS).sample(rhop);
      t <- invnttv (ntt_mulmxv _A (nttv s1)) + s2;
      (t1,t0) <- Power2Round t;
@@ -141,7 +155,7 @@ module MLDSA(XOFA : XOF_RejNTTPoly, XOFS : XOF_RejBPoly, XOFSIB : XOF_SIB, RO : 
   }
 
   proc sign_derand(sk : BytesSK.t, m : W8.t list, coins : rnd_) : BytesSig.t option * leakage = {
-     var rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,rhopp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
+     var rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,al,mu,rhopp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
          cs2,z,r0,ct0,h,leakage,sigma,bct0;
      var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
@@ -154,8 +168,10 @@ module MLDSA(XOFA : XOF_RejNTTPoly, XOFS : XOF_RejBPoly, XOFSIB : XOF_SIB, RO : 
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
-     leakage <- kvec_leak t0h;
-     _A <@ ExpandA(XOFA).sample(rho);
+     leakage <- rho_leak rho;
+     (_A,al) <@ ExpandA(XOFA).sample(rho);
+     leakage <- lcat leakage al;
+     leakage <- lcat leakage (kvec_leak t0h);
      mu <- H_mu tr m;
      rhopp <- H_rhopp _K coins mu;
      kappa <- 0;
@@ -166,6 +182,7 @@ module MLDSA(XOFA : XOF_RejNTTPoly, XOFS : XOF_RejBPoly, XOFSIB : XOF_SIB, RO : 
        w1 <- polykvec_HighBits w;
        ctl <@ RO(XOFSIB).get(mu,w1Encode w1);
        (ct,c) <- ctl.`1;
+       leakage <- lcat leakage (ctilde_leak ct);
        leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
        leakage <- lcat leakage (poly_leak ch);
@@ -199,7 +216,7 @@ module MLDSA(XOFA : XOF_RejNTTPoly, XOFS : XOF_RejBPoly, XOFSIB : XOF_SIB, RO : 
   (* Eager variant: decomposes w into (w0,w1) immediately, then uses w0 - cs2.
      The Jasmin implementation follows this order. *)
   proc sign_eager(sk : BytesSK.t, m : W8.t list, coins : rnd_) : BytesSig.t option * leakage = {
-     var rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,rhopp,kappa,y,w,w0,w1,ctl,ct,c,ch,cs1,
+     var rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,al,mu,rhopp,kappa,y,w,w0,w1,ctl,ct,c,ch,cs1,
          cs2,z,r0,ct0,h,leakage,sigma,bct0;
      var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
@@ -212,8 +229,10 @@ module MLDSA(XOFA : XOF_RejNTTPoly, XOFS : XOF_RejBPoly, XOFSIB : XOF_SIB, RO : 
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
-     leakage <- kvec_leak t0h;
-     _A <@ ExpandA(XOFA).sample(rho);
+     leakage <- rho_leak rho;
+     (_A,al) <@ ExpandA(XOFA).sample(rho);
+     leakage <- lcat leakage al;
+     leakage <- lcat leakage (kvec_leak t0h);
      mu <- H_mu tr m;
      rhopp <- H_rhopp _K coins mu;
      kappa <- 0;
@@ -226,6 +245,7 @@ module MLDSA(XOFA : XOF_RejNTTPoly, XOFS : XOF_RejBPoly, XOFSIB : XOF_SIB, RO : 
        w1 <- polykvec_HighBits w;
        ctl <@ RO(XOFSIB).get(mu,w1Encode w1);
        (ct,c) <- ctl.`1;
+       leakage <- lcat leakage (ctilde_leak ct);
        leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
        leakage <- lcat leakage (poly_leak ch);
@@ -257,13 +277,13 @@ module MLDSA(XOFA : XOF_RejNTTPoly, XOFS : XOF_RejBPoly, XOFSIB : XOF_SIB, RO : 
   }
 
   proc verify(pk : BytesPK.t, sigma : BytesSig.t, m : W8.t list) : bool = {
-    var rho,t1,c,l,ct,z,h,rb,_A,tr,mu,wapprox,w1,ctp;
+    var rho,t1,c,l,ct,z,h,rb,_A,al,tr,mu,wapprox,w1,ctp;
     w1 <- witness;
     rb <- false;
     (rho,t1) <@ PkEncDec.pkDecode(pk);
     (ct,z,h) <@ SigEncDec.sigDecode(sigma);
     if (h <> None) {
-      _A <@ ExpandA(XOFA).sample(rho);
+      (_A,al) <@ ExpandA(XOFA).sample(rho);
       tr <- H_tr pk;
       mu <- H_mu tr m;
       (c,l) <@ SampleInBall(XOFSIB).sample(ct); (* we don't care about leakage in verify *)
@@ -293,10 +313,11 @@ lemma sign_eager_equiv :
       ={res} ].
 proof.
 proc.
-(* Break seq 15 15 into: 5 witness assignments (sim), skDecode (equiv bridge
+(* Break seq 17 17 into: 5 witness assignments (sim), skDecode (equiv bridge
    skDecode_equiv_bound which yields infnorm_lt s2), 3 nttv assignments and
-   the leakage of t0h (auto yields s2h = nttv s2), 5 remaining assignments (sim). *)
-seq 15 15 : (={rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp,
+   the leakage of rho (auto yields s2h = nttv s2), ExpandA and the 6 remaining
+   assignments (sim). *)
+seq 17 17 : (={rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp,
                kappa, zh, leakage, sigma, ct, ctl, rf, hf,
                glob MLDSA_XOFA, glob MLDSA_XOFS, glob MLDSA_XOF_SIB, glob SIB_RO}
             /\ PolyKVec.infnorm_lt s2{1} (Eta + 1)
@@ -327,7 +348,7 @@ while (={rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu, rhopp,
         /\ s2h{1} = nttv s2{1}); last by auto => />.
 (* up to the z test: same z, same z cascade; cs2 is not computed yet, its
    bound is stated on its definition *)
-seq 12 13 : (={_K, tr, s1, s2, t0,
+seq 13 14 : (={_K, tr, s1, s2, t0,
                    w, w1, c, ch, cs1, z, zf, ct, ctl, leakage, rf, hf,
                    rho, s1h, s2h, t0h, _A, mu, rhopp, kappa, zh, sigma,
                    glob MLDSA_XOFA, glob MLDSA_XOFS,  glob SIB_RO}

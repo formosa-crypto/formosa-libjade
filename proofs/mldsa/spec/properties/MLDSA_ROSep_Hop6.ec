@@ -23,12 +23,12 @@ import Round ZModQ Zq MLDSAParams.
 module MLDSA_RO_DS6(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hmu : DS5.POracle4,
                     Hct : DS5.POracle5) = {
   proc keygen() : BytesPK.t * BytesSK.t = {
-    var sk,rho,_A,s1,s2,t,t1,t0,pk,tr,r0;
+    var sk,rho,_A,al,s1,s2,t,t1,t0,pk,tr,r0;
     RO_S.RO.init();
     RO_v.RO.init();
     r0 <$ dblock;
     rho <- Bytes32.of_list (take 32 r0);
-    _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+    (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
     (s1,s2) <@ ExpandS(XOFS_O(RO_S.RO)).sample(cS);
     t <- invnttv (ntt_mulmxv _A (nttv s1)) + s2;
     (t1,t0) <- Power2Round t;
@@ -39,7 +39,7 @@ module MLDSA_RO_DS6(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
   }
 
   proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * leakage = {
-     var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,kp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
+     var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,al,mu,kp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
          cs2,z,r0,ct0,h,leakage,sigma,bct0,sl;
      var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
@@ -53,8 +53,10 @@ module MLDSA_RO_DS6(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
-     leakage <- kvec_leak t0h;
-     _A <@ ExpandA(XOFA_O(XA)).sample(rho);
+     leakage <- rho_leak rho;
+     (_A,al) <@ ExpandA(XOFA_O(XA)).sample(rho);
+     leakage <- lcat leakage al;
+     leakage <- lcat leakage (kvec_leak t0h);
      mu <@ Hmu.get(tr, m);
      kp <- Bytes32.to_list _K ++ rnd_to_list coins ++ Bytes64.to_list mu;
      kappa <- 0;
@@ -66,6 +68,7 @@ module MLDSA_RO_DS6(XA : DS5.POracle1, XC : DS5.POracle2, Htr : DS5.POracle3, Hm
        ct <@ Hct.get(mu, w1Encode w1);
        (c, sl) <@ SampleInBall_O(XC).sample(ct);
        ctl <- ((ct, c), sl);
+       leakage <- lcat leakage (ctilde_leak ct);
        leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
        leakage <- lcat leakage (poly_leak ch);
@@ -108,11 +111,11 @@ equiv expandA6 : ExpandA(XOFA_O(DS2.RO2.RO)).sample ~ ExpandA(XOFA_O(DS5.RO1.RO)
   ={rho, glob XOFA_O} /\ DS2.RO2.RO.m{1} = DS5.RO1.RO.m{2}
   ==> ={res, glob XOFA_O} /\ DS2.RO2.RO.m{1} = DS5.RO1.RO.m{2}.
 proof.
-proc; while (={r, aa, rho, glob XOFA_O} /\ DS2.RO2.RO.m{1} = DS5.RO1.RO.m{2}); 2: by auto.
-wp; while (={r, s, aa, rho, glob XOFA_O} /\ DS2.RO2.RO.m{1} = DS5.RO1.RO.m{2}); 2: by auto.
+proc; while (={r, aa, al, rho, glob XOFA_O} /\ DS2.RO2.RO.m{1} = DS5.RO1.RO.m{2}); 2: by auto.
+wp; while (={r, s, aa, al, rho, glob XOFA_O} /\ DS2.RO2.RO.m{1} = DS5.RO1.RO.m{2}); 2: by auto.
 wp; call (: ={rho, glob XOFA_O} /\ DS2.RO2.RO.m{1} = DS5.RO1.RO.m{2}
             ==> ={res, glob XOFA_O} /\ DS2.RO2.RO.m{1} = DS5.RO1.RO.m{2}); 2: by auto.
-proc; while (={j, c, glob XOFA_O} /\ DS2.RO2.RO.m{1} = DS5.RO1.RO.m{2}); 2: by inline *; auto.
+proc; while (={j, c, vs, glob XOFA_O} /\ DS2.RO2.RO.m{1} = DS5.RO1.RO.m{2}); 2: by inline *; auto.
 by wp; inline XOFA_O(DS2.RO2.RO).next XOFA_O(DS5.RO1.RO).next; wp; do 3! call xa_get; auto.
 qed.
 
@@ -262,11 +265,11 @@ local equiv sign6a : MLDSA_RO_DS5R(RoutedH, DS2.RO2.RO).sign ~
   ==> ={res, RO_pad.RO.m, DS5.RO2.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O, RO_v.RO.m} /\
       DS2.RO2.RO.m{1} = DS5.RO1.RO.m{2}.
 proof.
-proc; seq 13 13 : (={sk, m, coins, ct, ctl, sigma, leakage, rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu,
+proc; seq 15 15 : (={sk, m, coins, ct, ctl, sigma, leakage, rho, _K, tr, s1, s2, t0, s1h, s2h, t0h, _A, mu,
                      RO_pad.RO.m, DS5.RO2.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O, RO_v.RO.m} /\
                    DS2.RO2.RO.m{1} = DS5.RO1.RO.m{2}).
 + call (: ={DS5.RO4.RO.m}); 1: by sim.
-  call expandA6.
+  wp; call expandA6.
   by wp; call (: true); [by sim | auto].
 seq 3 1 : (={sk, m, coins, ct, ctl, sigma, leakage, s1h, s2h, t0h, _A, mu, kp, RO_pad.RO.m, DS5.RO2.RO.m,
              DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O, RO_v.RO.m} /\
@@ -338,7 +341,7 @@ local equiv sign6b : MLDSA_RO_DS6(DS5.RO1.RO, DS5.RO2.RO, DS5.RO3.RO, DS5.RO4.RO
   ={sk, m, glob DS5.RO1.RO, DS5.RO2.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O, RO_v.RO.m}
   ==> ={res, glob DS5.RO1.RO, DS5.RO2.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O, RO_v.RO.m}.
 proof.
-proc; seq 14 14 : (={sk, m, coins, ct, ctl, sigma, leakage, s1h, s2h, t0h, _A, mu, kp, glob DS5.RO1.RO,
+proc; seq 16 16 : (={sk, m, coins, ct, ctl, sigma, leakage, s1h, s2h, t0h, _A, mu, kp, glob DS5.RO1.RO,
                      DS5.RO2.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m, glob XOFA_O, RO_v.RO.m}); 1: by sim.
 seq 3 3 : (={kappa, zh, ct, ctl, sigma, leakage, glob DS5.RO1.RO, DS5.RO2.RO.m, DS5.RO4.RO.m, DS5.RO5.RO.m,
              glob XOFA_O, RO_v.RO.m}); 2: by sim.

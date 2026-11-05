@@ -290,9 +290,9 @@ ehoare sign_coll (pk0 : BytesPK.t) (k : real) : MLDSA_RO(DS2.RO1.RO, DS2.RO2.RO)
     (b2r (coll DS2.RO1.RO.m pk0) + (1 + kappa_max)%r * p512 + k)%xr
   ==> inv_m DS2.RO1.RO.m pk0 `|` (b2r (coll DS2.RO1.RO.m pk0) + k)%xr.
 proof.
-proc; seq 17 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k /\ kappa = 0) `|`
+proc; seq 19 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k /\ kappa = 0) `|`
                 (b2r (coll DS2.RO1.RO.m pk0) + kappa_max%r * p512 + k)%xr).
-+ seq 13 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k) `|`
++ seq 15 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k) `|`
             (b2r (coll DS2.RO1.RO.m pk0) + kappa_max%r * p512 + k)%xr).
   + seq 11 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k) `|`
              (b2r (coll DS2.RO1.RO.m pk0) + (1 + kappa_max)%r * p512 + k)%xr).
@@ -310,7 +310,7 @@ proc; seq 17 : ((inv_m DS2.RO1.RO.m pk0 /\ 0%r <= k /\ kappa = 0) `|`
     call /(fun y => (0%r <= k) `|` y)
          (Squeeze_coll pk0 (Bytes64.to_list tr_ ++ m_) 64 (kappa_max%r * p512 + k)).
     + by move=> &hr /=; apply xle_cxr => /> *; apply le_pos; smt(kappa_max_bnd).
-    skip => &hr /=; apply xle_cxr => /> *.
+    wp; skip => &hr /=; apply xle_cxr => /> *.
     by split; [smt(RealOrder.expr_ge0 kappa_max_bnd) | apply le_pos; smt(RealOrder.expr_ge0 kappa_max_bnd)].
   wp; exlim _K, coins, mu => K_ c_ mu_.
   call /(fun y => (0%r <= k) `|` y)

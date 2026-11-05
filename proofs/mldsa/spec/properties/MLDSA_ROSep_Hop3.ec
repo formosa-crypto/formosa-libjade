@@ -32,7 +32,7 @@ module MLDSA_RO_DS2(H : BlockOracle, G : Oracle) = {
   proc keygen = MLDSA_RO_DS(H, G).keygen
 
   proc sign(sk : BytesSK.t, m : W8.t list) : BytesSig.t option * leakage = {
-     var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,mu,rhopp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
+     var coins,rho,_K,tr,s1,s2,t0,s1h,s2h,t0h,_A,al,mu,rhopp,kappa,y,w,w1,ctl,ct,c,ch,cs1,
          cs2,z,r0,ct0,h,leakage,sigma,bct0,bs,sl;
      var zf, rf, hf : int option;
      var zh : (polylvec * polykvec) option;
@@ -46,8 +46,10 @@ module MLDSA_RO_DS2(H : BlockOracle, G : Oracle) = {
      s1h <- nttv s1;
      s2h <- nttv s2;
      t0h <- nttv t0;
-     leakage <- kvec_leak t0h;
-     _A <@ ExpandA(XOFA_O(G)).sample(rho);
+     leakage <- rho_leak rho;
+     (_A,al) <@ ExpandA(XOFA_O(G)).sample(rho);
+     leakage <- lcat leakage al;
+     leakage <- lcat leakage (kvec_leak t0h);
      mu <@ DS5.RO4.RO.get(tr, m);
      bs <@ Squeeze(H).squeeze(Bytes32.to_list _K ++ rnd_to_list coins ++ Bytes64.to_list mu, 64);
      rhopp <- Bytes64.of_list bs;
@@ -60,6 +62,7 @@ module MLDSA_RO_DS2(H : BlockOracle, G : Oracle) = {
        ct <@ HctPad.get(mu, w1Encode w1);
        (c, sl) <@ SampleInBall_O(DS5.RO2.RO).sample(ct);
        ctl <- ((ct, c), sl);
+       leakage <- lcat leakage (ctilde_leak ct);
        leakage <- lcat leakage ctl.`2;
        ch <- ntt c;
        leakage <- lcat leakage (poly_leak ch);
@@ -91,13 +94,13 @@ module MLDSA_RO_DS2(H : BlockOracle, G : Oracle) = {
   }
 
   proc verify(pk : BytesPK.t, m : W8.t list, sigma : BytesSig.t) : bool = {
-    var rho,t1,c,l,ct,z,h,rb,_A,tr,mu,wapprox,w1,ctp;
+    var rho,t1,c,l,ct,z,h,rb,_A,al,tr,mu,wapprox,w1,ctp;
     w1 <- witness;
     rb <- false;
     (rho,t1) <@ PkEncDec.pkDecode(pk);
     (ct,z,h) <@ SigEncDec.sigDecode(sigma);
     if (h <> None) {
-      _A <@ ExpandA(XOFA_O(G)).sample(rho);
+      (_A,al) <@ ExpandA(XOFA_O(G)).sample(rho);
       tr <@ DS5.RO3.RO.get(pk);
       mu <@ DS5.RO4.RO.get(tr, m);
       (c,l) <@ SampleInBall_O(DS5.RO2.RO).sample(ct);
@@ -332,11 +335,11 @@ equiv sign_eq : MLDSA_RO_DS1(RoutedH, DS2.RO2.RO).sign ~ MLDSA_RO_DS2(RoutedH, D
 proof.
 proc; inline{1} MLDSA_RO(RoutedH, DS2.RO2.RO).sign_derand.
 exlim RoutedH.tr{2}, sk{2}, m{2} => t s mm.
-seq 15 12 : (={glob RoutedH, glob DS2.RO2.RO, glob XOFA_O, ct, ctl, sigma, leakage, rho, _K, tr,
+seq 17 14 : (={glob RoutedH, glob DS2.RO2.RO, glob XOFA_O, ct, ctl, sigma, leakage, rho, _K, tr,
                s1, s2, t0, s1h, s2h, t0h, _A} /\
              coins0{1} = coins{2} /\ m0{1} = m{2} /\ m{2} = mm /\ tr{2} = t /\
              RoutedH.trset{2} /\ RoutedH.tr{2} = t /\ !mapbad t DS5.RO4.RO.m{2} DS5.RO5.RO.m{2}).
-+ call (: ={glob DS2.RO2.RO, glob XOFA_O}); 1: by sim.
++ wp; call (: ={glob DS2.RO2.RO, glob XOFA_O}); 1: by sim.
   wp; call (: ={sk} /\ sk{2} = s ==>
               ={res} /\ res{2}.`3 = Bytes64.of_list (take 64 (drop 64 (BytesSK.to_list s)))).
   + by conseq (: ={sk} ==> ={res}) _ (skDecode_tr s) => //; sim.
@@ -478,7 +481,7 @@ hoare sign2_inv (b bb : bool) (t : Bytes64.t) (k : BytesPK.t) : MLDSA_RO_DS2(Rou
   ==> RoutedH.trset /\ RoutedH.tr = t /\ RoutedH.bad = bb /\ DS5.RO3.RO.m.[k] = Some t /\
       (b => mapbad t DS5.RO4.RO.m DS5.RO5.RO.m).
 proof.
-proc; seq 18 : (RoutedH.trset /\ RoutedH.tr = t /\ RoutedH.bad = bb /\ DS5.RO3.RO.m.[k] = Some t /\
+proc; seq 20 : (RoutedH.trset /\ RoutedH.tr = t /\ RoutedH.bad = bb /\ DS5.RO3.RO.m.[k] = Some t /\
                 (b => mapbad t DS5.RO4.RO.m DS5.RO5.RO.m));
   2: by if; [call (: true); [by conseq /> | auto] | auto].
 while (RoutedH.trset /\ RoutedH.tr = t /\ RoutedH.bad = bb /\ DS5.RO3.RO.m.[k] = Some t /\
@@ -486,18 +489,18 @@ while (RoutedH.trset /\ RoutedH.tr = t /\ RoutedH.bad = bb /\ DS5.RO3.RO.m.[k] =
 + wp; call (: true); 1: by conseq />.
   by call (hctpad_mono b t); wp; call (emask_inv b bb t k); auto.
 by wp; call (squeeze_inv b bb t k); call (ro4_mono b t);
-   call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]].
+   wp; call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]].
 qed.
 
 lemma sign2_ll : islossless MLDSA_RO_DS2(RoutedH, DS2.RO2.RO).sign.
 proof.
-proc; seq 18 : true => //; last by if; [call sigEncode_ll | ].
+proc; seq 20 : true => //; last by if; [call sigEncode_ll | ].
 while true (kappa_max - kappa);
   1: by move=> z; wp; call sib_XC_ll; call hctpad_ll; wp; call (emask_ll RoutedH RoutedH_get_ll);
         auto => /#.
 wp; call (Squeeze_ll RoutedH RoutedH_get_ll); call (: true);
   1: by auto => />; rewrite /dbytes64; apply dmap_ll; apply dlist_ll; apply W8.dword_ll.
-call expandA_ll; wp; call (: true).
+wp; call expandA_ll; wp; call (: true).
 + while true (kvec - i); 1: by move=> z; auto => /#.
   wp; while true (kvec - i); 1: by move=> z; auto => /#.
   by wp; while true (lvec - i); [by move=> z; auto => /# | auto => /#].
@@ -609,7 +612,7 @@ call (: true); 1: by conseq />.
 call (: true); 1: by conseq />.
 skip => /> &hr hct.
 move=> _ _ A t0 m4 c m5 hm _; right.
-exists (t0, w1Encode (UseHint (oget h{hr}) (invnttv (ntt_mulmxv A (nttv z{hr}) -
+exists (t0, w1Encode (UseHint (oget h{hr}) (invnttv (ntt_mulmxv A.`1 (nttv z{hr}) -
                      ntt_smul (ntt c.`1) (nttv (smul t1{hr} (incoeff 8192))))))) ct{hr}.
 split => //.
 by rewrite -hct take_oversize // BytesCT.size_to_list; have /= H := param_sets; smt().
@@ -817,12 +820,12 @@ proof. by proc; while (RoutedH.trset /\ RoutedH.bad = b); [wp; call (squeeze_kee
 hoare sign2_keep (b : bool) : MLDSA_RO_DS2(RoutedH, DS2.RO2.RO).sign :
   RoutedH.trset /\ RoutedH.bad = b ==> RoutedH.trset /\ RoutedH.bad = b.
 proof.
-proc; seq 18 : (RoutedH.trset /\ RoutedH.bad = b);
+proc; seq 20 : (RoutedH.trset /\ RoutedH.bad = b);
   2: by if; [call (: true); [by conseq /> | auto] | auto].
 while (RoutedH.trset /\ RoutedH.bad = b);
   1: by wp; call (: true); [by conseq /> | call (: true); [by conseq /> | wp; call (emask_keep b); auto]].
 by wp; call (squeeze_keep b);
-   call (: true); [by conseq /> | call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]]].
+   call (: true); [by conseq /> | wp; call (: true); [by conseq /> | wp; call (: true); [by conseq /> | auto]]].
 qed.
 
 section.

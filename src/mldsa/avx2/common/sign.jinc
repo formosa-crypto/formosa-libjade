@@ -9,21 +9,37 @@
 //     __make_hint_vector                 ← make_hint for all rows, check total hint count
 //
 // Leakage discipline (the security proof, MLDSATarget in proofs/mldsa/security,
-// models exactly what the signing loop declassifies):
+// models exactly what the signing procedure declassifies):
+//   - rho, the seed of A (part of the public key), is declassified once,
+//     before ExpandA; ExpandA (sample::__matrix_A) then declassifies, for
+//     each polynomial of A, the outcome of the rejection test of the
+//     candidates it reads from the XOF on rho (the masks of the AVX2 loop,
+//     the candidates of the scalar loops): the model leaks every candidate,
+//     accepted or rejected, which determines both.
 //   - t0 (the low bits of t, part of the signing key) is declassified once,
-//     when the signing key is unpacked; the challenge c is declassified once
-//     per iteration. Everything computed from (c, t0) alone is then public,
-//     in particular the norm test on c*t0.
-//   - the rejection tests are evaluated in the order z, w0 - c*s2, c*t0, hint
-//     (b1, b2, b3, b4 of FIPS 204), each as a short-circuit cascade over the
-//     polynomials: the only declassified value of a test is the boolean
-//     "the polynomial violates the bound", so the leakage of a test is the
-//     index of its first failing polynomial. The tests on w0 - c*s2 and on
-//     the hint are only run once the test on z passed; the hint test is run
-//     whether or not the (public) test on c*t0 passed. The test on c*t0
-//     declassifies nothing: it is a function of c and t0 only. It is not
-//     even compiled when it cannot fail (ML-DSA-65 and ML-DSA-87, see
-//     CT0_NORM_BOUND).
+//     when the signing key is unpacked.
+//   - per iteration, the commitment hash c~ is declassified right after it
+//     is computed; then SampleInBall(c~) declassifies the positions it
+//     reads from the XOF stream (sample::__challenge), and the challenge c
+//     is declassified. The positions and c are public functions of c~ (the
+//     XOF is public), so they add nothing to the leakage of c~. They are
+//     declassified because the checker types an array from its
+//     uninitialised content (secret) joined with its writes: the Keccak
+//     state and the squeezed blocks (the local arrays of the SHAKE256
+//     wrappers and of sample::__challenge), and the buffer of c, stay
+//     secret even when they only hold values computed from c~. Everything
+//     computed from (c, t0) alone is public, in particular the norm test on
+//     c*t0.
+//   - after c~ and c, the rejection tests are evaluated in the order z,
+//     w0 - c*s2, c*t0, hint (b1, b2, b3, b4 of FIPS 204), each as a
+//     short-circuit cascade over the polynomials: the only declassified
+//     value of a test is the boolean "the polynomial violates the bound",
+//     so the leakage of a test is the index of its first failing
+//     polynomial. The tests on w0 - c*s2 and on the hint are only run once
+//     the test on z passed; the hint test is run whether or not the
+//     (public) test on c*t0 passed. The test on c*t0 declassifies nothing:
+//     it is a function of c and t0 only. It is not even compiled when it
+//     cannot fail (ML-DSA-65 and ML-DSA-87, see CT0_NORM_BOUND).
 //   - on an exhausted budget the exiting (rejected) iteration is not encoded:
 //     the signature buffer is set to the fixed value 0^* and the failure
 //     code is returned (the model returns None).
@@ -390,6 +406,8 @@ fn __sign_internal(
 
     () = #spill(signature, randomness, signing_key, context_pointer, context_size, message_pointer, message_size);
     seed_for_matrix_A = signing_key[0:32];
+    // Model item: rho (rho_leak), then the candidates of ExpandA, declassified
+    // by sample::__matrix_A.
     () = #declassify(seed_for_matrix_A);
     matrix_A = sample::__matrix_A(seed_for_matrix_A);
 
@@ -453,10 +471,11 @@ fn __sign_internal(
     last_norm_check_result = 1;
 
     // The |#declassify|s in this loop body are the leakage of the model of
-    // the security proof (MLDSATarget.sign): the challenge c, then the
-    // outcome of each rejection test, polynomial by polynomial, in the order
-    // z, w0 - c*s2, hint (the test on c*t0 is a public computation and
-    // declassifies nothing). The
+    // the security proof (MLDSATarget.sign): the commitment hash c~, the
+    // SampleInBall leakage and the challenge c (public functions of c~),
+    // then the outcome of each rejection test, polynomial by polynomial, in
+    // the order z, w0 - c*s2, hint (the test on c*t0 is a public computation
+    // of c and t0 and declassifies nothing). The
     // constant-time checker validates that nothing else is leaked; that this
     // leakage is harmless is established by the EasyCrypt security proof.
     while (exit_rejection_sampling_loop == 0) {
@@ -483,10 +502,16 @@ fn __sign_internal(
 
         () = #spill(domain_separator_for_mask);
         commitment_hash = __derive_commitment_hash(commitment_hash, message_representative, commitment_encoded);
+        // Model item: c~, the commitment hash of every iteration.
+        () = #declassify(commitment_hash);
 
         verifier_challenge = sample::__challenge(verifier_challenge, commitment_hash);
         () = #unspill(domain_separator_for_mask);
-        // The leakage model leaks the challenge c of every iteration.
+        // Model item: the challenge c (c_leak c), a public function of c~
+        // (sample::__challenge declassifies the positions it reads, the
+        // SampleInBall leakage). The checker still types c secret: its
+        // buffer, and the XOF block its sign bits come from, are typed from
+        // their uninitialised (secret) content.
         () = #declassify(verifier_challenge);
 
         // The positions of its non-zero coefficients, for the products below
@@ -553,6 +578,9 @@ fn __sign_internal(
     // The exiting iteration is encoded only when it passed the tests; on an
     // exhausted budget the signature buffer is set to the fixed value 0^*
     // (the model returns None: the rejected iteration must not be output).
+    // c~ is the commitment hash of the exiting iteration, already leaked in
+    // the loop (the checker joins it with the uninitialised buffer before
+    // the loop, hence the declassification); z and h are the output.
     if (last_norm_check_result == 0) {
         () = #declassify(hint);
         () = #declassify(commitment_hash);

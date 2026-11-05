@@ -145,17 +145,17 @@ lemma ysign_ll : islossless MLDSA_Y(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.
 proof.
 proc.
 while true (kappa_max - ctr).
-+ move=> z; wp; call tfsib_ll; call ro5_get_ll; wp; call roy_get_ll; auto => /> /#.
-by wp; call ro4_get_ll; call tfexpandA_ll; auto => /> /#.
++ move=> z; wp; call tfsib_ll; wp; call ro5_get_ll; wp; call roy_get_ll; auto => /> /#.
+by wp; call ro4_get_ll; wp; call tfexpandA_ll; auto => /> /#.
 qed.
 
 lemma tfsign_ll : islossless MP.T.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign.
 proof.
 proc.
 while true (kappa_max - ctr).
-+ move=> z; wp; call tfsib_ll; call ro5_get_ll; auto => />.
++ move=> z; wp; call tfsib_ll; wp; call ro5_get_ll; auto => />.
   smt(MP.T.dRq_mask_ll DV.MatRq.Vectors.dvector_ll).
-by wp; call ro4_get_ll; call tfexpandA_ll; auto => /> /#.
+by wp; call ro4_get_ll; wp; call tfexpandA_ll; auto => /> /#.
 qed.
 
 lemma tfverify_ll : islossless MP.T.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).verify.
@@ -353,7 +353,7 @@ while (={s1, s2, t0, mA, mu, ct, ctr, response, leak, glob DST.RO1.RO, glob DST.
        yinv RO_y.RO.m{1} cl0 /\ coins{1} \in cl0 /\
        (forall mu k, (coins{1}, mu, k) \in RO_y.RO.m{1} => k < ctr{1})); last first.
 + wp; call (: ={glob DST.RO4.RO}); 1: by sim.
-  call (: ={glob DST.RO1.RO}); 1: by sim.
+  wp; call (: ={glob DST.RO1.RO}); 1: by sim.
   by auto => /> /#.
 inline{1} RO_y.RO.get.
 seq 5 1 : (={y, s1, s2, t0, mA, mu, ct, ctr, response, leak, glob DST.RO1.RO, glob DST.RO2.RO,
@@ -491,7 +491,8 @@ ehoare tfexpandA_e (u : xreal) : MP.T.ExpandA(DST.RO1.RO).get : u ==> u.
 proof.
 proc; while (u); [by move=> &hr; apply xle_cxr_r | | by auto].
 wp; while (u); [by move=> &hr; apply xle_cxr_r | | by auto => &hr; apply xle_cxr_r].
-wp; while (u); [by move=> &hr; apply xle_cxr_r | | by auto => &hr; apply xle_cxr_r].
+wp; call (: u ==> u); 2: by auto => &hr; apply xle_cxr_r.
+proc; wp; while (u); [by move=> &hr; apply xle_cxr_r | | by auto => &hr; apply xle_cxr_r].
 by wp; do 3! call (ro1_e u); auto => &hr; apply xle_cxr_r.
 qed.
 
@@ -507,8 +508,8 @@ qed.
 ehoare tfsign_e (u : xreal) : MP.T.MLDSA(DST.RO1.RO, DST.RO2.RO, DST.RO3.RO, DST.RO4.RO, DST.RO5.RO).sign :
   u ==> u.
 proof.
-proc; while (u); [by move=> &hr; apply xle_cxr_r | | by wp; call (ro4_e u); call (tfexpandA_e u); auto].
-wp; call (tfsib_e u); call (ro5_e u); auto => &hr.
+proc; while (u); [by move=> &hr; apply xle_cxr_r | | by wp; call (ro4_e u); wp; call (tfexpandA_e u); auto].
+wp; call (tfsib_e u); wp; call (ro5_e u); auto => &hr.
 have hll : is_lossless (dvector dmask lvec) by smt(MP.T.dRq_mask_ll dvector_ll).
 by rewrite EpC hll smul1m; apply xle_cxr_r.
 qed.

@@ -23,22 +23,6 @@ import DV DV.MatRq.Vectors DV.MatRq.Matrices.
 
 (*************** RejNTTPoly and the ExpandA of the target ****************)
 
-lemma cftb_E (b0 b1 b2 : W8.t) :
-  CoeffFromThreeBytes b0 b1 b2 =
-  let v = to_uint b0 + 256 * to_uint b1 + 65536 * (to_uint b2 %% 128) in if v < q then Some v else None.
-proof.
-rewrite /CoeffFromThreeBytes /=.
-have -> : to_uint (if 127 < to_uint b2 then b2 - W8.of_int 128 else b2) = to_uint b2 %% 128.
-+ have /= hx := W8.to_uint_cmp b2.
-  case: (127 < to_uint b2) => h /=; 2: smt().
-  rewrite W8.to_uintB; 1: by rewrite W8.uleE W8.of_uintK /#.
-  rewrite (W8.of_uintK 128) /=.
-  have -> : to_uint b2 %% 128 = (to_uint b2 - 128 + 128) %% 128 by smt().
-  rewrite modzDr modz_small; smt().
-by rewrite (_ : 65536 * (to_uint b2 %% 128) + 256 * to_uint b1 + to_uint b0 =
-                to_uint b0 + 256 * to_uint b1 + 65536 * (to_uint b2 %% 128)) 1:#ring.
-qed.
-
 lemma xa_key_seed (rho : Bytes32.t) (r s p : int) :
   0 <= r < 256 => 0 <= s < 256 =>
   xa_key (Bytes34.to_list (Bytes34.of_list (Bytes32.to_list rho ++ [W8.of_int s; W8.of_int r])), p) = ((rho, r, s), p).
@@ -85,18 +69,24 @@ rewrite /invnttm KLMatrix.mapiE; 1: smt().
 apply hf; smt().
 qed.
 
+(* The matrix of the target is the inverse NTT of the matrix of the
+   specification, and the leakages are equal: the candidates read are the
+   same integers ([rej_cand] is the [v] of the target) *)
 equiv expandA_14 : ExpandA(XOFA_O(XAw(DST.RO1.RO))).sample ~ MP.T.ExpandA(DST.RO1.RO).get :
-  ={rho, DST.RO1.RO.m, RO_xr.RO.m} ==> res{2} = mat_of (invnttm res{1}) /\ ={DST.RO1.RO.m, RO_xr.RO.m}.
+  ={rho, DST.RO1.RO.m, RO_xr.RO.m} ==>
+  res{2} = (mat_of (invnttm res{1}.`1), res{1}.`2) /\ ={DST.RO1.RO.m, RO_xr.RO.m}.
 proof.
 proc.
 while (={r, rho, DST.RO1.RO.m, RO_xr.RO.m} /\ 0 <= r{1} <= kvec /\ size mA{2} = (kvec, lvec) /\
-       filled aa{1} mA{2} (r{1} * lvec)).
+       al{1} = la{2} /\ filled aa{1} mA{2} (r{1} * lvec)).
 - wp; while (={r, s, rho, DST.RO1.RO.m, RO_xr.RO.m} /\ 0 <= r{1} < kvec /\ 0 <= s{1} <= lvec /\
-             size mA{2} = (kvec, lvec) /\ filled aa{1} mA{2} (r{1} * lvec + s{1})).
+             size mA{2} = (kvec, lvec) /\ al{1} = la{2} /\ filled aa{1} mA{2} (r{1} * lvec + s{1})).
   + wp.
     inline{1} RejNTTPoly(XOFA_O(XAw(DST.RO1.RO))).sample XOFA_O(XAw(DST.RO1.RO)).init.
+    inline{2} MP.T.ExpandA(DST.RO1.RO).poly.
     wp; while (={r, s, rho, DST.RO1.RO.m, RO_xr.RO.m} /\ 0 <= r{1} < kvec /\ 0 <= s{1} < lvec /\
                size mA{2} = (kvec, lvec) /\ filled aa{1} mA{2} (r{1} * lvec + s{1}) /\
+               al{1} = la{2} /\ vs0{1} = vs0{2} /\ x{2} = (rho{2}, r{2}, s{2}) /\
                XOFA_O.seed{1} = Bytes34.of_list (Bytes32.to_list rho{1} ++ [W8.of_int s{1}; W8.of_int r{1}]) /\
                XOFA_O.pos{1} = ctx{2} /\ j{1} = size cs{2} /\ 0 <= j{1} <= 256 /\
                (forall i, 0 <= i < j{1} => c{1}.[i] = incoeff (nth 0 cs{2} i))).
@@ -114,7 +104,8 @@ while (={r, rho, DST.RO1.RO.m, RO_xr.RO.m} /\ 0 <= r{1} <= kvec /\ size mA{2} = 
                                    [W8.of_int s{2}; W8.of_int r{2}])), p) = ((rho{2}, r{2}, s{2}), p)
         by move=> p; apply xa_key_seed; smt().
       rewrite !hk /= => _ _ _ b0 _ _ _ b1 _ _ _ b2.
-      rewrite cftb_E /=; case: (to_uint b0 + 256 * to_uint b1 + 65536 * (to_uint b2 %% 128) < q) => hv /=;
+      rewrite cftb_E /rej_cand /Byte.to_int /=.
+      case: (to_uint b0 + 256 * to_uint b1 + 65536 * (to_uint b2 %% 128) < q) => hv /=;
         smt(size_rcons nth_rcons Array256.get_setE).
     auto => />.
     move=> &1 &2 hr0 hr hs0 hs hrow hcol hf hsl.
@@ -141,10 +132,10 @@ qed.
 module MLDSA_RO_DS14(XA : DST.POracle1, XC : DS11.POracle2, Htr : DST.POracle3, Hmu : DST.POracle4,
                      Hct : DST.POracle5) = {
   proc keygen() : BytesPK.t * MP.T.SK = {
-    var rho, mA, s1, s2, t, pk, tr;
+    var rho, mA, la, s1, s2, t, pk, tr;
     RO_y.RO.init();
     rho <$ dxi;
-    mA <@ MP.T.ExpandA(XA).get(rho);
+    (mA, la) <@ MP.T.ExpandA(XA).get(rho);
     s1 <$ dvector (DR.dRq_ Eta) lvec;
     s2 <$ dvector (DR.dRq_ Eta) kvec;
     t <- mA *^ s1 + s2;
@@ -154,7 +145,7 @@ module MLDSA_RO_DS14(XA : DST.POracle1, XC : DS11.POracle2, Htr : DST.POracle3, 
   }
 
   proc sign(sk : MP.T.SK, m : W8.t list) : BytesSig.t option * leakage = {
-    var coins, rho, tr, s1, s2, t0, mA, mu, kappa, y, w, w1, ctl, ct, c, cr, z, h, leakage, sigma, w0, ct0_ok, sl;
+    var coins, rho, tr, s1, s2, t0, mA, la, mu, kappa, y, w, w1, ctl, ct, c, cr, z, h, leakage, sigma, w0, ct0_ok, sl;
     var z_fail, r0_fail, hint_fail : int option;
     var zh : (vector * bool list list) option;
     coins <$ drnd;
@@ -162,8 +153,10 @@ module MLDSA_RO_DS14(XA : DST.POracle1, XC : DS11.POracle2, Htr : DST.POracle3, 
     ctl <- witness;
     sigma <- witness;
     (rho, tr, s1, s2, t0) <- sk;
-    leakage <- MP.T.t0_leak t0;
-    mA <@ MP.T.ExpandA(XA).get(rho);
+    leakage <- MP.T.rho_leak rho;
+    (mA, la) <@ MP.T.ExpandA(XA).get(rho);
+    leakage <- lcat leakage la;
+    leakage <- lcat leakage (MP.T.t0_leak t0);
     mu <@ Hmu.get(tr, m);
     kappa <- 0;
     zh <- None;
@@ -174,6 +167,7 @@ module MLDSA_RO_DS14(XA : DST.POracle1, XC : DS11.POracle2, Htr : DST.POracle3, 
       ct <@ Hct.get(w1, mu);
       (c, sl) <@ SampleInBall_B(XC).sample(ct);
       ctl <- ((ct, c), sl);
+      leakage <- lcat leakage (ctilde_leak ct);
       leakage <- lcat leakage ctl.`2;
       cr <- poly2alg c;
       leakage <- lcat leakage (MP.T.c_leak cr);
@@ -202,13 +196,13 @@ module MLDSA_RO_DS14(XA : DST.POracle1, XC : DS11.POracle2, Htr : DST.POracle3, 
   }
 
   proc verify(pk : BytesPK.t, m : W8.t list, sigma : BytesSig.t) : bool = {
-    var rho, t1, c, l, ct, z, h, rb, mA, tr, mu, w1, ctp;
+    var rho, t1, c, l, ct, z, h, rb, mA, la, tr, mu, w1, ctp;
     w1 <- witness;
     rb <- false;
     (rho, t1) <@ PkEncDec.pkDecode(pk);
     (ct, z, h) <@ SigEncDec.sigDecode(sigma);
     if (h <> None) {
-      mA <@ MP.T.ExpandA(XA).get(rho);
+      (mA, la) <@ MP.T.ExpandA(XA).get(rho);
       tr <@ Htrw(Htr).get(pk);
       mu <@ Hmu.get(tr, m);
       (c, l) <@ SampleInBall_B(XC).sample(ct);
@@ -241,7 +235,7 @@ equiv sign_14 :
   ==> ={res, glob DST.RO1.RO, glob RO_xr.RO, glob DST.RO2.RO, glob DST.RO4.RO, glob DST.RO5.RO, RO_y.RO.m}.
 proof.
 proc.
-seq 8 7 : (={sk, m, coins, ct, ctl, sigma, leakage, rho, tr, s1, s2, t0, mA, glob DST.RO1.RO, glob RO_xr.RO,
+seq 10 9 : (={sk, m, coins, ct, ctl, sigma, leakage, rho, tr, s1, s2, t0, mA, glob DST.RO1.RO, glob RO_xr.RO,
              glob DST.RO2.RO, glob DST.RO4.RO, glob DST.RO5.RO, RO_y.RO.m}).
 + by wp; call expandA_14; auto.
 by sim.

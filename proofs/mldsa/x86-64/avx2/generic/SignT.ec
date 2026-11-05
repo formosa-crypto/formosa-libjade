@@ -328,10 +328,11 @@ sp;seq 1 1 : (#pre /\
   auto => |> &1 &2 H 8? rr -> Hr;congr; rewrite Bytes32.tP => k kb.
   by rewrite !Bytes32.get_of_list // get_to_list initiE 1:/# /= nth_take 1,2:/# /= BytesSK.get_of_list 1:/# get_to_list.
 
-(* ── Step 4: mu = H_mu tr m (spec simple) ───────────────────────────────
-   Spec: mu <- H_mu tr m
+(* ── Step 4: leakage of ExpandA and of t0, mu = H_mu tr m (spec simple) ──
+   Spec: leakage <- lcat leakage al; leakage <- lcat leakage (kvec_leak t0h);
+         mu <- H_mu tr m
    Jasmin: nothing (message representative computed next) *)
-sp 1 0.
+sp 3 0; elim* => leak0.
 seq 0 2 : #pre; 1: by auto => />; rewrite /SLH64.protect_ptr.
 
 (* ── Step 5: derive_message_representative (Jasmin) ─────────────────────
@@ -695,7 +696,7 @@ while (
      apply (wpolykvec_urng_widen _ ((q-1) %/ (2*gamma2)) q); smt(gamma2_cases).
    by rewrite Hw0_eq Hw1_lifts Hw1_eq Hreachable.
 
- seq 3 3 : (#pre /\
+ seq 4 3 : (#pre /\
      ct{1} = BytesCT.init (fun i => commitment_hash{2}.[i]) /\
      lifts_wpoly verifier_challenge{2} = c{1} /\
      wpoly_srng 1 1 verifier_challenge{2} /\
