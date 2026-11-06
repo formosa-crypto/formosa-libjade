@@ -12,9 +12,10 @@ JCTFLAGS ?=
 
 BUILD   ?= _build
 
-# Jasmin emits OS-specific assembly: the .s produced here matches the host
-# (Mach-O on macOS, ELF on Linux). bench/ links it into the libraries that
-# the KATs, memcheck and the benchmarks load.
+# Jasmin emits OS-specific assembly: the .s produced in $(BUILD) matches the
+# host (Mach-O on macOS, ELF on Linux). bench/ links it into the libraries
+# that the KATs, memcheck and the benchmarks load. The committed assembly,
+# for Linux, is in ../asm (see below).
 
 KECCAK       := fips202
 MLDSA_COMMON := mldsa/avx2/common
@@ -30,6 +31,10 @@ MLKEM_S := $(patsubst mlkem/avx2/%/jmlkem.jazz,$(BUILD)/mlkem%_avx2.s,\
              $(wildcard mlkem/avx2/*/jmlkem.jazz))
 
 TARGETS := $(MLDSA_S) $(MLKEM_S)
+
+# Parameter sets, from the same wildcards.
+MLDSA_SETS   := $(patsubst mldsa/avx2/%/mldsa.jazz,%,$(wildcard mldsa/avx2/*/mldsa.jazz))
+MLKEM_PARAMS := $(patsubst mlkem/avx2/%/jmlkem.jazz,%,$(wildcard mlkem/avx2/*/jmlkem.jazz))
 
 # ---- dependency tracking (rebuild when any included source changes) ------
 KECCAK_DEPS := $(shell find -L $(KECCAK) -name '*.jinc' 2>/dev/null)
@@ -55,6 +60,45 @@ $(BUILD):
 	mkdir -p $@
 
 # ==========================================================================
+#  The committed assembly: ../asm holds the .s of every entry point for
+#  x86-64 Linux (ELF, System V calling convention), whatever the host. It is
+#  extracted from the sources as the EasyCrypt models are (proofs/Makefile):
+#
+#    make extract-asm    # regenerate ../asm (always runs jasminc)
+#    make asm-unchanged  # fail if a file under ../asm differs from git's
+#    make check-asm      # both
+# ==========================================================================
+
+ASM       := ../asm
+ASM_FLAGS := -system linux -call-conv linux
+
+.PHONY: extract-asm asm-unchanged check-asm
+
+extract-asm:
+	mkdir -p $(ASM)
+	for s in $(MLDSA_SETS); do \
+	  env JASMINPATH="Common=$(MLDSA_COMMON):Keccak=$(KECCAK)" \
+	    $(JASMINC) -arch=$(ARCH) $(ASM_FLAGS) -o $(ASM)/mldsa$${s}_avx2.s \
+	    mldsa/avx2/$$s/mldsa.jazz || exit 1; \
+	done
+	for p in $(MLKEM_PARAMS); do \
+	  env JASMINPATH="Keccak=$(KECCAK)" \
+	    $(JASMINC) -arch=$(ARCH) $(ASM_FLAGS) -o $(ASM)/mlkem$${p}_avx2.s \
+	    mlkem/avx2/$$p/jmlkem.jazz || exit 1; \
+	done
+
+asm-unchanged:
+	@if [ -n "$$(git status --porcelain -- $(ASM))" ]; then \
+	  echo "the committed assembly is not the extraction of the sources:"; \
+	  git status --short -- $(ASM); \
+	  exit 1; \
+	fi
+	@echo "extracted assembly up to date"
+
+check-asm: extract-asm
+	@$(MAKE) --no-print-directory asm-unchanged
+
+# ==========================================================================
 #  Constant-time (CT) and speculative-constant-time (SCT) checking.
 #
 #  `jasmin-ct` type-checks the source directly -- no assembly is produced and
@@ -75,10 +119,6 @@ $(BUILD):
 
 MLDSA_INC := -I Common=$(MLDSA_COMMON) -I Keccak=$(KECCAK)
 MLKEM_INC := -I Keccak=$(KECCAK)
-
-# Entry point names, derived from the same wildcards as the .s targets.
-MLDSA_SETS   := $(patsubst mldsa/avx2/%/mldsa.jazz,%,$(wildcard mldsa/avx2/*/mldsa.jazz))
-MLKEM_PARAMS := $(patsubst mlkem/avx2/%/jmlkem.jazz,%,$(wildcard mlkem/avx2/*/jmlkem.jazz))
 
 CT_MLDSA  := $(addprefix ct-mldsa,$(MLDSA_SETS))
 CT_MLKEM  := $(addprefix ct-mlkem,$(MLKEM_PARAMS))

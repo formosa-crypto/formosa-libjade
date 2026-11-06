@@ -4,7 +4,8 @@ name: checks
 # one result per check and target (scripts/checks.sh, made of the same
 # `make` targets as a local run):
 #  - ct: constant time and speculative constant time (`jasmin-ct`);
-#  - extraction: the committed models are the jasmin2ec extraction of src/;
+#  - extraction: the committed models are the jasmin2ec extraction of src/,
+#    the committed assembly (asm/) its jasminc compilation;
 #  - kat-memcheck: the known-answer tests of bench/vectors, then Valgrind's
 #    memcheck on every entry point (x86-64 + AVX2 runners).
 # The results make one record per commit (scripts/checks-record.py), added
@@ -79,7 +80,7 @@ jobs:
       - name: Toolchain
         run: $XDEV true
 
-      - name: Extracted models
+      - name: Extracted models and assembly
         run: $XDEV sh scripts/checks.sh extraction checks/extraction.jsonl
 
       - name: Upload results

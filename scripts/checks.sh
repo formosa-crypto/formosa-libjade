@@ -25,12 +25,15 @@ case $job in
     done
     ;;
   extraction)
+    rec tool "$out" jasmin -- jasminc -version
     rec tool "$out" jasmin2ec -- jasmin2ec --version
     rec tool "$out" jasmin2ec-safety -- jasmin2ec-safety --version
     for k in correctness safety; do
       rec run "$out" extraction $k -- make -C proofs extract-$k || rc=1
     done
     rec run "$out" extraction unchanged -- make -C proofs extraction-unchanged || rc=1
+    rec run "$out" extraction assembly -- make -C src extract-asm || rc=1
+    rec run "$out" extraction assembly-unchanged -- make -C src asm-unchanged || rc=1
     ;;
   kat-memcheck)
     rec tool "$out" jasmin -- jasminc -version
