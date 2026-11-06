@@ -60,11 +60,12 @@ namespace polynomial {
         while { condition_group = offset < BYTES_PER_UNCOMPRESSED_POLYNOMIAL; } (condition_group) {
             ms = #update_msf(condition_group, ms);
             coefficients = challenge.[:u256 offset];
+            // MOVEMASK_8u32 is not DOIT: its operands are protected first.
+            coefficients = #protect_256(coefficients, ms);
 
             positive = #VPCMPGT_8u32(coefficients, zeros);
             mask32 = #MOVEMASK_8u32(positive);
             mask = (64u) mask32;
-            mask = #protect(mask, ms);
             while { condition_bit = mask != 0; } (condition_bit) {
                 ms = #update_msf(condition_bit, ms);
                 _, _, _, _, _, position = #TZCNT_64(mask);
@@ -80,7 +81,6 @@ namespace polynomial {
             negative = #VPCMPGT_8u32(zeros, coefficients);
             mask32 = #MOVEMASK_8u32(negative);
             mask = (64u) mask32;
-            mask = #protect(mask, ms);
             while { condition_bit = mask != 0; } (condition_bit) {
                 ms = #update_msf(condition_bit, ms);
                 _, _, _, _, _, position = #TZCNT_64(mask);

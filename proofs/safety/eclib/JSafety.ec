@@ -66,13 +66,6 @@ rewrite bs2int_cat bs2int_nseq_false hsz /=.
 by have := bs2int_le2Xs bs; rewrite hsz /=.
 qed.
 
-lemma to_uint_popcnt64_movemask8 (x : W256.t) :
-  0 <= to_uint (POPCNT_64 (zeroextu64 (MOVEMASK_8u32 x))).`6 <= 8.
-proof.
-apply to_uint_popcnt64_byte; rewrite /zeroextu64 W64.of_uintK.
-by have := to_uint_movemask8 x; have := W32.to_uint_cmp (MOVEMASK_8u32 x); smt().
-qed.
-
 (* the "done" flags of the hint decoder: a condition byte or-ed with a
    0/1 word is zero iff both are *)
 lemma setcc_or_eq0 (b : bool) (x : W64.t) :

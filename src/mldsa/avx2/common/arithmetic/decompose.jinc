@@ -233,16 +233,19 @@ namespace polynomial {
 
             low = #VPCMPGT_8u32(low, zeros);
 
-            t = #BLENDV_8u32(hints, zeros, low);
+            // The blends select bytes (VPBLENDVB is DOIT, VPBLENDVD is not).
+            // They act as 32-bit blends: the four bytes of a mask lane share
+            // their sign, as the lane is 0 or -1 (VPCMPGT) or in [-1, 44].
+            t = #BLENDV_32u8(hints, zeros, low);
             t = #VPSLL_8u32(t, 1);
             hints = #VPSUB_8u32(hints, t);
 
             high = #VPADD_8u32(high, hints);
 
-            high = #BLENDV_8u32(high, max, high);
+            high = #BLENDV_32u8(high, max, high);
             low = #VPCMPGT_8u32(high, max);
 
-            high = #BLENDV_8u32(high, zeros, low);
+            high = #BLENDV_32u8(high, zeros, low);
 
             commitment.[:u256 offset] = high;
 

@@ -341,7 +341,7 @@ wp; while (0 <= j <= 256 /\ j %% 8 = 0 /\ offset = 4 * j /\ condition_group = (o
     (0 <= b < 8 /\ (lifts_wpoly _c).[j{hr} + b] = - Zq.one).
   + move=> b; rewrite mask_neg; case: (0 <= b < 8) => // hb.
     by rewrite hcoef // (lifts_signE _c (j{hr} + b) hs _) 1:/#.
-  rewrite /SLH64.protect_64 /=.
+  rewrite /SLH64.protect_256 /=.
   split.
   + do ? (split; 1: smt()).
     by exists 0 => /=; split; [exact hmp | split].

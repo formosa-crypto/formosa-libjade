@@ -2102,14 +2102,10 @@ module M = {
     var low_out_of_bounds:W256.t;
     var low_equals_minus_gamma2_and_high_is_nonzero:W256.t;
     var hint_block:W256.t;
+    var signs:W32.t;
     var num_hints:W64.t;
     var weight:int;
     var offset:int;
-    var  _0:bool;
-    var  _1:bool;
-    var  _2:bool;
-    var  _3:bool;
-    var  _4:bool;
     var trace_polynomial____make_hint:trace;
     trace_polynomial____make_hint <- [];
     trace_polynomial____make_hint <-
@@ -2143,8 +2139,12 @@ module M = {
       hint_block <-
       (VPOR_256 low_out_of_bounds low_equals_minus_gamma2_and_high_is_nonzero
       );
-      num_hints <- (zeroextu64 (MOVEMASK_8u32 hint_block));
-      ( _0,  _1,  _2,  _3,  _4, num_hints) <- (POPCNT_64 num_hints);
+      signs <- (MOVEMASK_32u8 hint_block);
+      signs <- (signs `>>` (W8.of_int 3));
+      signs <- (signs `&` (W32.of_int 286331153));
+      signs <- (signs * (W32.of_int 286331153));
+      signs <- (signs `>>` (W8.of_int 28));
+      num_hints <- (zeroextu64 signs);
       hint_block <- (VPSRL_8u32 hint_block (W128.of_int 31));
       trace_polynomial____make_hint <-
       (trace_polynomial____make_hint ++
@@ -2284,10 +2284,10 @@ module M = {
       (trace_polynomial____challenge_positions ++
       [(Assert, ((0 <= offset) /\ ((offset + 32) <= 1024)))]);
       coefficients <- (BArray1024.get256d challenge offset);
+      coefficients <- (protect_256 coefficients ms);
       positive <- (VPCMPGT_8u32 coefficients zeros);
       mask32 <- (MOVEMASK_8u32 positive);
       mask <- (zeroextu64 mask32);
-      mask <- (protect_64 mask ms);
       condition_bit <- (mask <> (W64.of_int 0));
       while (condition_bit) {
         ms <- (update_msf condition_bit ms);
@@ -2317,7 +2317,6 @@ module M = {
       negative <- (VPCMPGT_8u32 zeros coefficients);
       mask32 <- (MOVEMASK_8u32 negative);
       mask <- (zeroextu64 mask32);
-      mask <- (protect_64 mask ms);
       condition_bit <- (mask <> (W64.of_int 0));
       while (condition_bit) {
         ms <- (update_msf condition_bit ms);
@@ -48373,9 +48372,10 @@ module M = {
       input_offset <- (input_offset + (W64.of_int 24));
       compare_with_field_modulus <-
       (VPCMPGT_8u32 modulus potential_coefficients);
+      compare_with_field_modulus <-
+      (protect_256 compare_with_field_modulus ms);
       good <- (zeroextu64 (MOVEMASK_8u32 compare_with_field_modulus));
       (* Erased call to declassify *)
-      good <- (protect_64 good ms);
       lower_coefficients <-
       (VEXTRACTI128 potential_coefficients (W8.of_int 0));
       good_lower <- good;
@@ -50317,7 +50317,6 @@ module M = {
     var exceeds_any:W256.t;
     var coefficients:W256.t;
     var exceeds:W256.t;
-    var msb_mask:W32.t;
     var zf:bool;
     var res8:W8.t;
     var offset:int;
@@ -50349,8 +50348,7 @@ module M = {
        ((0 <= (offset + 32)) /\ ((offset + 32) <= 18446744073709551615)))]);
       offset <- (offset + 32);
     }
-    msb_mask <- (MOVEMASK_8u32 exceeds_any);
-    ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
+    ( _0,  _1,  _2,  _3, zf) <- (VPTEST_256 exceeds_any exceeds_any);
     res8 <- (SETcc (! zf));
     result <- (zeroextu64 res8);
     return (result, trace_polynomial____check_infinity_norm);
@@ -50374,7 +50372,6 @@ module M = {
     var sum:W256.t;
     var t:W256.t;
     var exceeds:W256.t;
-    var msb_mask:W32.t;
     var zf:bool;
     var res8:W8.t;
     var offset:int;
@@ -50428,8 +50425,7 @@ module M = {
        ((0 <= (offset + 32)) /\ ((offset + 32) <= 18446744073709551615)))]);
       offset <- (offset + 32);
     }
-    msb_mask <- (MOVEMASK_8u32 exceeds_any);
-    ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
+    ( _0,  _1,  _2,  _3, zf) <- (VPTEST_256 exceeds_any exceeds_any);
     res8 <- (SETcc (! zf));
     result <- (zeroextu64 res8);
     return (sum_pointer, b_sum_pointer, result,
@@ -50454,7 +50450,6 @@ module M = {
     var sum:W256.t;
     var t:W256.t;
     var exceeds:W256.t;
-    var msb_mask:W32.t;
     var zf:bool;
     var res8:W8.t;
     var offset:int;
@@ -50509,8 +50504,7 @@ module M = {
        ((0 <= (offset + 32)) /\ ((offset + 32) <= 18446744073709551615)))]);
       offset <- (offset + 32);
     }
-    msb_mask <- (MOVEMASK_8u32 exceeds_any);
-    ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
+    ( _0,  _1,  _2,  _3, zf) <- (VPTEST_256 exceeds_any exceeds_any);
     res8 <- (SETcc (! zf));
     result <- (zeroextu64 res8);
     return (difference_pointer, b_difference_pointer, result,
@@ -50535,7 +50529,6 @@ module M = {
     var t:W256.t;
     var lhs:W256.t;
     var exceeds:W256.t;
-    var msb_mask:W32.t;
     var zf:bool;
     var res8:W8.t;
     var offset:int;
@@ -50594,8 +50587,7 @@ module M = {
       offset <- (offset + 32);
     }
     if ((threshold <= bound)) {
-      msb_mask <- (MOVEMASK_8u32 exceeds_any);
-      ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
+      ( _0,  _1,  _2,  _3, zf) <- (VPTEST_256 exceeds_any exceeds_any);
       res8 <- (SETcc (! zf));
       result <- (zeroextu64 res8);
     } else {
@@ -51976,11 +51968,11 @@ module M = {
         (trace_signature____encode_hint ++
         [(Assert, ((0 <= offset) /\ ((offset + 32) <= 6144)))]);
         coefficients <- (BArray6144.get256d hint_0 offset);
+        coefficients <- (protect_256 coefficients ms);
         equal_to_zero <- (VPCMPEQ_8u32 coefficients zeros);
         mask <- (MOVEMASK_8u32 equal_to_zero);
         nonzero <- (zeroextu64 mask);
         nonzero <- (nonzero `^` (W64.of_int 255));
-        nonzero <- (protect_64 nonzero ms);
         condition_bit <- (nonzero <> (W64.of_int 0));
         while (condition_bit) {
           ms <- (update_msf condition_bit ms);

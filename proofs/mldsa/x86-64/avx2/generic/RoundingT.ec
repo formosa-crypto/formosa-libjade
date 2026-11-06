@@ -477,13 +477,13 @@ module D88 = {
       hints <- get256_direct
                  (init32 (fun i => hint_polynomial.[i])) offset;
       low <- VPCMPGT_8u32 low zeros;
-      t <- BLENDV_8u32 hints zeros low;
+      t <- BLENDV_32u8 hints zeros low;
       t <- VPSLL_8u32 t (W128.of_int 1);
       hints <- VPSUB_8u32 hints t;
       high <- VPADD_8u32 high hints;
-      high <- BLENDV_8u32 high max high;
+      high <- BLENDV_32u8 high max high;
       low <- VPCMPGT_8u32 high max;
-      high <- BLENDV_8u32 high zeros low;
+      high <- BLENDV_32u8 high zeros low;
       commitment <- Array256.init (get32 (set256_direct
                       (init32 (fun i => commitment.[i])) offset high));
       offset <- offset + 32;
@@ -940,6 +940,18 @@ have -> : (r0 <= 0) = true by smt().
 by rewrite /= incoeffK (modz_small _ q) 1:/#.
 qed.
 
+(* The input ranges of use_hints as the List.all form circuit attaches to
+   lanes: the byte blends act as 32-bit blends only within them. *)
+lemma uh_lanes (h hi : W32.t Array256.t) :
+    wpoly_urng 2 h => wpoly_urng 44 hi =>
+    List.all (fun i => h.[i] \ult W32.of_int 2 /\ hi.[i] \ult W32.of_int 44)
+             (iotared 0 256).
+proof.
+rewrite /wpoly_urng !allP iotaredE => Hh Hhi x.
+rewrite mem_iota /= => Hx; rewrite !W32.ultE /=.
+by have := Hh x _; have := Hhi x _; smt().
+qed.
+
 lemma D88_use_hints_correct (_commitment : W32.t Array256.t) (_hints : W32.t Array256.t) :
     gamma2 = 95232 =>
     hoare [ D88.use_hints :
@@ -994,10 +1006,13 @@ seq 5 : (commitment = _commitment /\ hint_polynomial = _hints /\
 unroll for ^while; wp -1.
 conseq (: hint_polynomial = _hints /\ zeros = W256.zero /\
           max = polynomial__CONSTANTS_TABLE_gamma2_88.[4] /\
-          lows = lows /\ highs = highs ==>
+          lows = lows /\ highs = highs /\
+          List.all (fun i => _hints.[i] \ult W32.of_int 2 /\
+                             highs.[i] \ult W32.of_int 44) (iotared 0 256) ==>
           commitment = BSWA_256u32.init
                          (fun (i:int) => uh_lane88 _hints.[i] lows.[i] highs.[i])).
-+ by move => &hr [# _ -> _ _ -> -> _ _ _].
++ move => &hr [# _ -> _ Hhq -> -> _ _ Hhr].
+  by do 5! (split; 1: done); apply uh_lanes.
 + move => &hr [# Hc Hhp Hcq Hhq Hz Hm Hlv Hhv Hhr] c0 Hc0.
   (* Per-lane: the word-level map equals the spec's UseHint. *)
   have Hkey : forall i, 0 <= i < 256 =>

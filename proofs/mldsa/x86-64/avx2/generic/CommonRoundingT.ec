@@ -90,47 +90,49 @@ op mh_lane (g l h : W32.t) : W32.t =
   let c2 = if h \slt W32.zero then - e else if W32.zero \slt h then e else W32.zero in
   if (c1 `|` c2) \slt W32.zero then W32.one else W32.zero.
 
-lemma mh_popcnt6E (g : W64.t) : (POPCNT_64 g).`6 = W64.of_int (count idfun (W64.w2bits g)).
-proof. by rewrite /POPCNT_64 /flags_w. qed.
+(* The weight of a block, with DOIT instructions only: bit 4j+3 of the byte
+   mask is the sign of lane j, the product sums the eight sign bits into the
+   top nibble. The sum is the one of the stored hints (the lanes >>> 31). *)
+lemma mh_swar_sum (hb : W256.t) :
+  (((MOVEMASK_32u8 hb `>>` W8.of_int 3) `&` W32.of_int 286331153) * W32.of_int 286331153)
+    `>>` W8.of_int 28 =
+  let s = VPSRL_8u32 hb (W128.of_int 31) in
+  (s \bits32 0) + (s \bits32 1) + (s \bits32 2) + (s \bits32 3) +
+  (s \bits32 4) + (s \bits32 5) + (s \bits32 6) + (s \bits32 7).
+proof. by circuit. qed.
 
-lemma mh_popcnt_count8 (g : W64.t) (bs : bool list) :
-  size bs = 8 => to_uint g = bs2int bs => count idfun (W64.w2bits g) = count idfun bs.
+(* the 32-bit sum of eight words in [0, 1] does not wrap *)
+lemma mh_to_uint_sum8 (a0 a1 a2 a3 a4 a5 a6 a7 : W32.t) :
+  0 <= to_uint a0 <= 1 => 0 <= to_uint a1 <= 1 => 0 <= to_uint a2 <= 1 =>
+  0 <= to_uint a3 <= 1 => 0 <= to_uint a4 <= 1 => 0 <= to_uint a5 <= 1 =>
+  0 <= to_uint a6 <= 1 => 0 <= to_uint a7 <= 1 =>
+  to_uint (a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7) =
+  to_uint a0 + to_uint a1 + to_uint a2 + to_uint a3 +
+  to_uint a4 + to_uint a5 + to_uint a6 + to_uint a7.
 proof.
-move=> szb hg; have e1 : bs2int (W64.w2bits g) = bs2int (bs ++ nseq 56 false) by rewrite -W64.to_uintE hg bs2int_cat bs2int_nseq_false szb /=.
-have h1 := bs2intK (W64.w2bits g).
-have h2 := bs2intK (bs ++ nseq 56 false).
-move: h1 h2; rewrite W64.size_w2bits' size_cat szb size_nseq /= e1 => h1 h2.
-by rewrite -h1 h2 count_cat count_nseq /idfun /=.
+move=> *.
+rewrite -{1}(W32.to_uintK a0) -{1}(W32.to_uintK a1) -{1}(W32.to_uintK a2).
+rewrite -{1}(W32.to_uintK a3) -{1}(W32.to_uintK a4) -{1}(W32.to_uintK a5).
+rewrite -{1}(W32.to_uintK a6) -{1}(W32.to_uintK a7).
+by rewrite -!W32.of_intD W32.of_uintK pmod_small /#.
 qed.
 
-lemma mh_movemask_uint (hb : W256.t) : to_uint (zeroextu64 (MOVEMASK_8u32 hb)) = bs2int (map W32.msb (W8u32.to_list hb)).
+lemma mh_block_count (hb : W256.t) :
+  W64.to_uint (zeroextu64 ((((MOVEMASK_32u8 hb `>>` W8.of_int 3) `&` W32.of_int 286331153)
+                            * W32.of_int 286331153) `>>` W8.of_int 28)) =
+  count (fun j => VPSRL_8u32 hb (W128.of_int 31) \bits32 j <> W32.zero) (iota_ 0 8).
 proof.
-rewrite to_uint_zeroextu64 /MOVEMASK_8u32 /= W32.to_uintE.
-have HL : forall (L : bool list), size L = 8 => w2bits (W32.bits2w L) = L ++ nseq 24 false.
-+ move=> L szL; apply (eq_from_nth false); 1: by rewrite W32.size_w2bits' size_cat szL size_nseq.
-  move=> i; rewrite W32.size_w2bits' => rgi; rewrite w2bitsE nth_mkseq //= W32.get_bits2w // nth_cat szL.
-  by case: (i < 8) => hc //; rewrite nth_default 1:/# nth_nseq /#.
-by rewrite HL // bs2int_cat bs2int_nseq_false.
-qed.
-
-lemma mh_shr31 (x : W32.t) : (x `>>>` 31 <> W32.zero) = msb x.
-proof.
-rewrite JWordExtra.W32_msbE /=; case: (x.[31]) => h /=.
-+ rewrite eqT; apply/negP => H0.
-  have := congr1 (fun (w : W32.t) => w.[0]) _ _ H0; rewrite /=.
-  by rewrite h.
-have -> // : x `>>>` 31 = W32.zero; apply W32.wordP => k kb /=.
-case (k = 0) => [-> /= | hk]; [by rewrite h | by rewrite W32.get_out 1:/#].
-qed.
-
-lemma mh_block_popcnt (hb : W256.t) :
-  W64.to_uint (POPCNT_64 (zeroextu64 (MOVEMASK_8u32 hb))).`6 = count (fun j => VPSRL_8u32 hb (W128.of_int 31) \bits32 j <> W32.zero) (iota_ 0 8).
-proof.
-rewrite mh_popcnt6E (mh_popcnt_count8 _ (map W32.msb (W8u32.to_list hb))) 1:size_map 1:W8u32.size_to_list // 1:mh_movemask_uint // count_map.
-have hc : count (preim msb idfun) (W8u32.to_list hb) <= 8 by rewrite -(W8u32.size_to_list hb) count_size.
-rewrite W64.to_uint_small; 1: smt(count_ge0).
-rewrite count_map iotaredE; apply eq_in_count => j /mem_iota rj /=; rewrite /preim /idfun /VPSRL_8u32 W8u32.mapbE 1:/# /=.
-by rewrite mh_shr31.
+rewrite W2u32.to_uint_zeroextu64 mh_swar_sum /=.
+pose s := VPSRL_8u32 hb (W128.of_int 31).
+have hs : forall j, 0 <= j < 8 => to_uint (s \bits32 j) = b2i (s \bits32 j <> W32.zero).
++ move=> j hj; have hle : to_uint (s \bits32 j) < 2.
+  + rewrite /s /VPSRL_8u32 W8u32.mapbE 1:// /= W32.to_uint_shr 1:// /=.
+    by have := W32.to_uint_cmp (hb \bits32 j); smt().
+  case: (s \bits32 j = W32.zero) => [-> //|hn]; rewrite /b2i /=.
+  by have := W32.to_uint_cmp (s \bits32 j); move: hn; rewrite W32.to_uint_eq /=; smt().
+have hb1 : forall j, 0 <= j < 8 => 0 <= to_uint (s \bits32 j) <= 1.
++ by move=> j hj; rewrite hs //; smt().
+by rewrite -iotaredE /= -!hs // mh_to_uint_sum8 ?hb1 //; ring.
 qed.
 
 lemma mh_sliceset_get (t : W32.t Array256.t) (o : int) (s : W256.t) (i : int) :
@@ -205,7 +207,7 @@ proc change ^while.2 : {
           else get256_direct (init32 (fun i => high_coefficients.[i])) offset; }.
 + auto => /> &2; case (0 <= offset{2} * 8 <= 7936); last by auto.
   by move => *; rewrite -BSWAS_256u32_256_slicegetE 1:/#.
-proc change ^while.11 : {
+proc change ^while.15 : {
   hints <- if (0 <= offset*8 <= n*32-n)
            then BSWAS_256u32_256.sliceset hints (offset*8) hint_block
            else Array256.init
@@ -216,44 +218,44 @@ hoare split; last first.
 + unroll for ^while; wp -1.
   conseq (: low_coefficients = _low /\ high_coefficients = _high /\
             gamma2 = VPBROADCAST_8u32 g /\ minus_gamma2 = VPBROADCAST_8u32 (-g) ==> _); 1: smt().
-    kill 385; first by auto. kill 382; first by auto. kill 381; first by auto.
-    kill 373; first by auto. kill 370; first by auto. kill 369; first by auto.
-    kill 361; first by auto. kill 358; first by auto. kill 357; first by auto.
-    kill 349; first by auto. kill 346; first by auto. kill 345; first by auto.
-    kill 337; first by auto. kill 334; first by auto. kill 333; first by auto.
-    kill 325; first by auto. kill 322; first by auto. kill 321; first by auto.
-    kill 313; first by auto. kill 310; first by auto. kill 309; first by auto.
-    kill 301; first by auto. kill 298; first by auto. kill 297; first by auto.
-    kill 289; first by auto. kill 286; first by auto. kill 285; first by auto.
-    kill 277; first by auto. kill 274; first by auto. kill 273; first by auto.
-    kill 265; first by auto. kill 262; first by auto. kill 261; first by auto.
-    kill 253; first by auto. kill 250; first by auto. kill 249; first by auto.
-    kill 241; first by auto. kill 238; first by auto. kill 237; first by auto.
-    kill 229; first by auto. kill 226; first by auto. kill 225; first by auto.
-    kill 217; first by auto. kill 214; first by auto. kill 213; first by auto.
-    kill 205; first by auto. kill 202; first by auto. kill 201; first by auto.
-    kill 193; first by auto. kill 190; first by auto. kill 189; first by auto.
-    kill 181; first by auto. kill 178; first by auto. kill 177; first by auto.
-    kill 169; first by auto. kill 166; first by auto. kill 165; first by auto.
-    kill 157; first by auto. kill 154; first by auto. kill 153; first by auto.
-    kill 145; first by auto. kill 142; first by auto. kill 141; first by auto.
-    kill 133; first by auto. kill 130; first by auto. kill 129; first by auto.
-    kill 121; first by auto. kill 118; first by auto. kill 117; first by auto.
-    kill 109; first by auto. kill 106; first by auto. kill 105; first by auto.
-    kill 97; first by auto. kill 94; first by auto. kill 93; first by auto.
-    kill 85; first by auto. kill 82; first by auto. kill 81; first by auto.
-    kill 73; first by auto. kill 70; first by auto. kill 69; first by auto.
-    kill 61; first by auto. kill 58; first by auto. kill 57; first by auto.
-    kill 49; first by auto. kill 46; first by auto. kill 45; first by auto.
-    kill 37; first by auto. kill 34; first by auto. kill 33; first by auto.
-    kill 25; first by auto. kill 22; first by auto. kill 21; first by auto.
-    kill 13; first by auto. kill 10; first by auto. kill 9; first by auto.
+    kill 513; first by auto. kill 505 ! 6; first by auto.
+    kill 497; first by auto. kill 489 ! 6; first by auto.
+    kill 481; first by auto. kill 473 ! 6; first by auto.
+    kill 465; first by auto. kill 457 ! 6; first by auto.
+    kill 449; first by auto. kill 441 ! 6; first by auto.
+    kill 433; first by auto. kill 425 ! 6; first by auto.
+    kill 417; first by auto. kill 409 ! 6; first by auto.
+    kill 401; first by auto. kill 393 ! 6; first by auto.
+    kill 385; first by auto. kill 377 ! 6; first by auto.
+    kill 369; first by auto. kill 361 ! 6; first by auto.
+    kill 353; first by auto. kill 345 ! 6; first by auto.
+    kill 337; first by auto. kill 329 ! 6; first by auto.
+    kill 321; first by auto. kill 313 ! 6; first by auto.
+    kill 305; first by auto. kill 297 ! 6; first by auto.
+    kill 289; first by auto. kill 281 ! 6; first by auto.
+    kill 273; first by auto. kill 265 ! 6; first by auto.
+    kill 257; first by auto. kill 249 ! 6; first by auto.
+    kill 241; first by auto. kill 233 ! 6; first by auto.
+    kill 225; first by auto. kill 217 ! 6; first by auto.
+    kill 209; first by auto. kill 201 ! 6; first by auto.
+    kill 193; first by auto. kill 185 ! 6; first by auto.
+    kill 177; first by auto. kill 169 ! 6; first by auto.
+    kill 161; first by auto. kill 153 ! 6; first by auto.
+    kill 145; first by auto. kill 137 ! 6; first by auto.
+    kill 129; first by auto. kill 121 ! 6; first by auto.
+    kill 113; first by auto. kill 105 ! 6; first by auto.
+    kill 97; first by auto. kill 89 ! 6; first by auto.
+    kill 81; first by auto. kill 73 ! 6; first by auto.
+    kill 65; first by auto. kill 57 ! 6; first by auto.
+    kill 49; first by auto. kill 41 ! 6; first by auto.
+    kill 33; first by auto. kill 25 ! 6; first by auto.
+    kill 17; first by auto. kill 9 ! 6; first by auto.
     kill 1; first by auto.
   by rewrite /mh_lane /=; circuit.
 while (0 <= offset <= 1024 /\ offset %% 32 = 0 /\
        weight = count (fun (i:int) => hints.[i] <> W32.zero) (iota_ 0 (offset %/ 4))).
 + wp; skip => &hr [#] h0 h1 hm -> hc; have hb : 0 <= offset{hr} * 8 <= n * 32 - n by smt().
-  rewrite hb /= mh_block_popcnt; do! split; 1,2,3: smt().
+  rewrite hb /= mh_block_count; do! split; 1,2,3: smt().
   have E : forall (s : W256.t), count (fun (i : int) => (BSWAS_256u32_256.sliceset hints{hr} (offset{hr} * 8) s).[i] <> W32.zero) (iota_ 0 ((offset{hr} + 32) %/ 4)) = count (fun (i : int) => hints{hr}.[i] <> W32.zero) (iota_ 0 (offset{hr} %/ 4)) + count (fun (j : int) => s \bits32 j <> W32.zero) (iota_ 0 8).
   + move=> s; rewrite (_ : (offset{hr} + 32) %/ 4 = offset{hr} %/ 4 + 8) 1:/# iota_add 1,2:/# count_cat /=; congr.
     + by apply eq_in_count => i /mem_iota ri /=; rewrite mh_sliceset_get 1..3:/# ifF 1:/#.

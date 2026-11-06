@@ -3,7 +3,7 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List IntDiv.
 from Jasmin require import JModel_x86.
-require import JWordExtra.
+require import JWordExtra CircuitBindings.
 
 (* -------------------------------------------------------------------- *)
 (* Packing with signed saturation (VPACKSS), then VPERMQ                *)
@@ -173,4 +173,18 @@ rewrite W64.xorwE movemask_8u32_bit (_ : 255 = 2 ^ 8 - 1) // W64.of_int_powm1 //
 case: (0 <= b < 8) => hb /=; last by smt().
 rewrite VPCMPEQ_8u32_bits32E // W8u32.get_zero (_ : 0 <= b < 64) 1:/# (_ : b < 8) 1:/# /=.
 by case: (c \bits32 b = W32.zero) => _; rewrite /msb ?W32.to_uint_onew ?W32.to_uint0.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* The DOIT count of the hint bits of a block (MOVEMASK_32u8, product)  *)
+(* -------------------------------------------------------------------- *)
+
+(* the hint weight of a block, summed with DOIT instructions: eight bits *)
+lemma to_uint_hint_count8 (x : W32.t) :
+  0 <= to_uint (zeroextu64 ((((x `>>` W8.of_int 3) `&` W32.of_int 286331153)
+                             * W32.of_int 286331153) `>>` W8.of_int 28)) <= 8.
+proof.
+have h : (((x `>>` W8.of_int 3) `&` W32.of_int 286331153) * W32.of_int 286331153)
+           `>>` W8.of_int 28 \ule W32.of_int 8 by circuit.
+by move: h; rewrite W2u32.to_uint_zeroextu64 W32.uleE /=; smt(W32.to_uint_cmp).
 qed.

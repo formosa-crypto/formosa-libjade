@@ -146,8 +146,8 @@ proc change ^while.8 : {
                 (init32 (fun i => sum_pointer.[i])) offset sum)); }.
 + auto => /> &2; case (0 <= offset{2} * 8 <= 7936); last by auto.
   by move => *; rewrite BSWAS_256u32_256_slicesetE 1:/#.
-proc change 7 : { zf <- msb_mask = W32.zero; }.
-+ by auto => /= &1 &2 ->; rewrite /TEST_32 /rflags_of_bwop /= /ZF_of /=.
+proc change 6 : { zf <- exceeds_any = W256.zero; }.
++ by auto => /= &1 &2 ->; rewrite /VPTEST_256 /= /ZF_of W256.andwK.
 unroll for ^while.
 wp -2.
 (* The test is stated on the stored polynomial: stating it on the
@@ -193,8 +193,8 @@ proc change ^while.8 : {
                 (init32 (fun i => difference_pointer.[i])) offset sum)); }.
 + auto => /> &2; case (0 <= offset{2} * 8 <= 7936); last by auto.
   by move => *; rewrite BSWAS_256u32_256_slicesetE 1:/#.
-proc change 7 : { zf <- msb_mask = W32.zero; }.
-+ by auto => /= &1 &2 ->; rewrite /TEST_32 /rflags_of_bwop /= /ZF_of /=.
+proc change 6 : { zf <- exceeds_any = W256.zero; }.
++ by auto => /= &1 &2 ->; rewrite /VPTEST_256 /= /ZF_of W256.andwK.
 unroll for ^while.
 wp -2.
 (* The test is stated on the stored polynomial: stating it on the
@@ -221,7 +221,6 @@ module RHS = {
     var two_pow_22, modulus, threshold_vector, exceeds_any : W256.t;
     var rhs, t, lhs, exceeds : W256.t;
     var temp, result : W64.t;
-    var msb_mask : W32.t;
     var zf, _0, _1, _2, _3 : bool;
     var res8 : W8.t;
     var offset : int;
@@ -251,8 +250,7 @@ module RHS = {
       exceeds_any <- VPOR_256 exceeds_any exceeds;
       offset <- offset + 32;
     }
-    msb_mask <- MOVEMASK_8u32 exceeds_any;
-    (_0, _1, _2, _3, zf) <- TEST_32 msb_mask msb_mask;
+    (_0, _1, _2, _3, zf) <- VPTEST_256 exceeds_any exceeds_any;
     res8 <- SETcc (! zf);
     result <- zeroextu64 res8;
     return (sum_pointer, red, result);
@@ -342,8 +340,8 @@ proc change ^while.9 : {
                 (init32 (fun i => sum_pointer.[i])) offset lhs)); }.
 + auto => /> &2; case (0 <= offset{2} * 8 <= 7936); last by auto.
   by move => *; rewrite BSWAS_256u32_256_slicesetE 1:/#.
-proc change 7 : { zf <- msb_mask = W32.zero; }.
-+ by auto => /= &1 &2 ->; rewrite /TEST_32 /rflags_of_bwop /= /ZF_of /=.
+proc change 6 : { zf <- exceeds_any = W256.zero; }.
++ by auto => /= &1 &2 ->; rewrite /VPTEST_256 /= /ZF_of W256.andwK.
 unroll for ^while.
 wp -2.
 conseq (: _ ==> red = BSWA_256u32.init (fun i => reduce32_w _r.[i]) /\

@@ -541,7 +541,7 @@ while {2} (
   have hkb : kpolys_bytes = 1024 * kvec by rewrite /kpolys_bytes /kpolys; ring.
   split.
   + split; 1: done.
-    exists 0 => /=; move=> b; rewrite /SLH64.protect_64 mask_nz.
+    exists 0 => /=; move=> b; rewrite /SLH64.protect_256 -W64.xorwE mask_nz.
     case: (0 <= b < 8) => hb //=.
     rewrite WAE_kpolys_bytes.get256_direct_init32_bits32 1..4:/#.
     rewrite (_ : (1024 * i{hr} + 4 * j{hr}) %/ 4 + b = i{hr} * n + (j{hr} + b)) 1:/#.

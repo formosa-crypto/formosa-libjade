@@ -72,6 +72,7 @@ bind circuit
     VPCMPEQ_8u32 <- "VPCMPEQ_8u32",
     VPSIGN_8u32 <- "VPSIGN_8u32",
     BLENDV_8u32 <- "VPBLENDVD_256",
+    BLENDV_32u8 <- "VPBLENDVB_256",
     MOVEMASK_8u32 <- "MOVEMASK_8u32"
         from "specs/avx2.spec".
 

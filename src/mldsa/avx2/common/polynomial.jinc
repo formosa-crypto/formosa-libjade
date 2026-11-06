@@ -107,7 +107,6 @@ namespace polynomial {
         reg u256 coefficients;
         reg u256 threshold_vector;
         reg u256 exceeds exceeds_any;
-        reg u32 msb_mask;
         reg u64 result;
         reg u8 res8;
         reg bool zf;
@@ -137,9 +136,7 @@ namespace polynomial {
         // threshold, 1: some coefficient violates the bound). The caller
         // declassifies it where the leakage model allows: the model leaks the
         // index of the first failing polynomial, not the failing lanes.
-        msb_mask = #MOVEMASK_8u32(exceeds_any);
-
-        _, _, _, _, zf = #TEST_32(msb_mask, msb_mask);
+        _, _, _, _, zf = #VPTEST_256(exceeds_any, exceeds_any);
         res8 = #SETcc(!zf);
         result = (64u)res8;
 
@@ -165,7 +162,6 @@ namespace polynomial {
         reg u256 lhs rhs sum t;
         reg u256 two_pow_22 modulus;
         reg u256 threshold_vector exceeds exceeds_any;
-        reg u32 msb_mask;
         reg u64 result temp;
         reg u8 res8;
         reg bool zf;
@@ -199,8 +195,7 @@ namespace polynomial {
             offset += 32;
         }
 
-        msb_mask = #MOVEMASK_8u32(exceeds_any);
-        _, _, _, _, zf = #TEST_32(msb_mask, msb_mask);
+        _, _, _, _, zf = #VPTEST_256(exceeds_any, exceeds_any);
         res8 = #SETcc(!zf);
         result = (64u)res8;
 
@@ -226,7 +221,6 @@ namespace polynomial {
         reg u256 lhs rhs sum t;
         reg u256 two_pow_22 modulus;
         reg u256 threshold_vector exceeds exceeds_any;
-        reg u32 msb_mask;
         reg u64 result temp;
         reg u8 res8;
         reg bool zf;
@@ -260,8 +254,7 @@ namespace polynomial {
             offset += 32;
         }
 
-        msb_mask = #MOVEMASK_8u32(exceeds_any);
-        _, _, _, _, zf = #TEST_32(msb_mask, msb_mask);
+        _, _, _, _, zf = #VPTEST_256(exceeds_any, exceeds_any);
         res8 = #SETcc(!zf);
         result = (64u)res8;
 
@@ -289,7 +282,6 @@ namespace polynomial {
         reg u256 lhs rhs t;
         reg u256 two_pow_22 modulus;
         reg u256 threshold_vector exceeds exceeds_any;
-        reg u32 msb_mask;
         reg u64 result temp;
         reg u8 res8;
         reg bool zf;
@@ -330,8 +322,7 @@ namespace polynomial {
         }
 
         if (bound >= threshold) {
-            msb_mask = #MOVEMASK_8u32(exceeds_any);
-            _, _, _, _, zf = #TEST_32(msb_mask, msb_mask);
+            _, _, _, _, zf = #VPTEST_256(exceeds_any, exceeds_any);
             res8 = #SETcc(!zf);
             result = (64u)res8;
         } else {

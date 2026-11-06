@@ -56,8 +56,8 @@ proc change ^while.1 : { coefficients <- if (0 <= offset*8 <= 32*256-256)
 + auto => /> &2.
   case (0 <= offset{2} * 8 <= 7936); last by auto.
   by move => ?; rewrite BSWAS_256u32_256_slicegetE /#.
-proc change 5 : { zf <- msb_mask = W32.zero; }.
-+ by auto => /= &1 &2 ->; rewrite /TEST_32 /rflags_of_bwop /= /ZF_of  /=.
+proc change 4 : { zf <- exceeds_any = W256.zero; }.
++ by auto => /= &1 &2 ->; rewrite /VPTEST_256 /= /ZF_of W256.andwK.
 unroll for ^while.
 wp -2.
 conseq (: polynomial = _a /\ threshold_vector = VPBROADCAST_8u32 tw ==> zf = check_inf_norm_w _a tw).

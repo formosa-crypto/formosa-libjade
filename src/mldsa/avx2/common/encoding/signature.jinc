@@ -55,11 +55,12 @@ namespace signature {
             while { condition_group = offset < bound; } (condition_group) {
                 ms = #update_msf(condition_group, ms);
                 coefficients = hint.[:u256 offset];
+                // MOVEMASK_8u32 is not DOIT: its operand is protected first.
+                coefficients = #protect_256(coefficients, ms);
                 equal_to_zero = #VPCMPEQ_8u32(coefficients, zeros);
                 mask = #MOVEMASK_8u32(equal_to_zero);
                 nonzero = (64u) mask;
                 nonzero ^= 0xFF;
-                nonzero = #protect(nonzero, ms);
 
                 while { condition_bit = nonzero != 0; } (condition_bit) {
                     ms = #update_msf(condition_bit, ms);

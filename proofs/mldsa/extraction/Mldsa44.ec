@@ -1974,13 +1974,13 @@ module M = {
       (get256_direct (WArray1024.init32 (fun i => hint_polynomial.[i]))
       offset);
       low <- (VPCMPGT_8u32 low zeros);
-      t <- (BLENDV_8u32 hints zeros low);
+      t <- (BLENDV_32u8 hints zeros low);
       t <- (VPSLL_8u32 t (W128.of_int 1));
       hints <- (VPSUB_8u32 hints t);
       high <- (VPADD_8u32 high hints);
-      high <- (BLENDV_8u32 high max high);
+      high <- (BLENDV_32u8 high max high);
       low <- (VPCMPGT_8u32 high max);
-      high <- (BLENDV_8u32 high zeros low);
+      high <- (BLENDV_32u8 high zeros low);
       commitment <-
       (Array256.init
       (WArray1024.get32
@@ -2028,14 +2028,10 @@ module M = {
     var low_out_of_bounds:W256.t;
     var low_equals_minus_gamma2_and_high_is_nonzero:W256.t;
     var hint_block:W256.t;
+    var signs:W32.t;
     var num_hints:W64.t;
     var weight:int;
     var offset:int;
-    var  _0:bool;
-    var  _1:bool;
-    var  _2:bool;
-    var  _3:bool;
-    var  _4:bool;
     temp <- (W64.of_int ((8380417 - 1) %/ 88));
     gamma2 <- (zeroextu256 (VMOV_64 temp));
     gamma2 <- (VPBROADCAST_8u32 (truncateu32 gamma2));
@@ -2060,8 +2056,12 @@ module M = {
       hint_block <-
       (VPOR_256 low_out_of_bounds low_equals_minus_gamma2_and_high_is_nonzero
       );
-      num_hints <- (zeroextu64 (MOVEMASK_8u32 hint_block));
-      ( _0,  _1,  _2,  _3,  _4, num_hints) <- (POPCNT_64 num_hints);
+      signs <- (MOVEMASK_32u8 hint_block);
+      signs <- (signs `>>` (W8.of_int 3));
+      signs <- (signs `&` (W32.of_int 286331153));
+      signs <- (signs * (W32.of_int 286331153));
+      signs <- (signs `>>` (W8.of_int 28));
+      num_hints <- (zeroextu64 signs);
       hint_block <- (VPSRL_8u32 hint_block (W128.of_int 31));
       hints <-
       (Array256.init
@@ -2151,10 +2151,10 @@ module M = {
       ms <- (update_msf condition_group ms);
       coefficients <-
       (get256_direct (WArray1024.init32 (fun i => challenge.[i])) offset);
+      coefficients <- (protect_256 coefficients ms);
       positive <- (VPCMPGT_8u32 coefficients zeros);
       mask32 <- (MOVEMASK_8u32 positive);
       mask <- (zeroextu64 mask32);
-      mask <- (protect_64 mask ms);
       condition_bit <- (mask <> (W64.of_int 0));
       while (condition_bit) {
         ms <- (update_msf condition_bit ms);
@@ -2171,7 +2171,6 @@ module M = {
       negative <- (VPCMPGT_8u32 zeros coefficients);
       mask32 <- (MOVEMASK_8u32 negative);
       mask <- (zeroextu64 mask32);
-      mask <- (protect_64 mask ms);
       condition_bit <- (mask <> (W64.of_int 0));
       while (condition_bit) {
         ms <- (update_msf condition_bit ms);
@@ -14037,9 +14036,10 @@ module M = {
       input_offset <- (input_offset + (W64.of_int 24));
       compare_with_field_modulus <-
       (VPCMPGT_8u32 modulus potential_coefficients);
+      compare_with_field_modulus <-
+      (protect_256 compare_with_field_modulus ms);
       good <- (zeroextu64 (MOVEMASK_8u32 compare_with_field_modulus));
       (* Erased call to declassify *)
-      good <- (protect_64 good ms);
       lower_coefficients <-
       (VEXTRACTI128 potential_coefficients (W8.of_int 0));
       good_lower <- good;
@@ -14696,7 +14696,6 @@ module M = {
     var exceeds_any:W256.t;
     var coefficients:W256.t;
     var exceeds:W256.t;
-    var msb_mask:W32.t;
     var zf:bool;
     var res8:W8.t;
     var offset:int;
@@ -14717,8 +14716,7 @@ module M = {
       exceeds_any <- (VPOR_256 exceeds_any exceeds);
       offset <- (offset + 32);
     }
-    msb_mask <- (MOVEMASK_8u32 exceeds_any);
-    ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
+    ( _0,  _1,  _2,  _3, zf) <- (VPTEST_256 exceeds_any exceeds_any);
     res8 <- (SETcc (! zf));
     result <- (zeroextu64 res8);
     return result;
@@ -14739,7 +14737,6 @@ module M = {
     var sum:W256.t;
     var t:W256.t;
     var exceeds:W256.t;
-    var msb_mask:W32.t;
     var zf:bool;
     var res8:W8.t;
     var offset:int;
@@ -14774,8 +14771,7 @@ module M = {
       exceeds_any <- (VPOR_256 exceeds_any exceeds);
       offset <- (offset + 32);
     }
-    msb_mask <- (MOVEMASK_8u32 exceeds_any);
-    ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
+    ( _0,  _1,  _2,  _3, zf) <- (VPTEST_256 exceeds_any exceeds_any);
     res8 <- (SETcc (! zf));
     result <- (zeroextu64 res8);
     return (sum_pointer, result);
@@ -14796,7 +14792,6 @@ module M = {
     var sum:W256.t;
     var t:W256.t;
     var exceeds:W256.t;
-    var msb_mask:W32.t;
     var zf:bool;
     var res8:W8.t;
     var offset:int;
@@ -14831,8 +14826,7 @@ module M = {
       exceeds_any <- (VPOR_256 exceeds_any exceeds);
       offset <- (offset + 32);
     }
-    msb_mask <- (MOVEMASK_8u32 exceeds_any);
-    ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
+    ( _0,  _1,  _2,  _3, zf) <- (VPTEST_256 exceeds_any exceeds_any);
     res8 <- (SETcc (! zf));
     result <- (zeroextu64 res8);
     return (difference_pointer, result);
@@ -14853,7 +14847,6 @@ module M = {
     var t:W256.t;
     var lhs:W256.t;
     var exceeds:W256.t;
-    var msb_mask:W32.t;
     var zf:bool;
     var res8:W8.t;
     var offset:int;
@@ -14893,8 +14886,7 @@ module M = {
       offset <- (offset + 32);
     }
     if ((threshold <= bound)) {
-      msb_mask <- (MOVEMASK_8u32 exceeds_any);
-      ( _0,  _1,  _2,  _3, zf) <- (TEST_32 msb_mask msb_mask);
+      ( _0,  _1,  _2,  _3, zf) <- (VPTEST_256 exceeds_any exceeds_any);
       res8 <- (SETcc (! zf));
       result <- (zeroextu64 res8);
     } else {
@@ -15554,11 +15546,11 @@ module M = {
         ms <- (update_msf condition_group ms);
         coefficients <-
         (get256_direct (WArray4096.init32 (fun i_0 => hint_0.[i_0])) offset);
+        coefficients <- (protect_256 coefficients ms);
         equal_to_zero <- (VPCMPEQ_8u32 coefficients zeros);
         mask <- (MOVEMASK_8u32 equal_to_zero);
         nonzero <- (zeroextu64 mask);
         nonzero <- (nonzero `^` (W64.of_int 255));
-        nonzero <- (protect_64 nonzero ms);
         condition_bit <- (nonzero <> (W64.of_int 0));
         while (condition_bit) {
           ms <- (update_msf condition_bit ms);

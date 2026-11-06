@@ -60,6 +60,8 @@ $(BUILD):
 #  `jasmin-ct` type-checks the source directly -- no assembly is produced and
 #  no AVX2 host is needed, so these run anywhere (including Apple Silicon).
 #  Namespaces are passed with -I, the jasmin-ct spelling of JASMINPATH.
+#  Both checks run with --doit: secret values (for SCT, transient ones too)
+#  only reach instructions of Intel's data operand independent timing list.
 #
 #  Per-entry-point goals let you check one thing while another is being
 #  worked on:
@@ -67,7 +69,8 @@ $(BUILD):
 #    make ct-mlkem768        # just that one
 #    make sct-mldsa65
 #
-#  STATUS: ML-KEM and ML-DSA pass both CT and SCT; CI gates on all of them.
+#  STATUS: ML-KEM and ML-DSA pass both CT and SCT (with --doit); CI gates on
+#  all of them.
 # ==========================================================================
 
 MLDSA_INC := -I Common=$(MLDSA_COMMON) -I Keccak=$(KECCAK)
@@ -99,16 +102,16 @@ sct-mldsa: $(SCT_MLDSA)
 # would see no file to build and report "nothing to be done" -- a silent
 # false pass. Static patterns keep the goals phony and always run.
 $(CT_MLDSA):  ct-mldsa%:  mldsa/avx2/%/mldsa.jazz
-	$(JASMINCT) --arch=$(ARCH) $(JCTFLAGS) $(MLDSA_INC) $<
+	$(JASMINCT) --doit --arch=$(ARCH) $(JCTFLAGS) $(MLDSA_INC) $<
 
 $(SCT_MLDSA): sct-mldsa%: mldsa/avx2/%/mldsa.jazz
-	$(JASMINCT) --sct --arch=$(ARCH) $(JCTFLAGS) $(MLDSA_INC) $<
+	$(JASMINCT) --sct --doit --arch=$(ARCH) $(JCTFLAGS) $(MLDSA_INC) $<
 
 $(CT_MLKEM):  ct-mlkem%:  mlkem/avx2/%/jmlkem.jazz
-	$(JASMINCT) --arch=$(ARCH) $(JCTFLAGS) $(MLKEM_INC) $<
+	$(JASMINCT) --doit --arch=$(ARCH) $(JCTFLAGS) $(MLKEM_INC) $<
 
 $(SCT_MLKEM): sct-mlkem%: mlkem/avx2/%/jmlkem.jazz
-	$(JASMINCT) --sct --arch=$(ARCH) $(JCTFLAGS) $(MLKEM_INC) $<
+	$(JASMINCT) --sct --doit --arch=$(ARCH) $(JCTFLAGS) $(MLKEM_INC) $<
 
 clean:
 	rm -rf $(BUILD)

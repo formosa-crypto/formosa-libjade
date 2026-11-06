@@ -82,10 +82,11 @@ fn rejection_sample_multiple_blocks(
         input_offset += 24;
 
         compare_with_field_modulus = #VPCMPGT_8u32(modulus, potential_coefficients);
+        // MOVEMASK_8u32 is not DOIT: its operand is protected first.
+        compare_with_field_modulus = #protect_256(compare_with_field_modulus, ms);
 
         good = (64u)#MOVEMASK_8u32(compare_with_field_modulus);
         () = #declassify(good);
-        good = #protect(good, ms);
 
         // Do the lower 4 coefficients first.
         lower_coefficients = #VEXTRACTI128(potential_coefficients, 0);

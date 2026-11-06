@@ -20,6 +20,7 @@ namespace polynomial {
 
         reg ui64 offset;
         reg u64 temp;
+        reg u32 signs;
         reg u64 num_hints;
         reg ui64 weight;
 
@@ -54,9 +55,15 @@ namespace polynomial {
             // TODO: We could also handle serializing the hint here.
             // The hint bits stay secret: only the weight test of the caller is
             // declassified (the hint itself is public only once it is part of
-            // an accepted signature).
-            num_hints = (64u)#MOVEMASK_8u32(hint_block);
-            _, _, _, _, _, num_hints = #POPCNT_64(num_hints);
+            // an accepted signature). The count uses DOIT instructions only:
+            // bit 4j+3 of the byte mask is the sign of lane j; the product by
+            // 0x11111111 sums the eight sign bits into the top nibble.
+            signs = #MOVEMASK_32u8(hint_block);
+            signs >>= 3;
+            signs &= 0x11111111;
+            signs *= 0x11111111;
+            signs >>= 28;
+            num_hints = (64u)signs;
 
             hint_block = #VPSRL_8u32(hint_block, 31);
             hints.[:u256 offset] = hint_block;

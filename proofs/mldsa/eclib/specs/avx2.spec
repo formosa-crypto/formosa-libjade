@@ -423,6 +423,15 @@ VPBLENDVB_128(w1@128, w2@128, c@128) -> @128 =
     w2
   )
 
+# Intel intrinsic: _mm256_blendv_epi8 (vpblendvb)
+VPBLENDVB_256(w1@256, w2@256, c@256) -> @256 =
+  map<8, 32>(
+    fun c@8 w1@8 w2@8 . c[7] ? w2 : w1,
+    c,
+    w1,
+    w2
+  )
+
 # Intel intrinsic: _mm256_blendv_epi32 (vpblendvd)
 VPBLENDVD_256(w1@256, w2@256, c@256) -> @256 =
   map<32, 8>(

@@ -899,7 +899,7 @@ while (b_low_coefficients = BArray1024.init_arr (W8.of_int 255)
   rewrite BI1024.is_init_set256d_in 1,2:/# /= hinit //=.
   have h32 : offset{hr} + 32 <= 1024 by smt().
   have hm : (offset{hr} + 32) %% 32 = 0 by smt().
-  smt(to_uint_popcnt64_movemask8).
+  smt(to_uint_hint_count8).
 auto => /> b_hints0 offset0 tr w0 hge h0 h1024 hmod hw0 hw hinit hvalid.
 have := hinit; have -> : offset0 = 1024 by smt().
 by move=> -> /=; smt().
@@ -1346,7 +1346,7 @@ while (b_randombytes = BArray848.init_arr (W8.of_int 255)
     /\ valid trace_matrix_A__rejection_sample_multiple_blocks).
 + auto; ecall (matrix_A____bytestream_to_potential_coefficients_proof param).
   auto => /> &hr hle hmod hinit himod hio hvalid hlt hlt2 r hv.
-  rewrite /SLH64.protect_64.
+  rewrite /SLH64.protect_256.
   (* the vector terms are abstracted: only their bounds matter *)
   have hg : to_uint (zeroextu64 (MOVEMASK_8u32 (VPCMPGT_8u32 modulus{hr} r.`1))) < 256.
   + rewrite /zeroextu64 W64.of_uintK.
@@ -1929,7 +1929,7 @@ seq 15 : (j = 256 /\ challenge = _challenge /\ cnz _challenge = 49
     have hmn : forall b, (zeroextu64 (MOVEMASK_8u32 (VPCMPGT_8u32 W256.zero
         (BArray1024.get256d _challenge offset{hr})))).[b] = (0 <= b < 8 /\ Pm (j{hr} + b)).
     + by move=> b; rewrite mask_neg; case: (0 <= b < 8) => // hb; rewrite hcoef.
-    rewrite /SLH64.protect_64 /=.
+    rewrite /SLH64.protect_256 /=.
     split.
     + do 5! (split; 1: smt()).
       split; 1: by exists 0 => /=; split; [exact hmp | ].
