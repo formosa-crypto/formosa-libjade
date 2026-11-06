@@ -7,7 +7,7 @@ Usage:  job-summary.py proofs proofs-timing.json
 
 Links to the results dashboard rather than tables: on a push to main
 (PUBLISHED=true) the commit's results and its comparison with the previous
-commit; on a PR (PR=<number>, bench) the comparison with its merge base.
+commit; on a PR (PR=<number>) the comparison with its merge base.
 """
 
 import json
@@ -28,30 +28,28 @@ def commit_links():
             f"**[compare with the previous commit]({SITE}/#/compare/{sha})** {UPDATED}")
 
 
+def links(artifact):
+    pr = os.environ.get("PR")
+    if pr:
+        return f"**[compare with the merge base]({SITE}/#/pr/{pr})** {UPDATED}"
+    if os.environ.get("PUBLISHED") == "true":
+        return commit_links()
+    return (f"not published by this run (only main and PRs are; publish-pr publishes a "
+            f"manual run on the branch of a PR); the full report is in the `{artifact}` "
+            "artifact.")
+
+
 def proofs(m):
     print(f"Proof checking: **{m['total_seconds'] / 60:.1f} min** cumulative over "
           f"{m['files']} files ({m.get('machine', {}).get('jobs', '?')} jobs).")
     if m.get("memory"):
         print(f"Memory: peak **{gb(m['memory']['peak_total'])}** for the whole run, "
               f"largest file {gb(m.get('max_file_maxrss') or 0)}.")
-    if os.environ.get("PUBLISHED") == "true":
-        print(commit_links())
-    else:
-        print("If this commit is the head of a PR, its page on the "
-              f"**[results dashboard]({SITE}/)** compares it with the merge base "
-              "(published by publish-pr a minute after this run).")
+    print(links("proofs-timing"))
 
 
 def bench(m, runner):
-    pr = os.environ.get("PR")
-    if pr:
-        msg = f"**[compare with the merge base]({SITE}/#/pr/{pr})** {UPDATED}"
-    elif os.environ.get("PUBLISHED") == "true":
-        msg = commit_links()
-    else:
-        msg = (f"not published (only main and PRs are); the full report is in the "
-               f"`bench-{runner}` artifact.")
-    print(f"Benchmarks on `{runner}`: {msg}")
+    print(f"Benchmarks on `{runner}`: {links(f'bench-{runner}')}")
 
 
 def main():

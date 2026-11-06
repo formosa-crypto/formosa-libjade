@@ -230,34 +230,10 @@ jobs:
         with:
           name: bench-${{ matrix.runner }}
           path: result
-      # Where the record goes, from the event (trusted) rather than from the
-      # artifact (produced by the benchmarked code).
-      - name: Target
-        id: target
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT: ${{ github.event_name }}
-          RUNNER: ${{ matrix.runner }}
-          PR: ${{ github.event.pull_request.number }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          set -euo pipefail
-          if [ "$EVENT" = pull_request_target ]; then
-            mb=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE...$HEAD" \
-                   --jq '[.merge_base_commit.sha, .merge_base_commit.commit.committer.date] | @tsv')
-            meta=$(MB="$mb" python3 -I -c '
-          import json, os
-          sha, date = os.environ["MB"].split("\t")
-          print(json.dumps({"pr": {"number": int(os.environ["PR"]), "title": os.environ["TITLE"],
-                                   "head_ref": os.environ["HEAD_REF"], "base": os.environ["BASE"],
-                                   "merge_base": sha, "merge_base_date": date}}))')
-            { echo "dest=data/pr/$PR/bench/$RUNNER"; echo "commit=$HEAD"; echo "meta=$meta"; } >> "$GITHUB_OUTPUT"
-          else
-            { echo "dest=data/bench/$RUNNER"; echo "commit=$GITHUB_SHA"; echo "meta={}"; } >> "$GITHUB_OUTPUT"
-          fi
+      - id: target
+        uses: ./.github/actions/result-target
+        with:
+          kind: bench/${{ matrix.runner }}
       - uses: ./.github/actions/publish-result
         with:
           file: result/bench.json

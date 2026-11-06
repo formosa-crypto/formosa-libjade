@@ -19,19 +19,27 @@ on the GitHub side.
 ## Security model (designed for a public repo)
 
 A self-hosted runner executes job code on your machine, so on a **public**
-repo it is an RCE vector. The bench workflow is built to contain that:
+repo it is an RCE vector. The bench, proofs and checks workflows are built to
+contain that:
 
 - **No fork code ever runs** (the primary defense). PR runs are gated on
   `head.repo == this repo`, so only branches pushed into the repo by
-  collaborators are benched. A fork PR is skipped.
+  collaborators are checked. A fork PR is skipped: once reviewed, its branch
+  is pushed to the repo and the workflows are run on it by hand.
 - **The PR can't weaken the gate.** `pull_request_target` runs the workflow file
   from the **base branch**, not the PR's copy, so a PR cannot edit the gate or
   steps to bypass these checks. (It can still change the `src/`/`bench/` code we
   build and run — that is what the same-repo gate above contains.)
 - **Nothing to exfiltrate.** A `pull_request_target` job runs in the trusted base
-  context and *could* read `secrets.*` by default, but this workflow references
-  **no secrets** and sets `permissions: contents: read` (a read-only
-  `GITHUB_TOKEN`), so checked-out code has nothing sensitive to steal.
+  context and *could* read `secrets.*` by default, but the jobs that run the
+  checked code reference **no secrets** and have a read-only `GITHUB_TOKEN`
+  (`contents: read`, plus `actions: read` to fetch artifacts), so checked-out
+  code has nothing sensitive to steal. The one secret, the deploy key of the
+  results repo, is only used by the publish jobs, on GitHub-hosted runners,
+  which run no checked code.
+- **No forged reuse.** A run reuses the results of an earlier run on the same
+  tree through marker artifacts; only the markers of runs on this repo's own
+  branches count, since a fork's PR can upload an artifact of any name.
 
 Operational rules:
 

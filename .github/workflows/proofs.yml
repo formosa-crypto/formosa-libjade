@@ -5,22 +5,30 @@ name: proofs
 # already checked with the same EasyCrypt (a rebase that changes no file, a
 # rebase merge) reuses that run's results instead, except in a manual run.
 #
-# SECURITY: the plain pull_request trigger is safe while this repo is
-# PRIVATE (only collaborators can open PRs). Before making the repo public,
-# adopt bench.yml's model (pull_request_target + same-repo gate) so fork
-# code can never run on the self-hosted machines.
+# Security: a pull request runs this workflow as it is on main
+# (pull_request_target), and only when it comes from this repo: the code of
+# a fork never runs on the self-hosted machines. A fork's PR is checked by
+# pushing its branch to this repo once reviewed, and running the workflow on
+# that branch by hand (published by publish-pr). The deploy key of the
+# results repo is only used by the publish job, which runs no checked code.
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
-  pull_request:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
 
+# A PR has its own group, where a new push cancels the run in progress
+# (with pull_request_target, github.ref is the base branch).
 concurrency:
-  group: proofs-${{ github.ref }}
+  group: >-
+    proofs-${{ github.event_name == 'pull_request_target'
+               && format('pr-{0}', github.event.pull_request.number)
+               || github.ref }}
   cancel-in-progress: true
 
 # The toolchain (jasmin + EasyCrypt + provers + python) comes from flake.nix,
@@ -38,8 +46,13 @@ jobs:
   # GitHub-hosted runner, so that a reuse waits for no proofs runner. The
   # EasyCrypt commit is its pinned branch's head: if the store lags behind
   # it, the marker of the run (from the EasyCrypt it used) is not found and
-  # the proofs are checked again.
+  # the proofs are checked again. Every other job needs this one, which runs
+  # only for a push, a manual run or a PR from this repo; its code is the base
+  # branch's, the commit's opam file is read as data.
   earlier:
+    if: >-
+      github.event_name != 'pull_request_target' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -49,10 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ env.HEAD }}
-          sparse-checkout: |
-            .github/actions
-            formosa-libjade.opam
+          sparse-checkout: .github/actions
           persist-credentials: false
       # A failed lookup only means checking again.
       - name: EasyCrypt
@@ -61,7 +71,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          branch=$(sed -n 's|.*"git+https://github.com/EasyCrypt/easycrypt.git#\([^"]*\)".*|\1|p' formosa-libjade.opam)
+          opam=$(gh api "repos/$GITHUB_REPOSITORY/contents/formosa-libjade.opam?ref=$HEAD" \
+                   -H "Accept: application/vnd.github.raw")
+          branch=$(printf '%s\n' "$opam" | sed -n 's|.*"git+https://github.com/EasyCrypt/easycrypt.git#\([^"]*\)".*|\1|p')
           echo "rev=$(gh api "repos/EasyCrypt/easycrypt/commits/$branch" --jq .sha)" >> "$GITHUB_OUTPUT"
       - id: find
         continue-on-error: true
@@ -73,7 +85,7 @@ jobs:
 
   check-ec-proofs:
     needs: earlier
-    if: ${{ !cancelled() && !needs.earlier.outputs.run }}
+    if: needs.earlier.result == 'success' && !needs.earlier.outputs.run
     runs-on: [self-hosted, linux, proofs]
     timeout-minutes: 240
     steps:
@@ -128,6 +140,7 @@ jobs:
 
       - name: Job summary
         env:
+          PR: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
           PUBLISHED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: $ECDEV python3 -I scripts/job-summary.py proofs proofs-timing.json >> "$GITHUB_STEP_SUMMARY"
 
@@ -181,6 +194,7 @@ jobs:
         run: python3 -I scripts/ci-retarget.py proofs-timing.json
       - name: Job summary
         env:
+          PR: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
           PUBLISHED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: python3 -I scripts/job-summary.py proofs proofs-timing.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
@@ -192,14 +206,17 @@ jobs:
             proofs-timing.html
 
   # Add this run's timing JSON to the results repo
-  # (https://github.com/formosa-crypto/formosa-libjade-results), on pushes to main only.
-  # A separate job on a GitHub-hosted runner: it only downloads the artifact,
-  # so the deploy key never reaches the self-hosted machine nor shares a job
-  # with the proof-checking steps.
+  # (https://github.com/formosa-crypto/formosa-libjade-results): pushes to main
+  # go to main's history, runs of PRs to the PR's own space. A separate job on
+  # a GitHub-hosted runner: it only downloads the artifact, so the deploy key
+  # never reaches the self-hosted machine nor shares a job with the
+  # proof-checking steps.
   publish:
     needs: [check-ec-proofs, reuse]
     if: >-
-      !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      !cancelled() &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       github.event_name == 'pull_request_target') &&
       (needs.check-ec-proofs.result == 'success' || needs.reuse.result == 'success')
     runs-on: ubuntu-latest
     permissions:
@@ -213,8 +230,14 @@ jobs:
         with:
           name: proofs-timing
           path: result
+      - id: target
+        uses: ./.github/actions/result-target
+        with:
+          kind: proofs
       - uses: ./.github/actions/publish-result
         with:
           file: result/proofs-timing.json
-          dest: data/proofs
+          dest: ${{ steps.target.outputs.dest }}
+          commit: ${{ steps.target.outputs.commit }}
+          meta: ${{ steps.target.outputs.meta }}
           deploy-key: ${{ secrets.TIMING_DEPLOY_KEY }}

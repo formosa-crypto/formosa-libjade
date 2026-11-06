@@ -1,18 +1,20 @@
 name: publish-pr
 
-# Adds the records of a pull request's runs to the results repo
-# (https://github.com/formosa-crypto/formosa-libjade-results), with the PR's merge base:
+# Adds the records of the runs started by hand on the branch of a pull
+# request to the results repo
+# (https://github.com/formosa-crypto/formosa-libjade-results), with the
+# PR's merge base (the runs of the PR itself, pull_request_target, publish
+# their records themselves):
 #  - its proofs timing, as data/pr/<number>/proofs/<head>.json, once its
 #    proofs run has succeeded;
 #  - its checks record, as data/pr/<number>/checks/<head>.json, once its
 #    checks run has completed (failed checks are recorded too).
 #
-# A PR's runs (pull_request, or started by hand on its branch) run the
-# branch's copy of the workflows, so they must never hold the deploy key.
-# This workflow is triggered by their completion and always runs main's
-# version (workflow_run): it only downloads the run's artifact as data,
-# validates it, and takes the target (PR, head, merge base) from the event
-# and the API.
+# A manual run on a branch runs the branch's copy of the workflows, so it
+# must never hold the deploy key. This workflow is triggered by its
+# completion and always runs main's version (workflow_run): it only
+# downloads the run's artifact as data, validates it, and takes the target
+# (PR, head, merge base) from the event and the API.
 
 on:
   workflow_run:
@@ -29,8 +31,7 @@ permissions:
 jobs:
   publish:
     if: >-
-      (github.event.workflow_run.event == 'pull_request' ||
-       github.event.workflow_run.event == 'workflow_dispatch') &&
+      github.event.workflow_run.event == 'workflow_dispatch' &&
       (github.event.workflow_run.conclusion == 'success' ||
        (github.event.workflow_run.name == 'checks' &&
         github.event.workflow_run.conclusion == 'failure')) &&

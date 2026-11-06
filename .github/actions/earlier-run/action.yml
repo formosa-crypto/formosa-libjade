@@ -3,9 +3,10 @@ description: >-
   The marker artifacts of a commit, and the latest earlier run that left
   each one: a successful run on the same tree (same EasyCrypt for the
   proofs, same machine for bench), whose results a run can reuse instead of
-  running again. Needs the actions: read permission. A marker is only as
-  trustworthy as the code of the run that uploaded it: the PRs of
-  collaborators while the repo is private (see SECURITY in the workflows).
+  running again. Needs the actions: read permission. Only the markers of
+  runs on this repo's own branches count: a fork's PR can run a workflow
+  of its own and upload an artifact of any name, but the workflows only
+  run the checks for this repo's branches (see Security in the workflows).
 
 inputs:
   commit:
@@ -55,7 +56,8 @@ runs:
               const { data } = await github.rest.actions.listArtifactsForRepo(
                 { owner, repo, name, per_page: 100 });
               const found = data.artifacts
-                .filter(a => !a.expired && a.workflow_run && a.workflow_run.id !== context.runId)
+                .filter(a => !a.expired && a.workflow_run && a.workflow_run.id !== context.runId
+                             && a.workflow_run.head_repository_id === a.workflow_run.repository_id)
                 .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
               if (found) {
                 runs[label] = String(found.workflow_run.id);

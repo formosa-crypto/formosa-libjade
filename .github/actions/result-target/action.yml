@@ -1,0 +1,53 @@
+name: result-target
+description: >-
+  Where a run's record goes in the results repo, from the event (trusted)
+  rather than from the artifact (produced by the checked code): a push to
+  main goes to main's history (data/<kind>), a pull_request_target run to
+  the PR's own space (data/pr/<number>/<kind>), with the PR's merge base for
+  the comparison.
+
+inputs:
+  kind:
+    description: the kind of record, e.g. proofs, checks or bench/<runner>
+    required: true
+
+outputs:
+  dest:
+    description: the directory of the record in the results repo
+    value: ${{ steps.target.outputs.dest }}
+  commit:
+    description: the commit of the record
+    value: ${{ steps.target.outputs.commit }}
+  meta:
+    description: JSON object merged into the record's meta (the PR, if any)
+    value: ${{ steps.target.outputs.meta }}
+
+runs:
+  using: composite
+  steps:
+    - id: target
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        KIND: ${{ inputs.kind }}
+        EVENT: ${{ github.event_name }}
+        PR: ${{ github.event.pull_request.number }}
+        HEAD: ${{ github.event.pull_request.head.sha }}
+        BASE: ${{ github.event.pull_request.base.sha }}
+        HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        TITLE: ${{ github.event.pull_request.title }}
+      run: |
+        set -euo pipefail
+        if [ "$EVENT" = pull_request_target ]; then
+          mb=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE...$HEAD" \
+                 --jq '[.merge_base_commit.sha, .merge_base_commit.commit.committer.date] | @tsv')
+          meta=$(MB="$mb" python3 -I -c '
+        import json, os
+        sha, date = os.environ["MB"].split("\t")
+        print(json.dumps({"pr": {"number": int(os.environ["PR"]), "title": os.environ["TITLE"],
+                                 "head_ref": os.environ["HEAD_REF"], "base": os.environ["BASE"],
+                                 "merge_base": sha, "merge_base_date": date}}))')
+          { echo "dest=data/pr/$PR/$KIND"; echo "commit=$HEAD"; echo "meta=$meta"; } >> "$GITHUB_OUTPUT"
+        else
+          { echo "dest=data/$KIND"; echo "commit=$GITHUB_SHA"; echo "meta={}"; } >> "$GITHUB_OUTPUT"
+        fi
