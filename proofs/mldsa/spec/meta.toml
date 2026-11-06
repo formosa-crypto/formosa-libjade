@@ -1,0 +1,17 @@
+primitive      = "ML-DSA"
+standard       = "FIPS 204"
+spec           = "MLDSA.ec"
+operations     = ["keygen", "sign", "verify"]
+parameter_sets = ["44", "65", "87"]
+
+# the generic theorem, and its instance for each parameter set it covers
+[spec_security]
+notion         = "EUF-CMA, ROM, hedged signing"
+leakage        = true
+assumptions    = ["MLWE", "SelfTargetMSIS"]
+theorem        = { file = "properties/MLDSA_Security.ec", lemma = "mldsa_secure" }
+
+[spec_security.instances]
+"44" = { file = "properties/Security44.ec", clone = "Sec44" }
+"65" = { file = "properties/Security65.ec", clone = "Sec65" }
+"87" = { file = "properties/Security87.ec", clone = "Sec87" }

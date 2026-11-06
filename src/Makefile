@@ -1,5 +1,9 @@
 # Makefile -- assembly (.s) generation for the ML-KEM / ML-DSA entry points.
 #
+# Sources are laid out as <prim>/<target>/<profile>/<set>/, with the code
+# shared by the sets in <prim>/<target>/<profile>/common/; Keccak (FIPS 202)
+# as fips202/<target>/common/.
+#
 # Jasmin namespaces are resolved through JASMINPATH:
 #   Common -> per-implementation shared code (ML-DSA only)
 #   Keccak -> in-tree src/fips202 (flattened from formosa-keccak)
@@ -12,29 +16,35 @@ JCTFLAGS ?=
 
 BUILD   ?= _build
 
+# The implementation: target (instruction set) and profile.
+TARGET  := avx2
+PROFILE := sct
+MLDSA   := mldsa/$(TARGET)/$(PROFILE)
+MLKEM   := mlkem/$(TARGET)/$(PROFILE)
+
 # Jasmin emits OS-specific assembly: the .s produced in $(BUILD) matches the
 # host (Mach-O on macOS, ELF on Linux). bench/ links it into the libraries
 # that the KATs, memcheck and the benchmarks load. The committed assembly,
 # for Linux, is in ../asm (see below).
 
 KECCAK       := fips202
-MLDSA_COMMON := mldsa/avx2/common
+MLDSA_COMMON := $(MLDSA)/common
 
 # ---- entry points -> output assembly -------------------------------------
 # Discovered by wildcard, so a new parameter set is picked up as soon as its
 # source directory appears:
-#   ML-DSA: mldsa/avx2/<set>/mldsa.jazz   -> _build/mldsa<set>_avx2.s
-#   ML-KEM: mlkem/avx2/<param>/jmlkem.jazz -> _build/mlkem<param>_avx2.s
-MLDSA_S := $(patsubst mldsa/avx2/%/mldsa.jazz,$(BUILD)/mldsa%_avx2.s,\
-             $(wildcard mldsa/avx2/*/mldsa.jazz))
-MLKEM_S := $(patsubst mlkem/avx2/%/jmlkem.jazz,$(BUILD)/mlkem%_avx2.s,\
-             $(wildcard mlkem/avx2/*/jmlkem.jazz))
+#   ML-DSA: mldsa/avx2/sct/<set>/mldsa.jazz   -> _build/mldsa<set>_avx2.s
+#   ML-KEM: mlkem/avx2/sct/<param>/jmlkem.jazz -> _build/mlkem<param>_avx2.s
+MLDSA_S := $(patsubst $(MLDSA)/%/mldsa.jazz,$(BUILD)/mldsa%_$(TARGET).s,\
+             $(wildcard $(MLDSA)/*/mldsa.jazz))
+MLKEM_S := $(patsubst $(MLKEM)/%/jmlkem.jazz,$(BUILD)/mlkem%_$(TARGET).s,\
+             $(wildcard $(MLKEM)/*/jmlkem.jazz))
 
 TARGETS := $(MLDSA_S) $(MLKEM_S)
 
 # Parameter sets, from the same wildcards.
-MLDSA_SETS   := $(patsubst mldsa/avx2/%/mldsa.jazz,%,$(wildcard mldsa/avx2/*/mldsa.jazz))
-MLKEM_PARAMS := $(patsubst mlkem/avx2/%/jmlkem.jazz,%,$(wildcard mlkem/avx2/*/jmlkem.jazz))
+MLDSA_SETS   := $(patsubst $(MLDSA)/%/mldsa.jazz,%,$(wildcard $(MLDSA)/*/mldsa.jazz))
+MLKEM_PARAMS := $(patsubst $(MLKEM)/%/jmlkem.jazz,%,$(wildcard $(MLKEM)/*/jmlkem.jazz))
 
 # ---- dependency tracking (rebuild when any included source changes) ------
 KECCAK_DEPS := $(shell find -L $(KECCAK) -name '*.jinc' 2>/dev/null)
@@ -48,11 +58,11 @@ mlkem: $(MLKEM_S)
 
 # ---- pattern rules: one per scheme, parametric in the set/param ----------
 # ML-DSA needs the shared Common namespace; ML-KEM only needs Keccak.
-$(BUILD)/mldsa%_avx2.s: mldsa/avx2/%/mldsa.jazz $(MLDSA_DEPS) | $(BUILD)
+$(BUILD)/mldsa%_$(TARGET).s: $(MLDSA)/%/mldsa.jazz $(MLDSA_DEPS) | $(BUILD)
 	env JASMINPATH="Common=$(MLDSA_COMMON):Keccak=$(KECCAK)" \
 	    $(JASMINC) -arch=$(ARCH) $(JFLAGS) -o $@ $<
 
-$(BUILD)/mlkem%_avx2.s: mlkem/avx2/%/jmlkem.jazz $(MLKEM_DEPS) | $(BUILD)
+$(BUILD)/mlkem%_$(TARGET).s: $(MLKEM)/%/jmlkem.jazz $(MLKEM_DEPS) | $(BUILD)
 	env JASMINPATH="Keccak=$(KECCAK)" \
 	    $(JASMINC) -arch=$(ARCH) $(JFLAGS) -o $@ $<
 
@@ -61,8 +71,9 @@ $(BUILD):
 
 # ==========================================================================
 #  The committed assembly: ../asm holds the .s of every entry point for
-#  x86-64 Linux (ELF, System V calling convention), whatever the host. It is
-#  extracted from the sources as the EasyCrypt models are (proofs/Makefile):
+#  x86-64 Linux (ELF, System V calling convention), whatever the host, as
+#  ../asm/<prim>/<target>/<prim><set>_<target>_<profile>.s. It is extracted
+#  from the sources as the EasyCrypt models are (proofs/Makefile):
 #
 #    make extract-asm    # regenerate ../asm (always runs jasminc)
 #    make asm-unchanged  # fail if a file under ../asm differs from git's
@@ -75,16 +86,18 @@ ASM_FLAGS := -system linux -call-conv linux
 .PHONY: extract-asm asm-unchanged check-asm
 
 extract-asm:
-	mkdir -p $(ASM)
+	mkdir -p $(ASM)/mldsa/$(TARGET) $(ASM)/mlkem/$(TARGET)
 	for s in $(MLDSA_SETS); do \
 	  env JASMINPATH="Common=$(MLDSA_COMMON):Keccak=$(KECCAK)" \
-	    $(JASMINC) -arch=$(ARCH) $(ASM_FLAGS) -o $(ASM)/mldsa$${s}_avx2.s \
-	    mldsa/avx2/$$s/mldsa.jazz || exit 1; \
+	    $(JASMINC) -arch=$(ARCH) $(ASM_FLAGS) \
+	    -o $(ASM)/mldsa/$(TARGET)/mldsa$${s}_$(TARGET)_$(PROFILE).s \
+	    $(MLDSA)/$$s/mldsa.jazz || exit 1; \
 	done
 	for p in $(MLKEM_PARAMS); do \
 	  env JASMINPATH="Keccak=$(KECCAK)" \
-	    $(JASMINC) -arch=$(ARCH) $(ASM_FLAGS) -o $(ASM)/mlkem$${p}_avx2.s \
-	    mlkem/avx2/$$p/jmlkem.jazz || exit 1; \
+	    $(JASMINC) -arch=$(ARCH) $(ASM_FLAGS) \
+	    -o $(ASM)/mlkem/$(TARGET)/mlkem$${p}_$(TARGET)_$(PROFILE).s \
+	    $(MLKEM)/$$p/jmlkem.jazz || exit 1; \
 	done
 
 asm-unchanged:
@@ -141,16 +154,16 @@ sct-mldsa: $(SCT_MLDSA)
 # pattern rule would NOT be phony (pattern rules ignore .PHONY), so make
 # would see no file to build and report "nothing to be done" -- a silent
 # false pass. Static patterns keep the goals phony and always run.
-$(CT_MLDSA):  ct-mldsa%:  mldsa/avx2/%/mldsa.jazz
+$(CT_MLDSA):  ct-mldsa%:  $(MLDSA)/%/mldsa.jazz
 	$(JASMINCT) --doit --arch=$(ARCH) $(JCTFLAGS) $(MLDSA_INC) $<
 
-$(SCT_MLDSA): sct-mldsa%: mldsa/avx2/%/mldsa.jazz
+$(SCT_MLDSA): sct-mldsa%: $(MLDSA)/%/mldsa.jazz
 	$(JASMINCT) --sct --doit --arch=$(ARCH) $(JCTFLAGS) $(MLDSA_INC) $<
 
-$(CT_MLKEM):  ct-mlkem%:  mlkem/avx2/%/jmlkem.jazz
+$(CT_MLKEM):  ct-mlkem%:  $(MLKEM)/%/jmlkem.jazz
 	$(JASMINCT) --doit --arch=$(ARCH) $(JCTFLAGS) $(MLKEM_INC) $<
 
-$(SCT_MLKEM): sct-mlkem%: mlkem/avx2/%/jmlkem.jazz
+$(SCT_MLKEM): sct-mlkem%: $(MLKEM)/%/jmlkem.jazz
 	$(JASMINCT) --sct --doit --arch=$(ARCH) $(JCTFLAGS) $(MLKEM_INC) $<
 
 clean:

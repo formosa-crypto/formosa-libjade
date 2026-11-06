@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
 """Import KAT vectors into the bench/ JSON schema.
 
-ML-DSA: converts the hash-based "pqc" KAT files (key_generation_seed, context,
-        message, signing_randomness + sha3_256 hashes of vk/sk/sig), and
-        downloads NIST ACVP ML-DSA-keyGen / -sigGen / -sigVer, converted to
-        full-value vectors (mldsa<n>-acvp.json). Only the groups of the
-        external, pure interface are imported, the one the common ABI
-        exposes; the importer lists the others.
-ML-KEM: downloads NIST ACVP ML-KEM-keyGen / ML-KEM-encapDecap (prompt +
-        expectedResults) and converts to full-value vectors, the
-        encapsulation and decapsulation key checks (FIPS 203 7.2, 7.3)
-        included.
+Two sources, both downloaded at a fixed version:
 
-    python3 tools/import_kat.py --out vectors \\
-        --pqc /path/to/formosa-mldsa/tests/pqc --acvp-version v1.1.0.43
+- NIST ACVP (usnistgov/ACVP-Server), converted to full-value vectors:
+  ML-KEM-keyGen / ML-KEM-encapDecap, the encapsulation and decapsulation key
+  checks (FIPS 203 7.2, 7.3) included (mlkem<n>.json); ML-DSA-keyGen /
+  -sigGen / -sigVer (mldsa<n>-acvp.json), only the groups of the external,
+  pure interface, the one the common ABI exposes (the importer lists the
+  others).
+- the KAT files of post-quantum-cryptography/KAT (an archived repository,
+  pinned to a commit), with the SHA3-256 hashes of the long outputs:
+  ML-DSA hedged_pure (mldsa<n>.json), keygen then signing; ML-KEM
+  (mlkem<n>-pqc.json, the first PQC_TESTS records), keygen, encapsulation,
+  decapsulation of its ciphertext, then of an invalid ciphertext (implicit
+  rejection).
+
+    python3 tools/import_kat.py --out vectors --acvp-version v1.1.0.43
 """
 
 import argparse
+import hashlib
 import json
 import sys
 import urllib.request
@@ -25,6 +29,9 @@ from pathlib import Path
 ACVP_BASE = "https://raw.githubusercontent.com/usnistgov/ACVP-Server/{v}/gen-val/json-files"
 ACVP_MLKEM = ["ML-KEM-keyGen-FIPS203", "ML-KEM-encapDecap-FIPS203"]
 ACVP_MLDSA = ["ML-DSA-keyGen-FIPS204", "ML-DSA-sigGen-FIPS204", "ML-DSA-sigVer-FIPS204"]
+PQC_COMMIT = "f238e347b1323344208eb316df9993c923334817"
+PQC_BASE = f"https://raw.githubusercontent.com/post-quantum-cryptography/KAT/{PQC_COMMIT}"
+PQC_TESTS = 100  # ML-KEM records kept per parameter set (the files have 1000)
 
 
 def base_name(algo):
@@ -39,31 +46,68 @@ def write_scheme(out_dir, algo, tests, source, suffix=""):
 
 
 # --------------------------------------------------------------------------
-# ML-DSA: hash-based pqc KAT -> schema
+# post-quantum-cryptography/KAT -> schema (hashes of the long outputs)
 # --------------------------------------------------------------------------
-def import_mldsa(pqc_dir, out_dir):
+def fetch_pqc(cache, rel):
+    """the records of the .rsp file rel, as {field: hex} dicts"""
+    cache.mkdir(parents=True, exist_ok=True)
+    local = cache / rel.replace("/", "_")
+    if not local.exists():
+        print(f"  downloading {rel}")
+        urllib.request.urlretrieve(f"{PQC_BASE}/{rel}", local)
+    records, rec = [], {}
+    for line in local.read_text().splitlines():
+        if " = " in line:
+            key, value = (x.strip() for x in line.split(" = ", 1))
+            if key == "count" and rec:
+                records.append(rec)
+                rec = {}
+            rec[key] = value
+    return records + [rec] if rec else records
+
+
+def sha3(hexstr):
+    return hashlib.sha3_256(bytes.fromhex(hexstr)).hexdigest()
+
+
+def import_mldsa_pqc(out_dir, cache):
     for setn in (44, 65, 87):
-        src = pqc_dir / f"ml_dsa_{setn}.json"
-        if not src.exists():
-            print(f"  (skip ML-DSA-{setn}: {src} not found)")
-            continue
+        rel = f"MLDSA/kat_MLDSA_{setn}_hedged_pure.rsp"
         tests = []
-        for r in json.loads(src.read_text()):
+        for r in fetch_pqc(cache, rel):
+            sm, mlen = r["sm"], 2 * int(r["mlen"])  # sm = signature || message
+            if sm[len(sm) - mlen:] != r["msg"]:
+                raise SystemExit(f"{rel}: count {r['count']}: sm does not end with msg")
             tests.append({
                 "count": int(r["count"]),
-                "keygen": {
-                    "seed": r["key_generation_seed"],
-                    "verification_key_sha3_256": r["sha3_256_hash_of_verification_key"],
-                    "signing_key_sha3_256": r["sha3_256_hash_of_signing_key"],
-                },
-                "sign": {
-                    "context": r["context"],
-                    "message": r["message"],
-                    "randomness": r["signing_randomness"],
-                    "signature_sha3_256": r["sha3_256_hash_of_signature"],
-                },
+                "keygen": {"seed": r["xi"],
+                           "verification_key_sha3_256": sha3(r["pk"]),
+                           "signing_key_sha3_256": sha3(r["sk"])},
+                "sign": {"context": r["ctx"], "message": r["msg"], "randomness": r["rng"],
+                         "signature_sha3_256": sha3(sm[:len(sm) - mlen])},
             })
-        write_scheme(out_dir, f"ML-DSA-{setn}", tests, f"pqc KAT ({src.name})")
+        write_scheme(out_dir, f"ML-DSA-{setn}", tests, f"{rel} of post-quantum-cryptography/KAT "
+                     f"{PQC_COMMIT[:8]}")
+
+
+def import_mlkem_pqc(out_dir, cache):
+    for setn in (512, 768, 1024):
+        rel = f"MLKEM/kat_MLKEM_{setn}.rsp"
+        tests = []
+        for r in fetch_pqc(cache, rel)[:PQC_TESTS]:
+            tests.append({
+                "count": int(r["count"]),
+                "keygen": {"coins": r["d"] + r["z"],  # ML-KEM.KeyGen coins = d || z
+                           "public_key_sha3_256": sha3(r["pk"]),
+                           "secret_key_sha3_256": sha3(r["sk"])},
+                "encaps": {"coins": r["msg"], "ciphertext_sha3_256": sha3(r["ct"]),
+                           "shared_secret": r["ss"]},
+                # the ciphertext of encaps, then an invalid one (implicit rejection)
+                "decaps": [{"shared_secret": r["ss"]},
+                           {"ciphertext": r["ct_n"], "shared_secret": r["ss_n"]}],
+            })
+        write_scheme(out_dir, f"ML-KEM-{setn}", tests, f"{rel} of post-quantum-cryptography/KAT "
+                     f"{PQC_COMMIT[:8]}, first {PQC_TESTS} records", suffix="-pqc")
 
 
 # --------------------------------------------------------------------------
@@ -202,23 +246,23 @@ def main(argv=None):
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     here = Path(__file__).resolve().parent.parent
     ap.add_argument("--out", type=Path, default=here / "vectors")
-    ap.add_argument("--pqc", type=Path,
-                    default=Path("/Users/strub/Projects/formosa-mldsa/tests/pqc"),
-                    help="directory with ml_dsa_{44,65,87}.json (pqc KAT)")
     ap.add_argument("--acvp-version", default="v1.1.0.43")
     ap.add_argument("--only", choices=("mldsa", "mlkem"))
     args = ap.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)
 
-    cache = args.out / ".acvp-cache" / args.acvp_version
+    cache = args.out / ".cache"
+    acvp = cache / "acvp" / args.acvp_version
     if args.only != "mlkem":
-        print("ML-DSA (pqc KAT):")
-        import_mldsa(args.pqc, args.out)
+        print("ML-DSA (post-quantum-cryptography/KAT):")
+        import_mldsa_pqc(args.out, cache / "pqc")
         print("ML-DSA (NIST ACVP):")
-        import_mldsa_acvp(args.acvp_version, args.out, cache)
+        import_mldsa_acvp(args.acvp_version, args.out, acvp)
     if args.only != "mldsa":
         print("ML-KEM (NIST ACVP):")
-        import_mlkem(args.acvp_version, args.out, cache)
+        import_mlkem(args.acvp_version, args.out, acvp)
+        print("ML-KEM (post-quantum-cryptography/KAT):")
+        import_mlkem_pqc(args.out, cache / "pqc")
     return 0
 
 

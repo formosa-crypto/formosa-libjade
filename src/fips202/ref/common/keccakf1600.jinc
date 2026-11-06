@@ -1,0 +1,51 @@
+/**************************************************************************** 
+
+   DEPENDENCIES:
+   =============
+
+param int KECCAK_FEATURES
+param int KECCAK_PERMUTATION
+
+(e.g.
+param int KECCAK_FEATURES
+ = KECCAK_FEATURE_AVX2 | KECCAK_FEATURE_BMI | KECCAK_FEATURE_BMI2;
+param int KECCAK_PERMUTATION = KECCAK_F1600_OPT;
+)
+
+*****************************************************************************/
+
+from Keccak require "common/keccakf1600_generic.jinc"
+
+require "keccakf1600_ref.jinc"
+require "keccakf1600_basic.jinc"
+require "keccakf1600_opt.jinc"
+from Keccak require "avx2/common/keccakf1600.jinc"
+
+inline fn _keccakf1600
+( reg ptr u64[25] a
+) -> reg ptr u64[25]
+{
+  inline int KECCAK_F;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+
+  if (KECCAK_F == KECCAK_F1600_OPT) {
+    a = _keccakf1600_opt(a);
+  } else if (KECCAK_F == KECCAK_F1600_BASIC) {
+    a = _keccakf1600_basic(a);
+  } else if (KECCAK_F == KECCAK_F1600_AVX2) {
+    a = _keccakf1600_st25_avx2(a);
+  } else {
+    a = _keccakf1600_ref(a);
+  }
+  return a;
+}
+
+inline fn _keccakf1600_
+( reg ptr u64[25] a
+) -> reg ptr u64[25]
+{
+  a = a;
+  a = _keccakf1600(a);
+  a = a;
+  return a;
+}

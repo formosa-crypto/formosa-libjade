@@ -1,7 +1,7 @@
 from Keccak require "common/keccak1600_default.jinc"
 
 
-from Keccak require "avx2/keccakf1600x4_nat.jinc"
+from Keccak require "avx2/common/keccakf1600x4_nat.jinc"
 
 export fn keccakf1600x4_nat
 ( reg mut ptr u256[25] st

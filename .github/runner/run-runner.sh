@@ -40,7 +40,7 @@
 #                            Requires a multi-user nix install on the host
 #                            (see README.md).
 #   IMAGE        (optional)  docker image tag to build and run
-#                            (default: jasmin-nist-runner)
+#                            (default: formosa-libjade-runner)
 #
 # Example (foreground test):
 #
@@ -55,7 +55,7 @@ LABELS="${LABELS:?set LABELS=<runner label(s)>}"
 NAME="${NAME:?set NAME=<unique instance name>}"
 CPUSET="${CPUSET:-}"
 MOUNT_NIX="${MOUNT_NIX:-}"
-IMAGE="${IMAGE:-jasmin-nist-runner}"
+IMAGE="${IMAGE:-formosa-libjade-runner}"
 
 docker build -t "$IMAGE" .
 

@@ -6,7 +6,7 @@ param int KECCAK_FEATURES
  = KECCAK_FEATURE_BMI2;
 */
 
-from Keccak require "ref/keccakf1600_ref.jinc"
+from Keccak require "ref/common/keccakf1600_ref.jinc"
 
 export fn keccakf1600_ref
 ( reg mut ptr u64[25] st

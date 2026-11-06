@@ -1,0 +1,3 @@
+keygen = { file = "safety65.ec", lemma = "ml_dsa_65_keygen_proof" }
+sign   = { file = "safety65.ec", lemma = "ml_dsa_65_sign_proof" }
+verify = { file = "safety65.ec", lemma = "ml_dsa_65_verify_proof" }

@@ -14,7 +14,7 @@ import json
 import os
 import sys
 
-SITE = "https://www.strub.nu/jasmin-nist-timing"
+SITE = "https://formosa-crypto.github.io/formosa-libjade-results"
 UPDATED = "on the results dashboard (updated a minute after this run)."
 
 

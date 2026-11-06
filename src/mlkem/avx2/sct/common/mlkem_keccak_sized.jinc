@@ -1,0 +1,111 @@
+/* SHA3-256 and SHAKE256 on the parameter-dependent sizes: the public key
+   (H(pk)), z || ciphertext (the implicit-rejection key), and the output of
+   the eta1 noise sampler */
+require "params.jinc"
+require "mlkem_keccak_avx2.jinc"
+
+namespace APK {
+  param int _ASIZE = MLKEM_PUBLICKEYBYTES;
+  from Keccak require "ref/common/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/common/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/common/keccak1600x4_fixedsizes_ASIZE.jinc"
+}
+
+namespace AETA1 {
+  param int _ASIZE = MLKEM_ETA1_BUFBYTES;
+  from Keccak require "ref/common/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/common/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/common/keccak1600x4_fixedsizes_ASIZE.jinc"
+}
+
+namespace AZCT {
+  param int _ASIZE = MLKEM_SYMBYTES + MLKEM_CIPHERTEXTBYTES;
+  from Keccak require "ref/common/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/common/keccak1600_fixedsizes_ASIZE.jinc"
+  from Keccak require "avx2/common/keccak1600x4_fixedsizes_ASIZE.jinc"
+}
+
+#[safety =
+   { requires = is_arr_init(in,0,MLKEM_PUBLICKEYBYTES)
+   , ensures = is_arr_init(out,0,32)
+   }
+ ]
+fn _sha3_256A_APK
+( #[spill_to_mmx] reg mut ptr u8[32] out
+, #[spill_to_mmx] reg const ptr u8[MLKEM_PUBLICKEYBYTES] in
+) -> reg ptr u8[32]
+{ inline int KECCAK_F;
+  stack u64[25] st;
+  reg u256[7] state;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  if (KECCAK_F == KECCAK_F1600_AVX2) {
+    state = __state_init_avx2();
+    state, _ = APK::__absorb_avx2(state, 0, in, SHA3, R136);
+    _, out = A32::__squeeze_avx2(state, out, R136);
+  } else {
+    #spill(out);
+    st = __state_init(st);
+    st, _ = APK::__absorb(st, 0, in, SHA3, R136);
+    #unspill(out);
+    _, out = A32::__squeeze(st, out, R136);
+  }
+  return out;
+}
+
+#[ safety =
+   { requires = is_arr_init(in,0,MLKEM_SYMBYTES + MLKEM_CIPHERTEXTBYTES)
+   , ensures = is_arr_init(out,0,32)
+   }
+ ]
+fn _shake256_A32__AZCT
+(  #[spill_to_mmx] reg mut ptr u8[32] out
+,  reg const ptr u8[MLKEM_SYMBYTES + MLKEM_CIPHERTEXTBYTES] in
+) -> reg ptr u8[32]
+{ inline int KECCAK_F;
+  stack u64[25] st;
+  reg u256[7] state;
+  KECCAK_F = __KECCAK_F(KECCAK_PERMUTATION);
+  if (KECCAK_F == KECCAK_F1600_AVX2) {
+    state = __state_init_avx2();
+    state, _ = AZCT::__absorb_avx2(state, 0, in, SHAKE, R136);
+    _, out = A32::__squeeze_avx2(state, out, R136);
+  } else {
+    #spill(out);
+    st = __state_init(st);
+    st, _ = AZCT::__absorb(st, 0, in, SHAKE, R136);
+    #unspill(out);
+    _, out = A32::__squeeze(st, out, R136);
+  }
+  return out;
+}
+
+/* 4-way parallel SHAKE-256 writing the eta1 sampler's input (AETA1) and
+   reading from a 32 byte stack array first (same input on all lanes), and
+   then from 1 byte stack arrays next */
+#[safety =
+   { requires = is_arr_init(seed,0,32) && is_arr_init(nonces,0,4)
+    , ensures = is_arr_init(out0,0,MLKEM_ETA1_BUFBYTES) &&
+                is_arr_init(out1,0,MLKEM_ETA1_BUFBYTES) &&
+                is_arr_init(out2,0,MLKEM_ETA1_BUFBYTES) &&
+                is_arr_init(out3,0,MLKEM_ETA1_BUFBYTES)
+    }
+]
+fn _shake256x4_AETA1__A32_A1
+( reg mut ptr u8[MLKEM_ETA1_BUFBYTES] out0 out1 out2 out3
+, reg const ptr u8[32] seed
+, reg const ptr u8[4] nonces
+) -> reg ptr u8[MLKEM_ETA1_BUFBYTES] /* out0 */
+   , reg ptr u8[MLKEM_ETA1_BUFBYTES] /* out1 */
+   , reg ptr u8[MLKEM_ETA1_BUFBYTES] /* out2 */
+   , reg ptr u8[MLKEM_ETA1_BUFBYTES] /* out3 */
+{ stack u256[25] st_s;
+  reg ptr u256[25] st;
+  st = st_s;
+  st = __state_init_avx2x4(st);
+  st, _ = A32::__absorb_bcast_avx2x4(st, 0, seed, UNFINISHED, R136);
+  st, _ = A1::__absorb_avx2x4(st, 32, nonces[0:1], nonces[1:1], nonces[2:1], nonces[3:1], SHAKE, R136);
+  st, out0, out1, out2, out3
+    = AETA1::__squeeze_avx2x4(st, out0, out1, out2, out3, R136);
+
+  return out0, out1, out2, out3;
+}

@@ -124,8 +124,10 @@ class Scheme:
             self.cid = t.get("count", "?")
             self.reset()
             for op in self.OPS:
-                if op in t:
-                    getattr(self, op)(t[op], rep)
+                # a list of blocks runs the operation once per block, in order
+                blocks = t.get(op, [])
+                for b in blocks if isinstance(blocks, list) else [blocks]:
+                    getattr(self, op)(b, rep)
 
     def label(self, op):
         return f"[{self.cid}] {op}"

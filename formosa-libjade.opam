@@ -1,0 +1,33 @@
+opam-version: "2.0"
+name: "formosa-libjade"
+version: "dev"
+synopsis: "Jasmin implementations and EasyCrypt proofs of ML-KEM and ML-DSA"
+maintainer: "Pierre-Yves Strub <pierre-yves@strub.nu>"
+authors: "Formosa-Crypto"
+homepage: "https://github.com/formosa-crypto"
+license: "Apache-2.0"
+dev-repo: "git+https://github.com/formosa-crypto/formosa-libjade.git"
+bug-reports: "https://github.com/formosa-crypto/formosa-libjade/issues"
+
+# This package only pins the toolchain needed to compile the Jasmin
+# sources and to check the EasyCrypt proofs; there is nothing for opam
+# itself to build. Install the dependencies with:
+#
+#     opam install . --deps-only
+#
+build: []
+
+depends: [
+  "jasmin" {= "2026.09.0"}
+
+  # EasyCrypt is not published on the default opam repository; its tip
+  # is the current "release" and is pinned via pin-depends below.
+  "easycrypt"
+]
+
+pin-depends: [
+  # On the jasmin-nist integration branch: comm-algebra (PR 602: commutative
+  # algebra, peval/mprod/Lagrange stdlib additions, reduction-opacity hints)
+  # merged with llm-interactive (LLM agent REPL); back to main once both land.
+  [ "easycrypt.dev" "git+https://github.com/EasyCrypt/easycrypt.git#jasmin-nist" ]
+]

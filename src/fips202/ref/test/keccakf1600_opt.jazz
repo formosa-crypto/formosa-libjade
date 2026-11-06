@@ -4,7 +4,7 @@ from Keccak require "common/keccak1600_default.jinc"
  the opt permutation always assume all features (AVX2+BMI+BMI2).
 */
 
-from Keccak require "ref/keccakf1600_opt.jinc"
+from Keccak require "ref/common/keccakf1600_opt.jinc"
 
 export fn keccakf1600_opt
 ( reg mut ptr u64[25] st

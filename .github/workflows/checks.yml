@@ -1,14 +1,15 @@
 name: checks
 
 # The checks of the Jasmin sources and of the committed EasyCrypt models,
-# one result per check and target (scripts/checks.sh, made of the same
-# `make` targets as a local run):
+# one result per check and target (scripts/checks.py, made of the same
+# `make` targets as a local run), on the implementations that claim the
+# check in their src/**/meta.toml:
 #  - ct: constant time and speculative constant time (`jasmin-ct`);
 #  - extraction: the committed models are the jasmin2ec extraction of src/,
 #    the committed assembly (asm/) its jasminc compilation;
 #  - kat-memcheck: the known-answer tests of bench/vectors, then Valgrind's
-#    memcheck on every entry point (x86-64 + AVX2 runners).
-# The results make one record per commit (scripts/checks-record.py), added
+#    memcheck (x86-64 + AVX2 runners).
+# The results make one record per commit (checks.py merge), added
 # to the results repo: by the publish job below for main, by publish-pr for
 # pull requests. A commit whose tree a successful run already checked (a
 # rebase that changes no file, a rebase merge) reuses that run's record
@@ -85,7 +86,7 @@ jobs:
         run: $BENCHDEV true
 
       - name: CT and SCT
-        run: $BENCHDEV sh scripts/checks.sh ct checks/ct.jsonl
+        run: $BENCHDEV python3 -I scripts/checks.py ct checks/ct.jsonl
 
       - name: Upload results
         if: ${{ !cancelled() }}
@@ -111,7 +112,7 @@ jobs:
         run: $XDEV true
 
       - name: Extracted models and assembly
-        run: $XDEV sh scripts/checks.sh extraction checks/extraction.jsonl
+        run: $XDEV python3 -I scripts/checks.py extraction checks/extraction.jsonl
 
       - name: Upload results
         if: ${{ !cancelled() }}
@@ -137,7 +138,7 @@ jobs:
         run: $BENCHDEV true
 
       - name: KAT and memcheck
-        run: $BENCHDEV sh scripts/checks.sh kat-memcheck checks/kat-memcheck.jsonl
+        run: $BENCHDEV python3 -I scripts/checks.py kat-memcheck checks/kat-memcheck.jsonl
 
       - name: Upload results
         if: ${{ !cancelled() }}
@@ -201,7 +202,7 @@ jobs:
           JOB_LOGS: logs
         run: |
           JOBS=$(printf '%s' "$NEEDS" | jq -c 'del(.earlier)') \
-            python3 -I scripts/checks-record.py merge checks.json checks/*.jsonl
+            python3 -I scripts/checks.py merge checks.json checks/*.jsonl
       - uses: actions/upload-artifact@v7
         with:
           name: checks-record
@@ -222,7 +223,7 @@ jobs:
           path: checks-ok
 
   # Add the record to the results repo
-  # (https://github.com/strub/jasmin-nist-timing), on pushes to main only. A
+  # (https://github.com/formosa-crypto/formosa-libjade-results), on pushes to main only. A
   # separate job on a GitHub-hosted runner: it only downloads the record, so
   # the deploy key never reaches a self-hosted machine nor shares a job with
   # the checks.

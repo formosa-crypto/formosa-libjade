@@ -13,7 +13,7 @@ Every runner instance uses the same image and supervisor, and runs one
 ephemeral container per job.
 
 The workflows build their toolchain from the repo's `flake.nix` (derived
-from `jasmin-nist.opam` via opam-nix) with `nix develop`; nothing is cached
+from `formosa-libjade.opam` via opam-nix) with `nix develop`; nothing is cached
 on the GitHub side.
 
 ## Security model (designed for a public repo)

@@ -18,5 +18,5 @@ rdirs = spec
 
 idirs = JazzEC:extracted
 idirs = common
-idirs = ref
-idirs = avx2
+idirs = ref/common
+idirs = avx2/common

@@ -57,7 +57,7 @@ JASMIN2EC_SAFETY ?= jasmin2ec-safety
 
 SRC        := ../src
 KECCAK     := -I Keccak=$(SRC)/fips202
-COMMON     := -I Common=$(SRC)/mldsa/avx2/common
+COMMON     := -I Common=$(SRC)/mldsa/avx2/sct/common
 MLDSA_SETS := 44 65 87
 MLKEM_SETS := 512 768 1024
 
@@ -76,20 +76,20 @@ extract-correctness:
 	$(CORRECTNESS) $(KECCAK) fips202/extracted/toEC_keccak1600_ASIZE.jazz \
 	  -o fips202/extracted/Keccak1600_Jazz_ASIZE.ec
 	for s in $(MLDSA_SETS); do \
-	  $(CORRECTNESS) $(COMMON) $(KECCAK) $(SRC)/mldsa/avx2/$$s/mldsa.jazz \
-	    -o mldsa/extraction/Mldsa$$s.ec \
+	  $(CORRECTNESS) $(COMMON) $(KECCAK) $(SRC)/mldsa/avx2/sct/$$s/mldsa.jazz \
+	    -o mldsa/avx2/sct/correctness/extraction/Mldsa$$s.ec \
 	    -f __keygen_internal -f __sign_internal -f __verify_internal || exit 1; \
 	done
 	for s in $(MLKEM_SETS); do \
-	  $(CORRECTNESS) $(KECCAK) $(SRC)/mlkem/avx2/$$s/jmlkem.jazz \
-	    -o mlkem-correctness/extraction/avx2/$$s/Jkem_avx2.ec \
+	  $(CORRECTNESS) $(KECCAK) $(SRC)/mlkem/avx2/sct/$$s/jmlkem.jazz \
+	    -o mlkem/avx2/sct/correctness/extraction/$$s/Jkem_avx2.ec \
 	    -f __crypto_kem_keypair_jazz -f __crypto_kem_enc_jazz \
 	    -f __crypto_kem_dec_jazz -f __crypto_kem_check_pk_jazz \
 	    -f __crypto_kem_check_sk_jazz -f __crypto_kem_encaps_derand_jazz \
 	    -f __crypto_kem_decaps_jazz || exit 1; \
 	done
-	python3 mldsa/extraction/generalize.py
-	python3 mlkem-correctness/extraction/avx2/generalize.py
+	python3 mldsa/avx2/sct/correctness/extraction/generalize.py
+	python3 mlkem/avx2/sct/correctness/extraction/generalize.py
 
 # ML-DSA and ML-KEM: the exported functions, whose contracts are the
 # `#[safety = ...]` annotations of the sources
@@ -99,15 +99,15 @@ extract-safety:
 	$(SAFETY) $(KECCAK) safety/fips202/extracted/toEC_keccak1600_ASIZE.jazz \
 	  -o safety/fips202/extracted/Keccak1600_Jazz_ASIZE_safety.ec
 	for s in $(MLDSA_SETS); do \
-	  $(SAFETY) $(COMMON) $(KECCAK) $(SRC)/mldsa/avx2/$$s/mldsa.jazz \
-	    -o safety/mldsa/avx2/$$s/Jmldsa$${s}_safety.ec \
+	  $(SAFETY) $(COMMON) $(KECCAK) $(SRC)/mldsa/avx2/sct/$$s/mldsa.jazz \
+	    -o mldsa/avx2/sct/safety/$$s/Jmldsa$${s}_safety.ec \
 	    -f ml_dsa_$${s}_keygen -f ml_dsa_$${s}_sign \
 	    -f ml_dsa_$${s}_verify || exit 1; \
 	done
 	for s in $(MLKEM_SETS); do \
 	  p=jade_kem_mlkem_mlkem$${s}_amd64_avx2; \
-	  $(SAFETY) $(KECCAK) $(SRC)/mlkem/avx2/$$s/jmlkem.jazz \
-	    -o safety/mlkem/avx2/$$s/Jkem$${s}_safety.ec \
+	  $(SAFETY) $(KECCAK) $(SRC)/mlkem/avx2/sct/$$s/jmlkem.jazz \
+	    -o mlkem/avx2/sct/safety/$$s/Jkem$${s}_safety.ec \
 	    -f $${p}_keypair_derand -f $${p}_enc_derand -f $${p}_dec \
 	    -f $${p}_check_pk -f $${p}_check_sk || exit 1; \
 	done

@@ -1,7 +1,7 @@
 name: publish-pr
 
 # Adds the records of a pull request's runs to the results repo
-# (https://github.com/strub/jasmin-nist-timing), with the PR's merge base:
+# (https://github.com/formosa-crypto/formosa-libjade-results), with the PR's merge base:
 #  - its proofs timing, as data/pr/<number>/proofs/<head>.json, once its
 #    proofs run has succeeded;
 #  - its checks record, as data/pr/<number>/checks/<head>.json, once its

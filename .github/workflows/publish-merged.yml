@@ -2,7 +2,7 @@ name: publish-merged
 
 # On a push to main, gives the commits before the pushed head the results of
 # their PR runs (scripts/publish-merged-records.py), in the results repo
-# (https://github.com/strub/jasmin-nist-timing): a merged stack of PRs gets
+# (https://github.com/formosa-crypto/formosa-libjade-results): a merged stack of PRs gets
 # one record per PR in main's history, proofs and benchmarks, without running
 # them again. The head commit is published by its own runs (proofs.yml,
 # bench.yml). Only this repo's main code runs here, on a GitHub-hosted
@@ -30,7 +30,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BEFORE: ${{ github.event.before }}
           DEPLOY_KEY: ${{ secrets.TIMING_DEPLOY_KEY }}
-          REPO: strub/jasmin-nist-timing
+          REPO: formosa-crypto/formosa-libjade-results
         run: |
           set -euo pipefail
           key="$RUNNER_TEMP/results_deploy_key"
@@ -40,8 +40,8 @@ jobs:
           site="$RUNNER_TEMP/results"
           git clone -q --depth 1 "git@github.com:$REPO.git" "$site"
           # the identity also serves the rebase of the push loop
-          git -C "$site" config user.name 'jasmin-nist-ci'
-          git -C "$site" config user.email 'jasmin-nist-ci@users.noreply.github.com'
+          git -C "$site" config user.name 'formosa-libjade-ci'
+          git -C "$site" config user.email 'formosa-libjade-ci@users.noreply.github.com'
           python3 -I scripts/publish-merged-records.py "$BEFORE" "$GITHUB_SHA" "$site"
           git -C "$site" add data
           if git -C "$site" diff --cached --quiet; then

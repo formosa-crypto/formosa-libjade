@@ -1,0 +1,3 @@
+keygen = { file = "safety512.ec", lemma = "jade_kem_mlkem_mlkem512_amd64_avx2_keypair_derand_proof" }
+encaps = { file = "safety512.ec", lemma = "jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand_proof" }
+decaps = { file = "safety512.ec", lemma = "jade_kem_mlkem_mlkem512_amd64_avx2_dec_proof" }

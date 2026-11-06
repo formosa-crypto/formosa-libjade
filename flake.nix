@@ -1,5 +1,5 @@
 {
-  # Proof-checking toolchain, derived from jasmin-nist.opam via opam-nix:
+  # Proof-checking toolchain, derived from formosa-libjade.opam via opam-nix:
   # the opam file (jasmin version + easycrypt pin-depends) stays the single
   # source of truth. The easycrypt pin tracks a branch, so evaluation needs
   # --impure (the fetch follows the branch HEAD, like `opam update` does):
@@ -133,7 +133,7 @@
         '';
       in
       {
-        packages.default = scope.jasmin-nist;
+        packages.default = scope.formosa-libjade;
 
         # Toolchain for the cycle benchmarks, the KATs, memcheck and the
         # constant-time checks: jasmin and a pinned C toolchain (mkShell's
@@ -163,7 +163,7 @@
         };
 
         devShells.default = pkgs.mkShell {
-          inputsFrom = [ scope.jasmin-nist ];
+          inputsFrom = [ scope.formosa-libjade ];
           # The EasyCrypt commit the shell was built from (the pin follows a
           # branch, and a nix build embeds no git hash in the binary); read by
           # scripts/timing-report-to-json.py.

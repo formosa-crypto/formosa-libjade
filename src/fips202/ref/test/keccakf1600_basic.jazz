@@ -4,7 +4,7 @@ from Keccak require "common/keccak1600_default.jinc"
  the basic permutation never rely on them.
 */
 
-from Keccak require "ref/keccakf1600_basic.jinc"
+from Keccak require "ref/common/keccakf1600_basic.jinc"
 
 export fn keccakf1600_basic
 ( reg mut ptr u64[25] st

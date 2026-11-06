@@ -201,7 +201,7 @@ jobs:
             bench/_build/bench.csv
 
   # Add each machine's bench JSON to the results repo
-  # (https://github.com/strub/jasmin-nist-timing): pushes to main go to main's
+  # (https://github.com/formosa-crypto/formosa-libjade-results): pushes to main go to main's
   # history (data/bench/<runner>), runs of PRs to that PR's own
   # space (data/pr/<number>/bench/<runner>), with the PR's merge base for the
   # comparison. A separate job on a GitHub-hosted runner: it runs only this

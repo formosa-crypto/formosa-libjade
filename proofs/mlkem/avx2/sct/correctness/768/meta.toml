@@ -1,0 +1,4 @@
+leakage = false
+keygen  = { file = "correctness768.ec", lemma = "keygen_correct" }
+encaps  = { file = "correctness768.ec", lemma = "encaps_correct" }
+decaps  = { file = "correctness768.ec", lemma = "decaps_correct" }

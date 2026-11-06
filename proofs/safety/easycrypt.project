@@ -13,6 +13,4 @@ rdirs = ../core
 
 idirs = Jasmin:eclib
 rdirs = common
-rdirs = mlkem/avx2
-rdirs = mldsa/avx2
 rdirs = fips202

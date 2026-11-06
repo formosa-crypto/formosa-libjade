@@ -1,0 +1,2 @@
+claims  = ["kat", "memcheck", "ct", "sct", "safety", "correctness"]
+provsec = "functional"

@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 # The toolchain (jasmin + EasyCrypt + provers + python) comes from flake.nix,
-# itself derived from jasmin-nist.opam via opam-nix; the host's /nix/store
+# itself derived from formosa-libjade.opam via opam-nix; the host's /nix/store
 # carries it between jobs, so there is nothing to cache on the GitHub side.
 # --impure lets the easycrypt pin-depends follow its branch HEAD (the
 # equivalent of `opam update` advancing the pin).
@@ -52,7 +52,7 @@ jobs:
           ref: ${{ env.HEAD }}
           sparse-checkout: |
             .github/actions
-            jasmin-nist.opam
+            formosa-libjade.opam
           persist-credentials: false
       # A failed lookup only means checking again.
       - name: EasyCrypt
@@ -61,7 +61,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          branch=$(sed -n 's|.*"git+https://github.com/EasyCrypt/easycrypt.git#\([^"]*\)".*|\1|p' jasmin-nist.opam)
+          branch=$(sed -n 's|.*"git+https://github.com/EasyCrypt/easycrypt.git#\([^"]*\)".*|\1|p' formosa-libjade.opam)
           echo "rev=$(gh api "repos/EasyCrypt/easycrypt/commits/$branch" --jq .sha)" >> "$GITHUB_OUTPUT"
       - id: find
         continue-on-error: true
@@ -192,7 +192,7 @@ jobs:
             proofs-timing.html
 
   # Add this run's timing JSON to the results repo
-  # (https://github.com/strub/jasmin-nist-timing), on pushes to main only.
+  # (https://github.com/formosa-crypto/formosa-libjade-results), on pushes to main only.
   # A separate job on a GitHub-hosted runner: it only downloads the artifact,
   # so the deploy key never reaches the self-hosted machine nor shares a job
   # with the proof-checking steps.

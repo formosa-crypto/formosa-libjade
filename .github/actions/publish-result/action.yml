@@ -25,7 +25,7 @@ inputs:
     default: '{}'
   repo:
     description: results repo
-    default: strub/jasmin-nist-timing
+    default: formosa-crypto/formosa-libjade-results
 
 runs:
   using: composite
@@ -79,8 +79,8 @@ runs:
         rm -rf "$site"
         git clone -q --depth 1 "git@github.com:$REPO.git" "$site"
         # the identity also serves the rebase of the push loop
-        git -C "$site" config user.name 'jasmin-nist-ci'
-        git -C "$site" config user.email 'jasmin-nist-ci@users.noreply.github.com'
+        git -C "$site" config user.name 'formosa-libjade-ci'
+        git -C "$site" config user.email 'formosa-libjade-ci@users.noreply.github.com'
         mkdir -p "$site/$DEST"
         cp "$RUNNER_TEMP/result.json" "$site/$DEST/$sha.json"
         git -C "$site" add "$DEST/$sha.json"

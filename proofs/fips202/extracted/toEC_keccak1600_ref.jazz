@@ -1,6 +1,6 @@
 // used for the CI target of safety-checking
 from Keccak require "common/keccak1600_default.jinc"
-from Keccak require "ref/keccakf1600.jinc"
-from Keccak require "ref/keccak1600.jinc"
-from Keccak require "ref/keccak1600_fixedsizes.jinc"
-from Keccak require "ref/keccak1600_updstate_export.jinc"
+from Keccak require "ref/common/keccakf1600.jinc"
+from Keccak require "ref/common/keccak1600.jinc"
+from Keccak require "ref/common/keccak1600_fixedsizes.jinc"
+from Keccak require "ref/common/keccak1600_updstate_export.jinc"

@@ -1,5 +1,5 @@
 /* ML-KEM-768 (AVX2) -- derand entry points exported by
- * mlkem/avx2/768/jmlkem.jazz. The deterministic (*_derand) API takes caller
+ * mlkem/avx2/sct/768/jmlkem.jazz. The deterministic (*_derand) API takes caller
  * supplied coins; there is no randombytes-backed variant. */
 #ifndef MLKEM768_AVX2_H
 #define MLKEM768_AVX2_H

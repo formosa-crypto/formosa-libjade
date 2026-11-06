@@ -1,6 +1,6 @@
 {
  "algorithm": "ML-DSA-65",
- "source": "pqc KAT (ml_dsa_65.json)",
+ "source": "MLDSA/kat_MLDSA_65_hedged_pure.rsp of post-quantum-cryptography/KAT f238e347",
  "tests": [
   {
    "count": 0,

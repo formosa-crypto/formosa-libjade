@@ -1,5 +1,5 @@
 /* ML-DSA-65 (AVX2) -- derand entry points exported by
- * mldsa/avx2/65/mldsa.jazz. keygen and sign take caller-supplied 32-byte
+ * mldsa/avx2/sct/65/mldsa.jazz. keygen and sign take caller-supplied 32-byte
  * randomness (the deterministic/"internal" API). */
 #ifndef MLDSA65_AVX2_H
 #define MLDSA65_AVX2_H

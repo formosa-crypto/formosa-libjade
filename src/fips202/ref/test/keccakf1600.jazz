@@ -7,7 +7,7 @@ param int KECCAK_FEATURES
 param int KECCAK_PERMUTATION = KECCAK_F1600_REF + KECCAK_F1600x4_REF;
 */
 
-from Keccak require "ref/keccakf1600.jinc"
+from Keccak require "ref/common/keccakf1600.jinc"
 
 export fn keccakf1600
 ( reg mut ptr u64[25] st

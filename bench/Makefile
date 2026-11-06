@@ -26,11 +26,11 @@ DAVX := third_party/dilithium/avx2
 
 # ---- backend library sets (<backend>_<scheme>.so) ------------------------
 # jasmin: only the parameter sets present in src/, discovered from
-# src/mlkem/avx2/<set>/jmlkem.jazz and src/mldsa/avx2/<set>/mldsa.jazz.
-JASMIN_KEM := $(patsubst ../src/mlkem/avx2/%/jmlkem.jazz,$(BUILD)/jasmin_mlkem%.so,\
-                $(wildcard ../src/mlkem/avx2/*/jmlkem.jazz))
-JASMIN_SIG := $(patsubst ../src/mldsa/avx2/%/mldsa.jazz,$(BUILD)/jasmin_mldsa%.so,\
-                $(wildcard ../src/mldsa/avx2/*/mldsa.jazz))
+# src/mlkem/avx2/sct/<set>/jmlkem.jazz and src/mldsa/avx2/sct/<set>/mldsa.jazz.
+JASMIN_KEM := $(patsubst ../src/mlkem/avx2/sct/%/jmlkem.jazz,$(BUILD)/jasmin_mlkem%.so,\
+                $(wildcard ../src/mlkem/avx2/sct/*/jmlkem.jazz))
+JASMIN_SIG := $(patsubst ../src/mldsa/avx2/sct/%/mldsa.jazz,$(BUILD)/jasmin_mldsa%.so,\
+                $(wildcard ../src/mldsa/avx2/sct/*/mldsa.jazz))
 # native reference libraries: all parameter sets.
 MLKN_KEM   := $(BUILD)/mlkem-native_mlkem512.so \
               $(BUILD)/mlkem-native_mlkem768.so \

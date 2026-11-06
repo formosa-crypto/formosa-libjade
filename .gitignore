@@ -6,3 +6,6 @@
 # fresh extractions of `make check` in the extraction directories
 proofs/safety/fips202/extracted/_check/
 proofs/safety/*/extraction/_check/
+
+# bytecode of the Python scripts
+__pycache__/

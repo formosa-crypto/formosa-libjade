@@ -2,8 +2,8 @@
    Keccak1600_updstate_finish.ec:
 
    Contracts of the single-lane `_finish_updstate` and of the status export
-   `ststatus_updstate` (src/fips202/ref/keccak1600_updstate.jinc), used by
-   ref/Keccak1600_updstate_ref.ec.
+   `ststatus_updstate` (src/fips202/ref/common/keccak1600_updstate.jinc), used by
+   ref/common/Keccak1600_updstate_ref.ec.
    (Kept apart from Keccak1600_updstate.ec and from the ref file: the
    low-level finish script is sensitive to the lemmas in scope.)
 ******************************************************************************)

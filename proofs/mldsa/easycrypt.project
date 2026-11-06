@@ -9,12 +9,10 @@ pragmas = -Warn:unused_unfold
 
 idirs = JazzEC:../arrays
 rdirs = ../arrays
-rdirs = JazzEC:x86-64/avx2/ml_dsa_65
-rdirs = JazzEC:x86-64/avx2/ml_dsa_87
-rdirs = JazzEC:x86-64/avx2/ml_dsa_44
-rdirs = x86-64/avx2/common
-rdirs = x86-64/avx2/generic
-rdirs = x86-64/avx2/variants
+rdirs = JazzEC:avx2/sct/correctness/65
+rdirs = JazzEC:avx2/sct/correctness/87
+rdirs = JazzEC:avx2/sct/correctness/44
+rdirs = avx2/sct/correctness/common
 rdirs = ../core
 
 idirs = Spec:spec
@@ -25,11 +23,10 @@ rdirs = security/utils
 
 rdirs = eclib
 
-rdirs = extraction
-rdirs = generic
-rdirs = x86-64/avx2/ml_dsa_65
-rdirs = x86-64/avx2/ml_dsa_87
-rdirs = x86-64/avx2/ml_dsa_44
+rdirs = avx2/sct/correctness/extraction
+rdirs = avx2/sct/correctness/65
+rdirs = avx2/sct/correctness/87
+rdirs = avx2/sct/correctness/44
 
 rdirs = CryptoSpecs:../fips202/spec
 

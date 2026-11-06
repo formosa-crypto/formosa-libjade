@@ -4,7 +4,7 @@ from Keccak require "common/keccak1600_default.jinc"
  the avx2 permutations always assume AVX2 feature.
 */
 
-from Keccak require "avx2/keccakf1600.jinc"
+from Keccak require "avx2/common/keccakf1600.jinc"
 
 export fn keccakf1600_avx2
 ( reg mut ptr u64[25] st

@@ -1,0 +1,16 @@
+primitive      = "ML-KEM"
+standard       = "FIPS 203"
+spec           = "MLKEM.ec"
+operations     = ["keygen", "encaps", "decaps"]
+parameter_sets = ["512", "768", "1024"]
+
+# the generic theorem, and its instance for each parameter set it covers
+[spec_security]
+notion         = "IND-CCA, ROM"
+leakage        = false
+assumptions    = ["MLWE", "PRF", "PRG", "decryption-failure bound"]
+theorem        = { file = "properties/MLKEMSecurity.ec", lemma = "mlkem_spec_security" }
+
+[spec_security.instances]
+"768"  = { file = "properties/Security768.ec", clone = "Sec768" }
+"1024" = { file = "properties/Security1024.ec", clone = "Sec1024" }

@@ -1,0 +1,4 @@
+leakage = false
+keygen  = { file = "correctness87.ec", lemma = "keygen_correct" }
+sign    = { file = "correctness87.ec", lemma = "sign_correct" }
+verify  = { file = "correctness87.ec", lemma = "verify_correct" }

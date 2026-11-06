@@ -242,10 +242,10 @@ evaluate `z` before `r0` and declassify one boolean per polynomial
 `__check_infinity_norm`; declassifying the 8-lane mask is another
 instantiation (`Mz = 255 l`, see below).
 
-# Note: fine-grained leakage of the rejection tests (b1, b2, b3, b4): analysis of 2026-10-16
+# Note: fine-grained leakage of the rejection tests b1, b2, b3, b4 (2026-10-16)
 
 This note records the analysis of the `#declassify` annotations of the Jasmin
-implementation (`jasmin-nist`, `src/mldsa/avx2/common/sign.jinc`) against the
+implementation (`formosa-libjade`, `src/mldsa/avx2/sct/common/sign.jinc`) against the
 leakage model of `MLDSATarget`, where one signing iteration leaks
 `ite (b1 /\ b2) (ite b3 (ite b4 Empty Empty) Empty) Empty`, i.e. the boolean
 `b1 /\ b2`, then `b3`, then `b4`, with
@@ -349,11 +349,11 @@ Other points of the implementation:
 Since `||c t0|| <= ||c||_1 * ||t0|| <= tau * 2^(d-1)`, the test can never
 fail when `tau * 2^(d-1) < gamma2`:
 
-| parameter set | `tau * 2^(d-1)` | `gamma2` | `b3` can fail |
-|---|---|---|---|
-| ML-DSA-44 | 39 * 4096 = 159744 | 95232 | yes |
-| ML-DSA-65 | 49 * 4096 = 200704 | 261888 | no |
-| ML-DSA-87 | 60 * 4096 = 245760 | 261888 | no |
+| parameter set | `tau * 2^(d-1)`    | `gamma2` | `b3` can fail |
+| ------------- | ------------------ | -------- | ------------- |
+| ML-DSA-44     | 39 * 4096 = 159744 | 95232    | yes           |
+| ML-DSA-65     | 49 * 4096 = 200704 | 261888   | no            |
+| ML-DSA-87     | 60 * 4096 = 245760 | 261888   | no            |
 
 With the model of branch `leakage-fine-tests`, `t0` itself is leaked
 (see above): the test `b3` can be implemented as a public computation with
