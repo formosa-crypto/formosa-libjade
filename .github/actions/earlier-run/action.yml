@@ -1,0 +1,70 @@
+name: earlier-run
+description: >-
+  The marker artifacts of a commit, and the latest earlier run that left
+  each one: a successful run on the same tree (same EasyCrypt for the
+  proofs, same machine for bench), whose results a run can reuse instead of
+  running again. Needs the actions: read permission. A marker is only as
+  trustworthy as the code of the run that uploaded it: the PRs of
+  collaborators while the repo is private (see SECURITY in the workflows).
+
+inputs:
+  commit:
+    description: the commit to check
+    required: true
+  marker:
+    description: marker name, where {tree} is the commit's tree and {label} a label
+    required: true
+  labels:
+    description: JSON array of labels (one marker each, e.g. one per machine)
+    default: '["run"]'
+  lookup:
+    description: '"false" to look for no earlier run (a manual run always runs)'
+    default: 'true'
+
+outputs:
+  markers:
+    description: 'JSON object: label -> marker'
+    value: ${{ steps.find.outputs.markers }}
+  runs:
+    description: 'JSON object: label -> earlier run id, for the labels with one'
+    value: ${{ steps.find.outputs.runs }}
+
+runs:
+  using: composite
+  steps:
+    - id: find
+      uses: actions/github-script@v9
+      env:
+        COMMIT: ${{ inputs.commit }}
+        MARKER: ${{ inputs.marker }}
+        LABELS: ${{ inputs.labels }}
+        LOOKUP: ${{ inputs.lookup }}
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+          const { data: commit } = await github.rest.git.getCommit(
+            { owner, repo, commit_sha: process.env.COMMIT });
+          const markers = {}, runs = {};
+          for (const label of JSON.parse(process.env.LABELS)) {
+            markers[label] = process.env.MARKER
+              .replaceAll('{tree}', commit.tree.sha).replaceAll('{label}', label);
+          }
+          for (const [label, name] of Object.entries(markers)) {
+            if (process.env.LOOKUP !== 'true') break;
+            try {
+              const { data } = await github.rest.actions.listArtifactsForRepo(
+                { owner, repo, name, per_page: 100 });
+              const found = data.artifacts
+                .filter(a => !a.expired && a.workflow_run && a.workflow_run.id !== context.runId)
+                .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+              if (found) {
+                runs[label] = String(found.workflow_run.id);
+                core.notice(`${name}: reusing the results of run ${found.workflow_run.id} `
+                            + `(${found.workflow_run.head_sha})`);
+              }
+            } catch (e) {
+              core.warning(`${name}: lookup failed (${e.message}), no reuse`);
+            }
+          }
+          core.setOutput('markers', JSON.stringify(markers));
+          core.setOutput('runs', JSON.stringify(runs));

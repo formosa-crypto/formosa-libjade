@@ -10,7 +10,9 @@ name: checks
 #    memcheck on every entry point (x86-64 + AVX2 runners).
 # The results make one record per commit (scripts/checks-record.py), added
 # to the results repo: by the publish job below for main, by publish-pr for
-# pull requests.
+# pull requests. A commit whose tree a successful run already checked (a
+# rebase that changes no file, a rebase merge) reuses that run's record
+# instead, except in a manual run: the toolchain is the flake's, in the tree.
 #
 # SECURITY: the plain pull_request trigger is safe while this repo is
 # PRIVATE (only collaborators can open PRs). Before making the repo public,
@@ -42,7 +44,33 @@ env:
   HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
+  # The earlier successful run on the same tree, if any.
+  earlier:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      marker: ${{ fromJSON(steps.find.outputs.markers || '{}').run }}
+      run: ${{ fromJSON(steps.find.outputs.runs || '{}').run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HEAD }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+      # A failed lookup only means checking again.
+      - id: find
+        continue-on-error: true
+        uses: ./.github/actions/earlier-run
+        with:
+          commit: ${{ env.HEAD }}
+          marker: checks-ok-{tree}
+          lookup: ${{ github.event_name != 'workflow_dispatch' }}
+
   ct:
+    needs: earlier
+    if: ${{ !cancelled() && !needs.earlier.outputs.run }}
     runs-on: [self-hosted, linux, proofs]
     timeout-minutes: 30
     steps:
@@ -67,6 +95,8 @@ jobs:
           path: checks/ct.jsonl
 
   extraction:
+    needs: earlier
+    if: ${{ !cancelled() && !needs.earlier.outputs.run }}
     runs-on: [self-hosted, linux, proofs]
     timeout-minutes: 30
     steps:
@@ -91,6 +121,8 @@ jobs:
           path: checks/extraction.jsonl
 
   kat-memcheck:
+    needs: earlier
+    if: ${{ !cancelled() && !needs.earlier.outputs.run }}
     runs-on: [self-hosted, linux, x64]
     timeout-minutes: 30
     steps:
@@ -117,9 +149,10 @@ jobs:
   # The record of the commit, from the results of the three jobs, whatever
   # their outcome (a failed check is recorded too), with the end of the log
   # of every job that failed: the record must not depend on the run's logs,
-  # which GitHub deletes after the retention period.
+  # which GitHub deletes after the retention period. Or the record of the
+  # earlier run on the same tree, rewritten for this commit.
   record:
-    needs: [ct, extraction, kat-memcheck]
+    needs: [earlier, ct, extraction, kat-memcheck]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
@@ -130,12 +163,27 @@ jobs:
         with:
           ref: ${{ env.HEAD }}
           persist-credentials: false
+      - name: Reuse the earlier record
+        if: needs.earlier.outputs.run
+        uses: actions/download-artifact@v8
+        with:
+          name: checks-record
+          path: earlier
+          run-id: ${{ needs.earlier.outputs.run }}
+          github-token: ${{ github.token }}
+      - name: Record for this commit
+        if: needs.earlier.outputs.run
+        run: |
+          cp earlier/checks.json checks.json
+          python3 -I scripts/ci-retarget.py checks.json
       - uses: actions/download-artifact@v8
+        if: ${{ !needs.earlier.outputs.run }}
         with:
           pattern: checks-*
           path: checks
           merge-multiple: true
       - name: Logs of the failed jobs
+        if: ${{ !needs.earlier.outputs.run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -145,15 +193,33 @@ jobs:
           while read -r id name; do
             gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$id/logs" > "logs/$name.log" || true
           done
+      # The jobs of the checks, without the lookup of an earlier run.
       - name: Record
+        if: ${{ !needs.earlier.outputs.run }}
         env:
-          JOBS: ${{ toJSON(needs) }}
+          NEEDS: ${{ toJSON(needs) }}
           JOB_LOGS: logs
-        run: python3 -I scripts/checks-record.py merge checks.json checks/*.jsonl
+        run: |
+          JOBS=$(printf '%s' "$NEEDS" | jq -c 'del(.earlier)') \
+            python3 -I scripts/checks-record.py merge checks.json checks/*.jsonl
       - uses: actions/upload-artifact@v7
         with:
           name: checks-record
           path: checks.json
+      # The mark of a successful check of this tree, found by later runs.
+      - name: Marker
+        id: marker
+        if: >-
+          needs.earlier.outputs.run ||
+          (needs.ct.result == 'success' && needs.extraction.result == 'success' &&
+           needs.kat-memcheck.result == 'success')
+        run: git rev-parse HEAD > checks-ok
+      - name: Upload marker
+        if: steps.marker.outcome == 'success' && needs.earlier.outputs.marker
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ needs.earlier.outputs.marker }}
+          path: checks-ok
 
   # Add the record to the results repo
   # (https://github.com/strub/jasmin-nist-timing), on pushes to main only. A

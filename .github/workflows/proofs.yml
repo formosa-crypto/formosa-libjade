@@ -1,7 +1,9 @@
 name: proofs
 
 # Checks every proof on pushes to main and on every pull request; a new push
-# to a PR cancels its run in progress.
+# to a PR cancels its run in progress. A commit whose tree a successful run
+# already checked with the same EasyCrypt (a rebase that changes no file, a
+# rebase merge) reuses that run's results instead, except in a manual run.
 #
 # SECURITY: the plain pull_request trigger is safe while this repo is
 # PRIVATE (only collaborators can open PRs). Before making the repo public,
@@ -29,9 +31,49 @@ concurrency:
 env:
   NIX_CONFIG: 'experimental-features = nix-command flakes'
   ECDEV: nix develop --impure --command
+  HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
+  # The earlier successful run on the same tree and the same EasyCrypt, on a
+  # GitHub-hosted runner, so that a reuse waits for no proofs runner. The
+  # EasyCrypt commit is its pinned branch's head: if the store lags behind
+  # it, the marker of the run (from the EasyCrypt it used) is not found and
+  # the proofs are checked again.
+  earlier:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      run: ${{ fromJSON(steps.find.outputs.runs || '{}').run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HEAD }}
+          sparse-checkout: |
+            .github/actions
+            jasmin-nist.opam
+          persist-credentials: false
+      # A failed lookup only means checking again.
+      - name: EasyCrypt
+        id: easycrypt
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch=$(sed -n 's|.*"git+https://github.com/EasyCrypt/easycrypt.git#\([^"]*\)".*|\1|p' jasmin-nist.opam)
+          echo "rev=$(gh api "repos/EasyCrypt/easycrypt/commits/$branch" --jq .sha)" >> "$GITHUB_OUTPUT"
+      - id: find
+        continue-on-error: true
+        uses: ./.github/actions/earlier-run
+        with:
+          commit: ${{ env.HEAD }}
+          marker: proofs-ok-{tree}-${{ steps.easycrypt.outputs.rev }}
+          lookup: ${{ github.event_name != 'workflow_dispatch' && steps.easycrypt.outputs.rev != '' }}
+
   check-ec-proofs:
+    needs: earlier
+    if: ${{ !cancelled() && !needs.earlier.outputs.run }}
     runs-on: [self-hosted, linux, proofs]
     timeout-minutes: 240
     steps:
@@ -40,7 +82,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ env.HEAD }}
           submodules: false
           persist-credentials: false
 
@@ -87,26 +129,61 @@ jobs:
       - name: Job summary
         env:
           PUBLISHED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        run: |
-          $ECDEV python3 -I - proofs-timing.json >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          import json, sys
-          m = json.load(open(sys.argv[1]))["meta"]
-          print(f"Proof checking: **{m['total_seconds'] / 60:.1f} min** cumulative over "
-                f"{m['files']} files ({m.get('machine', {}).get('jobs', '?')} jobs).")
-          if m.get("memory"):
-              gb = lambda b: f"{b / 1e9:.1f} GB"
-              print(f"Memory: peak **{gb(m['memory']['peak_total'])}** for the whole run, "
-                    f"largest file {gb(m.get('max_file_maxrss') or 0)}.")
-          EOF
-          site=https://www.strub.nu/jasmin-nist-timing
-          if [ "$PUBLISHED" = true ]; then
-            echo "**[Results for this commit]($site/#/results/$GITHUB_SHA)** · **[compare with the previous commit]($site/#/compare/$GITHUB_SHA)** on the results dashboard (updated a minute after this run)." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "If this commit is the head of a PR, its page on the **[results dashboard]($site/)** compares it with the merge base (published by publish-pr a minute after this run)." >> "$GITHUB_STEP_SUMMARY"
-          fi
+        run: $ECDEV python3 -I scripts/job-summary.py proofs proofs-timing.json >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload timing artifact
         uses: actions/upload-artifact@v7
+        with:
+          name: proofs-timing
+          path: |
+            proofs/timing.yml
+            proofs-timing.json
+            proofs-timing.html
+
+      # The mark of a successful check of this tree with this EasyCrypt,
+      # found by later runs.
+      - name: Marker
+        id: marker
+        run: |
+          rev=$($ECDEV sh -c 'echo "$EASYCRYPT_REV"')
+          tree=$(git rev-parse 'HEAD^{tree}')
+          git rev-parse HEAD > proofs-ok
+          case "$rev" in ''|unknown) echo "name=" ;; *) echo "name=proofs-ok-$tree-$rev" ;; esac >> "$GITHUB_OUTPUT"
+
+      - name: Upload marker
+        if: steps.marker.outputs.name
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.marker.outputs.name }}
+          path: proofs-ok
+
+  # The results of the earlier run, rewritten for this commit, as this run's
+  # artifact.
+  reuse:
+    needs: earlier
+    if: needs.earlier.outputs.run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HEAD }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: proofs-timing
+          path: .
+          run-id: ${{ needs.earlier.outputs.run }}
+          github-token: ${{ github.token }}
+      - name: Results for this commit
+        run: python3 -I scripts/ci-retarget.py proofs-timing.json
+      - name: Job summary
+        env:
+          PUBLISHED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: python3 -I scripts/job-summary.py proofs proofs-timing.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
         with:
           name: proofs-timing
           path: |
@@ -120,8 +197,10 @@ jobs:
   # so the deploy key never reaches the self-hosted machine nor shares a job
   # with the proof-checking steps.
   publish:
-    needs: check-ec-proofs
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check-ec-proofs, reuse]
+    if: >-
+      !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.check-ec-proofs.result == 'success' || needs.reuse.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: read

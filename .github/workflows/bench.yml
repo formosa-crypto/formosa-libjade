@@ -2,7 +2,10 @@ name: bench
 
 # Runs the cycle benchmark on a self-hosted runner (label "bench") and publishes
 # the report to the workflow run's Job Summary. See .github/runner/README.md for runner
-# provisioning and the public-repo security model.
+# provisioning and the public-repo security model. A machine that already
+# benchmarked the commit's tree in a successful run (a rebase that changes no
+# file, a rebase merge) reuses that run's report instead, except in a manual
+# run: the toolchain is the flake's, in the tree.
 
 on:
   workflow_dispatch:
@@ -32,21 +35,65 @@ concurrency:
 env:
   NIX_CONFIG: 'experimental-features = nix-command flakes'
   BENCHDEV: nix develop .#bench --impure --command
+  HEAD: >-
+    ${{ github.event_name == 'pull_request_target'
+        && github.event.pull_request.head.sha
+        || github.sha }}
 
 jobs:
-  bench:
-    # dispatch/push run unconditionally; a PR runs only when it is from this
-    # repo (never a fork), so untrusted fork code can never execute on the
-    # self-hosted machine.
+  # The machines that benchmark this commit and those that reuse an earlier
+  # run, on a GitHub-hosted runner, so that a reuse waits for no bench
+  # machine. Its code is the base branch's (pull_request_target).
+  # dispatch/push run unconditionally; a PR runs only when it is from this
+  # repo (never a fork), so untrusted fork code can never execute on the
+  # self-hosted machine.
+  earlier:
     if: >-
       github.event_name != 'pull_request_target' ||
       github.event.pull_request.head.repo.full_name == github.repository
-    # One job per bench machine; each runner instance advertises a bench-<cpu>
-    # label naming its microarchitecture (E3-1245 v5 = Skylake).
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      # One job per bench machine; each runner instance advertises a
+      # bench-<cpu> label naming its microarchitecture (E3-1245 v5 = Skylake).
+      RUNNERS: '["bench-skylake"]'
+    outputs:
+      all: ${{ env.RUNNERS }}
+      markers: ${{ steps.find.outputs.markers || '{}' }}
+      todo: ${{ steps.plan.outputs.todo }}
+      reused: ${{ steps.plan.outputs.reused }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+      # A failed lookup only means benchmarking again.
+      - id: find
+        continue-on-error: true
+        uses: ./.github/actions/earlier-run
+        with:
+          commit: ${{ env.HEAD }}
+          marker: bench-ok-{label}-{tree}
+          labels: ${{ env.RUNNERS }}
+          lookup: ${{ github.event_name != 'workflow_dispatch' }}
+      - id: plan
+        env:
+          RUNS: ${{ steps.find.outputs.runs || '{}' }}
+        run: |
+          echo "todo=$(jq -cn --argjson all "$RUNNERS" --argjson runs "$RUNS" \
+            '$all - ($runs | keys)')" >> "$GITHUB_OUTPUT"
+          echo "reused=$(jq -cn --argjson runs "$RUNS" \
+            '[$runs | to_entries[] | {runner: .key, run: .value}]')" >> "$GITHUB_OUTPUT"
+
+  bench:
+    needs: earlier
+    if: needs.earlier.outputs.todo != '[]'
     strategy:
       fail-fast: false
       matrix:
-        runner: [bench-skylake]
+        runner: ${{ fromJSON(needs.earlier.outputs.todo) }}
     runs-on: [self-hosted, linux, x64, '${{ matrix.runner }}']
     steps:
       - name: Checkout
@@ -54,10 +101,7 @@ jobs:
         with:
           submodules: true
           persist-credentials: false
-          ref: >-
-            ${{ github.event_name == 'pull_request_target'
-                && github.event.pull_request.head.sha
-                || github.sha }}
+          ref: ${{ env.HEAD }}
 
       # Builds (or reuses from the host store) the bench toolchain.
       - name: Toolchain
@@ -84,28 +128,71 @@ jobs:
       - name: Benchmark + report
         run: $BENCHDEV make -C bench report META='runner=${{ matrix.runner }}'
 
-      # Links to the results dashboard rather than tables: on main the
-      # commit's results and its comparison with the previous commit, on a
-      # PR the comparison with its merge base. Other runs are not published:
-      # the full report is in the artifact.
       - name: Job summary
         env:
-          SITE: https://www.strub.nu/jasmin-nist-timing
-          PUBLISHED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          PR: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
           RUNNER: ${{ matrix.runner }}
-        run: |
-          if [ -n "$PR" ]; then
-            msg="**[compare with the merge base]($SITE/#/pr/$PR)** on the results dashboard (updated a minute after this run)."
-          elif [ "$PUBLISHED" = true ]; then
-            msg="**[results for this commit]($SITE/#/results/$GITHUB_SHA)** · **[compare with the previous commit]($SITE/#/compare/$GITHUB_SHA)** on the results dashboard (updated a minute after this run)."
-          else
-            msg="not published (only main and PRs are); the full report is in the \`bench-$RUNNER\` artifact."
-          fi
-          echo "Benchmarks on \`$RUNNER\`: $msg" >> "$GITHUB_STEP_SUMMARY"
+          PR: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
+          PUBLISHED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: >-
+          $BENCHDEV python3 -I scripts/job-summary.py bench bench/bench.json "$RUNNER"
+          >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload bench artifact
         uses: actions/upload-artifact@v7
+        with:
+          name: bench-${{ matrix.runner }}
+          path: |
+            bench/bench.json
+            bench/bench.md
+            bench/_build/bench.csv
+
+      # The mark of a successful benchmark of this tree on this machine,
+      # found by later runs.
+      - name: Marker
+        run: git rev-parse HEAD > bench-ok
+
+      - name: Upload marker
+        if: fromJSON(needs.earlier.outputs.markers)[matrix.runner]
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ fromJSON(needs.earlier.outputs.markers)[matrix.runner] }}
+          path: bench-ok
+
+  # The report of the earlier run of a machine, rewritten for this commit, as
+  # this run's artifact. Runs the base branch's code only: the commit is
+  # fetched as data.
+  reuse:
+    needs: earlier
+    if: needs.earlier.outputs.reused != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.earlier.outputs.reused) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Commit
+        run: git fetch -q --depth 1 origin "$HEAD"
+      - uses: actions/download-artifact@v8
+        with:
+          name: bench-${{ matrix.runner }}
+          path: bench
+          run-id: ${{ matrix.run }}
+          github-token: ${{ github.token }}
+      - name: Report for this commit
+        run: python3 -I scripts/ci-retarget.py bench/bench.json "$HEAD"
+      - name: Job summary
+        env:
+          RUNNER: ${{ matrix.runner }}
+          PR: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
+          PUBLISHED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: >-
+          python3 -I scripts/job-summary.py bench bench/bench.json "$RUNNER"
+          >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
         with:
           name: bench-${{ matrix.runner }}
           path: |
@@ -120,15 +207,17 @@ jobs:
   # comparison. A separate job on a GitHub-hosted runner: it runs only this
   # (base-branch) workflow's code and downloads the artifact as data, so no PR
   # code ever shares a job with the deploy key, which never reaches a bench
-  # machine either. Keep the matrix in sync with bench's.
+  # machine either.
   publish:
-    needs: bench
+    needs: [earlier, bench, reuse]
     if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.event_name == 'pull_request_target'
+      !cancelled() && needs.earlier.result == 'success' &&
+      !contains(needs.*.result, 'failure') &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       github.event_name == 'pull_request_target')
     strategy:
       matrix:
-        runner: [bench-skylake]
+        runner: ${{ fromJSON(needs.earlier.outputs.all) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
