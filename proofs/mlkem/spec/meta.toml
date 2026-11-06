@@ -12,5 +12,5 @@ assumptions    = ["MLWE", "PRF", "PRG", "decryption-failure bound"]
 theorem        = { file = "properties/MLKEMSecurity.ec", lemma = "mlkem_spec_security" }
 
 [spec_security.instances]
-"768"  = { file = "properties/Security768.ec", clone = "Sec768" }
-"1024" = { file = "properties/Security1024.ec", clone = "Sec1024" }
+"768"  = { file = "properties/Security768.ec", lemma = "mlkem768_secure" }
+"1024" = { file = "properties/Security1024.ec", lemma = "mlkem1024_secure" }

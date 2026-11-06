@@ -12,6 +12,6 @@ assumptions    = ["MLWE", "SelfTargetMSIS"]
 theorem        = { file = "properties/MLDSA_Security.ec", lemma = "mldsa_secure" }
 
 [spec_security.instances]
-"44" = { file = "properties/Security44.ec", clone = "Sec44" }
-"65" = { file = "properties/Security65.ec", clone = "Sec65" }
-"87" = { file = "properties/Security87.ec", clone = "Sec87" }
+"44" = { file = "properties/Security44.ec", lemma = "mldsa44_secure" }
+"65" = { file = "properties/Security65.ec", lemma = "mldsa65_secure" }
+"87" = { file = "properties/Security87.ec", lemma = "mldsa87_secure" }

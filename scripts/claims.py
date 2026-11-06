@@ -7,8 +7,9 @@ Usage:  claims.py
   proofs/<prim>/spec/meta.toml
       the specification of an algorithm: its standard, parameter sets and
       operations, and the security theorem of the specification: the
-      generic theorem, and its instance for each parameter set it covers
-      (a `clone <theory> as <name>` of the theory of the theorem)
+      generic theorem, and its instance for each parameter set it covers:
+      the theorem restated for the set, in a file that clones the theory of
+      the generic theorem
   src/<prim>/<target>/<profile>/<set>/meta.toml
       an implementation: the properties it claims and its provable security
       (provsec, "functional": correctness and the instance of the security
@@ -20,9 +21,10 @@ Usage:  claims.py
       the lemma of each operation for a proved property, stated in that
       directory (the statement of the parameter set, not a generic one)
 
-Each lemma is located by its declaration (lemma, equiv, hoare, ...), each
-instance by its clone, which must occur exactly once in its file, and the
-file must be checked by the proofs CI: in a scenario of proofs/tests.config
+Each lemma is located by its declaration (lemma, equiv, hoare, ...), which
+must occur exactly once in its file (and an instance's file must clone the
+theory of the generic theorem exactly once), and the file must be checked by
+the proofs CI: in a scenario of proofs/tests.config
 that proofs/Makefile runs. Every entry point of src/ (a directory
 <prim>/<target>/<profile>/<set> with a .jazz file) needs its meta.toml.
 Exits non-zero, listing them on stderr, on claims without evidence.
@@ -100,13 +102,13 @@ def lemma(base, ref, dirs):
 
 
 def instance(base, ref, theorem, dirs):
-    """{file, lemma, line} of the instance ref = {file, clone} of the generic
-    theorem: the clone, as <clone>, of a theory of the theorem's file"""
+    """{file, lemma, line} of the instance ref = {file, lemma} of the generic
+    theorem: a lemma of a file that clones a theory of the theorem's file
+    (the lemma restates the theorem for the set; EasyCrypt checks the proof)"""
     theory = re.escape(Path(theorem["file"]).stem)
-    decl = re.compile(rf"\s*clone\s+(?:(?:import|export)\s+)*{theory}\.[\w.]+\s+as\s+"
-                      rf"{re.escape(ref['clone'])}\b")
-    path, line = located(base, ref, dirs, decl, f"clones of {theory} as {ref['clone']}")
-    return {"file": rel(path), "lemma": f"{ref['clone']}.{theorem['lemma']}", "line": line}
+    clone = re.compile(rf"\s*clone\s+(?:(?:import|export)\s+)*{theory}\.[\w.]+\s+as\s")
+    located(base, ref, dirs, clone, f"clones of {theory}")
+    return lemma(base, ref, dirs)
 
 
 def spec(meta, dirs, errors):
