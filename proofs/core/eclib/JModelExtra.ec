@@ -188,3 +188,20 @@ have h : (((x `>>` W8.of_int 3) `&` W32.of_int 286331153) * W32.of_int 286331153
            `>>` W8.of_int 28 \ule W32.of_int 8 by circuit.
 by move: h; rewrite W2u32.to_uint_zeroextu64 W32.uleE /=; smt(W32.to_uint_cmp).
 qed.
+
+(* -------------------------------------------------------------------- *)
+(* The lane mask of a block from its byte mask (MOVEMASK_32u8)          *)
+(* -------------------------------------------------------------------- *)
+
+(* bit 4j+3 of a byte mask to bit j, for j < 8 *)
+op nibble_mask (g : W64.t) : W64.t =
+  (((((g `>>` W8.of_int 3) `&` W64.of_int 286331153) `&` W64.of_int 4369)
+     * W64.of_int 4680 `>>` W8.of_int 12) `&` W64.of_int 15)
+  `|` ((((((g `>>` W8.of_int 3) `&` W64.of_int 286331153) `>>` W8.of_int 16)
+        * W64.of_int 4680 `>>` W8.of_int 12) `&` W64.of_int 15) `<<` W8.of_int 4).
+
+lemma to_uint_nibble_mask (g : W64.t) : to_uint (nibble_mask g) < 256.
+proof.
+have h : nibble_mask g \ult W64.of_int 256 by rewrite /nibble_mask /=; circuit.
+by move: h; rewrite W64.ultE.
+qed.

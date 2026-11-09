@@ -528,17 +528,17 @@ ml_dsa_44_keygen:
 	leaq	4736(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$212:
-	movq	%rdi, %rbx
+	movq	%r9, %rbx
 	leaq	21984(%rsp), %rax
 	leaq	3872(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$211:
-	movq	%rdi, %rbp
+	movq	%r9, %rbp
 	leaq	23008(%rsp), %rax
 	leaq	3008(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$210:
-	movq	%rdi, %r12
+	movq	%r9, %r12
 	leaq	24032(%rsp), %rax
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
@@ -550,7 +550,7 @@ ml_dsa_44_keygen:
 	jb  	.L__verify_internal$204
 	cmpq	$256, %r12
 	jb  	.L__verify_internal$206
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__verify_internal$188
 	movl	$0, %ecx
 .L__verify_internal$208:
@@ -571,7 +571,7 @@ ml_dsa_44_keygen:
 	movq	%rbx, 37416(%rsp)
 	movq	%rbp, 37424(%rsp)
 	movq	%r12, 37432(%rsp)
-	movq	%rdi, 37440(%rsp)
+	movq	%r9, 37440(%rsp)
 	leaq	1344(%rsp), %rax
 	leaq	4736(%rsp), %rcx
 	leaq	3872(%rsp), %rdx
@@ -605,7 +605,7 @@ ml_dsa_44_keygen:
 	leaq	2144(%rsp), %r8
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__verify_internal$197:
-	movq	%rax, %rdi
+	movq	%rax, %r9
 	movl	$1, %ecx
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$190
@@ -613,7 +613,7 @@ ml_dsa_44_keygen:
 	jb  	.L__verify_internal$192
 	cmpq	$256, %r12
 	jb  	.L__verify_internal$194
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__verify_internal$188
 	movl	$0, %ecx
 .L__verify_internal$196:
@@ -687,17 +687,17 @@ ml_dsa_44_keygen:
 	leaq	4736(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$181:
-	movq	%rdi, %rbx
+	movq	%r9, %rbx
 	leaq	26080(%rsp), %rax
 	leaq	3872(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$180:
-	movq	%rdi, %rbp
+	movq	%r9, %rbp
 	leaq	27104(%rsp), %rax
 	leaq	3008(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$179:
-	movq	%rdi, %r12
+	movq	%r9, %r12
 	leaq	28128(%rsp), %rax
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
@@ -709,7 +709,7 @@ ml_dsa_44_keygen:
 	jb  	.L__verify_internal$173
 	cmpq	$256, %r12
 	jb  	.L__verify_internal$175
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__verify_internal$157
 	movl	$0, %ecx
 .L__verify_internal$177:
@@ -730,7 +730,7 @@ ml_dsa_44_keygen:
 	movq	%rbx, 37440(%rsp)
 	movq	%rbp, 37432(%rsp)
 	movq	%r12, 37424(%rsp)
-	movq	%rdi, 37416(%rsp)
+	movq	%r9, 37416(%rsp)
 	leaq	1344(%rsp), %rax
 	leaq	4736(%rsp), %rcx
 	leaq	3872(%rsp), %rdx
@@ -764,7 +764,7 @@ ml_dsa_44_keygen:
 	leaq	2144(%rsp), %r8
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__verify_internal$166:
-	movq	%rax, %rdi
+	movq	%rax, %r9
 	movl	$1, %ecx
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$159
@@ -772,7 +772,7 @@ ml_dsa_44_keygen:
 	jb  	.L__verify_internal$161
 	cmpq	$256, %r12
 	jb  	.L__verify_internal$163
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__verify_internal$157
 	movl	$0, %ecx
 .L__verify_internal$165:
@@ -846,17 +846,17 @@ ml_dsa_44_keygen:
 	leaq	4736(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$150:
-	movq	%rdi, %rbx
+	movq	%r9, %rbx
 	leaq	30176(%rsp), %rax
 	leaq	3872(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$149:
-	movq	%rdi, %rbp
+	movq	%r9, %rbp
 	leaq	31200(%rsp), %rax
 	leaq	3008(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$148:
-	movq	%rdi, %r12
+	movq	%r9, %r12
 	leaq	32224(%rsp), %rax
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
@@ -868,7 +868,7 @@ ml_dsa_44_keygen:
 	jb  	.L__verify_internal$142
 	cmpq	$256, %r12
 	jb  	.L__verify_internal$144
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__verify_internal$126
 	movl	$0, %ecx
 .L__verify_internal$146:
@@ -889,7 +889,7 @@ ml_dsa_44_keygen:
 	movq	%rbx, 37416(%rsp)
 	movq	%rbp, 37424(%rsp)
 	movq	%r12, 37432(%rsp)
-	movq	%rdi, 37440(%rsp)
+	movq	%r9, 37440(%rsp)
 	leaq	1344(%rsp), %rax
 	leaq	4736(%rsp), %rcx
 	leaq	3872(%rsp), %rdx
@@ -923,7 +923,7 @@ ml_dsa_44_keygen:
 	leaq	2144(%rsp), %r8
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__verify_internal$135:
-	movq	%rax, %rdi
+	movq	%rax, %r9
 	movl	$1, %ecx
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$128
@@ -931,7 +931,7 @@ ml_dsa_44_keygen:
 	jb  	.L__verify_internal$130
 	cmpq	$256, %r12
 	jb  	.L__verify_internal$132
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__verify_internal$126
 	movl	$0, %ecx
 .L__verify_internal$134:
@@ -1005,17 +1005,17 @@ ml_dsa_44_keygen:
 	leaq	4736(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$119:
-	movq	%rdi, %rbx
+	movq	%r9, %rbx
 	leaq	34272(%rsp), %rax
 	leaq	3872(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$118:
-	movq	%rdi, %rbp
+	movq	%r9, %rbp
 	leaq	35296(%rsp), %rax
 	leaq	3008(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$117:
-	movq	%rdi, %r12
+	movq	%r9, %r12
 	leaq	36320(%rsp), %rax
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
@@ -1027,7 +1027,7 @@ ml_dsa_44_keygen:
 	jb  	.L__verify_internal$111
 	cmpq	$256, %r12
 	jb  	.L__verify_internal$113
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__verify_internal$95
 	movl	$0, %ecx
 .L__verify_internal$115:
@@ -1048,7 +1048,7 @@ ml_dsa_44_keygen:
 	movq	%rbx, 37408(%rsp)
 	movq	%rbp, 37440(%rsp)
 	movq	%r12, 37432(%rsp)
-	movq	%rdi, 37424(%rsp)
+	movq	%r9, 37424(%rsp)
 	leaq	1344(%rsp), %rax
 	leaq	4736(%rsp), %rcx
 	leaq	3872(%rsp), %rdx
@@ -1082,7 +1082,7 @@ ml_dsa_44_keygen:
 	leaq	2144(%rsp), %r8
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__verify_internal$104:
-	movq	%rax, %rdi
+	movq	%rax, %r9
 	movl	$1, %ecx
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$97
@@ -1090,7 +1090,7 @@ ml_dsa_44_keygen:
 	jb  	.L__verify_internal$99
 	cmpq	$256, %r12
 	jb  	.L__verify_internal$101
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__verify_internal$95
 	movl	$0, %ecx
 .L__verify_internal$103:
@@ -1875,17 +1875,17 @@ ml_dsa_44_keygen:
 	leaq	7552(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$302:
-	movq	%rdi, %rbx
+	movq	%r9, %rbx
 	leaq	64736(%rsp), %rax
 	leaq	6688(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$301:
-	movq	%rdi, %rbp
+	movq	%r9, %rbp
 	leaq	65760(%rsp), %rax
 	leaq	5824(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$300:
-	movq	%rdi, %r12
+	movq	%r9, %r12
 	leaq	66784(%rsp), %rax
 	leaq	4960(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
@@ -1897,7 +1897,7 @@ ml_dsa_44_keygen:
 	jb  	.L__sign_internal$294
 	cmpq	$256, %r12
 	jb  	.L__sign_internal$296
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__sign_internal$278
 	movl	$0, %ecx
 .L__sign_internal$298:
@@ -1918,7 +1918,7 @@ ml_dsa_44_keygen:
 	movq	%rbx, 80176(%rsp)
 	movq	%rbp, 80184(%rsp)
 	movq	%r12, 80192(%rsp)
-	movq	%rdi, 80200(%rsp)
+	movq	%r9, 80200(%rsp)
 	leaq	4160(%rsp), %rax
 	leaq	7552(%rsp), %rcx
 	leaq	6688(%rsp), %rdx
@@ -1952,7 +1952,7 @@ ml_dsa_44_keygen:
 	leaq	4960(%rsp), %r8
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__sign_internal$287:
-	movq	%rax, %rdi
+	movq	%rax, %r9
 	movl	$1, %ecx
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$280
@@ -1960,7 +1960,7 @@ ml_dsa_44_keygen:
 	jb  	.L__sign_internal$282
 	cmpq	$256, %r12
 	jb  	.L__sign_internal$284
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__sign_internal$278
 	movl	$0, %ecx
 .L__sign_internal$286:
@@ -2034,17 +2034,17 @@ ml_dsa_44_keygen:
 	leaq	7552(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$271:
-	movq	%rdi, %rbx
+	movq	%r9, %rbx
 	leaq	68832(%rsp), %rax
 	leaq	6688(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$270:
-	movq	%rdi, %rbp
+	movq	%r9, %rbp
 	leaq	69856(%rsp), %rax
 	leaq	5824(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$269:
-	movq	%rdi, %r12
+	movq	%r9, %r12
 	leaq	70880(%rsp), %rax
 	leaq	4960(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
@@ -2056,7 +2056,7 @@ ml_dsa_44_keygen:
 	jb  	.L__sign_internal$263
 	cmpq	$256, %r12
 	jb  	.L__sign_internal$265
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__sign_internal$247
 	movl	$0, %ecx
 .L__sign_internal$267:
@@ -2077,7 +2077,7 @@ ml_dsa_44_keygen:
 	movq	%rbx, 80200(%rsp)
 	movq	%rbp, 80192(%rsp)
 	movq	%r12, 80184(%rsp)
-	movq	%rdi, 80176(%rsp)
+	movq	%r9, 80176(%rsp)
 	leaq	4160(%rsp), %rax
 	leaq	7552(%rsp), %rcx
 	leaq	6688(%rsp), %rdx
@@ -2111,7 +2111,7 @@ ml_dsa_44_keygen:
 	leaq	4960(%rsp), %r8
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__sign_internal$256:
-	movq	%rax, %rdi
+	movq	%rax, %r9
 	movl	$1, %ecx
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$249
@@ -2119,7 +2119,7 @@ ml_dsa_44_keygen:
 	jb  	.L__sign_internal$251
 	cmpq	$256, %r12
 	jb  	.L__sign_internal$253
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__sign_internal$247
 	movl	$0, %ecx
 .L__sign_internal$255:
@@ -2193,17 +2193,17 @@ ml_dsa_44_keygen:
 	leaq	7552(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$240:
-	movq	%rdi, %rbx
+	movq	%r9, %rbx
 	leaq	72928(%rsp), %rax
 	leaq	6688(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$239:
-	movq	%rdi, %rbp
+	movq	%r9, %rbp
 	leaq	73952(%rsp), %rax
 	leaq	5824(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$238:
-	movq	%rdi, %r12
+	movq	%r9, %r12
 	leaq	74976(%rsp), %rax
 	leaq	4960(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
@@ -2215,7 +2215,7 @@ ml_dsa_44_keygen:
 	jb  	.L__sign_internal$232
 	cmpq	$256, %r12
 	jb  	.L__sign_internal$234
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__sign_internal$216
 	movl	$0, %ecx
 .L__sign_internal$236:
@@ -2236,7 +2236,7 @@ ml_dsa_44_keygen:
 	movq	%rbx, 80176(%rsp)
 	movq	%rbp, 80184(%rsp)
 	movq	%r12, 80192(%rsp)
-	movq	%rdi, 80200(%rsp)
+	movq	%r9, 80200(%rsp)
 	leaq	4160(%rsp), %rax
 	leaq	7552(%rsp), %rcx
 	leaq	6688(%rsp), %rdx
@@ -2270,7 +2270,7 @@ ml_dsa_44_keygen:
 	leaq	4960(%rsp), %r8
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__sign_internal$225:
-	movq	%rax, %rdi
+	movq	%rax, %r9
 	movl	$1, %ecx
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$218
@@ -2278,7 +2278,7 @@ ml_dsa_44_keygen:
 	jb  	.L__sign_internal$220
 	cmpq	$256, %r12
 	jb  	.L__sign_internal$222
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__sign_internal$216
 	movl	$0, %ecx
 .L__sign_internal$224:
@@ -2352,17 +2352,17 @@ ml_dsa_44_keygen:
 	leaq	7552(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$209:
-	movq	%rdi, %rbx
+	movq	%r9, %rbx
 	leaq	77024(%rsp), %rax
 	leaq	6688(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$208:
-	movq	%rdi, %rbp
+	movq	%r9, %rbp
 	leaq	78048(%rsp), %rax
 	leaq	5824(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$207:
-	movq	%rdi, %r12
+	movq	%r9, %r12
 	leaq	79072(%rsp), %rax
 	leaq	4960(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
@@ -2374,7 +2374,7 @@ ml_dsa_44_keygen:
 	jb  	.L__sign_internal$201
 	cmpq	$256, %r12
 	jb  	.L__sign_internal$203
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__sign_internal$185
 	movl	$0, %ecx
 .L__sign_internal$205:
@@ -2395,7 +2395,7 @@ ml_dsa_44_keygen:
 	movq	%rbx, 80168(%rsp)
 	movq	%rbp, 80200(%rsp)
 	movq	%r12, 80192(%rsp)
-	movq	%rdi, 80184(%rsp)
+	movq	%r9, 80184(%rsp)
 	leaq	4160(%rsp), %rax
 	leaq	7552(%rsp), %rcx
 	leaq	6688(%rsp), %rdx
@@ -2429,7 +2429,7 @@ ml_dsa_44_keygen:
 	leaq	4960(%rsp), %r8
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__sign_internal$194:
-	movq	%rax, %rdi
+	movq	%rax, %r9
 	movl	$1, %ecx
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$187
@@ -2437,7 +2437,7 @@ ml_dsa_44_keygen:
 	jb  	.L__sign_internal$189
 	cmpq	$256, %r12
 	jb  	.L__sign_internal$191
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__sign_internal$185
 	movl	$0, %ecx
 .L__sign_internal$193:
@@ -6225,17 +6225,17 @@ ml_dsa_44_keygen:
 	leaq	4736(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$227:
-	movq	%rdi, %rbx
+	movq	%r9, %rbx
 	leaq	18912(%rsp), %rax
 	leaq	3872(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$226:
-	movq	%rdi, %rbp
+	movq	%r9, %rbp
 	leaq	19936(%rsp), %rax
 	leaq	3008(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$225:
-	movq	%rdi, %r12
+	movq	%r9, %r12
 	leaq	20960(%rsp), %rax
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
@@ -6247,7 +6247,7 @@ ml_dsa_44_keygen:
 	jb  	.L__keygen_internal$219
 	cmpq	$256, %r12
 	jb  	.L__keygen_internal$221
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__keygen_internal$203
 	movl	$0, %ecx
 .L__keygen_internal$223:
@@ -6268,7 +6268,7 @@ ml_dsa_44_keygen:
 	movq	%rbx, 34296(%rsp)
 	movq	%rbp, 34304(%rsp)
 	movq	%r12, 34312(%rsp)
-	movq	%rdi, 34320(%rsp)
+	movq	%r9, 34320(%rsp)
 	leaq	1344(%rsp), %rax
 	leaq	4736(%rsp), %rcx
 	leaq	3872(%rsp), %rdx
@@ -6302,7 +6302,7 @@ ml_dsa_44_keygen:
 	leaq	2144(%rsp), %r8
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__keygen_internal$212:
-	movq	%rax, %rdi
+	movq	%rax, %r9
 	movl	$1, %ecx
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$205
@@ -6310,7 +6310,7 @@ ml_dsa_44_keygen:
 	jb  	.L__keygen_internal$207
 	cmpq	$256, %r12
 	jb  	.L__keygen_internal$209
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__keygen_internal$203
 	movl	$0, %ecx
 .L__keygen_internal$211:
@@ -6384,17 +6384,17 @@ ml_dsa_44_keygen:
 	leaq	4736(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$196:
-	movq	%rdi, %rbx
+	movq	%r9, %rbx
 	leaq	23008(%rsp), %rax
 	leaq	3872(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$195:
-	movq	%rdi, %rbp
+	movq	%r9, %rbp
 	leaq	24032(%rsp), %rax
 	leaq	3008(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$194:
-	movq	%rdi, %r12
+	movq	%r9, %r12
 	leaq	25056(%rsp), %rax
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
@@ -6406,7 +6406,7 @@ ml_dsa_44_keygen:
 	jb  	.L__keygen_internal$188
 	cmpq	$256, %r12
 	jb  	.L__keygen_internal$190
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__keygen_internal$172
 	movl	$0, %ecx
 .L__keygen_internal$192:
@@ -6427,7 +6427,7 @@ ml_dsa_44_keygen:
 	movq	%rbx, 34320(%rsp)
 	movq	%rbp, 34312(%rsp)
 	movq	%r12, 34304(%rsp)
-	movq	%rdi, 34296(%rsp)
+	movq	%r9, 34296(%rsp)
 	leaq	1344(%rsp), %rax
 	leaq	4736(%rsp), %rcx
 	leaq	3872(%rsp), %rdx
@@ -6461,7 +6461,7 @@ ml_dsa_44_keygen:
 	leaq	2144(%rsp), %r8
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__keygen_internal$181:
-	movq	%rax, %rdi
+	movq	%rax, %r9
 	movl	$1, %ecx
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$174
@@ -6469,7 +6469,7 @@ ml_dsa_44_keygen:
 	jb  	.L__keygen_internal$176
 	cmpq	$256, %r12
 	jb  	.L__keygen_internal$178
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__keygen_internal$172
 	movl	$0, %ecx
 .L__keygen_internal$180:
@@ -6543,17 +6543,17 @@ ml_dsa_44_keygen:
 	leaq	4736(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$165:
-	movq	%rdi, %rbx
+	movq	%r9, %rbx
 	leaq	27104(%rsp), %rax
 	leaq	3872(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$164:
-	movq	%rdi, %rbp
+	movq	%r9, %rbp
 	leaq	28128(%rsp), %rax
 	leaq	3008(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$163:
-	movq	%rdi, %r12
+	movq	%r9, %r12
 	leaq	29152(%rsp), %rax
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
@@ -6565,7 +6565,7 @@ ml_dsa_44_keygen:
 	jb  	.L__keygen_internal$157
 	cmpq	$256, %r12
 	jb  	.L__keygen_internal$159
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__keygen_internal$141
 	movl	$0, %ecx
 .L__keygen_internal$161:
@@ -6586,7 +6586,7 @@ ml_dsa_44_keygen:
 	movq	%rbx, 34296(%rsp)
 	movq	%rbp, 34304(%rsp)
 	movq	%r12, 34312(%rsp)
-	movq	%rdi, 34320(%rsp)
+	movq	%r9, 34320(%rsp)
 	leaq	1344(%rsp), %rax
 	leaq	4736(%rsp), %rcx
 	leaq	3872(%rsp), %rdx
@@ -6620,7 +6620,7 @@ ml_dsa_44_keygen:
 	leaq	2144(%rsp), %r8
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__keygen_internal$150:
-	movq	%rax, %rdi
+	movq	%rax, %r9
 	movl	$1, %ecx
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$143
@@ -6628,7 +6628,7 @@ ml_dsa_44_keygen:
 	jb  	.L__keygen_internal$145
 	cmpq	$256, %r12
 	jb  	.L__keygen_internal$147
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__keygen_internal$141
 	movl	$0, %ecx
 .L__keygen_internal$149:
@@ -6702,17 +6702,17 @@ ml_dsa_44_keygen:
 	leaq	4736(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$134:
-	movq	%rdi, %rbx
+	movq	%r9, %rbx
 	leaq	31200(%rsp), %rax
 	leaq	3872(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$133:
-	movq	%rdi, %rbp
+	movq	%r9, %rbp
 	leaq	32224(%rsp), %rax
 	leaq	3008(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$132:
-	movq	%rdi, %r12
+	movq	%r9, %r12
 	leaq	33248(%rsp), %rax
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
@@ -6724,7 +6724,7 @@ ml_dsa_44_keygen:
 	jb  	.L__keygen_internal$126
 	cmpq	$256, %r12
 	jb  	.L__keygen_internal$128
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__keygen_internal$110
 	movl	$0, %ecx
 .L__keygen_internal$130:
@@ -6745,7 +6745,7 @@ ml_dsa_44_keygen:
 	movq	%rbx, 34288(%rsp)
 	movq	%rbp, 34320(%rsp)
 	movq	%r12, 34312(%rsp)
-	movq	%rdi, 34304(%rsp)
+	movq	%r9, 34304(%rsp)
 	leaq	1344(%rsp), %rax
 	leaq	4736(%rsp), %rcx
 	leaq	3872(%rsp), %rdx
@@ -6779,7 +6779,7 @@ ml_dsa_44_keygen:
 	leaq	2144(%rsp), %r8
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__keygen_internal$119:
-	movq	%rax, %rdi
+	movq	%rax, %r9
 	movl	$1, %ecx
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$112
@@ -6787,7 +6787,7 @@ ml_dsa_44_keygen:
 	jb  	.L__keygen_internal$114
 	cmpq	$256, %r12
 	jb  	.L__keygen_internal$116
-	cmpq	$256, %rdi
+	cmpq	$256, %r9
 	jnb 	.L__keygen_internal$110
 	movl	$0, %ecx
 .L__keygen_internal$118:
@@ -8252,7 +8252,7 @@ ml_dsa_44_keygen:
 	movq	$0, %rdi
 	movq	$0, %r8
 	vmovdqu	glob_data + 5344(%rip), %ymm1
-	movq	$0, %r9
+	movq	$0, %r10
 	jmp 	.Lmatrix_A__rejection_sample_multiple_blocks$14
 .Lmatrix_A__rejection_sample_multiple_blocks$15:
 	movq	$-1, %r9
@@ -8266,12 +8266,23 @@ ml_dsa_44_keygen:
 	vpand	%ymm0, %ymm2, %ymm0
 	addq	$24, %r8
 	vpcmpgtd	%ymm0, %ymm1, %ymm2
-	vpinsrq	$0, %rdx, %xmm3, %xmm3
-	vpinsrq	$1, %rdx, %xmm3, %xmm3
-	vinserti128	$1, %xmm3, %ymm3, %ymm3
-	vpor	%ymm3, %ymm2, %ymm2
-	vmovmskps	%ymm2, %r9d
+	vpmovmskb	%ymm2, %r9d
+	movl	%r9d, %r9d
 // declassify_val u64 %r9
+	orq 	%rdx, %r9
+	shrq	$3, %r9
+	andq	$286331153, %r9
+	movq	%r9, %r10
+	shrq	$16, %r10
+	imulq	$4680, %r10, %r10
+	shrq	$12, %r10
+	andq	$15, %r10
+	shlq	$4, %r10
+	andq	$4369, %r9
+	imulq	$4680, %r9, %r9
+	shrq	$12, %r9
+	andq	$15, %r9
+	orq 	%r10, %r9
 	vextracti128	$0, %ymm0, %xmm2
 	movq	%r9, %r10
 	andq	$15, %r10
@@ -8293,35 +8304,36 @@ ml_dsa_44_keygen:
 	popcnt	%r9, %r9
 	shlq	$2, %r9
 	addq	%r9, %rdi
-	movq	$0, %r9
+	movq	$0, %r10
 	cmpq	$992, %rdi
 	jnb 	.Lmatrix_A__rejection_sample_multiple_blocks$16
-	movq	$-1, %r10
-	cmovnb	%r10, %rdx
+	movq	$-1, %r9
+	cmovnb	%r9, %rdx
 	cmpq	$840, %r8
 	jnb 	.Lmatrix_A__rejection_sample_multiple_blocks$18
-	movq	$-1, %r10
-	cmovnb	%r10, %rdx
+	movq	$-1, %r9
+	cmovnb	%r9, %rdx
 	jmp 	.Lmatrix_A__rejection_sample_multiple_blocks$14
 .Lmatrix_A__rejection_sample_multiple_blocks$18:
 	movq	$-1, %r9
 	cmovb	%r9, %rdx
-	movq	$1, %r9
+	movq	$1, %r10
 .Lmatrix_A__rejection_sample_multiple_blocks$19:
 	jmp 	.Lmatrix_A__rejection_sample_multiple_blocks$14
 .Lmatrix_A__rejection_sample_multiple_blocks$16:
 	movq	$-1, %r9
 	cmovb	%r9, %rdx
-	movq	$1, %r9
+	movq	$1, %r10
 .Lmatrix_A__rejection_sample_multiple_blocks$17:
 .Lmatrix_A__rejection_sample_multiple_blocks$14:
-	cmpq	$1, %r9
+	cmpq	$1, %r10
 	jne 	.Lmatrix_A__rejection_sample_multiple_blocks$15
 	movq	$-1, %rsi
 	cmovne	%rsi, %rdx
-	shrq	$2, %rdi
-	movq	$1, %r9
-	cmpq	$256, %rdi
+	movq	%rdi, %r9
+	shrq	$2, %r9
+	movq	$1, %r10
+	cmpq	$256, %r9
 	jb  	.Lmatrix_A__rejection_sample_multiple_blocks$10
 	movq	$-1, %rsi
 	cmovb	%rsi, %rdx
@@ -8337,39 +8349,39 @@ ml_dsa_44_keygen:
 .Lmatrix_A__rejection_sample_multiple_blocks$12:
 	movq	$-1, %rsi
 	cmovnb	%rsi, %rdx
-	movq	$0, %r9
+	movq	$0, %r10
 .Lmatrix_A__rejection_sample_multiple_blocks$13:
 .Lmatrix_A__rejection_sample_multiple_blocks$11:
 	jmp 	.Lmatrix_A__rejection_sample_multiple_blocks$2
 .Lmatrix_A__rejection_sample_multiple_blocks$3:
 	movq	$-1, %rsi
 	cmove	%rsi, %rdx
-	movzbl	(%rcx,%r8), %esi
-	incq	%r8
 	movzbl	(%rcx,%r8), %r10d
 	incq	%r8
-	movzbl	(%rcx,%r8), %r9d
+	movzbl	(%rcx,%r8), %edi
 	incq	%r8
-	shll	$8, %r10d
-	orl 	%r10d, %esi
-	shll	$16, %r9d
-	orl 	%r9d, %esi
-	andl	$8388607, %esi
-// declassify_val u32 %esi
-	orl 	%edx, %esi
-	cmpl	$8380417, %esi
+	movzbl	(%rcx,%r8), %esi
+	incq	%r8
+	shll	$8, %edi
+	orl 	%edi, %r10d
+	shll	$16, %esi
+	orl 	%esi, %r10d
+	andl	$8388607, %r10d
+// declassify_val u32 %r10d
+	orl 	%edx, %r10d
+	cmpl	$8380417, %r10d
 	jb  	.Lmatrix_A__rejection_sample_multiple_blocks$8
 	movq	$-1, %rsi
 	cmovb	%rsi, %rdx
 	jmp 	.Lmatrix_A__rejection_sample_multiple_blocks$9
 .Lmatrix_A__rejection_sample_multiple_blocks$8:
-	movq	$-1, %r9
-	cmovnb	%r9, %rdx
-	movl	%esi, (%rax,%rdi,4)
-	incq	%rdi
+	movq	$-1, %rsi
+	cmovnb	%rsi, %rdx
+	movl	%r10d, (%rax,%r9,4)
+	incq	%r9
 .Lmatrix_A__rejection_sample_multiple_blocks$9:
-	movq	$0, %r9
-	cmpq	$256, %rdi
+	movq	$0, %r10
+	cmpq	$256, %r9
 	jnb 	.Lmatrix_A__rejection_sample_multiple_blocks$4
 	movq	$-1, %rsi
 	cmovnb	%rsi, %rdx
@@ -8381,16 +8393,16 @@ ml_dsa_44_keygen:
 .Lmatrix_A__rejection_sample_multiple_blocks$6:
 	movq	$-1, %rsi
 	cmovb	%rsi, %rdx
-	movq	$1, %r9
+	movq	$1, %r10
 .Lmatrix_A__rejection_sample_multiple_blocks$7:
 	jmp 	.Lmatrix_A__rejection_sample_multiple_blocks$2
 .Lmatrix_A__rejection_sample_multiple_blocks$4:
 	movq	$-1, %rsi
 	cmovb	%rsi, %rdx
-	movq	$1, %r9
+	movq	$1, %r10
 .Lmatrix_A__rejection_sample_multiple_blocks$5:
 .Lmatrix_A__rejection_sample_multiple_blocks$2:
-	cmpq	$1, %r9
+	cmpq	$1, %r10
 	jne 	.Lmatrix_A__rejection_sample_multiple_blocks$3
 	ret
 .Lshake256_squeezeblock4x$1:
@@ -8402,21 +8414,21 @@ ml_dsa_44_keygen:
 .Lshake256_squeezeblock4x$5:
 	vmovdqu	(%rax,%r9,4), %ymm0
 	vmovdqu	32(%rax,%r9,4), %ymm1
-	vmovdqu	64(%rax,%r9,4), %ymm2
-	vmovdqu	96(%rax,%r9,4), %ymm3
+	vmovdqu	64(%rax,%r9,4), %ymm3
+	vmovdqu	96(%rax,%r9,4), %ymm14
 	addq	$32, %r9
-	vperm2i128	$32, %ymm2, %ymm0, %ymm4
-	vperm2i128	$32, %ymm3, %ymm1, %ymm5
-	vperm2i128	$49, %ymm2, %ymm0, %ymm2
-	vperm2i128	$49, %ymm3, %ymm1, %ymm3
-	vpunpcklqdq	%ymm5, %ymm4, %ymm0
-	vpunpckhqdq	%ymm5, %ymm4, %ymm1
-	vpunpcklqdq	%ymm3, %ymm2, %ymm4
-	vpunpckhqdq	%ymm3, %ymm2, %ymm3
-	vmovdqu	%ymm0, (%rcx,%r8)
-	vmovdqu	%ymm1, (%rdx,%r8)
-	vmovdqu	%ymm4, (%rsi,%r8)
-	vmovdqu	%ymm3, (%rdi,%r8)
+	vperm2i128	$32, %ymm3, %ymm0, %ymm2
+	vperm2i128	$32, %ymm14, %ymm1, %ymm4
+	vperm2i128	$49, %ymm3, %ymm0, %ymm0
+	vperm2i128	$49, %ymm14, %ymm1, %ymm1
+	vpunpcklqdq	%ymm4, %ymm2, %ymm3
+	vpunpckhqdq	%ymm4, %ymm2, %ymm4
+	vpunpcklqdq	%ymm1, %ymm0, %ymm2
+	vpunpckhqdq	%ymm1, %ymm0, %ymm1
+	vmovdqu	%ymm3, (%rcx,%r8)
+	vmovdqu	%ymm4, (%rdx,%r8)
+	vmovdqu	%ymm2, (%rsi,%r8)
+	vmovdqu	%ymm1, (%rdi,%r8)
 	addq	$32, %r8
 .Lshake256_squeezeblock4x$4:
 	cmpq	$128, %r9
