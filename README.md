@@ -4,7 +4,8 @@ Libjade is a formally verified cryptographic library written in the
 [Jasmin](https://github.com/jasmin-lang/jasmin) programming language, with
 machine-checked proofs in [EasyCrypt](https://github.com/EasyCrypt/easycrypt).
 Libjade is part of [Formosa Crypto](https://formosa-crypto.org). Its focus is
-high-assurance implementations of the NIST post-quantum standards.
+high-assurance implementations of standardized cryptographic algorithms, with a
+special emphasis on the NIST post-quantum standards.
 
 ## Assurance
 
@@ -25,10 +26,13 @@ following terms used in this README:
   [Memcheck](docs/assurance.md#memcheck)
 - [High assurance](docs/assurance.md#high-assurance)
 - [End-to-end proofs](docs/assurance.md#end-to-end-proofs):
-  [security of the specification](docs/assurance.md#security-of-the-specification),
-  [correctness](docs/assurance.md#correctness),
-  [compilation](docs/assurance.md#compilation), [safety](docs/assurance.md#safety),
-  [CT and SCT](docs/assurance.md#ct-and-sct), [ProvSec](docs/assurance.md#provsec)
+  - [security of the specification](docs/assurance.md#security-of-the-specification):
+    the security theorem of the EasyCrypt specification of the standard;
+  - [correctness](docs/assurance.md#correctness),
+    [compilation](docs/assurance.md#compilation), [safety](docs/assurance.md#safety),
+    [CT and SCT](docs/assurance.md#ct-and-sct);
+  - [ProvSec](docs/assurance.md#provsec): how far the security theorem of the
+    specification carries over to the implementation.
 - [Trusted computing base](docs/assurance.md#trusted-computing-base)
 
 ## Algorithms
@@ -99,7 +103,14 @@ provsec = "functional"
   verify = { file = "correctness65.ec", lemma = "verify_correct" }
   ```
 
-- `provsec` is the [ProvSec](docs/assurance.md#provsec) kind of the implementation.
+- `provsec` is the [ProvSec](docs/assurance.md#provsec) kind of the implementation:
+  how far the security theorem of the specification carries over to the
+  implementation. *functional* means that the correctness of the implementation and
+  the security of the specification are proved separately and there is no explicit
+  reduction from specification security to implementation security; *reduction* and
+  *leakage-aware reduction* mean that an EasyCrypt theorem states the security of the
+  implementation, in the latter case showing that the constant-time leakage has a
+  theoretical justification.
 
 `scripts/claims.py` checks the claims on every pull request: every entry point of
 `src/` has its `meta.toml`, every proved claim has the lemma of each operation, in a
@@ -138,6 +149,9 @@ The exported functions of each algorithm, with `<p>` the parameter set:
   - `verify`: verification of a signature on a message with a context
     (Algorithm 3 in FIPS 204). Returns 0 when the signature verifies, -1 when the
     context is longer than 255 bytes, and a nonzero value otherwise.
+
+The header of each implementation describes informally the contract of each function:
+what it requires from the caller, what it ensures, and what the code declassifies.
 
 The caller may pass unaligned pointers, but must adhere to the following restrictions:
 - pass memory regions that do not overlap;
