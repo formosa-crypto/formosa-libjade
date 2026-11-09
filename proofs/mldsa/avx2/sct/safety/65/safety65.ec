@@ -1346,13 +1346,10 @@ while (b_randombytes = BArray848.init_arr (W8.of_int 255)
     /\ valid trace_matrix_A__rejection_sample_multiple_blocks).
 + auto; ecall (matrix_A____bytestream_to_potential_coefficients_proof param).
   auto => /> &hr hle hmod hinit himod hio hvalid hlt hlt2 r hv.
-  rewrite /SLH64.protect_256.
+  rewrite /SLH64.protect_64 -/(nibble_mask (zeroextu64 (MOVEMASK_32u8 _))).
   (* the vector terms are abstracted: only their bounds matter *)
-  have hg : to_uint (zeroextu64 (MOVEMASK_8u32 (VPCMPGT_8u32 modulus{hr} r.`1))) < 256.
-  + rewrite /zeroextu64 W64.of_uintK.
-    by have := to_uint_movemask8 (VPCMPGT_8u32 modulus{hr} r.`1);
-       have := W32.to_uint_cmp (MOVEMASK_8u32 (VPCMPGT_8u32 modulus{hr} r.`1)); smt().
-  move: (zeroextu64 (MOVEMASK_8u32 (VPCMPGT_8u32 modulus{hr} r.`1))) hg => g hg.
+  have hg := to_uint_nibble_mask (zeroextu64 (MOVEMASK_32u8 (VPCMPGT_8u32 modulus{hr} r.`1))).
+  move: (nibble_mask (zeroextu64 (MOVEMASK_32u8 (VPCMPGT_8u32 modulus{hr} r.`1)))) hg => g hg.
   have hgl : to_uint (g `&` W64.of_int 15) < 16.
   + have -> : W64.of_int 15 = W64.of_int (2 ^ 4 - 1) by done.
     by rewrite W64.to_uint_and_mod //; smt(modz_cmp).

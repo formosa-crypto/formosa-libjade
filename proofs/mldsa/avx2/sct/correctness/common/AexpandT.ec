@@ -6,6 +6,7 @@ import BitChunking.
 (* -------------------------------------------------------------------- *)
 from Jasmin require import JWord JModel_x86.
 
+require import CircuitBindings Bindings JModelExtra.
 require import Agree.
 require import Avx2red.
 require import Prefixarray.
@@ -18,6 +19,12 @@ require import XArray256.
 require import MldsaConstants.
 require BaseT Sha3x4.
 
+(* the lane mask of a comparison, from its byte mask                    *)
+lemma nibble_mask_movemask (c : W256.t) :
+  nibble_mask (zeroextu64 (MOVEMASK_32u8 c)) = zeroextu64 (MOVEMASK_8u32 c).
+proof. by rewrite /nibble_mask /=; circuit. qed.
+
+(* -------------------------------------------------------------------- *)
 (* The sampling of the matrix A (ExpandA): the four-lane rejection
    sampler, the same for every set, and the matrix of k * l polynomials,
    sampled four at a time, with a two-polynomial tail when k * l = 2
@@ -359,6 +366,14 @@ have -> : w2bits (W32.bits2w (map accept cs)) = map accept cs ++ nseq 24 false.
   by rewrite nth_default ?size_map ?sz8 1:/# nth_nseq /#.
 by rewrite bs2int_cat bs2int_nseq_false.
 qed.
+
+(* the same mask, from the byte mask of the comparison                  *)
+lemma to_uint_nibble_good (cs : W32.t list) :
+  size cs = 8 => (forall w, w \in cs => 0 <= to_uint w < 2 ^ 23) =>
+    to_uint (nibble_mask (zeroextu64 (MOVEMASK_32u8
+      (VPCMPGT_8u32 MODULUS8u32 (W8u32.pack8 cs)))))
+  = bs2int (map accept cs).
+proof. by rewrite nibble_mask_movemask; apply to_uint_good. qed.
 
 (* -------------------------------------------------------------------- *)
 (* the two 128-bit halves of the packed candidates                      *)
@@ -703,7 +718,7 @@ seq 1: (                        (* FIXME: code position *)
     by rewrite /cands take_sub_848 //.
   (* a. the acceptance mask: good lists the accepted candidates,       *)
   (*    least significant bit first                                     *)
-  seq > ^good<- : (
+  seq < ^lower_coefficients<- : (
        rb = buf
     /\ vsampled buf polynomial (to_uint bytes_filled) (to_uint off0)
     /\ to_uint bytes_filled < 992
@@ -718,7 +733,8 @@ seq 1: (                        (* FIXME: code position *)
   - auto=> &hr |> hs hdvd hne.
     have {hne} [h1 h2] : to_uint bytes_filled{hr} < 992 /\ to_uint input_offset{hr} < 840 by smt().
     rewrite h1 h2 /=.
-    by apply to_uint_good; [by rewrite size_cands size_sub | exact cands_uint_lt].
+    by rewrite /SLH64.protect_64 -(to_uint_nibble_good _ _ (cands_uint_lt _))
+       1:size_cands 1:size_sub.
 
   (* b. compact-store the accepted low half; bytes_filled counts it    *)
   seq > ^bytes_filled<- : (

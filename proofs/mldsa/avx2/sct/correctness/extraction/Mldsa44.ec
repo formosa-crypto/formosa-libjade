@@ -13996,13 +13996,14 @@ module M = {
     var condition_loop:bool;
     var potential_coefficients:W256.t;
     var compare_with_field_modulus:W256.t;
+    var good_bytes:W32.t;
     var good:W64.t;
+    var good_upper:W64.t;
     var lower_coefficients:W128.t;
     var good_lower:W64.t;
     var shuffle_table_idx:W64.t;
     var shuffles:W128.t;
     var upper_coefficients:W128.t;
-    var good_upper:W64.t;
     var condition:bool;
     var byte0:W32.t;
     var byte1:W32.t;
@@ -14036,10 +14037,23 @@ module M = {
       input_offset <- (input_offset + (W64.of_int 24));
       compare_with_field_modulus <-
       (VPCMPGT_8u32 modulus potential_coefficients);
-      compare_with_field_modulus <-
-      (protect_256 compare_with_field_modulus ms);
-      good <- (zeroextu64 (MOVEMASK_8u32 compare_with_field_modulus));
+      good_bytes <- (MOVEMASK_32u8 compare_with_field_modulus);
+      good <- (zeroextu64 good_bytes);
       (* Erased call to declassify *)
+      good <- (protect_64 good ms);
+      good <- (good `>>` (W8.of_int 3));
+      good <- (good `&` (W64.of_int 286331153));
+      good_upper <- good;
+      good_upper <- (good_upper `>>` (W8.of_int 16));
+      good_upper <- (good_upper * (W64.of_int 4680));
+      good_upper <- (good_upper `>>` (W8.of_int 12));
+      good_upper <- (good_upper `&` (W64.of_int 15));
+      good_upper <- (good_upper `<<` (W8.of_int 4));
+      good <- (good `&` (W64.of_int 4369));
+      good <- (good * (W64.of_int 4680));
+      good <- (good `>>` (W8.of_int 12));
+      good <- (good `&` (W64.of_int 15));
+      good <- (good `|` good_upper);
       lower_coefficients <-
       (VEXTRACTI128 potential_coefficients (W8.of_int 0));
       good_lower <- good;
