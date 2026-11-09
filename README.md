@@ -176,3 +176,10 @@ and cycle benchmarks for every commit on `main`.
 ## Contributors
 
 See [CONTRIBUTORS.md](CONTRIBUTORS.md).
+
+## License
+
+Libjade is dual-licensed under [CC0 1.0](LICENSES/CC0-1.0.txt) or
+[Apache 2.0](LICENSES/Apache-2.0.txt), at your option
+(`SPDX-License-Identifier: CC0-1.0 OR Apache-2.0`, see [LICENSE](LICENSE)). The
+submodules of `bench/third_party/` keep their own licenses.

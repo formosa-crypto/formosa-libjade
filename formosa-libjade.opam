@@ -5,7 +5,7 @@ synopsis: "Jasmin implementations and EasyCrypt proofs of ML-KEM and ML-DSA"
 maintainer: "Pierre-Yves Strub <pierre-yves@strub.nu>"
 authors: "Formosa-Crypto"
 homepage: "https://github.com/formosa-crypto"
-license: "Apache-2.0"
+license: "CC0-1.0 OR Apache-2.0"
 dev-repo: "git+https://github.com/formosa-crypto/formosa-libjade.git"
 bug-reports: "https://github.com/formosa-crypto/formosa-libjade/issues"
 
