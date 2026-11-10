@@ -15,12 +15,14 @@ name: checks
 # rebase that changes no file, a rebase merge) reuses that run's record
 # instead, except in a manual run: the toolchain is the flake's, in the tree.
 #
-# Security: a pull request runs this workflow as it is on main
-# (pull_request_target). A PR from this repo runs on every push. A fork's PR
-# runs only when a maintainer, once the PR is reviewed, adds the label
-# "safe to test", and then at the commit it had when labelled; a push to the
-# fork removes the label (safe-to-test.yml). Unreviewed fork code never runs
-# on the self-hosted machines, which refuse it too
+# Security: a PR from this repo runs on every push, with its own version of
+# this workflow (pull_request): its author can write to the repo anyway. A
+# fork's PR runs this workflow as it is on main (pull_request_target), only
+# when a maintainer, once the PR is reviewed, adds the label "safe to test",
+# and then at the commit it had when labelled; a push to the fork removes
+# the label (safe-to-test.yml). The pull_request runs of a fork's PR do
+# nothing; the fork can edit this workflow, but such a run has no secrets
+# and a read-only token, and the self-hosted machines refuse it
 # (.github/runner/job-started.sh). actions/checkout fetches a fork's code
 # only with allow-unsafe-pr-checkout, true in the runs of that label only.
 # The deploy key of the results repo is only used by the publish job, which
@@ -30,24 +32,26 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
   pull_request_target:
-    types: [opened, synchronize, reopened, labeled]
+    types: [labeled]
 
 permissions:
   contents: read
 
-# A PR has its own group, where a new push cancels the run in progress
-# (with pull_request_target, github.ref is the base branch). Any other label
-# than "safe to test" on a fork's PR has a group of its own: labelling a PR
-# cancels nothing.
+# A PR has its own group, where a new push cancels the run in progress: the
+# runs of a PR from this repo, the runs of the label "safe to test" on a
+# fork's PR. Every other run of a PR (any run of a fork's PR but those, any
+# other label) has a group of its own and cancels nothing.
 concurrency:
   group: >-
-    checks-${{ github.event.action == 'labeled'
-               && (github.event.label.name != 'safe to test'
-                   || github.event.pull_request.head.repo.full_name == github.repository)
-               && format('label-{0}', github.run_id)
-               || github.event_name == 'pull_request_target'
+    checks-${{ (github.event_name == 'pull_request'
+                && github.event.pull_request.head.repo.full_name == github.repository
+                || github.event_name == 'pull_request_target'
+                && github.event.label.name == 'safe to test'
+                && github.event.pull_request.head.repo.full_name != github.repository)
                && format('pr-{0}', github.event.pull_request.number)
+               || github.event.pull_request && format('run-{0}', github.run_id)
                || github.ref }}
   cancel-in-progress: true
 
@@ -65,13 +69,13 @@ env:
 jobs:
   # The earlier successful run on the same tree, if any. Every other job needs
   # this one, which runs only for a push, a manual run, a PR from this repo
-  # or a fork's PR labelled "safe to test"; its code is the base branch's.
+  # or a fork's PR labelled "safe to test" (with main's code).
   earlier:
     if: >-
-      github.event_name != 'pull_request_target' ||
-      (github.event.action != 'labeled' &&
+      !github.event.pull_request ||
+      (github.event_name == 'pull_request' &&
        github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.action == 'labeled' && github.event.label.name == 'safe to test' &&
+      (github.event_name == 'pull_request_target' && github.event.label.name == 'safe to test' &&
        github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     permissions:
@@ -261,6 +265,7 @@ jobs:
     if: >-
       !cancelled() && needs.record.result == 'success' &&
       ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       github.event_name == 'pull_request' ||
        github.event_name == 'pull_request_target')
     runs-on: ubuntu-latest
     permissions:

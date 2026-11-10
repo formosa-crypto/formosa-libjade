@@ -2,7 +2,7 @@ name: result-target
 description: >-
   Where a run's record goes in the results repo, from the event (trusted)
   rather than from the artifact (produced by the checked code): a push to
-  main goes to main's history (data/<kind>), a pull_request_target run to
+  main goes to main's history (data/<kind>), the run of a pull request to
   the PR's own space (data/pr/<number>/<kind>), with the PR's merge base for
   the comparison.
 
@@ -38,7 +38,7 @@ runs:
         TITLE: ${{ github.event.pull_request.title }}
       run: |
         set -euo pipefail
-        if [ "$EVENT" = pull_request_target ]; then
+        if [ "$EVENT" = pull_request ] || [ "$EVENT" = pull_request_target ]; then
           mb=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE...$HEAD" \
                  --jq '[.merge_base_commit.sha, .merge_base_commit.commit.committer.date] | @tsv')
           meta=$(MB="$mb" python3 -I -c '

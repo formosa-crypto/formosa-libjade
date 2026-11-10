@@ -11,8 +11,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
   pull_request_target:
-    types: [opened, synchronize, reopened, labeled]
+    types: [labeled]
 
 permissions:
   contents: read
@@ -20,18 +21,20 @@ permissions:
 # GitHub keeps at most one pending run per concurrency group, so a shared
 # group would cancel the queued runs of the other PRs; the runners queue the
 # jobs instead. A PR has its own group, where a new push cancels the run in
-# progress; every other run, including any other label than "safe to test"
-# on a fork's PR, has a group of its own.
+# progress: the runs of a PR from this repo, the runs of the label "safe to
+# test" on a fork's PR. Every other run (any run of a fork's PR but those, any
+# other label, a push, a manual run) has a group of its own.
 concurrency:
   group: >-
-    bench-${{ github.event.action == 'labeled'
-              && (github.event.label.name != 'safe to test'
-                  || github.event.pull_request.head.repo.full_name == github.repository)
-              && format('label-{0}', github.run_id)
-              || github.event_name == 'pull_request_target'
+    bench-${{ (github.event_name == 'pull_request'
+               && github.event.pull_request.head.repo.full_name == github.repository
+               || github.event_name == 'pull_request_target'
+               && github.event.label.name == 'safe to test'
+               && github.event.pull_request.head.repo.full_name != github.repository)
               && format('pr-{0}', github.event.pull_request.number)
+              || github.event.pull_request && format('run-{0}', github.run_id)
               || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
+  cancel-in-progress: true
 
 # The toolchain (jasminc + a pinned C compiler) comes from flake.nix's bench
 # shell, served by the host's shared nix store (MOUNT_NIX=1 on the runner
@@ -40,22 +43,22 @@ concurrency:
 env:
   NIX_CONFIG: 'experimental-features = nix-command flakes'
   BENCHDEV: nix develop .#bench --impure --command
-  HEAD: >-
-    ${{ github.event_name == 'pull_request_target'
-        && github.event.pull_request.head.sha
-        || github.sha }}
+  HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   # The machines that benchmark this commit and those that reuse an earlier
   # run, on a GitHub-hosted runner, so that a reuse waits for no bench
-  # machine. Its code is the base branch's (pull_request_target).
-  # dispatch/push run unconditionally; a PR runs when it is from this repo,
-  # and a fork's PR only when a maintainer, once the PR is reviewed, adds the
-  # label "safe to test" (at the commit it had then; a push to the fork
-  # removes the label, see safe-to-test.yml), so unreviewed fork code never
-  # executes on the self-hosted machines, which refuse it too
-  # (.github/runner/job-started.sh). actions/checkout fetches a fork's code
-  # only with allow-unsafe-pr-checkout, true in the runs of that label only.
+  # machine. dispatch/push run unconditionally; a PR from this repo runs on
+  # every push, with its own version of this workflow (pull_request): its
+  # author can write to the repo anyway. A fork's PR runs this workflow as it
+  # is on main (pull_request_target), only when a maintainer, once the PR is
+  # reviewed, adds the label "safe to test" (at the commit it had then; a push
+  # to the fork removes the label, see safe-to-test.yml). The pull_request
+  # runs of a fork's PR do nothing; the fork can edit this workflow, but such
+  # a run has no secrets and a read-only token, and the self-hosted machines
+  # refuse it (.github/runner/job-started.sh). actions/checkout fetches a
+  # fork's code only with allow-unsafe-pr-checkout, true in the runs of that
+  # label only.
   earlier:
     if: >-
       github.event_name != 'pull_request_target' ||
@@ -144,7 +147,7 @@ jobs:
       - name: Job summary
         env:
           RUNNER: ${{ matrix.runner }}
-          PR: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
+          PR: ${{ github.event.pull_request.number || '' }}
           PUBLISHED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: >-
           $BENCHDEV python3 -I scripts/job-summary.py bench bench/bench.json "$RUNNER"
@@ -172,8 +175,8 @@ jobs:
           path: bench-ok
 
   # The report of the earlier run of a machine, rewritten for this commit, as
-  # this run's artifact. Runs the base branch's code only: the commit is
-  # fetched as data.
+  # this run's artifact. Runs the workflow's code only (main's for a fork's
+  # PR): the commit is fetched as data.
   reuse:
     needs: earlier
     if: needs.earlier.outputs.reused != '[]'
@@ -200,7 +203,7 @@ jobs:
       - name: Job summary
         env:
           RUNNER: ${{ matrix.runner }}
-          PR: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
+          PR: ${{ github.event.pull_request.number || '' }}
           PUBLISHED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: >-
           python3 -I scripts/job-summary.py bench bench/bench.json "$RUNNER"
@@ -217,16 +220,17 @@ jobs:
   # (https://github.com/formosa-crypto/formosa-libjade-results): pushes to main go to main's
   # history (data/bench/<runner>), runs of PRs to that PR's own
   # space (data/pr/<number>/bench/<runner>), with the PR's merge base for the
-  # comparison. A separate job on a GitHub-hosted runner: it runs only this
-  # (base-branch) workflow's code and downloads the artifact as data, so no PR
-  # code ever shares a job with the deploy key, which never reaches a bench
-  # machine either.
+  # comparison. A separate job on a GitHub-hosted runner: it runs only the
+  # workflow's code (main's for a fork's PR) and downloads the artifact as
+  # data, so no benchmarked code shares a job with the deploy key, which never
+  # reaches a bench machine either.
   publish:
     needs: [earlier, bench, reuse]
     if: >-
       !cancelled() && needs.earlier.result == 'success' &&
       !contains(needs.*.result, 'failure') &&
       ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       github.event_name == 'pull_request' ||
        github.event_name == 'pull_request_target')
     strategy:
       matrix:

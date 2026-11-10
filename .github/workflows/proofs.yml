@@ -5,12 +5,14 @@ name: proofs
 # already checked with the same EasyCrypt (a rebase that changes no file, a
 # rebase merge) reuses that run's results instead, except in a manual run.
 #
-# Security: a pull request runs this workflow as it is on main
-# (pull_request_target). A PR from this repo runs on every push. A fork's PR
-# runs only when a maintainer, once the PR is reviewed, adds the label
-# "safe to test", and then at the commit it had when labelled; a push to the
-# fork removes the label (safe-to-test.yml). Unreviewed fork code never runs
-# on the self-hosted machines, which refuse it too
+# Security: a PR from this repo runs on every push, with its own version of
+# this workflow (pull_request): its author can write to the repo anyway. A
+# fork's PR runs this workflow as it is on main (pull_request_target), only
+# when a maintainer, once the PR is reviewed, adds the label "safe to test",
+# and then at the commit it had when labelled; a push to the fork removes
+# the label (safe-to-test.yml). The pull_request runs of a fork's PR do
+# nothing; the fork can edit this workflow, but such a run has no secrets
+# and a read-only token, and the self-hosted machines refuse it
 # (.github/runner/job-started.sh). actions/checkout fetches a fork's code
 # only with allow-unsafe-pr-checkout, true in the runs of that label only.
 # The deploy key of the results repo is only used by the publish job, which
@@ -20,24 +22,26 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
   pull_request_target:
-    types: [opened, synchronize, reopened, labeled]
+    types: [labeled]
 
 permissions:
   contents: read
 
-# A PR has its own group, where a new push cancels the run in progress
-# (with pull_request_target, github.ref is the base branch). Any other label
-# than "safe to test" on a fork's PR has a group of its own: labelling a PR
-# cancels nothing.
+# A PR has its own group, where a new push cancels the run in progress: the
+# runs of a PR from this repo, the runs of the label "safe to test" on a
+# fork's PR. Every other run of a PR (any run of a fork's PR but those, any
+# other label) has a group of its own and cancels nothing.
 concurrency:
   group: >-
-    proofs-${{ github.event.action == 'labeled'
-               && (github.event.label.name != 'safe to test'
-                   || github.event.pull_request.head.repo.full_name == github.repository)
-               && format('label-{0}', github.run_id)
-               || github.event_name == 'pull_request_target'
+    proofs-${{ (github.event_name == 'pull_request'
+                && github.event.pull_request.head.repo.full_name == github.repository
+                || github.event_name == 'pull_request_target'
+                && github.event.label.name == 'safe to test'
+                && github.event.pull_request.head.repo.full_name != github.repository)
                && format('pr-{0}', github.event.pull_request.number)
+               || github.event.pull_request && format('run-{0}', github.run_id)
                || github.ref }}
   cancel-in-progress: true
 
@@ -58,14 +62,14 @@ jobs:
   # it, the marker of the run (from the EasyCrypt it used) is not found and
   # the proofs are checked again. Every other job needs this one, which runs
   # only for a push, a manual run, a PR from this repo or a fork's PR labelled
-  # "safe to test"; its code is the base branch's, the commit's opam file is
-  # read as data.
+  # "safe to test"; for a fork's PR, its code is main's and the commit's opam
+  # file is read as data.
   earlier:
     if: >-
-      github.event_name != 'pull_request_target' ||
-      (github.event.action != 'labeled' &&
+      !github.event.pull_request ||
+      (github.event_name == 'pull_request' &&
        github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.action == 'labeled' && github.event.label.name == 'safe to test' &&
+      (github.event_name == 'pull_request_target' && github.event.label.name == 'safe to test' &&
        github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     permissions:
@@ -155,7 +159,7 @@ jobs:
 
       - name: Job summary
         env:
-          PR: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
+          PR: ${{ github.event.pull_request.number || '' }}
           PUBLISHED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: $ECDEV python3 -I scripts/job-summary.py proofs proofs-timing.json >> "$GITHUB_STEP_SUMMARY"
 
@@ -210,7 +214,7 @@ jobs:
         run: python3 -I scripts/ci-retarget.py proofs-timing.json
       - name: Job summary
         env:
-          PR: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
+          PR: ${{ github.event.pull_request.number || '' }}
           PUBLISHED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: python3 -I scripts/job-summary.py proofs proofs-timing.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
@@ -232,6 +236,7 @@ jobs:
     if: >-
       !cancelled() &&
       ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       github.event_name == 'pull_request' ||
        github.event_name == 'pull_request_target') &&
       (needs.check-ec-proofs.result == 'success' || needs.reuse.result == 'success')
     runs-on: ubuntu-latest

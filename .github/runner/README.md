@@ -22,15 +22,17 @@ A self-hosted runner executes job code on your machine, so on a **public**
 repo it is an RCE vector. The bench, proofs and checks workflows are built to
 contain that:
 
-- **No unreviewed fork code runs** (the primary defense). PR runs are gated
-  on `head.repo == this repo`, so branches pushed into the repo by
-  collaborators are checked on every push. A fork's PR runs only when a
-  maintainer, once the PR is reviewed, adds the label `safe to test` (only
-  members with triage or write access can label): the `labeled` event runs
-  the workflows at the commit the PR had then. A push to the fork removes the
-  label ([safe-to-test.yml](../workflows/safe-to-test.yml)), so new commits
-  wait for a new review and a new label. Before labelling, check that the
-  PR's head is the commit you reviewed.
+- **No unreviewed fork code runs** (the primary defense). A PR from a branch
+  of this repo runs on every push, with its own version of the workflows
+  (`pull_request`, gated on `head.repo == this repo`): a change to the CI
+  tests itself, and its author, a collaborator, can push code to these
+  runners anyway. A fork's PR runs only when a maintainer, once the PR is
+  reviewed, adds the label `safe to test` (only members with triage or write
+  access can label): the `labeled` event runs the workflows as they are on
+  main (`pull_request_target`) at the commit the PR had then. A push to the
+  fork removes the label ([safe-to-test.yml](../workflows/safe-to-test.yml)),
+  so new commits wait for a new review and a new label. Before labelling,
+  check that the PR's head is the commit you reviewed.
 - **The runner refuses forks too.** A fork's PR can add or edit a workflow
   (`on: pull_request`) that targets these runners; GitHub only asks a
   maintainer to approve it. The image's pre-job script,
@@ -38,10 +40,12 @@ contain that:
   except the `pull_request_target` runs started by the `safe to test` label,
   and every event other than a push, a manual run or a pull request, before
   the job's first step.
-- **The PR can't weaken the gate.** `pull_request_target` runs the workflow file
-  from the **base branch**, not the PR's copy, so a PR cannot edit the gate or
-  steps to bypass these checks. (It can still change the `src/`/`bench/` code we
-  build and run — that is what the gate and the review above contain.)
+- **A fork can't weaken the gate.** The labelled runs use the workflow files of
+  **main** (`pull_request_target`), not the PR's copy, so a fork's PR cannot
+  edit the gate or steps to bypass these checks. (It can still change the
+  `src/`/`bench/` code we build and run — that is what the label and the
+  review above contain.) Its own `pull_request` runs may drop the gate, but
+  they get no secrets and a read-only token, and these runners refuse them.
 - **Nothing to exfiltrate.** A `pull_request_target` job runs in the trusted base
   context and *could* read `secrets.*` by default, but the jobs that run the
   checked code reference **no secrets** and have a read-only `GITHUB_TOKEN`
