@@ -1,0 +1,28 @@
+name: safe-to-test
+
+# A fork's pull request runs on the self-hosted machines only once a maintainer
+# has reviewed it and added the label "safe to test" (bench.yml, checks.yml,
+# proofs.yml), at the commit it had then. A push to the fork removes the label,
+# so that new commits run only once reviewed and labelled again. This job runs
+# no code of the pull request.
+
+on:
+  pull_request_target:
+    types: [synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  unlabel:
+    if: >-
+      github.event.pull_request.head.repo.full_name != github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'safe to test')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Remove the label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/$PR/labels/safe%20to%20test"

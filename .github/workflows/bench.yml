@@ -12,7 +12,7 @@ on:
   push:
     branches: [main]
   pull_request_target:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   contents: read
@@ -20,10 +20,15 @@ permissions:
 # GitHub keeps at most one pending run per concurrency group, so a shared
 # group would cancel the queued runs of the other PRs; the runners queue the
 # jobs instead. A PR has its own group, where a new push cancels the run in
-# progress; every other run has a group of its own.
+# progress; every other run, including any other label than "safe to test"
+# on a fork's PR, has a group of its own.
 concurrency:
   group: >-
-    bench-${{ github.event_name == 'pull_request_target'
+    bench-${{ github.event.action == 'labeled'
+              && (github.event.label.name != 'safe to test'
+                  || github.event.pull_request.head.repo.full_name == github.repository)
+              && format('label-{0}', github.run_id)
+              || github.event_name == 'pull_request_target'
               && format('pr-{0}', github.event.pull_request.number)
               || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
@@ -44,13 +49,19 @@ jobs:
   # The machines that benchmark this commit and those that reuse an earlier
   # run, on a GitHub-hosted runner, so that a reuse waits for no bench
   # machine. Its code is the base branch's (pull_request_target).
-  # dispatch/push run unconditionally; a PR runs only when it is from this
-  # repo (never a fork), so untrusted fork code can never execute on the
-  # self-hosted machine.
+  # dispatch/push run unconditionally; a PR runs when it is from this repo,
+  # and a fork's PR only when a maintainer, once the PR is reviewed, adds the
+  # label "safe to test" (at the commit it had then; a push to the fork
+  # removes the label, see safe-to-test.yml), so unreviewed fork code never
+  # executes on the self-hosted machines, which refuse it too
+  # (.github/runner/job-started.sh).
   earlier:
     if: >-
       github.event_name != 'pull_request_target' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      (github.event.action != 'labeled' &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event.action == 'labeled' && github.event.label.name == 'safe to test' &&
+       github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -39,6 +39,12 @@ RUN set -eux; \
     ./bin/installdependencies.sh; \
     chown -R runner:runner /home/runner
 
+# Pre-job check: no job of a fork's pull request runs here (see job-started.sh). Owned
+# by root and outside the agent's directory, so the jobs cannot modify it.
+COPY job-started.sh /opt/runner-hooks/job-started.sh
+RUN chmod 0755 /opt/runner-hooks/job-started.sh
+ENV ACTIONS_RUNNER_HOOK_JOB_STARTED=/opt/runner-hooks/job-started.sh
+
 USER runner
 COPY --chown=runner:runner entrypoint.sh /home/runner/entrypoint.sh
 ENTRYPOINT ["/home/runner/entrypoint.sh"]

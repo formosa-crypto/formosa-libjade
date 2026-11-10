@@ -22,14 +22,26 @@ A self-hosted runner executes job code on your machine, so on a **public**
 repo it is an RCE vector. The bench, proofs and checks workflows are built to
 contain that:
 
-- **No fork code ever runs** (the primary defense). PR runs are gated on
-  `head.repo == this repo`, so only branches pushed into the repo by
-  collaborators are checked. A fork PR is skipped: once reviewed, its branch
-  is pushed to the repo and the workflows are run on it by hand.
+- **No unreviewed fork code runs** (the primary defense). PR runs are gated
+  on `head.repo == this repo`, so branches pushed into the repo by
+  collaborators are checked on every push. A fork's PR runs only when a
+  maintainer, once the PR is reviewed, adds the label `safe to test` (only
+  members with triage or write access can label): the `labeled` event runs
+  the workflows at the commit the PR had then. A push to the fork removes the
+  label ([safe-to-test.yml](../workflows/safe-to-test.yml)), so new commits
+  wait for a new review and a new label. Before labelling, check that the
+  PR's head is the commit you reviewed.
+- **The runner refuses forks too.** A fork's PR can add or edit a workflow
+  (`on: pull_request`) that targets these runners; GitHub only asks a
+  maintainer to approve it. The image's pre-job script,
+  [job-started.sh](job-started.sh), fails every job of a fork's pull request
+  except the `pull_request_target` runs started by the `safe to test` label,
+  and every event other than a push, a manual run or a pull request, before
+  the job's first step.
 - **The PR can't weaken the gate.** `pull_request_target` runs the workflow file
   from the **base branch**, not the PR's copy, so a PR cannot edit the gate or
   steps to bypass these checks. (It can still change the `src/`/`bench/` code we
-  build and run — that is what the same-repo gate above contains.)
+  build and run — that is what the gate and the review above contain.)
 - **Nothing to exfiltrate.** A `pull_request_target` job runs in the trusted base
   context and *could* read `secrets.*` by default, but the jobs that run the
   checked code reference **no secrets** and have a read-only `GITHUB_TOKEN`
@@ -46,8 +58,10 @@ Operational rules:
 - Only collaborators push branches to the repo: review who has write access.
 - Run the agent as a **dedicated unprivileged user** (the container path below
   does this for you), and restrict its network egress.
-- Do **not** relax the `head.repo == this repo` gate to bench forks unless you
-  fully accept arbitrary-code execution on this host.
+- Add `safe to test` to a fork's PR only after reading all of its changes: the
+  label lets that code run on these hosts.
+- Do **not** relax the `head.repo == this repo` gate or the label check
+  further unless you fully accept arbitrary-code execution on this host.
 
 ## Linux host — containerized runner
 
