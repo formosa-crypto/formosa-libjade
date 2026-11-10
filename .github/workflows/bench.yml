@@ -54,7 +54,8 @@ jobs:
   # label "safe to test" (at the commit it had then; a push to the fork
   # removes the label, see safe-to-test.yml), so unreviewed fork code never
   # executes on the self-hosted machines, which refuse it too
-  # (.github/runner/job-started.sh).
+  # (.github/runner/job-started.sh). actions/checkout fetches a fork's code
+  # only with allow-unsafe-pr-checkout, true in the runs of that label only.
   earlier:
     if: >-
       github.event_name != 'pull_request_target' ||
@@ -113,6 +114,7 @@ jobs:
           submodules: true
           persist-credentials: false
           ref: ${{ env.HEAD }}
+          allow-unsafe-pr-checkout: ${{ github.event.label.name == 'safe to test' }}
 
       # Builds (or reuses from the host store) the bench toolchain.
       - name: Toolchain
