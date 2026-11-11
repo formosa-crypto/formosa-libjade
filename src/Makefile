@@ -10,6 +10,7 @@
 
 JASMINC  ?= jasminc
 JASMINCT ?= jasmin-ct
+PYTHON   ?= python3
 ARCH     ?= x86-64
 JFLAGS   ?=
 JCTFLAGS ?=
@@ -165,6 +166,36 @@ $(CT_MLKEM):  ct-mlkem%:  $(MLKEM)/%/jmlkem.jazz
 
 $(SCT_MLKEM): sct-mlkem%: $(MLKEM)/%/jmlkem.jazz
 	$(JASMINCT) --sct --doit --arch=$(ARCH) $(JCTFLAGS) $(MLKEM_INC) $<
+
+# ==========================================================================
+#  Instruction-set checks of every exporting program of src/ (ML-KEM and
+#  ML-DSA entry points, Keccak test programs): ../scripts/check_isa.py.
+#
+#    make check-vex          # SIMD instructions are VEX-encoded (jasminc)
+#    make check-doit         # only DOIT instructions touch secrets (jasmin-ct)
+#    make check-isa          # both
+#
+#  check-doit is stricter than `ct` above: the signatures that jasmin-ct
+#  infers must be the same with and without --doit, and it also covers the
+#  Keccak test programs. It needs the DOIT classification of the pinned
+#  Jasmin (2026.09.0); a jasmin-ct that treats ROL as non-DOIT (before
+#  2026.03.2) is detected and the check stops without a verdict.
+#
+#  STATUS: src/fips202 and ML-DSA pass both, ML-KEM passes check-doit.
+#  ML-KEM still emits legacy movq/movd: MOVV in gen_matrix.jinc, and for
+#  1024 the (64u)/(32u) casts in compress.jinc. Not run in CI.
+# ==========================================================================
+
+.PHONY: check-isa check-vex check-doit
+
+check-isa:
+	$(PYTHON) ../scripts/check_isa.py all --jasminc "$(JASMINC)" --jasmin-ct "$(JASMINCT)"
+
+check-vex:
+	$(PYTHON) ../scripts/check_isa.py vex --jasminc "$(JASMINC)"
+
+check-doit:
+	$(PYTHON) ../scripts/check_isa.py doit --jasmin-ct "$(JASMINCT)"
 
 clean:
 	rm -rf $(BUILD)

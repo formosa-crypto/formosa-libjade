@@ -130,14 +130,18 @@ while (   buf = _buf
 - wp; ecall (buf_rejection_filter48_h pol counter buf buf_offset).
   auto => &hr |> haux hinv hd hle hlt.
   have [ge0c hb] := rej_inv_bound _ _ _ _ _ _ _ hinv.
-  have hbo : to_uint buf_offset{hr} <= 432 by case: hinv => /#.
+  have hbo : to_uint buf_offset{hr} <= 432.
+  + by case/dvdzP: hd => k hk; case: hinv => /#.
   split; 1: smt().
   move=> _ _ [rp rc] /= hrp ->.
   have hl := size_rejection16_subl buf{hr} (to_uint buf_offset{hr})
                (to_uint buf_offset{hr} + 48) _; 1: smt().
   rewrite ultE to_uintD_small /= 1:/# of_uintK modz_small 1:#smt:(size_ge0).
   split; 1: by apply (rej_inv_step 48 _ _ _ _ _ rp _ _ _ _ _ hinv hrp) => // /#.
-  by case: hinv => /#.
+  split; last smt().
+  rewrite (: to_uint buf_offset{hr} + 48 - to_uint _buf_offset
+             = to_uint buf_offset{hr} - to_uint _buf_offset + 48) 1:#ring.
+  by apply dvdzD.
 auto => &hr |> hs.
 split.
 - rewrite /auxdata_ok /= pack32_sample_load_shuffle /= ultE /=.

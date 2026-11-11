@@ -13,6 +13,7 @@ from JazzEC require import Keccak1600_Jazz.
 from JazzEC require import Array4 Array5 Array7 Array24 Array25.
 
 require import Avx2_extra.
+require import XArray25.
 
 lemma stavx2_from_st25_iota st rc:
  (stavx2_from_st25 st).[0 <- (stavx2_from_st25 st).[0] `^` VPBROADCAST_4u64 rc]
@@ -255,15 +256,25 @@ hoare stavx2_unpack_h _st:
  : state=_st ==> res = stavx2_to_st25 _st.
 proof.
 proc.
+proc change 1: { st <- BSWAS_25u64_128.sliceset st (0*8*8) (truncateu128 state.[0]); };
+ 1: by auto => /> &hr; have /= h := BSWAS_25u64_128_slicesetE st{hr} (0*8); rewrite h.
+proc change 2: { st <- sliceset25_64_256 st (3*8*8) state.[2]; };
+ 1: by auto => /#.
 proc change 3: { st <- sliceset25_64_256 st (1*8*8) state.[1]; };
  1: by auto => /#.
-proc change 11: { st <- sliceset25_64_256 st (6*8*8) t256_4; };
+proc change 9: { st <- sliceset25_64_256 st (6*8*8) t256_4; };
  1: by auto => /#.
-proc change 15: { st <- sliceset25_64_256 st (11*8*8) t256_4; };
+proc change 10: { st <- BSWAS_25u64_128.sliceset st (10*8*8) (truncateu128 state.[2]); };
+ 1: by auto => /> &hr; have /= h := BSWAS_25u64_128_slicesetE st{hr} (10*8); rewrite h.
+proc change 11: { st <- sliceset25_64_256 st (12*8*8) state.[2]; };
  1: by auto => /#.
-proc change 18: { st <- sliceset25_64_256 st (16*8*8) t256_4; };
+proc change 13: { st <- sliceset25_64_256 st (11*8*8) t256_4; };
  1: by auto => /#.
-proc change 21: { st <- sliceset25_64_256 st (21*8*8) t256_4; };
+proc change 14: { st <- BSWAS_25u64_128.sliceset st (19*8*8) (truncateu128 state.[2]); };
+ 1: by auto => /> &hr; have /= h := BSWAS_25u64_128_slicesetE st{hr} (19*8); rewrite h.
+proc change 16: { st <- sliceset25_64_256 st (16*8*8) t256_4; };
+ 1: by auto => /#.
+proc change 18: { st <- sliceset25_64_256 st (21*8*8) t256_4; };
  1: by auto => /#.
 by circuit.
 qed.

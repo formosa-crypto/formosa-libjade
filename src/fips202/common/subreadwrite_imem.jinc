@@ -304,12 +304,13 @@ inline fn __m_ilen_write_upto16
       LEN -= 16;
     } else {
       if (8 <=s LEN) {
-        [:u64 (64u) buf] = #MOVV(w);
+        [:u64 (64u) buf] = #VPEXTR_64(w, 0);
         buf += 8;
         LEN -= 8;
-        w = #VPUNPCKH_2u64(w, w);
+        t64 = #VPEXTR_64(w, 1);
+      } else {
+        t64 = #VPEXTR_64(w, 0);
       }
-      t64 = #MOVV_64(w);
       buf, LEN = __m_ilen_write_upto8(buf, LEN, t64);
     }
   }

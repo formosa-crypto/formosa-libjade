@@ -645,7 +645,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$333:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$326
 	cmpq	$256, %rbp
@@ -654,19 +654,19 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$330
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$312
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$332:
 	jmp 	.L__verify_internal$312
 .L__verify_internal$330:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$331:
 	jmp 	.L__verify_internal$312
 .L__verify_internal$328:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$329:
 	jmp 	.L__verify_internal$312
 .L__verify_internal$326:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$327:
 	jmp 	.L__verify_internal$312
 .L__verify_internal$313:
@@ -707,7 +707,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__verify_internal$321:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$314
 	cmpq	$256, %rbp
@@ -716,22 +716,22 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$318
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$312
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$320:
 	jmp 	.L__verify_internal$312
 .L__verify_internal$318:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$319:
 	jmp 	.L__verify_internal$312
 .L__verify_internal$316:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$317:
 	jmp 	.L__verify_internal$312
 .L__verify_internal$314:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$315:
 .L__verify_internal$312:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__verify_internal$313
 	movw	$4, 63056(%rsp)
 	movw	$256, 63058(%rsp)
@@ -803,7 +803,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$302:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$295
 	cmpq	$256, %rbp
@@ -812,19 +812,19 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$299
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$281
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$301:
 	jmp 	.L__verify_internal$281
 .L__verify_internal$299:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$300:
 	jmp 	.L__verify_internal$281
 .L__verify_internal$297:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$298:
 	jmp 	.L__verify_internal$281
 .L__verify_internal$295:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$296:
 	jmp 	.L__verify_internal$281
 .L__verify_internal$282:
@@ -865,7 +865,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__verify_internal$290:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$283
 	cmpq	$256, %rbp
@@ -874,22 +874,22 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$287
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$281
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$289:
 	jmp 	.L__verify_internal$281
 .L__verify_internal$287:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$288:
 	jmp 	.L__verify_internal$281
 .L__verify_internal$285:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$286:
 	jmp 	.L__verify_internal$281
 .L__verify_internal$283:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$284:
 .L__verify_internal$281:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__verify_internal$282
 	movw	$259, 63056(%rsp)
 	movw	$260, 63058(%rsp)
@@ -961,7 +961,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$271:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$264
 	cmpq	$256, %rbp
@@ -970,19 +970,19 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$268
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$250
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$270:
 	jmp 	.L__verify_internal$250
 .L__verify_internal$268:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$269:
 	jmp 	.L__verify_internal$250
 .L__verify_internal$266:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$267:
 	jmp 	.L__verify_internal$250
 .L__verify_internal$264:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$265:
 	jmp 	.L__verify_internal$250
 .L__verify_internal$251:
@@ -1023,7 +1023,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__verify_internal$259:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$252
 	cmpq	$256, %rbp
@@ -1032,22 +1032,22 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$256
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$250
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$258:
 	jmp 	.L__verify_internal$250
 .L__verify_internal$256:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$257:
 	jmp 	.L__verify_internal$250
 .L__verify_internal$254:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$255:
 	jmp 	.L__verify_internal$250
 .L__verify_internal$252:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$253:
 .L__verify_internal$250:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__verify_internal$251
 	movw	$514, 63056(%rsp)
 	movw	$515, 63058(%rsp)
@@ -1119,7 +1119,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$240:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$233
 	cmpq	$256, %rbp
@@ -1128,19 +1128,19 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$237
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$219
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$239:
 	jmp 	.L__verify_internal$219
 .L__verify_internal$237:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$238:
 	jmp 	.L__verify_internal$219
 .L__verify_internal$235:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$236:
 	jmp 	.L__verify_internal$219
 .L__verify_internal$233:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$234:
 	jmp 	.L__verify_internal$219
 .L__verify_internal$220:
@@ -1181,7 +1181,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__verify_internal$228:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$221
 	cmpq	$256, %rbp
@@ -1190,22 +1190,22 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$225
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$219
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$227:
 	jmp 	.L__verify_internal$219
 .L__verify_internal$225:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$226:
 	jmp 	.L__verify_internal$219
 .L__verify_internal$223:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$224:
 	jmp 	.L__verify_internal$219
 .L__verify_internal$221:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$222:
 .L__verify_internal$219:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__verify_internal$220
 	movw	$769, 63056(%rsp)
 	movw	$770, 63058(%rsp)
@@ -1277,7 +1277,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$209:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$202
 	cmpq	$256, %rbp
@@ -1286,19 +1286,19 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$206
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$188
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$208:
 	jmp 	.L__verify_internal$188
 .L__verify_internal$206:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$207:
 	jmp 	.L__verify_internal$188
 .L__verify_internal$204:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$205:
 	jmp 	.L__verify_internal$188
 .L__verify_internal$202:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$203:
 	jmp 	.L__verify_internal$188
 .L__verify_internal$189:
@@ -1339,7 +1339,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__verify_internal$197:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$190
 	cmpq	$256, %rbp
@@ -1348,22 +1348,22 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$194
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$188
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$196:
 	jmp 	.L__verify_internal$188
 .L__verify_internal$194:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$195:
 	jmp 	.L__verify_internal$188
 .L__verify_internal$192:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$193:
 	jmp 	.L__verify_internal$188
 .L__verify_internal$190:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$191:
 .L__verify_internal$188:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__verify_internal$189
 	movw	$1024, 63056(%rsp)
 	movw	$1025, 63058(%rsp)
@@ -1435,7 +1435,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$178:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$171
 	cmpq	$256, %rbp
@@ -1444,19 +1444,19 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$175
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$157
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$177:
 	jmp 	.L__verify_internal$157
 .L__verify_internal$175:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$176:
 	jmp 	.L__verify_internal$157
 .L__verify_internal$173:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$174:
 	jmp 	.L__verify_internal$157
 .L__verify_internal$171:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$172:
 	jmp 	.L__verify_internal$157
 .L__verify_internal$158:
@@ -1497,7 +1497,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__verify_internal$166:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$159
 	cmpq	$256, %rbp
@@ -1506,22 +1506,22 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$163
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$157
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$165:
 	jmp 	.L__verify_internal$157
 .L__verify_internal$163:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$164:
 	jmp 	.L__verify_internal$157
 .L__verify_internal$161:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$162:
 	jmp 	.L__verify_internal$157
 .L__verify_internal$159:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$160:
 .L__verify_internal$157:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__verify_internal$158
 	movw	$1028, 63056(%rsp)
 	movw	$1280, 63058(%rsp)
@@ -1593,7 +1593,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$147:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$140
 	cmpq	$256, %rbp
@@ -1602,19 +1602,19 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$144
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$126
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$146:
 	jmp 	.L__verify_internal$126
 .L__verify_internal$144:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$145:
 	jmp 	.L__verify_internal$126
 .L__verify_internal$142:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$143:
 	jmp 	.L__verify_internal$126
 .L__verify_internal$140:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$141:
 	jmp 	.L__verify_internal$126
 .L__verify_internal$127:
@@ -1655,7 +1655,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__verify_internal$135:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$128
 	cmpq	$256, %rbp
@@ -1664,22 +1664,22 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$132
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$126
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$134:
 	jmp 	.L__verify_internal$126
 .L__verify_internal$132:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$133:
 	jmp 	.L__verify_internal$126
 .L__verify_internal$130:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$131:
 	jmp 	.L__verify_internal$126
 .L__verify_internal$128:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$129:
 .L__verify_internal$126:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__verify_internal$127
 	movw	$1283, 63056(%rsp)
 	movw	$1284, 63058(%rsp)
@@ -1749,7 +1749,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__verify_internal$116:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$109
 	cmpq	$256, %rbp
@@ -1758,19 +1758,19 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$113
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$95
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$115:
 	jmp 	.L__verify_internal$95
 .L__verify_internal$113:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$114:
 	jmp 	.L__verify_internal$95
 .L__verify_internal$111:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$112:
 	jmp 	.L__verify_internal$95
 .L__verify_internal$109:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$110:
 	jmp 	.L__verify_internal$95
 .L__verify_internal$96:
@@ -1811,7 +1811,7 @@ ml_dsa_65_keygen:
 	leaq	2208(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__verify_internal$104:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__verify_internal$97
 	cmpq	$256, %rbp
@@ -1820,22 +1820,22 @@ ml_dsa_65_keygen:
 	jb  	.L__verify_internal$101
 	cmpq	$256, %r8
 	jnb 	.L__verify_internal$95
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$103:
 	jmp 	.L__verify_internal$95
 .L__verify_internal$101:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$102:
 	jmp 	.L__verify_internal$95
 .L__verify_internal$99:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$100:
 	jmp 	.L__verify_internal$95
 .L__verify_internal$97:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__verify_internal$98:
 .L__verify_internal$95:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__verify_internal$96
 	leaq	8736(%rsp), %rcx
 	call	.Lrow_vector__ntt$1
@@ -2892,7 +2892,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$439:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$432
 	cmpq	$256, %rbp
@@ -2901,19 +2901,19 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$436
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$418
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$438:
 	jmp 	.L__sign_internal$418
 .L__sign_internal$436:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$437:
 	jmp 	.L__sign_internal$418
 .L__sign_internal$434:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$435:
 	jmp 	.L__sign_internal$418
 .L__sign_internal$432:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$433:
 	jmp 	.L__sign_internal$418
 .L__sign_internal$419:
@@ -2954,7 +2954,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__sign_internal$427:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$420
 	cmpq	$256, %rbp
@@ -2963,22 +2963,22 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$424
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$418
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$426:
 	jmp 	.L__sign_internal$418
 .L__sign_internal$424:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$425:
 	jmp 	.L__sign_internal$418
 .L__sign_internal$422:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$423:
 	jmp 	.L__sign_internal$418
 .L__sign_internal$420:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$421:
 .L__sign_internal$418:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__sign_internal$419
 	movw	$4, 117096(%rsp)
 	movw	$256, 117098(%rsp)
@@ -3050,7 +3050,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$408:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$401
 	cmpq	$256, %rbp
@@ -3059,19 +3059,19 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$405
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$387
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$407:
 	jmp 	.L__sign_internal$387
 .L__sign_internal$405:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$406:
 	jmp 	.L__sign_internal$387
 .L__sign_internal$403:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$404:
 	jmp 	.L__sign_internal$387
 .L__sign_internal$401:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$402:
 	jmp 	.L__sign_internal$387
 .L__sign_internal$388:
@@ -3112,7 +3112,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__sign_internal$396:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$389
 	cmpq	$256, %rbp
@@ -3121,22 +3121,22 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$393
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$387
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$395:
 	jmp 	.L__sign_internal$387
 .L__sign_internal$393:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$394:
 	jmp 	.L__sign_internal$387
 .L__sign_internal$391:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$392:
 	jmp 	.L__sign_internal$387
 .L__sign_internal$389:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$390:
 .L__sign_internal$387:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__sign_internal$388
 	movw	$259, 117096(%rsp)
 	movw	$260, 117098(%rsp)
@@ -3208,7 +3208,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$377:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$370
 	cmpq	$256, %rbp
@@ -3217,19 +3217,19 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$374
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$356
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$376:
 	jmp 	.L__sign_internal$356
 .L__sign_internal$374:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$375:
 	jmp 	.L__sign_internal$356
 .L__sign_internal$372:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$373:
 	jmp 	.L__sign_internal$356
 .L__sign_internal$370:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$371:
 	jmp 	.L__sign_internal$356
 .L__sign_internal$357:
@@ -3270,7 +3270,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__sign_internal$365:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$358
 	cmpq	$256, %rbp
@@ -3279,22 +3279,22 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$362
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$356
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$364:
 	jmp 	.L__sign_internal$356
 .L__sign_internal$362:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$363:
 	jmp 	.L__sign_internal$356
 .L__sign_internal$360:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$361:
 	jmp 	.L__sign_internal$356
 .L__sign_internal$358:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$359:
 .L__sign_internal$356:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__sign_internal$357
 	movw	$514, 117096(%rsp)
 	movw	$515, 117098(%rsp)
@@ -3366,7 +3366,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$346:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$339
 	cmpq	$256, %rbp
@@ -3375,19 +3375,19 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$343
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$325
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$345:
 	jmp 	.L__sign_internal$325
 .L__sign_internal$343:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$344:
 	jmp 	.L__sign_internal$325
 .L__sign_internal$341:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$342:
 	jmp 	.L__sign_internal$325
 .L__sign_internal$339:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$340:
 	jmp 	.L__sign_internal$325
 .L__sign_internal$326:
@@ -3428,7 +3428,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__sign_internal$334:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$327
 	cmpq	$256, %rbp
@@ -3437,22 +3437,22 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$331
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$325
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$333:
 	jmp 	.L__sign_internal$325
 .L__sign_internal$331:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$332:
 	jmp 	.L__sign_internal$325
 .L__sign_internal$329:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$330:
 	jmp 	.L__sign_internal$325
 .L__sign_internal$327:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$328:
 .L__sign_internal$325:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__sign_internal$326
 	movw	$769, 117096(%rsp)
 	movw	$770, 117098(%rsp)
@@ -3524,7 +3524,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$315:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$308
 	cmpq	$256, %rbp
@@ -3533,19 +3533,19 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$312
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$294
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$314:
 	jmp 	.L__sign_internal$294
 .L__sign_internal$312:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$313:
 	jmp 	.L__sign_internal$294
 .L__sign_internal$310:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$311:
 	jmp 	.L__sign_internal$294
 .L__sign_internal$308:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$309:
 	jmp 	.L__sign_internal$294
 .L__sign_internal$295:
@@ -3586,7 +3586,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__sign_internal$303:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$296
 	cmpq	$256, %rbp
@@ -3595,22 +3595,22 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$300
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$294
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$302:
 	jmp 	.L__sign_internal$294
 .L__sign_internal$300:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$301:
 	jmp 	.L__sign_internal$294
 .L__sign_internal$298:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$299:
 	jmp 	.L__sign_internal$294
 .L__sign_internal$296:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$297:
 .L__sign_internal$294:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__sign_internal$295
 	movw	$1024, 117096(%rsp)
 	movw	$1025, 117098(%rsp)
@@ -3682,7 +3682,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$284:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$277
 	cmpq	$256, %rbp
@@ -3691,19 +3691,19 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$281
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$263
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$283:
 	jmp 	.L__sign_internal$263
 .L__sign_internal$281:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$282:
 	jmp 	.L__sign_internal$263
 .L__sign_internal$279:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$280:
 	jmp 	.L__sign_internal$263
 .L__sign_internal$277:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$278:
 	jmp 	.L__sign_internal$263
 .L__sign_internal$264:
@@ -3744,7 +3744,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__sign_internal$272:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$265
 	cmpq	$256, %rbp
@@ -3753,22 +3753,22 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$269
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$263
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$271:
 	jmp 	.L__sign_internal$263
 .L__sign_internal$269:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$270:
 	jmp 	.L__sign_internal$263
 .L__sign_internal$267:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$268:
 	jmp 	.L__sign_internal$263
 .L__sign_internal$265:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$266:
 .L__sign_internal$263:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__sign_internal$264
 	movw	$1028, 117096(%rsp)
 	movw	$1280, 117098(%rsp)
@@ -3840,7 +3840,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$253:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$246
 	cmpq	$256, %rbp
@@ -3849,19 +3849,19 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$250
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$232
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$252:
 	jmp 	.L__sign_internal$232
 .L__sign_internal$250:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$251:
 	jmp 	.L__sign_internal$232
 .L__sign_internal$248:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$249:
 	jmp 	.L__sign_internal$232
 .L__sign_internal$246:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$247:
 	jmp 	.L__sign_internal$232
 .L__sign_internal$233:
@@ -3902,7 +3902,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__sign_internal$241:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$234
 	cmpq	$256, %rbp
@@ -3911,22 +3911,22 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$238
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$232
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$240:
 	jmp 	.L__sign_internal$232
 .L__sign_internal$238:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$239:
 	jmp 	.L__sign_internal$232
 .L__sign_internal$236:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$237:
 	jmp 	.L__sign_internal$232
 .L__sign_internal$234:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$235:
 .L__sign_internal$232:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__sign_internal$233
 	movw	$1283, 117096(%rsp)
 	movw	$1284, 117098(%rsp)
@@ -3996,7 +3996,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__sign_internal$222:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$215
 	cmpq	$256, %rbp
@@ -4005,19 +4005,19 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$219
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$201
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$221:
 	jmp 	.L__sign_internal$201
 .L__sign_internal$219:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$220:
 	jmp 	.L__sign_internal$201
 .L__sign_internal$217:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$218:
 	jmp 	.L__sign_internal$201
 .L__sign_internal$215:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$216:
 	jmp 	.L__sign_internal$201
 .L__sign_internal$202:
@@ -4058,7 +4058,7 @@ ml_dsa_65_keygen:
 	leaq	5024(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__sign_internal$210:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__sign_internal$203
 	cmpq	$256, %rbp
@@ -4067,22 +4067,22 @@ ml_dsa_65_keygen:
 	jb  	.L__sign_internal$207
 	cmpq	$256, %r8
 	jnb 	.L__sign_internal$201
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$209:
 	jmp 	.L__sign_internal$201
 .L__sign_internal$207:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$208:
 	jmp 	.L__sign_internal$201
 .L__sign_internal$205:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$206:
 	jmp 	.L__sign_internal$201
 .L__sign_internal$203:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__sign_internal$204:
 .L__sign_internal$201:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__sign_internal$202
 	movq	117056(%rsp), %rsi
 	movq	117064(%rsp), %rcx
@@ -8853,7 +8853,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$398:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$391
 	cmpq	$256, %rbp
@@ -8862,19 +8862,19 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$395
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$377
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$397:
 	jmp 	.L__keygen_internal$377
 .L__keygen_internal$395:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$396:
 	jmp 	.L__keygen_internal$377
 .L__keygen_internal$393:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$394:
 	jmp 	.L__keygen_internal$377
 .L__keygen_internal$391:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$392:
 	jmp 	.L__keygen_internal$377
 .L__keygen_internal$378:
@@ -8915,7 +8915,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__keygen_internal$386:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$379
 	cmpq	$256, %rbp
@@ -8924,22 +8924,22 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$383
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$377
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$385:
 	jmp 	.L__keygen_internal$377
 .L__keygen_internal$383:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$384:
 	jmp 	.L__keygen_internal$377
 .L__keygen_internal$381:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$382:
 	jmp 	.L__keygen_internal$377
 .L__keygen_internal$379:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$380:
 .L__keygen_internal$377:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__keygen_internal$378
 	movw	$4, 61936(%rsp)
 	movw	$256, 61938(%rsp)
@@ -9011,7 +9011,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$367:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$360
 	cmpq	$256, %rbp
@@ -9020,19 +9020,19 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$364
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$346
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$366:
 	jmp 	.L__keygen_internal$346
 .L__keygen_internal$364:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$365:
 	jmp 	.L__keygen_internal$346
 .L__keygen_internal$362:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$363:
 	jmp 	.L__keygen_internal$346
 .L__keygen_internal$360:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$361:
 	jmp 	.L__keygen_internal$346
 .L__keygen_internal$347:
@@ -9073,7 +9073,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__keygen_internal$355:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$348
 	cmpq	$256, %rbp
@@ -9082,22 +9082,22 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$352
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$346
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$354:
 	jmp 	.L__keygen_internal$346
 .L__keygen_internal$352:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$353:
 	jmp 	.L__keygen_internal$346
 .L__keygen_internal$350:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$351:
 	jmp 	.L__keygen_internal$346
 .L__keygen_internal$348:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$349:
 .L__keygen_internal$346:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__keygen_internal$347
 	movw	$259, 61936(%rsp)
 	movw	$260, 61938(%rsp)
@@ -9169,7 +9169,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$336:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$329
 	cmpq	$256, %rbp
@@ -9178,19 +9178,19 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$333
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$315
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$335:
 	jmp 	.L__keygen_internal$315
 .L__keygen_internal$333:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$334:
 	jmp 	.L__keygen_internal$315
 .L__keygen_internal$331:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$332:
 	jmp 	.L__keygen_internal$315
 .L__keygen_internal$329:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$330:
 	jmp 	.L__keygen_internal$315
 .L__keygen_internal$316:
@@ -9231,7 +9231,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__keygen_internal$324:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$317
 	cmpq	$256, %rbp
@@ -9240,22 +9240,22 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$321
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$315
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$323:
 	jmp 	.L__keygen_internal$315
 .L__keygen_internal$321:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$322:
 	jmp 	.L__keygen_internal$315
 .L__keygen_internal$319:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$320:
 	jmp 	.L__keygen_internal$315
 .L__keygen_internal$317:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$318:
 .L__keygen_internal$315:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__keygen_internal$316
 	movw	$514, 61936(%rsp)
 	movw	$515, 61938(%rsp)
@@ -9327,7 +9327,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$305:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$298
 	cmpq	$256, %rbp
@@ -9336,19 +9336,19 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$302
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$284
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$304:
 	jmp 	.L__keygen_internal$284
 .L__keygen_internal$302:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$303:
 	jmp 	.L__keygen_internal$284
 .L__keygen_internal$300:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$301:
 	jmp 	.L__keygen_internal$284
 .L__keygen_internal$298:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$299:
 	jmp 	.L__keygen_internal$284
 .L__keygen_internal$285:
@@ -9389,7 +9389,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__keygen_internal$293:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$286
 	cmpq	$256, %rbp
@@ -9398,22 +9398,22 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$290
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$284
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$292:
 	jmp 	.L__keygen_internal$284
 .L__keygen_internal$290:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$291:
 	jmp 	.L__keygen_internal$284
 .L__keygen_internal$288:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$289:
 	jmp 	.L__keygen_internal$284
 .L__keygen_internal$286:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$287:
 .L__keygen_internal$284:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__keygen_internal$285
 	movw	$769, 61936(%rsp)
 	movw	$770, 61938(%rsp)
@@ -9485,7 +9485,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$274:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$267
 	cmpq	$256, %rbp
@@ -9494,19 +9494,19 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$271
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$253
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$273:
 	jmp 	.L__keygen_internal$253
 .L__keygen_internal$271:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$272:
 	jmp 	.L__keygen_internal$253
 .L__keygen_internal$269:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$270:
 	jmp 	.L__keygen_internal$253
 .L__keygen_internal$267:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$268:
 	jmp 	.L__keygen_internal$253
 .L__keygen_internal$254:
@@ -9547,7 +9547,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__keygen_internal$262:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$255
 	cmpq	$256, %rbp
@@ -9556,22 +9556,22 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$259
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$253
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$261:
 	jmp 	.L__keygen_internal$253
 .L__keygen_internal$259:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$260:
 	jmp 	.L__keygen_internal$253
 .L__keygen_internal$257:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$258:
 	jmp 	.L__keygen_internal$253
 .L__keygen_internal$255:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$256:
 .L__keygen_internal$253:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__keygen_internal$254
 	movw	$1024, 61936(%rsp)
 	movw	$1025, 61938(%rsp)
@@ -9643,7 +9643,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$243:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$236
 	cmpq	$256, %rbp
@@ -9652,19 +9652,19 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$240
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$222
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$242:
 	jmp 	.L__keygen_internal$222
 .L__keygen_internal$240:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$241:
 	jmp 	.L__keygen_internal$222
 .L__keygen_internal$238:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$239:
 	jmp 	.L__keygen_internal$222
 .L__keygen_internal$236:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$237:
 	jmp 	.L__keygen_internal$222
 .L__keygen_internal$223:
@@ -9705,7 +9705,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__keygen_internal$231:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$224
 	cmpq	$256, %rbp
@@ -9714,22 +9714,22 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$228
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$222
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$230:
 	jmp 	.L__keygen_internal$222
 .L__keygen_internal$228:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$229:
 	jmp 	.L__keygen_internal$222
 .L__keygen_internal$226:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$227:
 	jmp 	.L__keygen_internal$222
 .L__keygen_internal$224:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$225:
 .L__keygen_internal$222:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__keygen_internal$223
 	movw	$1028, 61936(%rsp)
 	movw	$1280, 61938(%rsp)
@@ -9801,7 +9801,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$212:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$205
 	cmpq	$256, %rbp
@@ -9810,19 +9810,19 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$209
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$191
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$211:
 	jmp 	.L__keygen_internal$191
 .L__keygen_internal$209:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$210:
 	jmp 	.L__keygen_internal$191
 .L__keygen_internal$207:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$208:
 	jmp 	.L__keygen_internal$191
 .L__keygen_internal$205:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$206:
 	jmp 	.L__keygen_internal$191
 .L__keygen_internal$192:
@@ -9863,7 +9863,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__keygen_internal$200:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$193
 	cmpq	$256, %rbp
@@ -9872,22 +9872,22 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$197
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$191
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$199:
 	jmp 	.L__keygen_internal$191
 .L__keygen_internal$197:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$198:
 	jmp 	.L__keygen_internal$191
 .L__keygen_internal$195:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$196:
 	jmp 	.L__keygen_internal$191
 .L__keygen_internal$193:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$194:
 .L__keygen_internal$191:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__keygen_internal$192
 	movw	$1283, 61936(%rsp)
 	movw	$1284, 61938(%rsp)
@@ -9957,7 +9957,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rcx
 	call	.Lmatrix_A__rejection_sample_multiple_blocks$1
 .L__keygen_internal$181:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$174
 	cmpq	$256, %rbp
@@ -9966,19 +9966,19 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$178
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$160
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$180:
 	jmp 	.L__keygen_internal$160
 .L__keygen_internal$178:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$179:
 	jmp 	.L__keygen_internal$160
 .L__keygen_internal$176:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$177:
 	jmp 	.L__keygen_internal$160
 .L__keygen_internal$174:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$175:
 	jmp 	.L__keygen_internal$160
 .L__keygen_internal$161:
@@ -10019,7 +10019,7 @@ ml_dsa_65_keygen:
 	leaq	2144(%rsp), %rdx
 	call	.Lmatrix_A__rejection_sample_one_block$1
 .L__keygen_internal$169:
-	movl	$1, %edi
+	movl	$1, %esi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$162
 	cmpq	$256, %rbp
@@ -10028,22 +10028,22 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$166
 	cmpq	$256, %r8
 	jnb 	.L__keygen_internal$160
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$168:
 	jmp 	.L__keygen_internal$160
 .L__keygen_internal$166:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$167:
 	jmp 	.L__keygen_internal$160
 .L__keygen_internal$164:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$165:
 	jmp 	.L__keygen_internal$160
 .L__keygen_internal$162:
-	movl	$0, %edi
+	movl	$0, %esi
 .L__keygen_internal$163:
 .L__keygen_internal$160:
-	cmpl	$1, %edi
+	cmpl	$1, %esi
 	jne 	.L__keygen_internal$161
 	leaq	96(%rsp), %rcx
 	movw	$0, %dx
@@ -10086,7 +10086,7 @@ ml_dsa_65_keygen:
 	call	.Lerror_4x__rejection_sample_multiple_blocks$1
 .L__keygen_internal$153:
 	movq	%r8, %rbx
-	movq	$1, %rdi
+	movq	$1, %rsi
 	cmpq	$256, %r11
 	jb  	.L__keygen_internal$146
 	cmpq	$256, %rbp
@@ -10095,19 +10095,19 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$150
 	cmpq	$256, %rbx
 	jnb 	.L__keygen_internal$128
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$152:
 	jmp 	.L__keygen_internal$128
 .L__keygen_internal$150:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$151:
 	jmp 	.L__keygen_internal$128
 .L__keygen_internal$148:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$149:
 	jmp 	.L__keygen_internal$128
 .L__keygen_internal$146:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$147:
 	jmp 	.L__keygen_internal$128
 .L__keygen_internal$129:
@@ -10164,7 +10164,7 @@ ml_dsa_65_keygen:
 .L__keygen_internal$138:
 	movq	%r9, %rbx
 .L__keygen_internal$137:
-	movq	$1, %rdi
+	movq	$1, %rsi
 	cmpq	$256, %r11
 	jb  	.L__keygen_internal$130
 	cmpq	$256, %rbp
@@ -10173,22 +10173,22 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$134
 	cmpq	$256, %rbx
 	jnb 	.L__keygen_internal$128
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$136:
 	jmp 	.L__keygen_internal$128
 .L__keygen_internal$134:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$135:
 	jmp 	.L__keygen_internal$128
 .L__keygen_internal$132:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$133:
 	jmp 	.L__keygen_internal$128
 .L__keygen_internal$130:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$131:
 .L__keygen_internal$128:
-	cmpq	$1, %rdi
+	cmpq	$1, %rsi
 	jne 	.L__keygen_internal$129
 	leaq	96(%rsp), %rcx
 	movw	$4, %dx
@@ -10231,7 +10231,7 @@ ml_dsa_65_keygen:
 	call	.Lerror_4x__rejection_sample_multiple_blocks$1
 .L__keygen_internal$121:
 	movq	%r8, %r12
-	movq	$1, %rdi
+	movq	$1, %rsi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$114
 	cmpq	$256, %rbp
@@ -10240,19 +10240,19 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$118
 	cmpq	$256, %r12
 	jnb 	.L__keygen_internal$96
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$120:
 	jmp 	.L__keygen_internal$96
 .L__keygen_internal$118:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$119:
 	jmp 	.L__keygen_internal$96
 .L__keygen_internal$116:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$117:
 	jmp 	.L__keygen_internal$96
 .L__keygen_internal$114:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$115:
 	jmp 	.L__keygen_internal$96
 .L__keygen_internal$97:
@@ -10309,7 +10309,7 @@ ml_dsa_65_keygen:
 .L__keygen_internal$106:
 	movq	%r9, %r12
 .L__keygen_internal$105:
-	movq	$1, %rdi
+	movq	$1, %rsi
 	cmpq	$256, %rbx
 	jb  	.L__keygen_internal$98
 	cmpq	$256, %rbp
@@ -10318,22 +10318,22 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$102
 	cmpq	$256, %r12
 	jnb 	.L__keygen_internal$96
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$104:
 	jmp 	.L__keygen_internal$96
 .L__keygen_internal$102:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$103:
 	jmp 	.L__keygen_internal$96
 .L__keygen_internal$100:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$101:
 	jmp 	.L__keygen_internal$96
 .L__keygen_internal$98:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$99:
 .L__keygen_internal$96:
-	cmpq	$1, %rdi
+	cmpq	$1, %rsi
 	jne 	.L__keygen_internal$97
 	leaq	96(%rsp), %rcx
 	movw	$8, %dx
@@ -10376,7 +10376,7 @@ ml_dsa_65_keygen:
 	call	.Lerror_4x__rejection_sample_multiple_blocks$1
 .L__keygen_internal$89:
 	movq	%r8, %rbx
-	movq	$1, %rdi
+	movq	$1, %rsi
 	cmpq	$256, %r11
 	jb  	.L__keygen_internal$82
 	cmpq	$256, %rbp
@@ -10385,19 +10385,19 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$86
 	cmpq	$256, %rbx
 	jnb 	.L__keygen_internal$64
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$88:
 	jmp 	.L__keygen_internal$64
 .L__keygen_internal$86:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$87:
 	jmp 	.L__keygen_internal$64
 .L__keygen_internal$84:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$85:
 	jmp 	.L__keygen_internal$64
 .L__keygen_internal$82:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$83:
 	jmp 	.L__keygen_internal$64
 .L__keygen_internal$65:
@@ -10454,7 +10454,7 @@ ml_dsa_65_keygen:
 .L__keygen_internal$74:
 	movq	%r9, %rbx
 .L__keygen_internal$73:
-	movq	$1, %rdi
+	movq	$1, %rsi
 	cmpq	$256, %r11
 	jb  	.L__keygen_internal$66
 	cmpq	$256, %rbp
@@ -10463,22 +10463,22 @@ ml_dsa_65_keygen:
 	jb  	.L__keygen_internal$70
 	cmpq	$256, %rbx
 	jnb 	.L__keygen_internal$64
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$72:
 	jmp 	.L__keygen_internal$64
 .L__keygen_internal$70:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$71:
 	jmp 	.L__keygen_internal$64
 .L__keygen_internal$68:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$69:
 	jmp 	.L__keygen_internal$64
 .L__keygen_internal$66:
-	movq	$0, %rdi
+	movq	$0, %rsi
 .L__keygen_internal$67:
 .L__keygen_internal$64:
-	cmpq	$1, %rdi
+	cmpq	$1, %rsi
 	jne 	.L__keygen_internal$65
 	movq	61920(%rsp), %rdi
 	movq	61928(%rsp), %rsi
@@ -11811,24 +11811,24 @@ ml_dsa_65_keygen:
 	movq	$-1, %rsi
 	cmovb	%rsi, %rdx
 	shrq	$2, %r8
-	movq	$1, %rdi
+	movq	$1, %rsi
 	cmpq	$256, %r8
 	jb  	.Lmatrix_A__rejection_sample_multiple_blocks$10
-	movq	$-1, %rsi
-	cmovb	%rsi, %rdx
+	movq	$-1, %rdi
+	cmovb	%rdi, %rdx
 	jmp 	.Lmatrix_A__rejection_sample_multiple_blocks$2
 .Lmatrix_A__rejection_sample_multiple_blocks$10:
-	movq	$-1, %rsi
-	cmovnb	%rsi, %rdx
+	movq	$-1, %rdi
+	cmovnb	%rdi, %rdx
 	cmpq	$838, %r9
 	jb  	.Lmatrix_A__rejection_sample_multiple_blocks$12
-	movq	$-1, %rsi
-	cmovb	%rsi, %rdx
+	movq	$-1, %rdi
+	cmovb	%rdi, %rdx
 	jmp 	.Lmatrix_A__rejection_sample_multiple_blocks$2
 .Lmatrix_A__rejection_sample_multiple_blocks$12:
 	movq	$-1, %rsi
 	cmovnb	%rsi, %rdx
-	movq	$0, %rdi
+	movq	$0, %rsi
 .Lmatrix_A__rejection_sample_multiple_blocks$13:
 .Lmatrix_A__rejection_sample_multiple_blocks$11:
 	jmp 	.Lmatrix_A__rejection_sample_multiple_blocks$2
@@ -11859,29 +11859,29 @@ ml_dsa_65_keygen:
 	movl	%edi, (%rax,%r8,4)
 	incq	%r8
 .Lmatrix_A__rejection_sample_multiple_blocks$9:
-	movq	$0, %rdi
+	movq	$0, %rsi
 	cmpq	$256, %r8
 	jnb 	.Lmatrix_A__rejection_sample_multiple_blocks$4
-	movq	$-1, %rsi
-	cmovnb	%rsi, %rdx
+	movq	$-1, %rdi
+	cmovnb	%rdi, %rdx
 	cmpq	$838, %r9
 	jnb 	.Lmatrix_A__rejection_sample_multiple_blocks$6
-	movq	$-1, %rsi
-	cmovnb	%rsi, %rdx
+	movq	$-1, %rdi
+	cmovnb	%rdi, %rdx
 	jmp 	.Lmatrix_A__rejection_sample_multiple_blocks$2
 .Lmatrix_A__rejection_sample_multiple_blocks$6:
 	movq	$-1, %rsi
 	cmovb	%rsi, %rdx
-	movq	$1, %rdi
+	movq	$1, %rsi
 .Lmatrix_A__rejection_sample_multiple_blocks$7:
 	jmp 	.Lmatrix_A__rejection_sample_multiple_blocks$2
 .Lmatrix_A__rejection_sample_multiple_blocks$4:
 	movq	$-1, %rsi
 	cmovb	%rsi, %rdx
-	movq	$1, %rdi
+	movq	$1, %rsi
 .Lmatrix_A__rejection_sample_multiple_blocks$5:
 .Lmatrix_A__rejection_sample_multiple_blocks$2:
-	cmpq	$1, %rdi
+	cmpq	$1, %rsi
 	jne 	.Lmatrix_A__rejection_sample_multiple_blocks$3
 	ret
 .Lshake256_squeezeblock4x$1:
@@ -16810,7 +16810,7 @@ ml_dsa_65_keygen:
 	vpsubq	%ymm6, %ymm8, %ymm8
 	vmovshdup	%ymm5, %ymm5
 	vpblendd	$170, %ymm8, %ymm5, %ymm5
-	vpsubd	%ymm5, %ymm4, %ymm8
+	vpsubd	%ymm5, %ymm4, %ymm6
 	vpaddd	%ymm5, %ymm4, %ymm4
 	vmovdqu	%ymm3, 96(%rsi)
 	vmovdqu	%ymm11, 224(%rsi)
@@ -16819,10 +16819,10 @@ ml_dsa_65_keygen:
 	vmovdqu	%ymm0, 608(%rsi)
 	vmovdqu	%ymm1, 736(%rsi)
 	vmovdqu	%ymm4, 864(%rsi)
-	vmovdqu	%ymm8, 992(%rsi)
-	vmovdqu	(%rsi), %ymm5
-	vmovdqu	32(%rsi), %ymm9
-	vmovdqu	64(%rsi), %ymm10
+	vmovdqu	%ymm6, 992(%rsi)
+	vmovdqu	(%rsi), %ymm10
+	vmovdqu	32(%rsi), %ymm11
+	vmovdqu	64(%rsi), %ymm9
 	vmovdqu	96(%rsi), %ymm6
 	vmovdqu	128(%rsi), %ymm1
 	vmovdqu	160(%rsi), %ymm2
@@ -16830,32 +16830,32 @@ ml_dsa_65_keygen:
 	vmovdqu	224(%rsi), %ymm4
 	vmovdqu	glob_data + 6272(%rip), %ymm8
 	vmovdqu	glob_data + 2304(%rip), %ymm7
-	vmovshdup	%ymm10, %ymm12
-	vpmuldq	%ymm8, %ymm10, %ymm3
-	vpmuldq	%ymm8, %ymm12, %ymm13
-	vpmuldq	%ymm7, %ymm10, %ymm10
+	vmovshdup	%ymm9, %ymm12
+	vpmuldq	%ymm8, %ymm9, %ymm3
+	vpmuldq	%ymm8, %ymm12, %ymm5
+	vpmuldq	%ymm7, %ymm9, %ymm9
 	vpmuldq	%ymm7, %ymm12, %ymm12
-	vpmuldq	glob_data + 9024(%rip), %ymm10, %ymm10
+	vpmuldq	glob_data + 9024(%rip), %ymm9, %ymm9
 	vpmuldq	glob_data + 9024(%rip), %ymm12, %ymm12
-	vpsubq	%ymm10, %ymm3, %ymm3
-	vpsubq	%ymm12, %ymm13, %ymm13
+	vpsubq	%ymm9, %ymm3, %ymm3
+	vpsubq	%ymm12, %ymm5, %ymm5
 	vmovshdup	%ymm3, %ymm3
-	vpblendd	$170, %ymm13, %ymm3, %ymm10
-	vpsubd	%ymm10, %ymm5, %ymm3
-	vpaddd	%ymm10, %ymm5, %ymm5
-	vmovshdup	%ymm6, %ymm10
+	vpblendd	$170, %ymm5, %ymm3, %ymm5
+	vpsubd	%ymm5, %ymm10, %ymm3
+	vpaddd	%ymm5, %ymm10, %ymm5
+	vmovshdup	%ymm6, %ymm9
 	vpmuldq	%ymm8, %ymm6, %ymm12
-	vpmuldq	%ymm8, %ymm10, %ymm8
-	vpmuldq	%ymm7, %ymm6, %ymm11
-	vpmuldq	%ymm7, %ymm10, %ymm6
-	vpmuldq	glob_data + 9024(%rip), %ymm11, %ymm7
+	vpmuldq	%ymm8, %ymm9, %ymm8
+	vpmuldq	%ymm7, %ymm6, %ymm10
+	vpmuldq	%ymm7, %ymm9, %ymm6
+	vpmuldq	glob_data + 9024(%rip), %ymm10, %ymm7
 	vpmuldq	glob_data + 9024(%rip), %ymm6, %ymm6
 	vpsubq	%ymm7, %ymm12, %ymm12
 	vpsubq	%ymm6, %ymm8, %ymm7
 	vmovshdup	%ymm12, %ymm6
 	vpblendd	$170, %ymm7, %ymm6, %ymm10
-	vpsubd	%ymm10, %ymm9, %ymm6
-	vpaddd	%ymm10, %ymm9, %ymm10
+	vpsubd	%ymm10, %ymm11, %ymm6
+	vpaddd	%ymm10, %ymm11, %ymm10
 	vmovdqu	glob_data + 6304(%rip), %ymm8
 	vmovdqu	glob_data + 2336(%rip), %ymm7
 	vmovshdup	%ymm0, %ymm14
