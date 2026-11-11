@@ -250,20 +250,72 @@ rewrite (nth_map W64.zero []); 1: smt(Array25.size_to_list).
 rewrite nth_mkseq 1:/# /= bits8E /= initiE /# /=.
 qed.
 
+op sliceset25_64_128 (st: W64.t Array25.t) (offset: int) (bv: W128.t) : W64.t Array25.t =
+ if 8%| offset
+ then
+  stwords
+   (WArray200.set128_direct (WArray200.init64 (fun i => st.[i])) (offset %/ 8) bv)
+ else
+   Array25.of_list
+    witness
+    (map W64.bits2w (chunk 64 (take offset (flatten (map W64.w2bits (to_list st)))
+     ++ w2bits bv
+     ++ drop (offset + 128) (flatten (map W64.w2bits (to_list st)))))).
+
+bind op [W64.t & W128.t & Array25.t] sliceset25_64_128 "asliceset".
+realize le_size by done.
+realize bvaslicesetP.
+move => arr offset bv H /= k kb; rewrite /sliceset25_64_128 /=.
+case (8 %| offset) => /= *; last first.
++ rewrite of_listK.
+   rewrite size_map size_chunk 1:// !size_cat size_take. smt().
+    rewrite size_flatten_W64_w2bits size_to_list size_w2bits' /= ifT 1:/#.
+    by rewrite size_drop 1:/# size_flatten_W64_w2bits size_to_list /#.
+  rewrite -(map_comp W64.w2bits W64.bits2w) /(\o).
+  have := eq_in_map ((fun (x : bool list) => w2bits ((bits2w x))%W64)) idfun (chunk 64
+        (take offset (flatten (map W64.w2bits (to_list arr))) ++ w2bits bv ++
+         drop (offset + 128) (flatten (map W64.w2bits (to_list arr))))).
+  rewrite iffE => [#] -> * /=; 1: by smt(in_chunk_size W64.bits2wK).
+  rewrite map_id /= chunkK 1://;1: by rewrite !size_cat size_take;
+    by smt(size_take size_drop  W64.size_w2bits' size_cat Array25.size_to_list size_flatten_W64_w2bits size_ge0).
+  by rewrite !nth_cat !size_cat /=;
+     smt(nth_take nth_drop size_take size_drop  W64.size_w2bits' size_cat Array25.size_to_list size_flatten_W64_w2bits size_ge0).
+rewrite (nth_flatten _ 64); 1: by rewrite allP => i;rewrite mapP => He; elim He;smt(W64.size_w2bits').
+rewrite (nth_map W64.zero []); 1: smt(Array25.size_to_list).
+rewrite nth_mkseq 1:/# /= initiE 1:/# /= get64E pack8E initiE 1:/# /= initiE 1:/# /= /set128_direct.
+rewrite initiE 1:/# /=.
+case (offset <= k && k < offset + 128) => *; 1: by
+  rewrite ifT 1:/#  get_bits8 /= 1,2:/# initiE // initiE //.
+rewrite ifF 1:/# initiE 1:/# /=.
+rewrite (nth_flatten _ 64); 1: by rewrite allP => i;rewrite mapP => He; elim He;smt(W64.size_w2bits').
+rewrite (nth_map W64.zero []); 1: smt(Array25.size_to_list).
+rewrite nth_mkseq 1:/# /= bits8E /= initiE /# /=.
+qed.
+
 hoare stavx2_unpack_h _st:
  M.__stavx2_unpack
  : state=_st ==> res = stavx2_to_st25 _st.
 proof.
 proc.
+proc change 1: { st <- sliceset25_64_128 st (0*8*8) (truncateu128 state.[0]); };
+ 1: by auto => /#.
+proc change 2: { st <- sliceset25_64_256 st (3*8*8) state.[2]; };
+ 1: by auto => /#.
 proc change 3: { st <- sliceset25_64_256 st (1*8*8) state.[1]; };
  1: by auto => /#.
-proc change 11: { st <- sliceset25_64_256 st (6*8*8) t256_4; };
+proc change 9: { st <- sliceset25_64_256 st (6*8*8) t256_4; };
  1: by auto => /#.
-proc change 15: { st <- sliceset25_64_256 st (11*8*8) t256_4; };
+proc change 10: { st <- sliceset25_64_128 st (10*8*8) (truncateu128 state.[2]); };
  1: by auto => /#.
-proc change 18: { st <- sliceset25_64_256 st (16*8*8) t256_4; };
+proc change 11: { st <- sliceset25_64_256 st (12*8*8) state.[2]; };
  1: by auto => /#.
-proc change 21: { st <- sliceset25_64_256 st (21*8*8) t256_4; };
+proc change 13: { st <- sliceset25_64_256 st (11*8*8) t256_4; };
+ 1: by auto => /#.
+proc change 14: { st <- sliceset25_64_128 st (19*8*8) (truncateu128 state.[2]); };
+ 1: by auto => /#.
+proc change 16: { st <- sliceset25_64_256 st (16*8*8) t256_4; };
+ 1: by auto => /#.
+proc change 18: { st <- sliceset25_64_256 st (21*8*8) t256_4; };
  1: by auto => /#.
 by circuit.
 qed.

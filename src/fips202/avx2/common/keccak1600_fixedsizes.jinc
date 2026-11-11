@@ -139,9 +139,8 @@ inline fn __dumpstate_m_avx2
   if (0 < _LEN) {
     t128_1 = #VEXTRACTI128(st[2], 1);
     t128_0 = (128u) st[2];
-    t = #MOVV_64(t128_1);
+    t = #VPEXTR_64(t128_1, 0);
     buf, _LEN = __m_ilen_write_upto8(buf, _LEN, t);
-    t128_1 = #VPUNPCKH_2u64(t128_1, t128_1);
 
     if (0 < _LEN) { // regs 3,4,5,6
       // [ 16, 7, 8, 19 ]
@@ -159,9 +158,8 @@ inline fn __dumpstate_m_avx2
       
       // reg2 (10)
       if (0 < _LEN) {
-	t = #MOVV_64(t128_0);
+	t = #VPEXTR_64(t128_0, 0);
 	buf, _LEN = __m_ilen_write_upto8(buf, _LEN, t);
-	t128_0 = #VPUNPCKH_2u64(t128_0, t128_0);
       }
 
       if (0 < _LEN) { // [ 11, 12, 13, 14 ]
@@ -171,7 +169,7 @@ inline fn __dumpstate_m_avx2
 
       // reg2 (15)
       if (0 < _LEN) {
-	t = #MOVV_64(t128_1);
+	t = #VPEXTR_64(t128_1, 1);
 	buf, _LEN = __m_ilen_write_upto8(buf, _LEN, t);
       }
 
@@ -182,7 +180,7 @@ inline fn __dumpstate_m_avx2
 
       // reg2 (20)
       if (0 < _LEN) {
-	t = #MOVV_64(t128_0);
+	t = #VPEXTR_64(t128_0, 1);
 	buf, _LEN = __m_ilen_write_upto8(buf, _LEN, t);
       }
 
