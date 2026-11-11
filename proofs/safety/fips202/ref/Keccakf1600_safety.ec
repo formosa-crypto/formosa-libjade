@@ -359,8 +359,8 @@ proof.
 hint +safety.
 rewrite /__stavx2_unpack_spec; proc.
 by auto => /> *; (try split);
-   smt(BI200.is_init_set256d_in BI200.is_init_set256d_out BI200.is_init_set64d_in
-       BI200.is_init_set64d_out).
+   smt(BI200.is_init_set128d_in BI200.is_init_set128d_out BI200.is_init_set256d_in
+       BI200.is_init_set256d_out).
 qed.
 
 lemma _keccakf1600_st25_avx2_proof _st25 _b_st25 :

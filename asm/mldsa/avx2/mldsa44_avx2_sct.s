@@ -8359,14 +8359,14 @@ ml_dsa_44_keygen:
 	vperm2i128	$32, %ymm14, %ymm11, %ymm1
 	vperm2i128	$49, %ymm3, %ymm9, %ymm2
 	vperm2i128	$49, %ymm14, %ymm11, %ymm3
-	vpunpcklqdq	%ymm1, %ymm0, %ymm9
+	vpunpcklqdq	%ymm1, %ymm0, %ymm4
 	vpunpckhqdq	%ymm1, %ymm0, %ymm1
 	vpunpcklqdq	%ymm3, %ymm2, %ymm0
-	vpunpckhqdq	%ymm3, %ymm2, %ymm3
-	vmovdqu	%ymm9, (%rcx,%r8)
+	vpunpckhqdq	%ymm3, %ymm2, %ymm14
+	vmovdqu	%ymm4, (%rcx,%r8)
 	vmovdqu	%ymm1, (%rdx,%r8)
 	vmovdqu	%ymm0, (%rsi,%r8)
-	vmovdqu	%ymm3, (%rdi,%r8)
+	vmovdqu	%ymm14, (%rdi,%r8)
 	addq	$32, %r8
 .Lshake128_squeezeblock4x$4:
 	cmpq	$160, %r9

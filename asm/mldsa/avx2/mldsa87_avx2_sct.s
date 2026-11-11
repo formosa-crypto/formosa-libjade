@@ -17582,38 +17582,38 @@ ml_dsa_87_keygen:
 	orq 	%r9, %r10
 	xorq	%r10, 8(%rax)
 	xorb	$128, 135(%rax)
-	movq	%mm0, %rsi
+	movq	%mm0, %rcx
 	leaq	32(%rsp), %rax
 	movq	$0, %rdx
-	movq	$0, %r9
+	movq	$0, %rsi
 	jmp 	.Lhash_verification_key$3
 .Lhash_verification_key$4:
-	incq	%r9
-	movq	%rsi, %mm1
+	incq	%rsi
+	movq	%rcx, %mm1
 	movq	%rdx, %mm2
-	movq	%r9, %mm4
+	movq	%rsi, %mm4
 	leaq	-200(%rsp), %rsp
 	call	.L_keccakf1600_opt$1
 .Lhash_verification_key$5:
 	leaq	200(%rsp), %rsp
-	movq	%mm1, %rsi
+	movq	%mm1, %rcx
 	movq	%mm2, %rdx
-	movq	%mm4, %r9
+	movq	%mm4, %rsi
 	vmovdqu	(%rax), %ymm0
-	vmovdqu	%ymm0, (%rsi,%rdx)
+	vmovdqu	%ymm0, (%rcx,%rdx)
 	vmovdqu	32(%rax), %ymm0
-	vmovdqu	%ymm0, 32(%rsi,%rdx)
+	vmovdqu	%ymm0, 32(%rcx,%rdx)
 	vmovdqu	64(%rax), %ymm0
-	vmovdqu	%ymm0, 64(%rsi,%rdx)
+	vmovdqu	%ymm0, 64(%rcx,%rdx)
 	vmovdqu	96(%rax), %ymm0
-	vmovdqu	%ymm0, 96(%rsi,%rdx)
+	vmovdqu	%ymm0, 96(%rcx,%rdx)
 	movq	128(%rax), %rdi
-	movq	%rdi, 128(%rsi,%rdx)
+	movq	%rdi, 128(%rcx,%rdx)
 	addq	$136, %rdx
 .Lhash_verification_key$3:
-	cmpq	$0, %r9
+	cmpq	$0, %rsi
 	jb  	.Lhash_verification_key$4
-	movq	%rsi, %mm1
+	movq	%rcx, %mm1
 	movq	%rdx, %mm2
 	leaq	-200(%rsp), %rsp
 	call	.L_keccakf1600_opt$1
@@ -17751,12 +17751,12 @@ ml_dsa_87_keygen:
 	call	.L_keccakf1600_opt$1
 .L_shake256_A64__A128$2:
 	leaq	200(%rsp), %rsp
-	movq	%mm1, %rcx
+	movq	%mm1, %rdi
 	movq	%mm2, %rdx
 	vmovdqu	(%rax), %ymm0
-	vmovdqu	%ymm0, (%rcx,%rdx)
+	vmovdqu	%ymm0, (%rdi,%rdx)
 	vmovdqu	32(%rax), %ymm0
-	vmovdqu	%ymm0, 32(%rcx,%rdx)
+	vmovdqu	%ymm0, 32(%rdi,%rdx)
 	ret
 .L_shake256_A128__A32_A2$1:
 	leaq	32(%rsp), %rdx
@@ -21992,11 +21992,11 @@ ml_dsa_87_keygen:
 	vpblendd	$170, %ymm7, %ymm8, %ymm10
 	vpsubd	%ymm10, %ymm2, %ymm7
 	vpaddd	%ymm10, %ymm2, %ymm2
-	vmovdqu	glob_data + 6208(%rip), %ymm9
+	vmovdqu	glob_data + 6208(%rip), %ymm11
 	vmovdqu	glob_data + 2240(%rip), %ymm10
 	vmovshdup	%ymm1, %ymm12
-	vpmuldq	%ymm9, %ymm1, %ymm8
-	vpmuldq	%ymm9, %ymm12, %ymm9
+	vpmuldq	%ymm11, %ymm1, %ymm8
+	vpmuldq	%ymm11, %ymm12, %ymm9
 	vpmuldq	%ymm10, %ymm1, %ymm1
 	vpmuldq	%ymm10, %ymm12, %ymm10
 	vpmuldq	glob_data + 9248(%rip), %ymm1, %ymm1

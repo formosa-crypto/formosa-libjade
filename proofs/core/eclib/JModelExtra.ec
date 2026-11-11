@@ -74,6 +74,15 @@ proof. by rewrite /truncateu128 W2u128.bits128_div. qed.
 lemma VEXTRACTI128_1 (w : W256.t) : VEXTRACTI128 w (W8.of_int 1) = w \bits128 1.
 proof. by rewrite /VEXTRACTI128 /b2i W8.of_intwE. qed.
 
+lemma truncateu64_bits64 (w : W128.t) : truncateu64 w = w \bits64 0.
+proof. by rewrite /truncateu64 W2u64.bits64_div. qed.
+
+lemma VPEXTR_64_0 (w : W128.t) : VPEXTR_64 w (W8.of_int 0) = w \bits64 0.
+proof. by rewrite /VPEXTR_64. qed.
+
+lemma VPEXTR_64_1 (w : W128.t) : VPEXTR_64 w (W8.of_int 1) = w \bits64 1.
+proof. by rewrite /VPEXTR_64. qed.
+
 lemma VPMOVSX_8u16_8u32_bits32 (h : W128.t) (k : int) : 0 <= k < 8 =>
   VPMOVSX_8u16_8u32 h \bits32 k = W32.of_int (W16.to_sint (h \bits16 k)).
 proof.

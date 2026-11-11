@@ -4585,20 +4585,25 @@ module M = {
   proc __stavx2_unpack (st:BArray200.t, b_st:BArray200.t, state:BArray224.t,
                         b_state:BArray224.t) : BArray200.t * BArray200.t *
                                                trace = {
-    var t128_0:W128.t;
     var t256_0:W256.t;
     var t256_1:W256.t;
     var t256_2:W256.t;
     var t256_3:W256.t;
-    var t128_1:W128.t;
     var t256_4:W256.t;
     var trace___stavx2_unpack:trace;
     trace___stavx2_unpack <- [];
     trace___stavx2_unpack <-
     (trace___stavx2_unpack ++ [(Assert, (BArray224.is_init b_state 0 224))]);
-    t128_0 <- (truncateu128 (BArray224.get256 state 0));
-    b_st <- (BArray200.set64d b_st 0 (W64.of_int 18446744073709551615));
-    st <- (BArray200.set64 st 0 (VMOVLPD t128_0));
+    b_st <-
+    (BArray200.set128d b_st 0
+    (W128.of_int 340282366920938463463374607431768211455));
+    st <- (BArray200.set128d st 0 (truncateu128 (BArray224.get256 state 0)));
+    b_st <-
+    (BArray200.set256d b_st 24
+    (W256.of_int
+    115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ));
+    st <- (BArray200.set256d st 24 (BArray224.get256 state 2));
     b_st <-
     (BArray200.set256d b_st 8
     (W256.of_int
@@ -4617,9 +4622,6 @@ module M = {
     t256_3 <-
     (VPBLEND_8u32 (BArray224.get256 state 6) (BArray224.get256 state 5)
     (W8.of_int 240));
-    t128_1 <- (VEXTRACTI128 (BArray224.get256 state 2) (W8.of_int 1));
-    b_st <- (BArray200.set64d b_st 40 (W64.of_int 18446744073709551615));
-    st <- (BArray200.set64 st 5 (VMOVLPD t128_1));
     t256_4 <- (VPBLEND_8u32 t256_0 t256_3 (W8.of_int 195));
     b_st <-
     (BArray200.set256d b_st 48
@@ -4627,9 +4629,17 @@ module M = {
     115792089237316195423570985008687907853269984665640564039457584007913129639935
     ));
     st <- (BArray200.set256d st 48 t256_4);
-    t128_0 <- (truncateu128 (BArray224.get256 state 2));
-    b_st <- (BArray200.set64d b_st 80 (W64.of_int 18446744073709551615));
-    st <- (BArray200.set64 st 10 (VMOVLPD t128_0));
+    b_st <-
+    (BArray200.set128d b_st 80
+    (W128.of_int 340282366920938463463374607431768211455));
+    st <-
+    (BArray200.set128d st 80 (truncateu128 (BArray224.get256 state 2)));
+    b_st <-
+    (BArray200.set256d b_st 96
+    (W256.of_int
+    115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ));
+    st <- (BArray200.set256d st 96 (BArray224.get256 state 2));
     t256_4 <- (VPBLEND_8u32 t256_3 t256_1 (W8.of_int 195));
     b_st <-
     (BArray200.set256d b_st 88
@@ -4637,8 +4647,11 @@ module M = {
     115792089237316195423570985008687907853269984665640564039457584007913129639935
     ));
     st <- (BArray200.set256d st 88 t256_4);
-    b_st <- (BArray200.set64d b_st 120 (W64.of_int 18446744073709551615));
-    st <- (BArray200.set64 st 15 (VMOVHPD t128_1));
+    b_st <-
+    (BArray200.set128d b_st 152
+    (W128.of_int 340282366920938463463374607431768211455));
+    st <-
+    (BArray200.set128d st 152 (truncateu128 (BArray224.get256 state 2)));
     t256_4 <- (VPBLEND_8u32 t256_2 t256_0 (W8.of_int 195));
     b_st <-
     (BArray200.set256d b_st 128
@@ -4646,8 +4659,6 @@ module M = {
     115792089237316195423570985008687907853269984665640564039457584007913129639935
     ));
     st <- (BArray200.set256d st 128 t256_4);
-    b_st <- (BArray200.set64d b_st 160 (W64.of_int 18446744073709551615));
-    st <- (BArray200.set64 st 20 (VMOVHPD t128_0));
     t256_4 <- (VPBLEND_8u32 t256_1 t256_2 (W8.of_int 195));
     b_st <-
     (BArray200.set256d b_st 168
@@ -19038,14 +19049,13 @@ module M = {
           (BArray32.set64d b_buf (offset + dELTA)
           (W64.of_int 18446744073709551615));
           buf <-
-          (BArray32.set64d buf (offset + dELTA) (MOVV_64 (truncateu64 w)));
+          (BArray32.set64d buf (offset + dELTA) (VPEXTR_64 w (W8.of_int 0)));
           dELTA <- (dELTA + 8);
           lEN <- (lEN - 8);
-          w <- (VPUNPCKH_2u64 w w);
+          t64 <- (VPEXTR_64 w (W8.of_int 1));
         } else {
-          
+          t64 <- (VPEXTR_64 w (W8.of_int 0));
         }
-        t64 <- (MOVV_64 (truncateu64 w));
         b_param <- b_buf;
         param_3 <- buf;
         param_2 <- offset;
@@ -21596,7 +21606,7 @@ module M = {
     if ((0 < _LEN)) {
       t128_1 <- (VEXTRACTI128 (BArray224.get256 st 2) (W8.of_int 1));
       t128_0 <- (truncateu128 (BArray224.get256 st 2));
-      t <- (MOVV_64 (truncateu64 t128_1));
+      t <- (VPEXTR_64 t128_1 (W8.of_int 0));
       b_param_6 <- b_buf;
       param_18 <- buf;
       param_17 <- offset;
@@ -21644,7 +21654,6 @@ module M = {
       buf <- result_10;
       dELTA <- result_9;
       _LEN <- result_8;
-      t128_1 <- (VPUNPCKH_2u64 t128_1 t128_1);
       if ((0 < _LEN)) {
         t256_0 <-
         (VPBLEND_8u32 (BArray224.get256 st 3) (BArray224.get256 st 4)
@@ -21708,7 +21717,7 @@ module M = {
         dELTA <- result_12;
         _LEN <- result_11;
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 0));
           b_param_4 <- b_buf;
           param_28 <- buf;
           param_27 <- offset;
@@ -21757,7 +21766,6 @@ module M = {
           buf <- result_16;
           dELTA <- result_15;
           _LEN <- result_14;
-          t128_0 <- (VPUNPCKH_2u64 t128_0 t128_0);
         } else {
           
         }
@@ -21815,7 +21823,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_1));
+          t <- (VPEXTR_64 t128_1 (W8.of_int 1));
           b_param_2 <- b_buf;
           param_38 <- buf;
           param_37 <- offset;
@@ -21921,7 +21929,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 1));
           b_param_0 <- b_buf;
           param_48 <- buf;
           param_47 <- offset;
@@ -26336,14 +26344,13 @@ module M = {
           (BArray64.set64d b_buf (offset + dELTA)
           (W64.of_int 18446744073709551615));
           buf <-
-          (BArray64.set64d buf (offset + dELTA) (MOVV_64 (truncateu64 w)));
+          (BArray64.set64d buf (offset + dELTA) (VPEXTR_64 w (W8.of_int 0)));
           dELTA <- (dELTA + 8);
           lEN <- (lEN - 8);
-          w <- (VPUNPCKH_2u64 w w);
+          t64 <- (VPEXTR_64 w (W8.of_int 1));
         } else {
-          
+          t64 <- (VPEXTR_64 w (W8.of_int 0));
         }
-        t64 <- (MOVV_64 (truncateu64 w));
         b_param <- b_buf;
         param_3 <- buf;
         param_2 <- offset;
@@ -28894,7 +28901,7 @@ module M = {
     if ((0 < _LEN)) {
       t128_1 <- (VEXTRACTI128 (BArray224.get256 st 2) (W8.of_int 1));
       t128_0 <- (truncateu128 (BArray224.get256 st 2));
-      t <- (MOVV_64 (truncateu64 t128_1));
+      t <- (VPEXTR_64 t128_1 (W8.of_int 0));
       b_param_6 <- b_buf;
       param_18 <- buf;
       param_17 <- offset;
@@ -28942,7 +28949,6 @@ module M = {
       buf <- result_10;
       dELTA <- result_9;
       _LEN <- result_8;
-      t128_1 <- (VPUNPCKH_2u64 t128_1 t128_1);
       if ((0 < _LEN)) {
         t256_0 <-
         (VPBLEND_8u32 (BArray224.get256 st 3) (BArray224.get256 st 4)
@@ -29006,7 +29012,7 @@ module M = {
         dELTA <- result_12;
         _LEN <- result_11;
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 0));
           b_param_4 <- b_buf;
           param_28 <- buf;
           param_27 <- offset;
@@ -29055,7 +29061,6 @@ module M = {
           buf <- result_16;
           dELTA <- result_15;
           _LEN <- result_14;
-          t128_0 <- (VPUNPCKH_2u64 t128_0 t128_0);
         } else {
           
         }
@@ -29113,7 +29118,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_1));
+          t <- (VPEXTR_64 t128_1 (W8.of_int 1));
           b_param_2 <- b_buf;
           param_38 <- buf;
           param_37 <- offset;
@@ -29219,7 +29224,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 1));
           b_param_0 <- b_buf;
           param_48 <- buf;
           param_47 <- offset;
@@ -29683,14 +29688,13 @@ module M = {
           (BArray128.set64d b_buf (offset + dELTA)
           (W64.of_int 18446744073709551615));
           buf <-
-          (BArray128.set64d buf (offset + dELTA) (MOVV_64 (truncateu64 w)));
+          (BArray128.set64d buf (offset + dELTA) (VPEXTR_64 w (W8.of_int 0)));
           dELTA <- (dELTA + 8);
           lEN <- (lEN - 8);
-          w <- (VPUNPCKH_2u64 w w);
+          t64 <- (VPEXTR_64 w (W8.of_int 1));
         } else {
-          
+          t64 <- (VPEXTR_64 w (W8.of_int 0));
         }
-        t64 <- (MOVV_64 (truncateu64 w));
         b_param <- b_buf;
         param_3 <- buf;
         param_2 <- offset;
@@ -30590,7 +30594,7 @@ module M = {
     if ((0 < _LEN)) {
       t128_1 <- (VEXTRACTI128 (BArray224.get256 st 2) (W8.of_int 1));
       t128_0 <- (truncateu128 (BArray224.get256 st 2));
-      t <- (MOVV_64 (truncateu64 t128_1));
+      t <- (VPEXTR_64 t128_1 (W8.of_int 0));
       b_param_6 <- b_buf;
       param_18 <- buf;
       param_17 <- offset;
@@ -30638,7 +30642,6 @@ module M = {
       buf <- result_10;
       dELTA <- result_9;
       _LEN <- result_8;
-      t128_1 <- (VPUNPCKH_2u64 t128_1 t128_1);
       if ((0 < _LEN)) {
         t256_0 <-
         (VPBLEND_8u32 (BArray224.get256 st 3) (BArray224.get256 st 4)
@@ -30702,7 +30705,7 @@ module M = {
         dELTA <- result_12;
         _LEN <- result_11;
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 0));
           b_param_4 <- b_buf;
           param_28 <- buf;
           param_27 <- offset;
@@ -30751,7 +30754,6 @@ module M = {
           buf <- result_16;
           dELTA <- result_15;
           _LEN <- result_14;
-          t128_0 <- (VPUNPCKH_2u64 t128_0 t128_0);
         } else {
           
         }
@@ -30809,7 +30811,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_1));
+          t <- (VPEXTR_64 t128_1 (W8.of_int 1));
           b_param_2 <- b_buf;
           param_38 <- buf;
           param_37 <- offset;
@@ -30915,7 +30917,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 1));
           b_param_0 <- b_buf;
           param_48 <- buf;
           param_47 <- offset;
