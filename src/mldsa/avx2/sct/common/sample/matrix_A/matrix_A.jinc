@@ -8,6 +8,10 @@ namespace matrix_A {
     param int PADDING_BYTES = 8;
 
     param int REJECTION_SAMPLE_INPUT_SIZE = REJECTION_SAMPLING_BYTES + PADDING_BYTES;
+
+    // The input of the vectorized rejection loop: 24 bytes (8 candidates)
+    // per block, as many blocks as a polynomial has groups of 8 coefficients.
+    param int VECTOR_SAMPLING_BYTES = (COEFFICIENTS_IN_POLYNOMIAL / 8) * 24;
     require "rejection_sample.jinc"
 
     #[safety =
@@ -50,9 +54,8 @@ namespace matrix_A {
             );
         }
 
-        // The rejection sampler loads 32 bytes at a time and its last load
-        // reaches into the padding (one 64-bit word), which is never read as
-        // a coefficient.
+        // The rejection sampler never reads the padding (one 64-bit word): it
+        // is zeroed so that the whole buffer is initialized.
         zero = 0;
         b0.[:u64 REJECTION_SAMPLING_BYTES] = zero;
         b1.[:u64 REJECTION_SAMPLING_BYTES] = zero;
