@@ -1,8 +1,10 @@
 # Multi-backend KAT + benchmark harness.
 #
 # Each backend builds to _build/<backend>_<scheme>.so exposing the common
-# derand ABI (adapters/common_abi.h). Backends are x86-64 + AVX2: on Apple
-# Silicon they cross-build but only run on an x86-64 + AVX2 host.
+# derand ABI (adapters/common_abi.h); FIPS 202 is one library for every
+# function, _build/jasmin_fips202.so, exposing the C API of JKCP.h. Backends
+# are x86-64 + AVX2: on Apple Silicon they cross-build but only run on an
+# x86-64 + AVX2 host.
 
 CC      ?= cc
 PYTHON  ?= python3
@@ -31,6 +33,9 @@ JASMIN_KEM := $(patsubst ../src/mlkem/avx2/sct/%/jmlkem.jazz,$(BUILD)/jasmin_mlk
                 $(wildcard ../src/mlkem/avx2/sct/*/jmlkem.jazz))
 JASMIN_SIG := $(patsubst ../src/mldsa/avx2/sct/%/mldsa.jazz,$(BUILD)/jasmin_mldsa%.so,\
                 $(wildcard ../src/mldsa/avx2/sct/*/mldsa.jazz))
+# FIPS 202: one library with both JKCP programs (single lane and 4-way), whose
+# exports are the C API of src/include/JKCP.h (no shim)
+JASMIN_FIPS202 := $(if $(wildcard ../src/fips202/ref/JKCP.jazz),$(BUILD)/jasmin_fips202.so)
 # native reference libraries: all parameter sets.
 MLKN_KEM   := $(BUILD)/mlkem-native_mlkem512.so \
               $(BUILD)/mlkem-native_mlkem768.so \
@@ -54,7 +59,7 @@ PQCR_SIG   := $(BUILD)/pqcrystals-ref_mldsa44.so \
               $(BUILD)/pqcrystals-ref_mldsa87.so
 
 # the libraries of each backend (BACKENDS names them)
-LIBS_jasmin         := $(JASMIN_KEM) $(JASMIN_SIG)
+LIBS_jasmin         := $(JASMIN_KEM) $(JASMIN_SIG) $(JASMIN_FIPS202)
 LIBS_mlkem-native   := $(MLKN_KEM)
 LIBS_mldsa-native   := $(MLDN_SIG)
 LIBS_pqcrystals     := $(PQC_KEM) $(PQC_SIG)
@@ -82,6 +87,12 @@ $(SRC_BUILD)/mldsa%_avx2.s:
 $(BUILD)/jasmin_mldsa%.so: $(ADAPTERS)/jasmin/sig_shim.c $(SRC_BUILD)/mldsa%_avx2.s | $(BUILD)
 	$(CC) $(XARCH) -O2 -fPIC -shared -I$(ADAPTERS) \
 	    -DJASMIN_SIG_NS=ml_dsa_$* -o $@ $^
+
+$(SRC_BUILD)/fips202x%_avx2.s:
+	$(MAKE) -C ../src _build/fips202x$*_avx2.s
+
+$(BUILD)/jasmin_fips202.so: $(SRC_BUILD)/fips202x1_avx2.s $(SRC_BUILD)/fips202x4_avx2.s | $(BUILD)
+	$(CC) $(XARCH) -O2 -fPIC -shared -o $@ $^
 
 # ---- mlkem-native backend: shim + monolithic source + asm, AVX2 backend --
 # mlkem_native_asm.S bundles the x86_64 backend assembly; NO_RANDOMIZED_API
@@ -176,6 +187,8 @@ SCHEME   ?= ML-KEM-768
 N        ?= 100
 SCHEME_BASE = $(shell echo $(SCHEME) | tr -d '-' | tr 'A-Z' 'a-z')
 ALL_SCHEMES ?= ML-KEM-512 ML-KEM-768 ML-KEM-1024 ML-DSA-44 ML-DSA-65 ML-DSA-87
+# memcheck also covers FIPS 202 (JKCP), which the cycle benchmark does not
+MEMCHECK_SCHEMES ?= $(ALL_SCHEMES) FIPS-202
 
 REPORT  ?= bench.md
 # machine-readable report (aggregated results + run metadata) next to REPORT
@@ -218,7 +231,7 @@ $(BUILD)/memcheck: memcheck.c FORCE | $(BUILD)
 FORCE:
 
 memcheck: $(LIBS_jasmin) $(BUILD)/memcheck
-	@for s in $(ALL_SCHEMES); do \
+	@for s in $(MEMCHECK_SCHEMES); do \
 	   sb=$$(echo $$s | tr -d '-' | tr 'A-Z' 'a-z'); \
 	   $(VALGRIND) $(BUILD)/memcheck $$s $(BUILD)/jasmin_$$sb.so || exit 1; \
 	 done

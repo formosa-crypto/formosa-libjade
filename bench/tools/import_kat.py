@@ -8,8 +8,10 @@ Two sources, both downloaded at a fixed version:
   checks (FIPS 203 7.2, 7.3) included (mlkem<n>.json); ML-DSA-keyGen /
   -sigGen / -sigVer (mldsa<n>-acvp.json), only the groups of the external,
   pure interface, the one the common ABI exposes (the importer lists the
-  others); SHA3-{224,256,384,512} and SHAKE-{128,256} (sha3<n>.json,
-  shake<n>.json), AFT only, byte-aligned messages only.
+  others); SHA3-{224,256,384,512} and SHAKE-{128,256}
+  (fips202-sha3<n>.json, fips202-shake<n>.json: the tests of the fips202
+  implementation, which covers every function), AFT only, byte-aligned
+  messages only.
 - the KAT files of post-quantum-cryptography/KAT (an archived repository,
   pinned to a commit), with the SHA3-256 hashes of the long outputs:
   ML-DSA hedged_pure (mldsa<n>.json), keygen then signing; ML-KEM
@@ -41,8 +43,8 @@ def base_name(algo):
     return algo.replace("-", "").lower()  # "ML-KEM-512" -> "mlkem512"
 
 
-def write_scheme(out_dir, algo, tests, source, suffix=""):
-    path = out_dir / f"{base_name(algo)}{suffix}.json"
+def write_scheme(out_dir, algo, tests, source, suffix="", prefix=""):
+    path = out_dir / f"{prefix}{base_name(algo)}{suffix}.json"
     path.write_text(json.dumps(
         {"algorithm": algo, "source": source, "tests": tests}, indent=1))
     print(f"  {path.name}: {len(tests)} test(s)")
@@ -217,7 +219,7 @@ def import_fips202(version, out_dir, cache):
                     rec["output_length"] = out_bits // 8
                 tests.append({"count": t["tcId"], "hash": rec})
         note = f" ({skipped} sub-byte test(s) excluded)" if skipped else ""
-        write_scheme(out_dir, algo, tests, f"NIST ACVP {version}{note}")
+        write_scheme(out_dir, algo, tests, f"NIST ACVP {version}{note}", prefix="fips202-")
 
 
 def import_mldsa_acvp(version, out_dir, cache):

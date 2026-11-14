@@ -287,6 +287,25 @@ Both files are proved correct in EasyCrypt against FIPS 202:
 `proofs/fips202/ref/JKCP.ec` and `proofs/fips202/avx2/JKCP_avx2x4.ec`
 (see [the proofs README](../../proofs/fips202/README.md)).
 
+**CI.**  Together they are the `fips202` implementation of the claims
+(`src/fips202/meta.toml`, an implementation of every parameter set of
+`proofs/fips202/spec/meta.toml`), which claims `kat`, `memcheck`, `ct` and
+`sct`:
+
+- `make -C src fips202` builds `_build/fips202x1_avx2.s` (single lane) and
+  `_build/fips202x4_avx2.s` (4-way); `make -C src extract-asm` commits them
+  for Linux as `asm/fips202/avx2/fips202x{1,4}_avx2_sct.s`.
+- `make -C src ct-fips202 sct-fips202` checks both programs with
+  `jasmin-ct --doit` and `--sct --doit`.
+- `bench/` links both into `jasmin_fips202.so`.  `bench/kat.py` runs every
+  test of `bench/vectors/fips202-*.json` (NIST ACVP, byte-aligned messages)
+  through the one-shot function, the incremental API (the message absorbed
+  in three parts, the output squeezed in two, with zero-length squeezes) and
+  the 4-way API (broadcast and four-buffer absorbs, every lane).
+- `bench/memcheck.c` (scheme `FIPS-202`) runs every function on exact-size
+  heap buffers, empty ones included, through the three APIs, under
+  Valgrind's memcheck.
+
 
 ## Standard rates and trail bytes
 

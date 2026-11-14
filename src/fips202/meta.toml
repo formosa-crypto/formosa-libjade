@@ -1,0 +1,7 @@
+# JKCP, the C API of FIPS 202 (src/include/JKCP.h): one implementation of every
+# parameter set, made of two programs, the single-lane functions and the 4-way
+# ones, built into one library (bench/Makefile).
+target       = "avx2"
+profile      = "sct"
+entry_points = ["ref/JKCP.jazz", "avx2/JKCP.jazz"]
+claims       = ["kat", "memcheck", "ct", "sct"]
