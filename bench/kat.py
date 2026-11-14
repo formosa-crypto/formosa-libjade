@@ -3,7 +3,9 @@
 
 Loads _build/<backend>_<scheme>.so (built by `make libs`) and replays the KAT
 vectors through the common derand ABI (adapters/common_abi.h): kem_* for ML-KEM,
-sig_* for ML-DSA; selects the library by backend.
+sig_* for ML-DSA; selects the library by backend. The FIPS 202 functions (SHA-3,
+SHAKE) go through the C API of src/include/JKCP.h, in one library for all of
+them (<backend>_fips202.so).
 
 Usage:
     python3 kat.py --backend jasmin vectors/*.json
@@ -14,8 +16,9 @@ import argparse
 import ctypes
 import hashlib
 import json
+import re
 import sys
-from ctypes import c_int, c_size_t, c_void_p
+from ctypes import c_int, c_size_t, c_uint64, c_void_p
 from pathlib import Path
 
 
@@ -30,6 +33,12 @@ def _mlkem(base, pk, sk, ct):
             "shared_secret": 32}
 
 
+def _fips202(fn, digest=None):
+    # fn: the function of JKCP.h, without its jkcp_ prefix; digest: the output
+    # length of a hash function (None for an XOF, whose vectors give it)
+    return {"kind": "fips202", "base": "fips202", "fn": fn, "digest": digest}
+
+
 SCHEMES = {
     "ML-DSA-44": _mldsa("mldsa44", 1312, 2560, 2420),
     "ML-DSA-65": _mldsa("mldsa65", 1952, 4032, 3309),
@@ -37,6 +46,8 @@ SCHEMES = {
     "ML-KEM-512": _mlkem("mlkem512", 800, 1632, 768),
     "ML-KEM-768": _mlkem("mlkem768", 1184, 2400, 1088),
     "ML-KEM-1024": _mlkem("mlkem1024", 1568, 3168, 1568),
+    **{f"SHA3-{n}": _fips202(f"sha3_{n}", n // 8) for n in (224, 256, 384, 512)},
+    **{f"SHAKE{n}": _fips202(f"shake{n}") for n in (128, 256)},
 }
 
 
@@ -254,6 +265,92 @@ class MLKEM(Scheme):
             ssb = out_buf(self.spec["shared_secret"])
             r = self.dec_fn(ssb, in_buf(bytes(self.spec["ciphertext"])), sk)
             rep.check(self.label("check_sk") + ".decaps", r == want, f"got {r}")
+
+
+def jkcp_size(name):
+    """the value of the macro JKCP_<name>_SIZE of src/include/JKCP.h"""
+    header = Path(__file__).resolve().parent.parent / "src" / "include" / "JKCP.h"
+    return int(re.search(rf"^#define JKCP_{name}_SIZE (\d+)$", header.read_text(), re.M).group(1))
+
+
+@runner("fips202")
+class FIPS202(Scheme):
+    """Each test runs three times: through the one-shot function; through
+    the incremental API, with the message absorbed in three parts and the
+    output squeezed in two, after and between zero-length squeezes; through
+    the 4-way API, absorbed the same way (broadcast absorb, then the
+    four-buffer absorb, then broadcast again) and squeezed the same way.
+    Each output must be the digest. In the 4-way run, lane 0 has the message;
+    the other lanes have other bytes in its middle part, and their outputs
+    must be those of hashlib."""
+    OPS = ("hash",)
+
+    def bind(self, lib):
+        fn = "jkcp_" + self.spec["fn"]
+
+        def f(name, argtypes):
+            g = getattr(lib, name)
+            g.restype, g.argtypes = None, argtypes
+            return g
+        p, n = c_void_p, c_uint64
+        self.oneshot = f(fn, [p, p, n] if self.spec["digest"] else [p, n, p, n])
+        self.init = f(fn + "_init", [p])
+        self.absorb = f("jkcp_keccak_absorb", [p, p, n])
+        self.squeeze = f("jkcp_keccak_squeeze", [p, p, n])
+        self.init4 = f(fn + "x4_init", [p])
+        self.absorb4_bcast = f("jkcp_keccakx4_absorb_bcast", [p, p, n])
+        self.absorb4 = f("jkcp_keccakx4_absorb", [p, p, p, p, p, n])
+        self.squeeze4 = f("jkcp_keccakx4_squeeze", [p, p, p, p, p, n])
+        self.state, self.state4 = jkcp_size("STATE"), jkcp_size("X4_STATE")
+
+    def reference(self, msg, n):
+        f = getattr(hashlib, self.spec["fn"].replace("shake", "shake_"))
+        return f(msg).digest() if self.spec["digest"] else f(msg).digest(n)
+
+    def hash(self, b, rep):
+        msg = h(b, "message")
+        n = self.spec["digest"] or b["output_length"]
+        label = self.label("hash")
+
+        out = out_buf(n)
+        if self.spec["digest"]:
+            self.oneshot(out, in_buf(msg), len(msg))
+        else:
+            self.oneshot(out, n, in_buf(msg), len(msg))
+        rep.check_output(label + ".oneshot", b, "digest", out.raw)
+
+        cuts = [0, len(msg) // 3, 2 * len(msg) // 3, len(msg)]
+        parts = [msg[a:c] for a, c in zip(cuts, cuts[1:])]
+        k = n // 2
+
+        st = out_buf(self.state)
+        self.init(st)
+        for part in parts:
+            self.absorb(st, in_buf(part), len(part))
+        o1, o2 = out_buf(k), out_buf(n - k)
+        self.squeeze(st, out_buf(0), 0)
+        self.squeeze(st, o1, k)
+        self.squeeze(st, out_buf(0), 0)
+        self.squeeze(st, o2, n - k)
+        rep.check_output(label + ".incremental", b, "digest", o1.raw + o2.raw)
+
+        mids = [bytes(x ^ lane for x in parts[1]) for lane in range(4)]
+        st4 = out_buf(self.state4)
+        self.init4(st4)
+        self.absorb4_bcast(st4, in_buf(parts[0]), len(parts[0]))
+        self.absorb4(st4, *map(in_buf, mids), len(parts[1]))
+        self.absorb4_bcast(st4, in_buf(parts[2]), len(parts[2]))
+        o1, o2 = [out_buf(k) for _ in range(4)], [out_buf(n - k) for _ in range(4)]
+        self.squeeze4(st4, *(out_buf(0) for _ in range(4)), 0)
+        self.squeeze4(st4, *o1, k)
+        self.squeeze4(st4, *(out_buf(0) for _ in range(4)), 0)
+        self.squeeze4(st4, *o2, n - k)
+        rep.check_output(f"{label}.x4[0]", b, "digest", o1[0].raw + o2[0].raw)
+        for lane in range(1, 4):
+            want = self.reference(parts[0] + mids[lane] + parts[2], n)
+            got = o1[lane].raw + o2[lane].raw
+            rep.check(f"{label}.x4[{lane}]", got == want,
+                      f"expected {want.hex()[:24]}..., got {got.hex()[:24]}...")
 
 
 def load_backend(backend, scheme_base, lib_dir):

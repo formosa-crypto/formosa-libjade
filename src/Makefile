@@ -1,4 +1,5 @@
-# Makefile -- assembly (.s) generation for the ML-KEM / ML-DSA entry points.
+# Makefile -- assembly (.s) generation for the ML-KEM / ML-DSA entry points
+# and the FIPS 202 (SHA-3) C API (JKCP).
 #
 # Sources are laid out as <prim>/<target>/<profile>/<set>/, with the code
 # shared by the sets in <prim>/<target>/<profile>/common/; Keccak (FIPS 202)
@@ -41,7 +42,16 @@ MLDSA_S := $(patsubst $(MLDSA)/%/mldsa.jazz,$(BUILD)/mldsa%_$(TARGET).s,\
 MLKEM_S := $(patsubst $(MLKEM)/%/jmlkem.jazz,$(BUILD)/mlkem%_$(TARGET).s,\
              $(wildcard $(MLKEM)/*/jmlkem.jazz))
 
-TARGETS := $(MLDSA_S) $(MLKEM_S)
+# FIPS 202: the JKCP C API, one implementation of every function made of two
+# programs, x1 (single lane) and x4 (4-way), each given as <program>:<dir>:
+# fips202/<dir>/JKCP.jazz -> _build/fips202<program>_avx2.s.
+FIPS202_PROGS := x1:ref x4:avx2
+fips202_src    = $(KECCAK)/$(patsubst $(1):%,%,$(filter $(1):%,$(FIPS202_PROGS)))/JKCP.jazz
+FIPS202_NAMES := $(foreach pd,$(FIPS202_PROGS),$(firstword $(subst :, ,$(pd))))
+FIPS202_SRCS  := $(foreach p,$(FIPS202_NAMES),$(call fips202_src,$(p)))
+FIPS202_S     := $(foreach p,$(FIPS202_NAMES),$(BUILD)/fips202$(p)_$(TARGET).s)
+
+TARGETS := $(MLDSA_S) $(MLKEM_S) $(FIPS202_S)
 
 # Parameter sets, from the same wildcards.
 MLDSA_SETS   := $(patsubst $(MLDSA)/%/mldsa.jazz,%,$(wildcard $(MLDSA)/*/mldsa.jazz))
@@ -52,10 +62,11 @@ KECCAK_DEPS := $(shell find -L $(KECCAK) -name '*.jinc' 2>/dev/null)
 MLDSA_DEPS  := $(shell find mldsa -name '*.jinc' 2>/dev/null) $(KECCAK_DEPS)
 MLKEM_DEPS  := $(shell find mlkem -name '*.jinc' 2>/dev/null) $(KECCAK_DEPS)
 
-.PHONY: all mldsa mlkem clean
-all:   $(TARGETS)
-mldsa: $(MLDSA_S)
-mlkem: $(MLKEM_S)
+.PHONY: all mldsa mlkem fips202 clean
+all:     $(TARGETS)
+mldsa:   $(MLDSA_S)
+mlkem:   $(MLKEM_S)
+fips202: $(FIPS202_S)
 
 # ---- pattern rules: one per scheme, parametric in the set/param ----------
 # ML-DSA needs the shared Common namespace; ML-KEM only needs Keccak.
@@ -66,6 +77,10 @@ $(BUILD)/mldsa%_$(TARGET).s: $(MLDSA)/%/mldsa.jazz $(MLDSA_DEPS) | $(BUILD)
 $(BUILD)/mlkem%_$(TARGET).s: $(MLKEM)/%/jmlkem.jazz $(MLKEM_DEPS) | $(BUILD)
 	env JASMINPATH="Keccak=$(KECCAK)" \
 	    $(JASMINC) -arch=$(ARCH) $(JFLAGS) -o $@ $<
+
+$(BUILD)/fips202%_$(TARGET).s: $(FIPS202_SRCS) $(KECCAK_DEPS) | $(BUILD)
+	env JASMINPATH="Keccak=$(KECCAK)" \
+	    $(JASMINC) -arch=$(ARCH) $(JFLAGS) -o $@ $(call fips202_src,$*)
 
 $(BUILD):
 	mkdir -p $@
@@ -87,7 +102,7 @@ ASM_FLAGS := -system linux -call-conv linux
 .PHONY: extract-asm asm-unchanged check-asm
 
 extract-asm:
-	mkdir -p $(ASM)/mldsa/$(TARGET) $(ASM)/mlkem/$(TARGET)
+	mkdir -p $(ASM)/mldsa/$(TARGET) $(ASM)/mlkem/$(TARGET) $(ASM)/fips202/$(TARGET)
 	for s in $(MLDSA_SETS); do \
 	  env JASMINPATH="Common=$(MLDSA_COMMON):Keccak=$(KECCAK)" \
 	    $(JASMINC) -arch=$(ARCH) $(ASM_FLAGS) \
@@ -99,6 +114,11 @@ extract-asm:
 	    $(JASMINC) -arch=$(ARCH) $(ASM_FLAGS) \
 	    -o $(ASM)/mlkem/$(TARGET)/mlkem$${p}_$(TARGET)_$(PROFILE).s \
 	    $(MLKEM)/$$p/jmlkem.jazz || exit 1; \
+	done
+	for pd in $(FIPS202_PROGS); do \
+	  env JASMINPATH="Keccak=$(KECCAK)" $(JASMINC) -arch=$(ARCH) $(ASM_FLAGS) \
+	    -o $(ASM)/fips202/$(TARGET)/fips202$${pd%%:*}_$(TARGET)_$(PROFILE).s \
+	    $(KECCAK)/$${pd##*:}/JKCP.jazz || exit 1; \
 	done
 
 asm-unchanged:
@@ -126,24 +146,34 @@ check-asm: extract-asm
 #    make ct                 # every entry point
 #    make ct-mlkem768        # just that one
 #    make sct-mldsa65
+#    make sct-fips202        # both JKCP programs
 #
-#  STATUS: ML-KEM and ML-DSA pass both CT and SCT (with --doit); CI gates on
-#  all of them.
+#  STATUS: ML-KEM, ML-DSA and FIPS 202 (JKCP) pass both CT and SCT (with
+#  --doit); CI gates on all of them.
 # ==========================================================================
 
 MLDSA_INC := -I Common=$(MLDSA_COMMON) -I Keccak=$(KECCAK)
 MLKEM_INC := -I Keccak=$(KECCAK)
+FIPS202_INC := -I Keccak=$(KECCAK)
 
 CT_MLDSA  := $(addprefix ct-mldsa,$(MLDSA_SETS))
 CT_MLKEM  := $(addprefix ct-mlkem,$(MLKEM_PARAMS))
 SCT_MLDSA := $(addprefix sct-mldsa,$(MLDSA_SETS))
 SCT_MLKEM := $(addprefix sct-mlkem,$(MLKEM_PARAMS))
 
-.PHONY: ct sct ct-mlkem sct-mlkem ct-mldsa sct-mldsa \
+.PHONY: ct sct ct-mlkem sct-mlkem ct-mldsa sct-mldsa ct-fips202 sct-fips202 \
         $(CT_MLDSA) $(CT_MLKEM) $(SCT_MLDSA) $(SCT_MLKEM)
 
-ct:  $(CT_MLKEM)  $(CT_MLDSA)
-sct: $(SCT_MLKEM) $(SCT_MLDSA)
+ct:  $(CT_MLKEM)  $(CT_MLDSA)  ct-fips202
+sct: $(SCT_MLKEM) $(SCT_MLDSA) sct-fips202
+
+# FIPS 202: the two JKCP programs, checked as whole programs (every export,
+# with the signatures of its #[sct] annotations).
+ct-fips202 sct-fips202: %-fips202:
+	for f in $(FIPS202_SRCS); do \
+	  $(JASMINCT) $(if $(filter sct,$*),--sct) --doit --arch=$(ARCH) $(JCTFLAGS) \
+	    $(FIPS202_INC) $$f || exit 1; \
+	done
 
 # Per-scheme aggregates.
 ct-mlkem:  $(CT_MLKEM)

@@ -17,6 +17,11 @@ Usage:  claims.py
       memcheck, ct, sct) on the implementations that claim it
       (scripts/checks.py); a proved property (safety, correctness) needs the
       file below.
+  src/<prim>/meta.toml
+      an implementation of every parameter set at once, with its target, its
+      profile and the name of its scheme in bench/: the C API of FIPS 202
+      (JKCP). Its parameter_set is "all"; it claims checks only (no proved
+      property, no provsec yet).
   proofs/<prim>/<target>/<profile>/<property>/<set>/meta.toml
       the lemma of each operation for a proved property, stated in that
       directory (the statement of the parameter set, not a generic one)
@@ -184,6 +189,46 @@ def evidence(sp, impl, dirs, errors):
                                "theorem": sec.get("instances", {}).get(impl["parameter_set"])}
 
 
+def implementation(sp, prim, meta, impls, errors):
+    """the implementation that meta states, of the specification sp: of one
+    parameter set (src/<prim>/<target>/<profile>/<set>/meta.toml) or of every
+    one (src/<prim>/meta.toml, which gives its target, its profile and its
+    scheme in bench/)"""
+    m = load(meta)
+    whole = meta.parent == REPO / "src" / prim
+    if whole:
+        target, profile, param = m.get("target"), m.get("profile"), "all"
+        name, scheme = prim, m.get("scheme")
+    else:
+        target, profile, param = meta.parents[2].name, meta.parents[1].name, meta.parent.name
+        name, scheme = f"{prim}{param}", f"{sp['primitive']}-{param}"
+    impl = {"primitive": sp["primitive"], "prim": prim, "parameter_set": param,
+            "name": name, "scheme": scheme, "target": target, "profile": profile,
+            "meta": rel(meta), "claims": m.get("claims", []), "proofs": {},
+            "provsec": None, "provsec_kind": m.get("provsec")}
+    if whole:
+        impl["parameter_sets"] = sp["parameter_sets"]
+        if not scheme:
+            errors.append(f"{impl['meta']}: no scheme")
+        if impl["provsec_kind"] is not None:
+            errors.append(f"{impl['meta']}: provsec, not supported yet for an implementation "
+                          "of every parameter set")
+    elif param not in sp["parameter_sets"]:
+        errors.append(f"{impl['meta']}: {param} is no parameter set of {sp['primitive']}")
+    for c in impl["claims"]:
+        if c not in CI_PROPS + PROOF_PROPS:
+            errors.append(f"{impl['meta']}: unknown claim {c}")
+        elif whole and c in PROOF_PROPS:
+            errors.append(f"{impl['meta']}: claims {c}, not supported yet for an "
+                          "implementation of every parameter set")
+    if (target, profile) != BUILT:
+        errors.append(f"{impl['meta']}: the build has {'/'.join(BUILT)} only")
+    if any(i["name"] == name for i in impls):
+        errors.append(f"{impl['meta']}: a second implementation named {name}; the build "
+                      "has one of each")
+    return impl
+
+
 def collect(errors, proofs=True):
     """the specifications and the implementations, with the evidence of the
     proved claims when proofs is set"""
@@ -197,26 +242,11 @@ def collect(errors, proofs=True):
             if (d.is_dir() and d.name != "common" and any(d.glob("*.jazz"))
                     and not (d / "meta.toml").is_file()):
                 errors.append(f"{rel(d)}: an entry point without meta.toml")
-        for imeta in sorted((REPO / "src" / prim).glob("*/*/*/meta.toml")):
-            target, profile, param = (imeta.parents[2].name, imeta.parents[1].name,
-                                      imeta.parent.name)
-            m = load(imeta)
-            impl = {"primitive": sp["primitive"], "prim": prim, "parameter_set": param,
-                    "name": f"{prim}{param}", "target": target, "profile": profile,
-                    "meta": rel(imeta), "claims": m.get("claims", []), "proofs": {},
-                    "provsec": None, "provsec_kind": m.get("provsec")}
-            for c in impl["claims"]:
-                if c not in CI_PROPS + PROOF_PROPS:
-                    errors.append(f"{impl['meta']}: unknown claim {c}")
-            if param not in sp["parameter_sets"]:
-                errors.append(f"{impl['meta']}: {param} is no parameter set of "
-                              f"{sp['primitive']}")
-            if (target, profile) != BUILT:
-                errors.append(f"{impl['meta']}: the build has {'/'.join(BUILT)} only")
-            if any(i["name"] == impl["name"] for i in impls):
-                errors.append(f"{impl['meta']}: a second implementation of "
-                              f"{sp['primitive']}-{param}; the build has one per parameter set")
-            if proofs:
+        whole = REPO / "src" / prim / "meta.toml"
+        for imeta in ([whole] if whole.is_file() else []) + sorted(
+                (REPO / "src" / prim).glob("*/*/*/meta.toml")):
+            impl = implementation(sp, prim, imeta, impls, errors)
+            if proofs and imeta != whole:
                 evidence(sp, impl, dirs, errors)
             else:
                 impl.pop("provsec_kind")
