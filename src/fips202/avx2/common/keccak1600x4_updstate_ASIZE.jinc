@@ -107,6 +107,8 @@ fn _absorb_bcast_updstate_avx2x4
   reg ptr keccakx4_state stk;
 
   ststatus = st[:u64 4*25];
+  () = #declassify(ststatus); // public status word: rate, trail byte, lengths
+  _ = #init_msf();
   _, r8, at = _ststatus_data_avx2x4(ststatus); // 0 < r8 < 200; r8 |% 8; 0 <= at <= r8
   stk = st[:u256 0:25];
 
@@ -121,7 +123,7 @@ fn _absorb_bcast_updstate_avx2x4
   len = len;
   stk, at, _ = _add_bcast_updstate_avx2x4(stk, at, buf, off, len);
   st[:u256 0:25] = stk;
-  st.[:u8 32*25] = (8u) (64u) at;
+  st.[:u8 32*25] = (8u) (64u) at; // public status word: the cursor depends only on the lengths
 
   return st;
 }
@@ -237,6 +239,8 @@ fn _absorb_updstate_avx2x4
   reg ptr keccakx4_state stk;
 
   ststatus = st[:u64 4*25];
+  () = #declassify(ststatus); // public status word: rate, trail byte, lengths
+  _ = #init_msf();
   _, r8, at = _ststatus_data_avx2x4(ststatus); // 0 < r8 < 200; r8 |% 8; 0 <= at <= r8
   stk = st[:u256 0:25];
   () = #spill(st);
@@ -255,7 +259,7 @@ fn _absorb_updstate_avx2x4
   stk, at, _ = _add_updstate_avx2x4(stk, at, buf0, buf1, buf2, buf3, off, len);
   () = #unspill(st);
   st[:u256 0:25] = stk;
-  st.[:u8 32*25] = (8u) (64u) at;
+  st.[:u8 32*25] = (8u) (64u) at; // public status word: the cursor depends only on the lengths
 
   return st;
 }
@@ -377,6 +381,8 @@ fn _squeeze_updstate_avx2x4
   reg ptr keccakx4_state stk;
 
   ststatus = st[:u64 4*25];
+  () = #declassify(ststatus); // public status word: rate, trail byte, lengths
+  _ = #init_msf();
   _, r8, at = _ststatus_data_avx2x4(ststatus); // 0 < r8 < 200; r8 |% 8; 0 <= at <= r8
   stk = st[:u256 0:25];
 
@@ -399,7 +405,7 @@ fn _squeeze_updstate_avx2x4
 
   st[:u256 0:25] = stk;
   // if ( at == r8 ) at = 0; // avoidable because r8_at() returns 0<=at<r8
-  st.[:u8 32*25] = (8u) (64u) at;
+  st.[:u8 32*25] = (8u) (64u) at; // public status word: the cursor depends only on the lengths
 
   return st, buf0, buf1, buf2, buf3;
 }

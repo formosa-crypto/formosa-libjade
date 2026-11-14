@@ -392,6 +392,34 @@ have E := finish_lanes_absorbing r8 tb l (ust_state st) Hpab.
 by apply Array25.tP => i Hi; rewrite Array25.initiE // Array26.initiE 1:/# /= ifT 1:/# E.
 qed.
 
+(* The trail byte is nonzero while absorbing (with a nonzero trail byte) and
+   zero once finished; finish clears it and the squeezes keep it. *)
+lemma clear_at_trailb_tb s:
+ ststatus_trailb (clear_at_trailb s) = W8.zero.
+proof.
+rewrite /ststatus_trailb /truncateu8 -W8.of_int_mod /= (: 256 = 2^8) 1:// -(W64.to_uint_and_mod 8) //.
+have -> : (clear_at_trailb s `>>` W8.of_int 16) `&` W64.of_int (2^8 - 1) = W64.zero; last by rewrite W64.to_uint0.
+apply W64.wordP => k Hk; rewrite /clear_at_trailb !shr_shrw // !W64.andwE !W64.shrwE W64.of_int_powm1 //=.
+case: (k < 8) => C //=; have : k \in iota_ 0 8 by rewrite mem_iota /#.
+move: k Hk C; rewrite -iotaredE /= => k _ _; rewrite W64.of_intwE /int_bit.
+by do 7! (case => [-> //= |]); move=> -> //=.
+qed.
+
+lemma finish_spec_trailb st:
+ ststatus_trailb (finish_updstate_spec st).[25] = W8.zero.
+proof.
+rewrite /finish_updstate_spec; case: (ststatus_data_spec st.[25]) => tb r8 at /=.
+exact clear_at_trailb_tb.
+qed.
+
+lemma st26_store_trailb stk st at:
+ ststatus_trailb (st26_store stk st at).[25] = ststatus_trailb st.[25].
+proof.
+have [_ [_ ->]] // := ststatus_byte0 (st26_store stk st at).[25] st.[25] (truncateu8 (W64.of_int at)) _.
+move=> j Hj; rewrite /st26_store Array26.initiE // st26_set8_bits8 //.
+by case: (j = 0) => C; [rewrite ifT 1:/# | rewrite ifF 1:/# Array26.initiE].
+qed.
+
 
 (* ========================================================================= *)
 (* E. Absorb drivers (the `while (r8 <= len)` body and the epilogue)         *)

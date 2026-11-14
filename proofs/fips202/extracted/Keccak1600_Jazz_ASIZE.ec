@@ -6163,7 +6163,10 @@ module M = {
     var rbit:W64.t;
     var r8:int;
     var at:int;
+    var  _0:W64.t;
     ststatus <- st.[(4 * 25)];
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
     (trailb, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     t8 <- (truncateu8 (W64.of_int at));
     at <- (at `|>>` 3);
@@ -6207,8 +6210,11 @@ module M = {
     var r8:int;
     var at:int;
     var  _0:W64.t;
+    var  _1:W64.t;
+     _0 <- (init_msf);
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     status.[0] <- (truncateu8 (W64.of_int r8));
     status.[1] <- (truncateu8 (W64.of_int at));
     status.[2] <-
@@ -6217,7 +6223,8 @@ module M = {
   }
   proc init_updstate_avx2x4 (st:W64.t Array101.t, r64:int, trailb:W8.t) : 
   W64.t Array101.t = {
-    
+    var  _0:W64.t;
+     _0 <- (init_msf);
     st <- st;
     r64 <- r64;
     trailb <- trailb;
@@ -6225,7 +6232,8 @@ module M = {
     return st;
   }
   proc finish_updstate_avx2x4 (st:W64.t Array101.t) : W64.t Array101.t = {
-    
+    var  _0:W64.t;
+     _0 <- (init_msf);
     st <- st;
     st <@ _finish_updstate_avx2x4 (st);
     return st;
@@ -6318,10 +6326,13 @@ module M = {
     var r8:int;
     var at:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
+    var  _2:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -6333,7 +6344,7 @@ module M = {
       at <- 0;
     }
     len <- len;
-    (stk, at,  _1) <@ _add_m_bcast_updstate_avx2x4 (stk, at, buf, len);
+    (stk, at,  _2) <@ _add_m_bcast_updstate_avx2x4 (stk, at, buf, len);
     st <-
     (Array101.init
     (WArray808.get64
@@ -6519,13 +6530,16 @@ module M = {
     var r8:int;
     var at:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
     var  _2:int;
     var  _3:int;
     var  _4:int;
+    var  _5:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -6541,7 +6555,7 @@ module M = {
       at <- 0;
     }
     len <- len;
-    (stk, at,  _1,  _2,  _3,  _4) <@ _add_m_updstate_avx2x4 (stk, at, 
+    (stk, at,  _2,  _3,  _4,  _5) <@ _add_m_updstate_avx2x4 (stk, at, 
     buf0, buf1, buf2, buf3, len);
     (* Erased call to unspill *)
     st <-
@@ -6664,13 +6678,16 @@ module M = {
     var r8:int;
     var at:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
     var  _2:int;
     var  _3:int;
     var  _4:int;
+    var  _5:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -6688,7 +6705,7 @@ module M = {
       at <- 0;
     }
     len <- len;
-    ( _1,  _2,  _3,  _4, at) <@ _dump_m_updstate_avx2x4 (buf0, buf1, 
+    ( _2,  _3,  _4,  _5, at) <@ _dump_m_updstate_avx2x4 (buf0, buf1, 
     buf2, buf3, stk, at, len);
     st <-
     (Array101.init
@@ -6709,7 +6726,8 @@ module M = {
   }
   proc absorb_m_bcast_updstate_avx2x4 (st:W64.t Array101.t, buf:int, len:int) : 
   W64.t Array101.t = {
-    
+    var  _0:W64.t;
+     _0 <- (init_msf);
     st <- st;
     buf <- buf;
     len <- len;
@@ -6718,7 +6736,8 @@ module M = {
   }
   proc absorb_m_updstate_avx2x4 (st:W64.t Array101.t, buf0:int, buf1:int,
                                  buf2:int, buf3:int, len:int) : W64.t Array101.t = {
-    
+    var  _0:W64.t;
+     _0 <- (init_msf);
     st <- st;
     buf0 <- buf0;
     buf1 <- buf1;
@@ -6730,7 +6749,8 @@ module M = {
   }
   proc squeeze_m_updstate_avx2x4 (st:W64.t Array101.t, buf0:int, buf1:int,
                                   buf2:int, buf3:int, len:int) : W64.t Array101.t = {
-    
+    var  _0:W64.t;
+     _0 <- (init_msf);
     st <- st;
     buf0 <- buf0;
     buf1 <- buf1;
@@ -8638,10 +8658,13 @@ module M = {
     var at:int;
     var off:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
+    var  _2:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -8654,7 +8677,7 @@ module M = {
       at <- 0;
     }
     len <- len;
-    (stk, at,  _1) <@ _add_bcast_updstate_avx2x4 (stk, at, buf, off, len);
+    (stk, at,  _2) <@ _add_bcast_updstate_avx2x4 (stk, at, buf, off, len);
     st <-
     (Array101.init
     (WArray808.get64
@@ -8842,10 +8865,13 @@ module M = {
     var at:int;
     var off:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
+    var  _2:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -8862,7 +8888,7 @@ module M = {
       at <- 0;
     }
     len <- len;
-    (stk, at,  _1) <@ _add_updstate_avx2x4 (stk, at, buf0, buf1, buf2, 
+    (stk, at,  _2) <@ _add_updstate_avx2x4 (stk, at, buf0, buf1, buf2, 
     buf3, off, len);
     (* Erased call to unspill *)
     st <-
@@ -9011,10 +9037,13 @@ module M = {
     var at:int;
     var off:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
+    var  _2:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -9033,7 +9062,7 @@ module M = {
       at <- 0;
     }
     len <- len;
-    (buf0, buf1, buf2, buf3,  _1, at) <@ _dump_updstate_avx2x4 (buf0, 
+    (buf0, buf1, buf2, buf3,  _2, at) <@ _dump_updstate_avx2x4 (buf0, 
     buf1, buf2, buf3, off, stk, at, len);
     st <-
     (Array101.init
