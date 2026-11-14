@@ -6,6 +6,7 @@ import BitChunking.
 (* -------------------------------------------------------------------- *)
 from Jasmin require import JWord JModel_x86.
 
+require import JModelExtra.
 require import Agree.
 require import Avx2red.
 require import Prefixarray.
@@ -18,6 +19,7 @@ require import XArray256.
 require import MldsaConstants.
 require BaseT Sha3x4.
 
+(* -------------------------------------------------------------------- *)
 (* The sampling of the matrix A (ExpandA): the four-lane rejection
    sampler, the same for every set, and the matrix of k * l polynomials,
    sampled four at a time, with a two-polynomial tail when k * l = 2
@@ -360,6 +362,14 @@ have -> : w2bits (W32.bits2w (map accept cs)) = map accept cs ++ nseq 24 false.
 by rewrite bs2int_cat bs2int_nseq_false.
 qed.
 
+(* the lane mask of lane_signs.jinc                                     *)
+lemma __lane_signs_ll : islossless M.__lane_signs.
+proof. by proc; auto. qed.
+
+lemma __lane_signsP (c : W256.t) :
+  hoare [M.__lane_signs : lanes = c ==> res = zeroextu64 (MOVEMASK_8u32 c)].
+proof. by proc; auto => />; rewrite -lane_signs_movemask. qed.
+
 (* -------------------------------------------------------------------- *)
 (* the two 128-bit halves of the packed candidates                      *)
 lemma extract_lo (cs : W32.t list) : size cs = 8 =>
@@ -458,6 +468,15 @@ op vsampled (b : W8.t Array848.t) (p : wpoly) (bf off : int) =
   /\ bf <= 1024
   /\ bf = 4 * size (reject (Array848.sub b 0 off))
   /\ agree p 0 (reject (Array848.sub b 0 off)).
+
+(* -------------------------------------------------------------------- *)
+(* at most one accepted candidate per 3 bytes                           *)
+lemma size_reject_sub (a : W8.t Array848.t) (n : int) :
+  0 <= n <= 848 => size (reject (Array848.sub a 0 n)) <= n %/ 3.
+proof.
+move=> hn; rewrite rejectE size_filter.
+by have := count_size accept (cands (Array848.sub a 0 n)); rewrite size_cands size_sub /#.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma cands_cat (xs ys : W8.t list) : 3 %| size xs =>
@@ -663,14 +682,14 @@ proof.
 proc=> /=.
 seq 3 : (#pre /\ shuffle_table_pointer = matrix_A__SHUFFLE_TABLE).
 - by auto.
-sp 5; seq 0 : (#{/~{modulus}}pre /\ modulus = MODULUS8u32).
+sp 4; seq 0 : (#{/~{modulus}}pre /\ modulus = MODULUS8u32).
 - by auto=> &hr |>; rewrite MODULUS8u32E.
-seq 1: (                        (* FIXME: code position *)
+(* the vector loop: 32 windows of 24 bytes, which never overflow the     *)
+(* polynomial (8 candidates per window)                                 *)
+seq 1: (
      randombytes = buf
   /\ to_uint bytes_filled <= 1024
-  /\ to_uint input_offset <= 5 * 168
-  /\ (to_uint bytes_filled < (256 - 8) * 4 => to_uint input_offset = 5 * 168)
-  /\ 3 %| to_uint input_offset
+  /\ to_uint input_offset = 768
   /\ to_uint bytes_filled
        = 4 * size (reject (Array848.sub randombytes 0 (to_uint input_offset)))
   /\ agree polynomial 0 (reject (Array848.sub randombytes 0 (to_uint input_offset)))
@@ -678,15 +697,14 @@ seq 1: (                        (* FIXME: code position *)
 - while (
        randombytes = buf
     /\ vsampled buf polynomial (to_uint bytes_filled) (to_uint input_offset)
+    /\ to_uint input_offset <= 768
     /\ 24 %| to_uint input_offset
     /\ modulus = MODULUS8u32
     /\ shuffle_table_pointer = matrix_A__SHUFFLE_TABLE
-    /\ condition_loop = (stop_sampling <> W64.one)
-    /\ (stop_sampling = W64.of_int (b2i (!(
-            to_uint bytes_filled < (256 - 8) * 4
-         /\ to_uint input_offset < 5 * 168))))
+    /\ condition_loop = (input_offset \ult W64.of_int (Parameters.n %/ 8 * 24))
   ); last first.
-  - by hoare split; auto=> &hr @/vsampled |> * /=; smt(of_int_b2i_eq1P).
+  - hoare split; auto=> &hr @/vsampled |> bf cl io p hcl hio840 hdvd3 hbf hsz hag hio hdvd hc.
+    by move: hc; rewrite ultE of_uintK /= /#.
   exlim randombytes => rb.
   proc change <1 : { randombytes <- rb; }; [by auto | cfold 1; wp -1].
   (* one window per iteration; off0 names its offset                   *)
@@ -696,18 +714,19 @@ seq 1: (                        (* FIXME: code position *)
     potential_coefficients =
       W8u32.pack8 (cands (Array848.sub randombytes (to_uint input_offset) 24))).
   - ecall (matrix_A____bytestream_to_potential_coefficientsP (Array848.sub randombytes (to_uint input_offset) 32)).
-    auto=> &hr |> hs hdvd hne.
+    auto=> &hr |> hs hio hdvd hne.
     move: hs => @/vsampled [#] hio0 hdvd0 hble hsz hag.
-    have hoff840 : to_uint input_offset{hr} < 840 by smt().
+    have hoff : to_uint input_offset{hr} < 768 by move: hne; rewrite ultE of_uintK.
     rewrite size_sub //= WArray848_get256E ~-1:#smt:(W64.to_uint_cmp) /=.
     by rewrite /cands take_sub_848 //.
   (* a. the acceptance mask: good lists the accepted candidates,       *)
-  (*    least significant bit first                                     *)
-  seq > ^good<- : (
+  (*    least significant bit first; at most 8 coefficients per window *)
+  (*    so far, hence room for this one                                *)
+  seq < ^lower_coefficients<- : (
        rb = buf
     /\ vsampled buf polynomial (to_uint bytes_filled) (to_uint off0)
-    /\ to_uint bytes_filled < 992
-    /\ to_uint off0 < 840
+    /\ to_uint bytes_filled <= 992
+    /\ to_uint off0 < 768
     /\ 24 %| to_uint off0
     /\ modulus = MODULUS8u32
     /\ shuffle_table_pointer = matrix_A__SHUFFLE_TABLE
@@ -715,17 +734,23 @@ seq 1: (                        (* FIXME: code position *)
     /\ potential_coefficients = W8u32.pack8 (cands (Array848.sub buf (to_uint off0) 24))
     /\ to_uint good = bs2int (map accept (cands (Array848.sub buf (to_uint off0) 24)))
   ).
-  - auto=> &hr |> hs hdvd hne.
-    have {hne} [h1 h2] : to_uint bytes_filled{hr} < 992 /\ to_uint input_offset{hr} < 840 by smt().
-    rewrite h1 h2 /=.
-    by apply to_uint_good; [by rewrite size_cands size_sub | exact cands_uint_lt].
+  - wp; ecall (__lane_signsP compare_with_field_modulus); auto=> &hr |> hs hio hdvd hne.
+    have hoff : to_uint input_offset{hr} < 768 by move: hne; rewrite ultE of_uintK.
+    have hle : to_uint input_offset{hr} <= 744 by move: hdvd hoff => /dvdzP [q ->] /#.
+    move: hs => @/vsampled [#] hio0 hdvd0 hble hsz hag.
+    have := size_reject_sub randombytes{hr} (to_uint input_offset{hr}) _.
+    - by smt(W64.to_uint_cmp).
+    move=> hrs; split; 1: smt().
+    rewrite hoff /=.
+    by rewrite /SLH64.protect_64 -(to_uint_good _ _ (cands_uint_lt _))
+       1:size_cands 1:size_sub.
 
   (* b. compact-store the accepted low half; bytes_filled counts it    *)
   seq > ^bytes_filled<- : (
        rb = buf
     /\ vsampled buf polynomial (to_uint bytes_filled) (to_uint off0 + 12)
     /\ to_uint bytes_filled <= 1008
-    /\ to_uint off0 < 840
+    /\ to_uint off0 < 768
     /\ 24 %| to_uint off0
     /\ modulus = MODULUS8u32
     /\ shuffle_table_pointer = matrix_A__SHUFFLE_TABLE
@@ -733,7 +758,7 @@ seq 1: (                        (* FIXME: code position *)
     /\ potential_coefficients = W8u32.pack8 (cands (Array848.sub buf (to_uint off0) 24))
     /\ to_uint good = bs2int (map accept (cands (Array848.sub buf (to_uint off0) 24)))
   ).
-  - auto=> &hr |> hs h992 h840 hdvd hgood.
+  - auto=> &hr |> hs h992 h768 hdvd hgood.
     move: hs => @/vsampled [#] hio0 hdvd0 hble hsz hag.
     have szcs : size (cands (Array848.sub buf (to_uint off0) 24)) = 8 by rewrite size_cands size_sub.
     have hfle := size_filter_take4 _ szcs.
@@ -753,13 +778,13 @@ seq 1: (                        (* FIXME: code position *)
   seq > ^bytes_filled<- : (
        rb = buf
     /\ vsampled buf polynomial (to_uint bytes_filled) (to_uint off0 + 24)
-    /\ to_uint off0 < 840
+    /\ to_uint off0 < 768
     /\ 24 %| to_uint off0
     /\ modulus = MODULUS8u32
     /\ shuffle_table_pointer = matrix_A__SHUFFLE_TABLE
     /\ input_offset = off0 + W64.of_int 24
   ).
-  - auto=> &hr |> hs h1008 h840 hdvd hgood.
+  - auto=> &hr |> hs h1008 h768 hdvd hgood.
     move: hs => @/vsampled [#] hio0 hdvd0 hble hsz hag.
     have szcs : size (cands (Array848.sub buf (to_uint off0) 24)) = 8 by rewrite size_cands size_sub.
     have hfle := size_filter_drop4 _ szcs.
@@ -781,9 +806,10 @@ seq 1: (                        (* FIXME: code position *)
     split; 1: by rewrite size_cat /#.
     by apply agree_store_hi => //.
 
-  (* d. re-encode the stop flag from the new counters                  *)
-  auto=> &hr |> hs h840 hdvd.
-  by rewrite !uleE !of_uintK /= !to_uintD_small ?of_uintK /#.
+  (* d. the next window, if any, starts at off0 + 24                    *)
+  auto=> &hr |> hs h768 hdvd.
+  have hle : to_uint off0 <= 744 by move: hdvd h768 => /dvdzP [q ->] /#.
+  by rewrite to_uintD_small of_uintK /=; smt(dvdzD dvdzz).
 
 (* The scalar tail: candidate-per-candidate rejection sampling         *)
 (* entry: filled switches from byte count to coefficient count       *)
@@ -794,7 +820,8 @@ seq < ^while : (
   /\ condition_loop = (stop_sampling <> W64.one)
   /\ stop_sampling = W64.of_int (b2i (!(to_uint filled < 256 /\ to_uint input_offset < 838)))
 ).
-- by auto=> &hr |> hbf hio h992 hdvd hsz hag; rewrite /sampled !ultE !to_uint_shr2 !of_uintK /=; smt().
+- auto=> &hr |> hbf hio hsz hag.
+  by rewrite /sampled !ultE !to_uint_shr2 !of_uintK /= hio /=; smt().
 
 (* each iteration consumes one 3-byte candidate, preserving sampled  *)
 while (
@@ -1031,18 +1058,17 @@ while (   to_uint input_offset <= 840
   rewrite !to_uintD_small ?of_uintK /=; 1..3: smt().
   by rewrite !uleE h3 /=; smt().
 wp.
-while (   to_uint input_offset <= 840 /\ 24 %| to_uint input_offset
-       /\ (condition_loop => to_uint input_offset < 840))
-      (840 - to_uint input_offset).
-- move=> z; wp; call matrix_A____bytestream_to_potential_coefficients_ll.
-  auto=> &hr |> hle hdvd hlt hc.
-  have h816 : to_uint input_offset{hr} <= 816.
-  - by move: hdvd (hlt hc) => /dvdzP [q ->] /#.
+while (   to_uint input_offset <= 768 /\ 24 %| to_uint input_offset
+       /\ condition_loop = (to_uint input_offset < 768))
+      (768 - to_uint input_offset).
+- move=> z; wp; call __lane_signs_ll; wp.
+  call matrix_A____bytestream_to_potential_coefficients_ll.
+  auto=> &hr |> hle hdvd hc.
+  have h744 : to_uint input_offset{hr} <= 744.
+  - by move: hdvd hc => /dvdzP [q ->] /#.
   have h24 : to_uint (input_offset{hr} + W64.of_int 24) = to_uint input_offset{hr} + 24.
   - by rewrite to_uintD_small of_uintK /= /#.
-  have hd : 24 %| (to_uint input_offset{hr} + 24) by smt(dvdzD dvdzz).
-  move=> r; rewrite h24 (W64.uleE (W64.of_int 840)) h24 W64.of_uintK /= hd /=.
-  by smt().
+  by rewrite ultE h24 of_uintK /=; smt(dvdzD dvdzz).
 by auto=> /> bf c io; rewrite !W64.ultE !W64.of_uintK /=; smt().
 qed.
 
@@ -1208,7 +1234,8 @@ proof.
 move=> hok hfuel [_ hinv].
 have hall : forall i, 0 <= i < 4 => 256 <= to_uint (nth witness [f0; f1; f2; f3] i).
 - move=> i rgi; have [_ hf] := hinv i rgi; rewrite /= in hf.
-  by rewrite hf Array4.initiE //=; smt(stream_fuelP).
+  rewrite hf Array4.initiE //=.
+  by have := stream_fuelP (nonce i) k (hok i rgi) (hfuel i rgi); smt().
 move: (hall 0 _) (hall 1 _) (hall 2 _) (hall 3 _) => //=.
 by rewrite /a_stop /= !W64.ultE /= => 4?; rewrite !ltzNge /#.
 qed.

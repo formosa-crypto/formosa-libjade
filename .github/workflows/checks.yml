@@ -255,6 +255,36 @@ jobs:
           name: ${{ needs.earlier.outputs.marker }}
           path: checks-ok
 
+  # The required check of main's ruleset: green only if every check of the
+  # commit passed, in this run or in the earlier run on the same tree.
+  # GitHub counts a skipped job as passed, so this job never skips a run that
+  # should check (a fork's pull_request run fails here: its PR is checked once
+  # labelled "safe to test"). The runs that check nothing (another label, the
+  # label on a PR from this repo) give it another name, which no rule requires.
+  checks-ok:
+    name: >-
+      ${{ (!github.event.pull_request || github.event_name == 'pull_request' ||
+           github.event.label.name == 'safe to test' &&
+           github.event.pull_request.head.repo.full_name != github.repository)
+          && 'checks-ok' || 'checks-ok (nothing to check)' }}
+    needs: [earlier, ct, extraction, kat-memcheck, record]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Checks of the commit
+        env:
+          CHECKED: >-
+            ${{ needs.earlier.result == 'success' && needs.record.result == 'success' &&
+                (needs.earlier.outputs.run != '' ||
+                 needs.ct.result == 'success' && needs.extraction.result == 'success' &&
+                 needs.kat-memcheck.result == 'success') }}
+          REQUIRED: >-
+            ${{ !github.event.pull_request || github.event_name == 'pull_request' ||
+                github.event.label.name == 'safe to test' &&
+                github.event.pull_request.head.repo.full_name != github.repository }}
+        run: test "$CHECKED" = true || test "$REQUIRED" = false
+
   # Add the record to the results repo
   # (https://github.com/formosa-crypto/formosa-libjade-results): pushes to main
   # go to main's history, runs of PRs to the PR's own space. A separate job on

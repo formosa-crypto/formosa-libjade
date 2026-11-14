@@ -229,15 +229,25 @@ op minus_ok (pos : W32.t Array_tau1.t) (c : poly) (k : int) =
 (* __challenge_positions                                                *)
 (* ------------------------------------------------------------------ *)
 
+(* the lane mask of lane_signs.jinc                                     *)
+lemma __lane_signs_ll : islossless M.__lane_signs.
+proof. by proc; auto. qed.
+
+lemma __lane_signsP (c : W256.t) :
+  hoare [M.__lane_signs : lanes = c ==> res = zeroextu64 (MOVEMASK_8u32 c)].
+proof. by proc; auto => />; rewrite -lane_signs_movemask. qed.
+
 lemma polynomial____challenge_positions_ll : islossless M.polynomial____challenge_positions.
 proof.
 proc; wp; while (condition_group = (offset < 1024)) (1024 - offset).
 + move=> z; wp.
   while (condition_bit = (mask <> W64.zero)) (to_uint mask).
   + by move=> z'; auto => /> &hr hnz; apply WE64.blsr_lt.
-  wp; while (condition_bit = (mask <> W64.zero)) (to_uint mask).
+  wp; call __lane_signs_ll; wp.
+  while (condition_bit = (mask <> W64.zero)) (to_uint mask).
   + by move=> z'; auto => /> &hr hnz; apply WE64.blsr_lt.
-  auto => /> &hr _ c m; split; 1: smt(W64.to_uint_eq W64.to_uint0 W64.to_uint_cmp).
+  wp; call __lane_signs_ll; auto => /> &hr _ c m.
+  split; 1: smt(W64.to_uint_eq W64.to_uint0 W64.to_uint_cmp).
   move=> _ _ c' m'; split; 1: smt(W64.to_uint_eq W64.to_uint0 W64.to_uint_cmp).
   smt().
 by auto => /#.
@@ -289,7 +299,8 @@ wp; while (0 <= j <= 256 /\ j %% 8 = 0 /\ offset = 4 * j /\ condition_group = (o
     case: (i = size (cposp (lifts_wpoly _c) (- Zq.one) (j{hr} + t))) => [-> /= | hne].
     + by rewrite hnm ifT 1:#ring hv ltzz.
     by rewrite ifF 1:/# ifT 1:/#; apply hmi; smt().
-  wp; while (0 <= j < 256 /\ j %% 8 = 0 /\ offset = 4 * j
+  wp; ecall (__lane_signsP negative); wp.
+  while (0 <= j < 256 /\ j %% 8 = 0 /\ offset = 4 * j
     /\ challenge = _c /\ zeros = W256.zero /\ wpoly_srng 1 1 _c /\ challenge_shape (lifts_wpoly _c)
     /\ coefficients = get256_direct (WArray1024.init32 (fun i => _c.[i])) offset
     /\ n_minus = tau - size (cposp (lifts_wpoly _c) (- Zq.one) j)
@@ -325,6 +336,7 @@ wp; while (0 <= j <= 256 /\ j %% 8 = 0 /\ offset = 4 * j /\ condition_group = (o
     rewrite /plus_ok e size_rcons => m hm; rewrite Array_tau1.get_setE 1:/# nth_rcons -hnp.
     case: (m = to_uint n_plus{hr}) => [-> /= | hne]; 1: by rewrite hv.
     by rewrite ifT 1:/#; apply hpl; smt().
+  wp; ecall (__lane_signsP positive).
   auto => &hr [[#] hj0 hj1 hj8 hoff hcgd -> -> hs hcs hnp hnm hpl hmi] hcg.
   have hj : j{hr} < 256 by smt().
   have [_ hsz] := hcs.
@@ -341,7 +353,7 @@ wp; while (0 <= j <= 256 /\ j %% 8 = 0 /\ offset = 4 * j /\ condition_group = (o
     (0 <= b < 8 /\ (lifts_wpoly _c).[j{hr} + b] = - Zq.one).
   + move=> b; rewrite mask_neg; case: (0 <= b < 8) => // hb.
     by rewrite hcoef // (lifts_signE _c (j{hr} + b) hs _) 1:/#.
-  rewrite /SLH64.protect_256 /=.
+  move=> /= r ->; rewrite /SLH64.protect_64 /=.
   split.
   + do ? (split; 1: smt()).
     by exists 0 => /=; split; [exact hmp | split].
@@ -350,6 +362,7 @@ wp; while (0 <= j <= 256 /\ j %% 8 = 0 /\ offset = 4 * j /\ condition_group = (o
   have e1 := scan_end (fun i => (lifts_wpoly _c).[i] = Zq.one) _ _ _ _ hbt; 1,2: smt().
   have hnp8 : to_uint np0 = size (cposp (lifts_wpoly _c) Zq.one (j{hr} + 8)) by rewrite e1.
   have hpl8 : plus_ok pos0 (lifts_wpoly _c) (j{hr} + 8) by rewrite /plus_ok e1; exact hpl0.
+  move=> r' ->.
   split.
   + do ? (split; 1: smt()).
     by exists 0 => /=; split; [exact hmn | split].

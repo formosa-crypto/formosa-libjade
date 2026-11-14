@@ -73,22 +73,24 @@ fn rejection_sample_multiple_blocks(
 
     modulus = MODULUS_VECTOR;
 
-    stop_sampling = 0;
-
-    while { condition_loop = stop_sampling != 1; } (condition_loop) {
+    // Each block of 24 bytes gives at most 8 coefficients, so the first
+    // COEFFICIENTS_IN_POLYNOMIAL / 8 blocks never overflow the polynomial: the
+    // loop branches on the input offset only. The misspeculation flag then
+    // does not depend on the number of accepted coefficients, and neither
+    // does its protection of the mask: the iterations do not wait on each
+    // other.
+    while { condition_loop = input_offset < VECTOR_SAMPLING_BYTES; } (condition_loop) {
         ms = #update_msf(condition_loop, ms);
         potential_coefficients = randombytes.[:u256 input_offset];
         potential_coefficients = __bytestream_to_potential_coefficients(potential_coefficients);
         input_offset += 24;
 
         compare_with_field_modulus = #VPCMPGT_8u32(modulus, potential_coefficients);
-        // MOVEMASK_8u32 is not DOIT: its operand is protected first.
-        compare_with_field_modulus = #protect_256(compare_with_field_modulus, ms);
-
-        good = (64u)#MOVEMASK_8u32(compare_with_field_modulus);
+        good = __lane_signs(compare_with_field_modulus);
         // Model item: the candidates of ExpandA (cands_leak); this mask, the
         // outcome of the rejection test of 8 candidates, is a function of them.
         () = #declassify(good);
+        good = #protect(good, ms);
 
         // Do the lower 4 coefficients first.
         lower_coefficients = #VEXTRACTI128(potential_coefficients, 0);
@@ -123,22 +125,6 @@ fn rejection_sample_multiple_blocks(
         _, _, _, _, _, good_upper = #POPCNT_64(good_upper);
         good_upper <<= 2;
         bytes_filled += good_upper;
-
-        stop_sampling = 0;
-        condition = bytes_filled >= BYTES_PER_UNCOMPRESSED_POLYNOMIAL - 32;
-        if (condition) {
-            ms = #update_msf(condition, ms);
-            stop_sampling = 1;
-        } else {
-            ms = #update_msf(!condition, ms);
-            condition = input_offset >= REJECTION_SAMPLING_BYTES;
-            if (condition) {
-                ms = #update_msf(condition, ms);
-                stop_sampling = 1;
-            } else {
-                ms = #update_msf(!condition, ms);
-            }
-        }
     }
     ms = #update_msf(!condition_loop, ms);
 

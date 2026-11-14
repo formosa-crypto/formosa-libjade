@@ -1069,6 +1069,17 @@ abbrev mODULUS_VECTOR =
 225935595421087293402315996791205668696012104344015382954355885915737415681).
 
 module M = {
+  proc __lane_signs (lanes:W256.t) : W64.t = {
+    var signs:W64.t;
+    var bytes:W32.t;
+    lanes <- (VPACKSS_8u32 lanes lanes);
+    lanes <- (VPERMQ lanes (W8.of_int 216));
+    lanes <- (VPACKSS_16u16 lanes lanes);
+    bytes <- (MOVEMASK_32u8 lanes);
+    signs <- (zeroextu64 bytes);
+    signs <- (signs `&` (W64.of_int 255));
+    return signs;
+  }
   proc error_polynomial__encode_eta4 (encoded:W8.t Array96.t,
                                       polynomial:W32.t Array256.t) : 
   W8.t Array96.t = {
@@ -2121,7 +2132,6 @@ module M = {
     var condition_group:bool;
     var coefficients:W256.t;
     var positive:W256.t;
-    var mask32:W32.t;
     var mask:W64.t;
     var condition_bit:bool;
     var position:W64.t;
@@ -2152,10 +2162,9 @@ module M = {
       ms <- (update_msf condition_group ms);
       coefficients <-
       (get256_direct (WArray1024.init32 (fun i => challenge.[i])) offset);
-      coefficients <- (protect_256 coefficients ms);
       positive <- (VPCMPGT_8u32 coefficients zeros);
-      mask32 <- (MOVEMASK_8u32 positive);
-      mask <- (zeroextu64 mask32);
+      mask <@ __lane_signs (positive);
+      mask <- (protect_64 mask ms);
       condition_bit <- (mask <> (W64.of_int 0));
       while (condition_bit) {
         ms <- (update_msf condition_bit ms);
@@ -2170,8 +2179,8 @@ module M = {
       }
       ms <- (update_msf (! condition_bit) ms);
       negative <- (VPCMPGT_8u32 zeros coefficients);
-      mask32 <- (MOVEMASK_8u32 negative);
-      mask <- (zeroextu64 mask32);
+      mask <@ __lane_signs (negative);
+      mask <- (protect_64 mask ms);
       condition_bit <- (mask <> (W64.of_int 0));
       while (condition_bit) {
         ms <- (update_msf condition_bit ms);
@@ -13999,7 +14008,6 @@ module M = {
     var bytes_filled:W64.t;
     var input_offset:W64.t;
     var modulus:W256.t;
-    var stop_sampling:W64.t;
     var condition_loop:bool;
     var potential_coefficients:W256.t;
     var compare_with_field_modulus:W256.t;
@@ -14010,6 +14018,7 @@ module M = {
     var shuffles:W128.t;
     var upper_coefficients:W128.t;
     var good_upper:W64.t;
+    var stop_sampling:W64.t;
     var condition:bool;
     var byte0:W32.t;
     var byte1:W32.t;
@@ -14031,8 +14040,7 @@ module M = {
     bytes_filled <- (W64.of_int 0);
     input_offset <- (W64.of_int 0);
     modulus <- mODULUS_VECTOR;
-    stop_sampling <- (W64.of_int 0);
-    condition_loop <- (stop_sampling <> (W64.of_int 1));
+    condition_loop <- (input_offset \ult (W64.of_int ((256 %/ 8) * 24)));
     while (condition_loop) {
       ms <- (update_msf condition_loop ms);
       potential_coefficients <-
@@ -14043,10 +14051,9 @@ module M = {
       input_offset <- (input_offset + (W64.of_int 24));
       compare_with_field_modulus <-
       (VPCMPGT_8u32 modulus potential_coefficients);
-      compare_with_field_modulus <-
-      (protect_256 compare_with_field_modulus ms);
-      good <- (zeroextu64 (MOVEMASK_8u32 compare_with_field_modulus));
+      good <@ __lane_signs (compare_with_field_modulus);
       (* Erased call to declassify *)
+      good <- (protect_64 good ms);
       lower_coefficients <-
       (VEXTRACTI128 potential_coefficients (W8.of_int 0));
       good_lower <- good;
@@ -14083,22 +14090,7 @@ module M = {
       ( _5,  _6,  _7,  _8,  _9, good_upper) <- (POPCNT_64 good_upper);
       good_upper <- (good_upper `<<` (W8.of_int 2));
       bytes_filled <- (bytes_filled + good_upper);
-      stop_sampling <- (W64.of_int 0);
-      condition <- ((W64.of_int (((256 * 32) %/ 8) - 32)) \ule bytes_filled);
-      if (condition) {
-        ms <- (update_msf condition ms);
-        stop_sampling <- (W64.of_int 1);
-      } else {
-        ms <- (update_msf (! condition) ms);
-        condition <- ((W64.of_int (5 * 168)) \ule input_offset);
-        if (condition) {
-          ms <- (update_msf condition ms);
-          stop_sampling <- (W64.of_int 1);
-        } else {
-          ms <- (update_msf (! condition) ms);
-        }
-      }
-      condition_loop <- (stop_sampling <> (W64.of_int 1));
+      condition_loop <- (input_offset \ult (W64.of_int ((256 %/ 8) * 24)));
     }
     ms <- (update_msf (! condition_loop) ms);
     filled <- bytes_filled;
@@ -15503,7 +15495,6 @@ module M = {
     var condition_group:bool;
     var coefficients:W256.t;
     var equal_to_zero:W256.t;
-    var mask:W32.t;
     var nonzero:W64.t;
     var condition_bit:bool;
     var position:W64.t;
@@ -15553,11 +15544,10 @@ module M = {
         ms <- (update_msf condition_group ms);
         coefficients <-
         (get256_direct (WArray8192.init32 (fun i_0 => hint_0.[i_0])) offset);
-        coefficients <- (protect_256 coefficients ms);
         equal_to_zero <- (VPCMPEQ_8u32 coefficients zeros);
-        mask <- (MOVEMASK_8u32 equal_to_zero);
-        nonzero <- (zeroextu64 mask);
+        nonzero <@ __lane_signs (equal_to_zero);
         nonzero <- (nonzero `^` (W64.of_int 255));
+        nonzero <- (protect_64 nonzero ms);
         condition_bit <- (nonzero <> (W64.of_int 0));
         while (condition_bit) {
           ms <- (update_msf condition_bit ms);
