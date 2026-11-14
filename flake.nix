@@ -136,11 +136,13 @@
         packages.default = scope.formosa-libjade;
 
         # Toolchain for the cycle benchmarks, the KATs, memcheck and the
-        # constant-time checks: jasmin and a pinned C toolchain (mkShell's
-        # stdenv cc), no EasyCrypt/provers — keeps the bench closure small and
-        # the benchmark compiler pinned by flake.lock. Valgrind (Linux only)
-        # is a build input for the headers of its client requests.
-        devShells.bench = pkgs.mkShell {
+        # constant-time checks: jasmin and a pinned C toolchain, no
+        # EasyCrypt/provers — keeps the bench closure small and the benchmark
+        # compiler pinned by flake.lock. The C compiler is clang (clangStdenv),
+        # with which the C implementations the benchmarks compare against are
+        # faster overall than with gcc. Valgrind (Linux only) is a build input
+        # for the headers of its client requests.
+        devShells.bench = pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
           packages = [
             scope.jasmin
             pkgs.python3

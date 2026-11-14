@@ -15,6 +15,23 @@ else
   XARCH ?=
 endif
 
+# The backend libraries are shared objects, loaded by dlopen. On ELF, PIC code
+# calls the global functions through the PLT and reads the global data through
+# the GOT, as another library could interpose them: the C backends, whose
+# functions span several files or call their assembly, would pay for it,
+# Jasmin's single assembly file would not. -Bsymbolic binds these references
+# inside the library at link time (the linker turns them into direct calls and
+# addresses), as in a static link. Mach-O binds them so already.
+ifeq ($(UNAME_S),Darwin)
+  LINKFLAGS ?=
+else
+  LINKFLAGS ?= -fno-semantic-interposition -Wl,-Bsymbolic
+endif
+# The instruction set of the AVX2 backends: the x86-64-v3 level (AVX2, BMI1/2,
+# LZCNT, POPCNT, MOVBE, FMA). The portable-C backend (pqcrystals-ref) keeps
+# the default one.
+ISAFLAGS ?= -march=x86-64-v3
+
 ADAPTERS := adapters
 SRC_BUILD := ../src/_build
 MLKN := third_party/mlkem-native/mlkem
@@ -73,20 +90,20 @@ $(SRC_BUILD)/mlkem%_avx2.s:
 	$(MAKE) -C ../src _build/mlkem$*_avx2.s
 
 $(BUILD)/jasmin_mlkem%.so: $(ADAPTERS)/jasmin/kem_shim.c $(SRC_BUILD)/mlkem%_avx2.s | $(BUILD)
-	$(CC) $(XARCH) -O2 -fPIC -shared -I$(ADAPTERS) \
+	$(CC) $(XARCH) -O2 -fPIC -shared $(LINKFLAGS) -I$(ADAPTERS) \
 	    -DJASMIN_KEM_NS=jade_kem_mlkem_mlkem$*_amd64_avx2 -o $@ $^
 
 $(SRC_BUILD)/mldsa%_avx2.s:
 	$(MAKE) -C ../src _build/mldsa$*_avx2.s
 
 $(BUILD)/jasmin_mldsa%.so: $(ADAPTERS)/jasmin/sig_shim.c $(SRC_BUILD)/mldsa%_avx2.s | $(BUILD)
-	$(CC) $(XARCH) -O2 -fPIC -shared -I$(ADAPTERS) \
+	$(CC) $(XARCH) -O2 -fPIC -shared $(LINKFLAGS) -I$(ADAPTERS) \
 	    -DJASMIN_SIG_NS=ml_dsa_$* -o $@ $^
 
 # ---- mlkem-native backend: shim + monolithic source + asm, AVX2 backend --
 # mlkem_native_asm.S bundles the x86_64 backend assembly; NO_RANDOMIZED_API
 # drops the non-derand keypair/enc (and their randombytes dependency).
-MLKN_FLAGS := -mavx2 -mbmi2 \
+MLKN_FLAGS := $(ISAFLAGS) \
               -DMLK_CONFIG_USE_NATIVE_BACKEND_ARITH \
               -DMLK_CONFIG_USE_NATIVE_BACKEND_FIPS202 \
               -DMLK_CONFIG_NO_RANDOMIZED_API
@@ -94,13 +111,13 @@ MLKN_SRC := $(ADAPTERS)/mlkem-native/kem_shim.c \
             $(MLKN)/mlkem_native.c $(MLKN)/mlkem_native_asm.S
 
 $(BUILD)/mlkem-native_mlkem%.so: $(MLKN_SRC) | $(BUILD)
-	$(CC) $(XARCH) -O3 -fomit-frame-pointer -fPIC -shared \
+	$(CC) $(XARCH) -O3 -fomit-frame-pointer -fPIC -shared $(LINKFLAGS) \
 	    $(MLKN_FLAGS) -DMLK_CONFIG_PARAMETER_SET=$* \
 	    -DMLK_CONFIG_NAMESPACE_PREFIX=mlkn$*_ \
 	    -I$(MLKN) -I$(ADAPTERS) -o $@ $(MLKN_SRC)
 
 # ---- mldsa-native backend: shim + monolithic source + asm, AVX2 backend --
-MLDN_FLAGS := -mavx2 -mbmi2 \
+MLDN_FLAGS := $(ISAFLAGS) \
               -DMLD_CONFIG_USE_NATIVE_BACKEND_ARITH \
               -DMLD_CONFIG_USE_NATIVE_BACKEND_FIPS202 \
               -DMLD_CONFIG_NO_RANDOMIZED_API
@@ -108,7 +125,7 @@ MLDN_SRC := $(ADAPTERS)/mldsa-native/sig_shim.c \
             $(MLDN)/mldsa_native.c $(MLDN)/mldsa_native_asm.S
 
 $(BUILD)/mldsa-native_mldsa%.so: $(MLDN_SRC) | $(BUILD)
-	$(CC) $(XARCH) -O3 -fomit-frame-pointer -fPIC -shared \
+	$(CC) $(XARCH) -O3 -fomit-frame-pointer -fPIC -shared $(LINKFLAGS) \
 	    $(MLDN_FLAGS) -DMLD_CONFIG_PARAMETER_SET=$* \
 	    -DMLD_CONFIG_NAMESPACE_PREFIX=mldn$*_ \
 	    -I$(MLDN) -I$(ADAPTERS) -o $@ $(MLDN_SRC)
@@ -134,7 +151,7 @@ DAVX_SRC := $(addprefix $(DAVX)/,sign.c packing.c polyvec.c poly.c ntt.S invntt.
 KREF_SRC := $(wildcard $(KREF)/*.c)
 DREF_SRC := $(filter-out %/randombytes.c,$(wildcard $(DREF)/*.c))
 
-AVX2FLAGS := -mavx2 -mbmi2 -Wl,-z,noexecstack
+AVX2FLAGS := $(ISAFLAGS) -Wl,-z,noexecstack
 
 # scheme -> KYBER_K / DILITHIUM_MODE (shared by both variants)
 $(BUILD)/pqcrystals_mlkem512.so $(BUILD)/pqcrystals-ref_mlkem512.so:   KYBER_K := 2
@@ -146,18 +163,18 @@ $(BUILD)/pqcrystals_mldsa87.so $(BUILD)/pqcrystals-ref_mldsa87.so: DILITHIUM_MOD
 
 # avx2 variant (the `pqcrystals` backend)
 $(PQC_KEM): $(BUILD)/pqcrystals_mlkem%.so: $(SHK) $(KAVX_SRC) | $(BUILD)
-	$(CC) $(XARCH) -O3 -fomit-frame-pointer $(AVX2FLAGS) -fPIC -shared \
+	$(CC) $(XARCH) -O3 -fomit-frame-pointer $(AVX2FLAGS) -fPIC -shared $(LINKFLAGS) \
 	    -DKYBER_K=$(KYBER_K) -I$(KAVX) -Iadapters -o $@ $(SHK) $(KAVX_SRC)
 $(PQC_SIG): $(BUILD)/pqcrystals_mldsa%.so: $(SHS) $(DAVX_SRC) | $(BUILD)
-	$(CC) $(XARCH) -O3 -fomit-frame-pointer $(AVX2FLAGS) -fPIC -shared \
+	$(CC) $(XARCH) -O3 -fomit-frame-pointer $(AVX2FLAGS) -fPIC -shared $(LINKFLAGS) \
 	    -DDILITHIUM_MODE=$(DILITHIUM_MODE) -I$(DAVX) -Iadapters -o $@ $(SHS) $(DAVX_SRC)
 
 # portable-C variant (the `pqcrystals-ref` backend)
 $(PQCR_KEM): $(BUILD)/pqcrystals-ref_mlkem%.so: $(SHK) $(KREF_SRC) | $(BUILD)
-	$(CC) $(XARCH) -O3 -fomit-frame-pointer -fPIC -shared \
+	$(CC) $(XARCH) -O3 -fomit-frame-pointer -fPIC -shared $(LINKFLAGS) \
 	    -DKYBER_K=$(KYBER_K) -I$(KREF) -Iadapters -o $@ $(SHK) $(KREF_SRC)
 $(PQCR_SIG): $(BUILD)/pqcrystals-ref_mldsa%.so: $(SHS) $(DREF_SRC) | $(BUILD)
-	$(CC) $(XARCH) -O3 -fomit-frame-pointer -fPIC -shared \
+	$(CC) $(XARCH) -O3 -fomit-frame-pointer -fPIC -shared $(LINKFLAGS) \
 	    -DDILITHIUM_MODE=$(DILITHIUM_MODE) -I$(DREF) -Iadapters -o $@ $(SHS) $(DREF_SRC)
 
 # ---- drivers (x86-64 + AVX2 host only) -----------------------------------
@@ -258,6 +275,7 @@ report: libs $(BUILD)/bench
 	        --version "pinned core=$(if $(PIN),$(CPU),none)" \
 	        --version "freq governor=$$(cat /sys/devices/system/cpu/cpu$(if $(PIN),$(CPU),0)/cpufreq/scaling_governor 2>/dev/null || echo unknown)" \
 	        --version "jasminc=$$(jasminc -version 2>/dev/null | head -1)" \
+	        --version "cc=$$($(CC) --version 2>/dev/null | head -1)" \
 	        --version "mlkem-native=$(call gitver,$(MLKN)/..)" \
 	        --version "mldsa-native=$(call gitver,$(MLDN)/..)" \
 	        --version "pq-crystals/kyber=$(call gitver,$(KREF)/..)" \
