@@ -13,6 +13,15 @@ type keccak_updstate = u64[26];
   - byte[0] - at_position (pre: 0 <= at <= 200)
   - byte[1] - r64-1, where r8 = 8*r64 (r8 = rate in bytes) -- (pre: 0 < r64 <= 25)
   - byte[2] - Trail Byte
+
+ The status word is public: it depends only on the rate and the trail byte,
+ set by init, and on the lengths absorbed and squeezed, never on the data.
+ It is declassified where it is read; the procedures that branch on it or
+ index the state with it then call #init_msf, so that the declassified value
+ is not transient either.  The declassification is a workaround for a
+ limitation of the SCT type system, which gives all the entries of an array
+ the same security type: the status word shares its array with the secret
+ Keccak state, so it cannot be typed public on its own.
 */
 
 /**

@@ -48,7 +48,7 @@ fn _init_updstate
   t = (64u) (8u) r64;
   status += t;
   status <<= 8;
-  st[25] = status;
+  st[25] = status; // public status word: rate and trail byte, cursor 0
 
   return st;
 }
@@ -63,12 +63,12 @@ fn _finish_updstate
   reg ui64 at, r8;
   reg u8 trailb;
   ststatus = st[25];
-  () = #declassify(ststatus);
+  () = #declassify(ststatus); // public status word: rate, trail byte, lengths
   _ = #init_msf();
   trailb, r8, at = _ststatus_data(ststatus);
   st.[:u8 at] ^= trailb;
   st.[:u8 r8-1] ^= 0x80;
-  st.[:u32 8*25] &= 0xFF00FF00; // clear trail-byte and at-position
+  st.[:u32 8*25] &= 0xFF00FF00; // public status word: clear trail-byte and at-position
   
   return st;
 }
@@ -195,7 +195,7 @@ fn _absorb_m_updstate
   SPILL = KECCAK_F != KECCAK_F1600_AVX2;
 
   ststatus = st[25];
-  () = #declassify(ststatus);
+  () = #declassify(ststatus); // public status word: rate, trail byte, lengths
   _ = #init_msf();
   _, r8, at = _ststatus_data(ststatus); // 0 < r8 < 200; r8 |% 8; 0 <= at <= r8
   stk = st[0:25];
@@ -218,7 +218,7 @@ fn _absorb_m_updstate
   () = #unspill(st);
   stk, at, _ = _add_m_updstate(stk, at, buf, len);
   st[0:25] = stk;
-  st.[:u8 8*25] = (8u) (64u) at;
+  st.[:u8 8*25] = (8u) (64u) at; // public status word: the cursor depends only on the lengths
 
   return st;
 }
@@ -341,7 +341,7 @@ fn _squeeze_m_updstate
   SPILL = KECCAK_F != KECCAK_F1600_AVX2;
 
   ststatus = st[25];
-  () = #declassify(ststatus);
+  () = #declassify(ststatus); // public status word: rate, trail byte, lengths
   _ = #init_msf();
   _, r8, at = _ststatus_data(ststatus); // 0 < r8 < 200; r8 |% 8; 0 <= at <= r8
   stk = st[0:25];
@@ -379,7 +379,7 @@ fn _squeeze_m_updstate
   () = #unspill(st);
   st[0:25] = stk;
   // if ( at == r8 ) at = 0; // avoidable because r8_at() returns 0<=at<r8
-  st.[:u8 8*25] = (8u) (64u) at;
+  st.[:u8 8*25] = (8u) (64u) at; // public status word: the cursor depends only on the lengths
 
   return st;
 }

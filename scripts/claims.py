@@ -17,6 +17,11 @@ Usage:  claims.py
       memcheck, ct, sct) on the implementations that claim it
       (scripts/checks.py); a proved property (safety, correctness) needs the
       file below.
+  src/<prim>/meta.toml
+      an implementation of every parameter set at once, made of the programs
+      it lists (entry_points, relative to src/<prim>), with its target and
+      profile: the C API of FIPS 202 (JKCP). Its parameter_set is "all"; it
+      claims checks only (no proved property, no provsec yet).
   proofs/<prim>/<target>/<profile>/<property>/<set>/meta.toml
       the lemma of each operation for a proved property, stated in that
       directory (the statement of the parameter set, not a generic one)
@@ -184,6 +189,38 @@ def evidence(sp, impl, dirs, errors):
                                "theorem": sec.get("instances", {}).get(impl["parameter_set"])}
 
 
+def whole_impl(sp, prim, meta, impls, errors):
+    """the implementation of every parameter set of the specification sp,
+    src/<prim>/meta.toml: named <prim>, with the scheme of bench/ named after
+    the standard ("FIPS 202" -> "FIPS-202", library jasmin_fips202.so)"""
+    m = load(meta)
+    impl = {"primitive": sp["primitive"], "prim": prim, "parameter_set": "all",
+            "parameter_sets": sp["parameter_sets"], "name": prim,
+            "scheme": sp["standard"].replace(" ", "-"),
+            "target": m.get("target"), "profile": m.get("profile"),
+            "entry_points": [f"src/{prim}/{e}" for e in m.get("entry_points", [])],
+            "meta": rel(meta), "claims": m.get("claims", []), "proofs": {}, "provsec": None}
+    for c in impl["claims"]:
+        if c in PROOF_PROPS:
+            errors.append(f"{impl['meta']}: claims {c}, not supported yet for an "
+                          "implementation of every parameter set")
+        elif c not in CI_PROPS:
+            errors.append(f"{impl['meta']}: unknown claim {c}")
+    if "provsec" in m:
+        errors.append(f"{impl['meta']}: provsec, not supported yet for an implementation "
+                      "of every parameter set")
+    if (impl["target"], impl["profile"]) != BUILT:
+        errors.append(f"{impl['meta']}: the build has {'/'.join(BUILT)} only")
+    if not impl["entry_points"]:
+        errors.append(f"{impl['meta']}: no entry_points")
+    for e in impl["entry_points"]:
+        if not e.endswith(".jazz") or not (REPO / e).is_file():
+            errors.append(f"{impl['meta']}: entry point {e} is no .jazz file")
+    if any(i["name"] == impl["name"] for i in impls):
+        errors.append(f"{impl['meta']}: a second implementation named {impl['name']}")
+    return impl
+
+
 def collect(errors, proofs=True):
     """the specifications and the implementations, with the evidence of the
     proved claims when proofs is set"""
@@ -197,12 +234,16 @@ def collect(errors, proofs=True):
             if (d.is_dir() and d.name != "common" and any(d.glob("*.jazz"))
                     and not (d / "meta.toml").is_file()):
                 errors.append(f"{rel(d)}: an entry point without meta.toml")
+        whole = REPO / "src" / prim / "meta.toml"
+        if whole.is_file():
+            impls.append(whole_impl(sp, prim, whole, impls, errors))
         for imeta in sorted((REPO / "src" / prim).glob("*/*/*/meta.toml")):
             target, profile, param = (imeta.parents[2].name, imeta.parents[1].name,
                                       imeta.parent.name)
             m = load(imeta)
             impl = {"primitive": sp["primitive"], "prim": prim, "parameter_set": param,
-                    "name": f"{prim}{param}", "target": target, "profile": profile,
+                    "name": f"{prim}{param}", "scheme": f"{sp['primitive']}-{param}",
+                    "target": target, "profile": profile,
                     "meta": rel(imeta), "claims": m.get("claims", []), "proofs": {},
                     "provsec": None, "provsec_kind": m.get("provsec")}
             for c in impl["claims"]:

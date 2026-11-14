@@ -1,0 +1,196 @@
+/*
+  Jasmin Keccak Code Package (JKCP) -- 4-way AVX2 C-ABI exports.
+
+  Incremental interface for the 4-way (x4) Keccak sponge.  All four
+  lanes share the same rate and trail byte (set at init time); absorb
+  comes in two flavours -- broadcast (same data to all lanes) and
+  independent (four separate buffers, same length).
+
+  Per-variant init:
+    sha3_224x4_init(st)  sha3_256x4_init(st)  sha3_384x4_init(st)
+    sha3_512x4_init(st)  shake128x4_init(st)   shake256x4_init(st)
+
+  Generic operations:
+    keccakx4_absorb_bcast(st, data, len)
+    keccakx4_absorb(st, buf0, buf1, buf2, buf3, len)
+    keccakx4_squeeze(st, out0, out1, out2, out3, len)  -- the first call
+                                                          also finishes
+
+  State type: keccakx4_updstate (u64[101], 808 bytes).  Its trail byte is
+  nonzero while absorbing and zero once finished, so keccakx4_squeeze knows
+  whether to finish first.
+
+  Speculative constant time: the state, the input and the output are
+  secret; pointers and lengths are public.  The exports that take the state
+  start with #init_msf (an LFENCE), as their pointer argument is transient;
+  the 4-way updstate procedures fence after reading (and declassifying) the
+  public status word.
+*/
+
+from Keccak require "common/keccak1600_default.jinc"
+from Keccak require "avx2/common/keccak1600x4.jinc"
+from Keccak require "avx2/common/keccak1600x4_updstate.jinc"
+
+
+/* =====================================================================
+   Incremental: per-variant init
+   ===================================================================== */
+
+inline fn __keccakx4_init
+( reg mut ptr keccakx4_updstate st
+, inline int _RATE64
+, inline int _TRAILB
+) -> reg ptr keccakx4_updstate
+{
+  reg ui8 r64;
+  reg u8 trailb;
+
+  r64 = _RATE64;
+  trailb = _TRAILB;
+  st = _init_updstate_avx2x4(st, r64, trailb);
+  return st;
+}
+
+#[sct="{ptr: transient, val: secret} -> {ptr: transient, val: secret}"]
+export fn sha3_224x4_init
+( reg mut ptr keccakx4_updstate st
+) -> reg ptr keccakx4_updstate
+{
+  _ = #init_msf();
+  st = st;
+  st = __keccakx4_init(st, R144/8, SHA3);
+  return st;
+}
+
+#[sct="{ptr: transient, val: secret} -> {ptr: transient, val: secret}"]
+export fn sha3_256x4_init
+( reg mut ptr keccakx4_updstate st
+) -> reg ptr keccakx4_updstate
+{
+  _ = #init_msf();
+  st = st;
+  st = __keccakx4_init(st, R136/8, SHA3);
+  return st;
+}
+
+#[sct="{ptr: transient, val: secret} -> {ptr: transient, val: secret}"]
+export fn sha3_384x4_init
+( reg mut ptr keccakx4_updstate st
+) -> reg ptr keccakx4_updstate
+{
+  _ = #init_msf();
+  st = st;
+  st = __keccakx4_init(st, R104/8, SHA3);
+  return st;
+}
+
+#[sct="{ptr: transient, val: secret} -> {ptr: transient, val: secret}"]
+export fn sha3_512x4_init
+( reg mut ptr keccakx4_updstate st
+) -> reg ptr keccakx4_updstate
+{
+  _ = #init_msf();
+  st = st;
+  st = __keccakx4_init(st, R72/8, SHA3);
+  return st;
+}
+
+#[sct="{ptr: transient, val: secret} -> {ptr: transient, val: secret}"]
+export fn shake128x4_init
+( reg mut ptr keccakx4_updstate st
+) -> reg ptr keccakx4_updstate
+{
+  _ = #init_msf();
+  st = st;
+  st = __keccakx4_init(st, R168/8, SHAKE);
+  return st;
+}
+
+#[sct="{ptr: transient, val: secret} -> {ptr: transient, val: secret}"]
+export fn shake256x4_init
+( reg mut ptr keccakx4_updstate st
+) -> reg ptr keccakx4_updstate
+{
+  _ = #init_msf();
+  st = st;
+  st = __keccakx4_init(st, R136/8, SHAKE);
+  return st;
+}
+
+
+/* =====================================================================
+   Incremental: absorb (broadcast and independent) / squeeze
+   ===================================================================== */
+
+#[sct="{ptr: transient, val: secret} * transient * transient -> {ptr: transient, val: secret}"]
+export fn keccakx4_absorb_bcast
+( reg mut ptr keccakx4_updstate st
+, reg ui64 buf
+, reg ui64 len
+) -> reg ptr keccakx4_updstate
+{
+  _ = #init_msf();
+  st = st;
+  buf = buf;
+  len = len;
+  st = _absorb_m_bcast_updstate_avx2x4(st, buf, len);
+  return st;
+}
+
+#[sct="{ptr: transient, val: secret} * transient * transient * transient * transient * transient -> {ptr: transient, val: secret}"]
+export fn keccakx4_absorb
+( reg mut ptr keccakx4_updstate st
+, reg ui64 buf0 buf1 buf2 buf3
+, reg ui64 len
+) -> reg ptr keccakx4_updstate
+{
+  _ = #init_msf();
+  st = st;
+  buf0 = buf0;
+  buf1 = buf1;
+  buf2 = buf2;
+  buf3 = buf3;
+  len = len;
+  st = _absorb_m_updstate_avx2x4(st, buf0, buf1, buf2, buf3, len);
+  return st;
+}
+
+/* The first squeeze finishes the absorption: the trail byte, nonzero until
+   then, is cleared by _finish_updstate_avx2x4.  The status word depends only
+   on the rate, the trail byte and the lengths, so it is declassified.
+   A zero-length squeeze must not reach _squeeze_m_updstate_avx2x4: at a
+   block boundary it would permute the state and skip a block of output. */
+#[sct="{ptr: transient, val: secret} * transient * transient * transient * transient * transient -> {ptr: transient, val: secret}"]
+export fn keccakx4_squeeze
+( reg mut ptr keccakx4_updstate st
+, reg ui64 buf0 buf1 buf2 buf3
+, reg ui64 len
+) -> reg ptr keccakx4_updstate
+{
+  reg u64 ststatus;
+  #[msf] reg u64 ms;
+  reg u8 trailb;
+  reg bool nonempty;
+
+  ms = #init_msf();
+  st = st;
+  buf0 = buf0;
+  buf1 = buf1;
+  buf2 = buf2;
+  buf3 = buf3;
+  len = len;
+  nonempty = len > 0;
+  if (nonempty) {
+    ms = #update_msf(nonempty, ms);
+    ststatus = st[4*25];
+    () = #declassify(ststatus); // public status word: rate, trail byte, lengths
+    ststatus = #protect(ststatus, ms);
+    ststatus >>= 16;
+    trailb = (8u) ststatus;
+    if (trailb != 0) {
+      st = _finish_updstate_avx2x4(st);
+    }
+    st = _squeeze_m_updstate_avx2x4(st, buf0, buf1, buf2, buf3, len);
+  }
+  return st;
+}

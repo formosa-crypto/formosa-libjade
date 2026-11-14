@@ -10,6 +10,8 @@ require import Keccak1600_safety_lib.
 require import SBArray808_800.
 from Jasmin require import JModel_x86 Jcheck JSafety JByte_array.
 import JWord JUtils.
+(* init_msf, in the MM blocks of the jasmin-nist streaming procedures *)
+import SLH64.
 
 (* memory absorb/squeeze *)
 
@@ -491,7 +493,7 @@ lemma _absorb_m_bcast_updstate_avx2x4_proof _st _b_st _buf _len :
 proof.
 hint +safety.
 rewrite /_absorb_m_bcast_updstate_avx2x4_spec; proc.
-seq 30 : (valid trace__absorb_m_bcast_updstate_avx2x4 /\ 0 < r8 <= 200 /\ 0 <= at < r8 /\
+seq 31 : (valid trace__absorb_m_bcast_updstate_avx2x4 /\ 0 < r8 <= 200 /\ 0 <= at < r8 /\
           at <= len /\ 0 <= _buf <= buf /\ is_valid ptr_modulus Glob.mem_v _buf _len /\
           buf + (len - at) = _buf + _len /\ BArray808.is_init b_st 0 808 /\
           BArray800.is_init b_stk 0 800).
@@ -569,7 +571,7 @@ lemma _absorb_m_updstate_avx2x4_proof _st _b_st _buf0 _buf1 _buf2 _buf3 _len :
 proof.
 hint +safety.
 rewrite /_absorb_m_updstate_avx2x4_spec; proc.
-seq 33 : (valid trace__absorb_m_updstate_avx2x4 /\ 0 < r8 <= 200 /\ 0 <= at < r8 /\ at <= len /\
+seq 34 : (valid trace__absorb_m_updstate_avx2x4 /\ 0 < r8 <= 200 /\ 0 <= at < r8 /\ at <= len /\
           0 <= _buf0 <= buf0 /\ is_valid ptr_modulus Glob.mem_v _buf0 _len /\
           buf0 + (len - at) = _buf0 + _len /\ 0 <= _buf1 <= buf1 /\
           is_valid ptr_modulus Glob.mem_v _buf1 _len /\ buf1 + (len - at) = _buf1 + _len /\
@@ -654,7 +656,7 @@ lemma _squeeze_m_updstate_avx2x4_proof _st _b_st _buf0 _buf1 _buf2 _buf3 _len :
 proof.
 hint +safety.
 rewrite /_squeeze_m_updstate_avx2x4_spec; proc.
-seq 32 : (valid trace__squeeze_m_updstate_avx2x4 /\ 0 < r8 <= 200 /\ 0 <= at < r8 /\ len = _len /\
+seq 33 : (valid trace__squeeze_m_updstate_avx2x4 /\ 0 < r8 <= 200 /\ 0 <= at < r8 /\ len = _len /\
           0 <= _len <= 18446744073709551360 /\ buf0 = _buf0 /\ 0 <= _buf0 /\
           is_valid ptr_modulus Glob.mem_v _buf0 _len /\ buf1 = _buf1 /\ 0 <= _buf1 /\
           is_valid ptr_modulus Glob.mem_v _buf1 _len /\ buf2 = _buf2 /\ 0 <= _buf2 /\
@@ -4227,6 +4229,7 @@ module MM = {
     var b_result_1:BArray800.t;
     var b_param_1:A.t;
     var b_param_2:BArray800.t;
+    var  _0:W64.t;
     var trace__absorb_bcast_updstate_avx2x4:trace;
     b_param <- witness;
     b_param_0 <- witness;
@@ -4256,6 +4259,8 @@ module MM = {
     (trace__absorb_bcast_updstate_avx2x4 ++
     [(Assert, ((0 <= len) /\ (len <= 18446744073709551615)))]);
     ststatus <- (BArray808.get64 st 100);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
     param <- ststatus;
     (result_1, result_0, result, tmp__trace) <@ M._ststatus_data_avx2x4 (
     param);
@@ -5181,6 +5186,7 @@ module MM = {
     var b_param_6:A.t;
     var b_param_7:A.t;
     var b_param_8:BArray800.t;
+    var  _0:W64.t;
     var trace__absorb_updstate_avx2x4:trace;
     b_param <- witness;
     b_param_0 <- witness;
@@ -5225,6 +5231,8 @@ module MM = {
     (trace__absorb_updstate_avx2x4 ++
     [(Assert, ((0 <= len) /\ (len <= 18446744073709551615)))]);
     ststatus <- (BArray808.get64 st 100);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
     param <- ststatus;
     (result_1, result_0, result, tmp__trace) <@ M._ststatus_data_avx2x4 (
     param);
@@ -6232,6 +6240,7 @@ module MM = {
     var b_param_9:A.t;
     var b_result_8:BArray800.t;
     var b_param_10:BArray800.t;
+    var  _0:W64.t;
     var trace__squeeze_updstate_avx2x4:trace;
     b_param <- witness;
     b_param_0 <- witness;
@@ -6289,6 +6298,8 @@ module MM = {
     (trace__squeeze_updstate_avx2x4 ++
     [(Assert, ((0 <= len) /\ (len <= 18446744073709551615)))]);
     ststatus <- (BArray808.get64 st 100);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
     param <- ststatus;
     (result_1, result_0, result, tmp__trace) <@ M._ststatus_data_avx2x4 (
     param);
@@ -7272,7 +7283,7 @@ lemma _absorb_bcast_updstate_avx2x4_proof _st _b_st _buf _b_buf _len :
 proof.
 hint +safety.
 rewrite /_absorb_bcast_updstate_avx2x4_spec; proc.
-seq 34 : (valid trace__absorb_bcast_updstate_avx2x4 /\ 0 < r8 <= 200 /\ 0 <= at < r8 /\ at <= len /\
+seq 35 : (valid trace__absorb_bcast_updstate_avx2x4 /\ 0 < r8 <= 200 /\ 0 <= at < r8 /\ at <= len /\
           0 <= off /\ off + (len - at) = _len /\ 0 <= _len <= _ASIZE /\
           A.is_init b_buf 0 _len /\ BArray808.is_init b_st 0 808 /\
           BArray800.is_init b_stk 0 800).
@@ -7365,7 +7376,7 @@ lemma _absorb_updstate_avx2x4_proof _st _b_st _buf0 _b_buf0 _buf1 _b_buf1 _buf2 
 proof.
 hint +safety.
 rewrite /_absorb_updstate_avx2x4_spec; proc.
-seq 46 : (valid trace__absorb_updstate_avx2x4 /\ 0 < r8 <= 200 /\ 0 <= at < r8 /\ at <= len /\
+seq 47 : (valid trace__absorb_updstate_avx2x4 /\ 0 < r8 <= 200 /\ 0 <= at < r8 /\ at <= len /\
           0 <= off /\ off + (len - at) = _len /\ 0 <= _len <= _ASIZE /\
           A.is_init b_buf0 0 _len /\ A.is_init b_buf1 0 _len /\
           A.is_init b_buf2 0 _len /\ A.is_init b_buf3 0 _len /\
@@ -7454,7 +7465,7 @@ lemma _squeeze_updstate_avx2x4_proof _st _b_st _buf0 _b_buf0 _buf1 _b_buf1 _buf2
 proof.
 hint +safety.
 rewrite /_squeeze_updstate_avx2x4_spec; proc.
-seq 60 : (valid trace__squeeze_updstate_avx2x4 /\ 0 < r8 <= 200 /\ 0 <= at < r8 /\ len = _len /\
+seq 61 : (valid trace__squeeze_updstate_avx2x4 /\ 0 < r8 <= 200 /\ 0 <= at < r8 /\ len = _len /\
           0 <= _len <= _ASIZE /\ _len <= 18446744073709551360 /\ BArray808.is_init b_st 0 808 /\
           BArray800.is_init b_stk 0 800).
 + wp; ecall (_ststatus_data_avx2x4_proof param).

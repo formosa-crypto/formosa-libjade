@@ -1168,6 +1168,12 @@ proof. by rewrite trunc_unpckh /u128bytes /u64bytes /=; do! split; circuit. qed.
 lemma take8_u128bytes (w: W128.t): take 8 (u128bytes w) = u64bytes (truncateu64 w).
 proof. by rewrite u128bytes_split take_size_cat // /u64bytes size_to_list. qed.
 
+lemma vpextr64_0 (w: W128.t): VPEXTR_64 w (W8.of_int 0) = truncateu64 w.
+proof. by rewrite /VPEXTR_64 /=; circuit. qed.
+
+lemma vpextr64_1 (w: W128.t): VPEXTR_64 w (W8.of_int 1) = truncateu64 (VPUNPCKH_2u64 w w).
+proof. by rewrite trunc_unpckh /VPEXTR_64 /=. qed.
+
 lemma u256bytes_split (w: W256.t):
  u256bytes w = u128bytes (truncateu128 w) ++ u128bytes (VEXTRACTI128 w (W8.of_int 1)).
 proof. by rewrite /u256bytes /u128bytes /=; do! split; circuit. qed.
@@ -2058,22 +2064,22 @@ if => //=.
 (* 0 < lEN < 16: an optional low u64, then the rest via __m_ilen_write_upto8 *)
 seq 1: (0 < _len < 16
         /\ ((8 <= _len /\ msubwrite _m Glob.mem (take 8 (u128bytes _w)) _buf _len buf lEN
-             /\ w = VPUNPCKH_2u64 _w _w)
-         \/ (_len < 8 /\ Glob.mem = _m /\ buf = _buf /\ lEN = _len /\ w = _w))).
+             /\ t64 = truncateu64 (VPUNPCKH_2u64 _w _w))
+         \/ (_len < 8 /\ Glob.mem = _m /\ buf = _buf /\ lEN = _len /\ t64 = truncateu64 _w))).
  if => //.
   auto => /> H0 H16 H8; split; first smt().
-  have Hm: msubwrite _m (storeW64 _m _buf (MOVV_64 (truncateu64 _w))) (take 8 (u128bytes _w))
+  have Hm: msubwrite _m (storeW64 _m _buf (VPEXTR_64 _w (W8.of_int 0))) (take 8 (u128bytes _w))
              _buf _len (_buf + 8) (_len - 8).
-   by rewrite take8_u128bytes /MOVV_64; apply msubwrite_storeW64 => /#.
-  by left.
- by auto => /> /#.
+   by rewrite take8_u128bytes vpextr64_0; apply msubwrite_storeW64 => /#.
+  by left; rewrite vpextr64_1.
+ by auto => /> *; rewrite vpextr64_0 /#.
 ecall (m_ilen_write_upto8_h Glob.mem buf lEN t64).
 auto => |> &m H0 H16 Hc [b2 l2] m2 /= H2.
 case: Hc => [[H8 [H Hw]]|[H8 [Hm [Hb [Hl Hw]]]]].
- move: H2; rewrite Hw /MOVV_64 => H2.
+ move: H2; rewrite Hw => H2.
  have := msubwrite_cat _ _ _ _ _ _ _ _ _ _ _ H H2.
  by rewrite take8_u128bytes -u128bytes_split.
-move: H2; rewrite Hm Hb Hl Hw /MOVV_64 -take8_u128bytes => H2.
+move: H2; rewrite Hm Hb Hl Hw -take8_u128bytes => H2.
 by apply (msubwrite_untake _ _ _ 8 _ _ _ _ _ _ H2) => /#.
 qed.
 
@@ -3282,14 +3288,13 @@ module MM = {
           (A.init
           (WA.get8
           (WA.set64_direct (WA.init8 (fun i => buf.[i]))
-          (offset + dELTA) (MOVV_64 (truncateu64 w)))));
+          (offset + dELTA) (VPEXTR_64 w (W8.of_int 0)))));
           dELTA <- (dELTA + 8);
           lEN <- (lEN - 8);
-          w <- (VPUNPCKH_2u64 w w);
+          t64 <- (VPEXTR_64 w (W8.of_int 1));
         } else {
-          
+          t64 <- (VPEXTR_64 w (W8.of_int 0));
         }
-        t64 <- MOVV_64 (truncateu64 w);
         (buf, dELTA, lEN) <@ __a_ilen_write_upto8 (buf, offset, dELTA, 
         lEN, t64);
       }
@@ -3768,22 +3773,22 @@ if => //=.
 (* 0 < lEN < 16: an optional low u64, then the rest via __a_ilen_write_upto8 *)
 seq 1: (0 < _len < 16 /\ offset = _off
         /\ ((8 <= _len /\ asubwrite _buf buf _off (take 8 (u128bytes _w)) _dlt _len dELTA lEN
-             /\ w = VPUNPCKH_2u64 _w _w)
-         \/ (_len < 8 /\ buf = _buf /\ dELTA = _dlt /\ lEN = _len /\ w = _w))).
+             /\ t64 = truncateu64 (VPUNPCKH_2u64 _w _w))
+         \/ (_len < 8 /\ buf = _buf /\ dELTA = _dlt /\ lEN = _len /\ t64 = truncateu64 _w))).
  if => //.
   auto => /> H0 H16 H8; split; first smt().
-  have Hm: asubwrite _buf (A.init (WA.get8 (WA.set64_direct (WA.init8 ("_.[_]" _buf)) (_off + _dlt) (MOVV_64 (truncateu64 _w)))))
+  have Hm: asubwrite _buf (A.init (WA.get8 (WA.set64_direct (WA.init8 ("_.[_]" _buf)) (_off + _dlt) (VPEXTR_64 _w (W8.of_int 0)))))
              _off (take 8 (u128bytes _w)) _dlt _len (_dlt + 8) (_len - 8).
-   by rewrite take8_u128bytes /MOVV_64; apply asubwrite_set64 => /#.
-  by left.
- by auto => /> /#.
+   by rewrite take8_u128bytes vpextr64_0; apply asubwrite_set64 => /#.
+  by left; rewrite vpextr64_1.
+ by auto => /> *; rewrite vpextr64_0 /#.
 ecall (a_ilen_write_upto8_h buf offset dELTA lEN t64).
 auto => |> &m H0 H16 Hc [b2 d2 l2] /= H2.
 case: Hc => [[H8 [H Hw]]|[H8 [Hb [Hd [Hl Hw]]]]].
- move: H2; rewrite Hw /MOVV_64 => H2.
+ move: H2; rewrite Hw => H2.
  have := asubwrite_cat _ _ _ _ _ _ _ _ _ _ _ _ H H2.
  by rewrite take8_u128bytes -u128bytes_split.
-move: H2; rewrite Hb Hd Hl Hw /MOVV_64 -take8_u128bytes => H2.
+move: H2; rewrite Hb Hd Hl Hw -take8_u128bytes => H2.
 by apply (asubwrite_untake _ _ _ _ 8 _ _ _ _ _ _ H2) => /#.
 qed.
 

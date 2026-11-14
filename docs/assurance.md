@@ -22,7 +22,8 @@ The known-answer tests of `bench/vectors/` run against the assembly of every
 parameter set (`bench/tools/import_kat.py` downloads them at a fixed version):
 
 - the NIST ACVP vectors, the ML-KEM encapsulation and decapsulation key checks
-  included;
+  included, and for SHA-3 the tests with a byte-aligned message, run through the
+  one-shot, incremental and 4-way functions of JKCP;
 - the KAT files of
   [post-quantum-cryptography/KAT](https://github.com/post-quantum-cryptography/KAT):
   ML-DSA key generation and hedged signing; ML-KEM key generation, encapsulation and
@@ -35,7 +36,9 @@ the exact size of the arguments (`bench/memcheck.c`): memcheck reports any acces
 outside the arguments, and the driver checks that the outputs are fully initialised.
 The inputs cover the paths of the API: decapsulation of a valid and of a modified
 ciphertext, the key checks, signing and verification with messages and contexts of
-several lengths, and verification of a modified signature.
+several lengths, and verification of a modified signature; for SHA-3, inputs and
+outputs of lengths around the rates, empty ones included, through the one-shot,
+incremental and 4-way functions, whose outputs must agree.
 
 ## High assurance
 

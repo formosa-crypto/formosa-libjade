@@ -13,6 +13,15 @@ type keccakx4_updstate = u64[4*25+1];
   - byte[0] - at_position (pre: 0 <= at <= 200)
   - byte[1] - r64-1, where r8 = 8*r64 (r8 = rate in bytes) -- (pre: 0 < r64 <= 25)
   - byte[2] - Trail Byte
+
+ The status word is public: it depends only on the rate and the trail byte,
+ set by init, and on the lengths absorbed and squeezed, never on the data.
+ It is declassified where it is read; the procedures that branch on it or
+ index the state with it then call #init_msf, so that the declassified value
+ is not transient either.  The declassification is a workaround for a
+ limitation of the SCT type system, which gives all the entries of an array
+ the same security type: the status word shares its array with the secret
+ Keccak state, so it cannot be typed public on its own.
 */
 
 
@@ -37,7 +46,7 @@ fn _init_updstate_avx2x4
   t = (64u) (8u) r64;
   status += t;
   status <<= 8;
-  st[:u64 4*25] = status;
+  st[:u64 4*25] = status; // public status word: rate and trail byte, cursor 0
 
   return st;
 }
@@ -98,6 +107,8 @@ fn _finish_updstate_avx2x4
   reg u256 t256;
 
   ststatus = st[:u64 4*25];
+  () = #declassify(ststatus); // public status word: rate, trail byte, lengths
+  _ = #init_msf();
   trailb, r8, at = _ststatus_data_avx2x4(ststatus);
   // add trailbyte
   t8 = (8u) (64u) at;
@@ -120,7 +131,7 @@ fn _finish_updstate_avx2x4
   t256 = #VPBROADCAST_4u64(t128);
   t256 ^= st.[:u256 r8];
   st.[:u256 r8] = t256;
-  st.[:u32 4*8*25] &= 0xFF00FF00; // clear trail-byte and at-position
+  st.[:u32 4*8*25] &= 0xFF00FF00; // public status word: clear trail-byte and at-position
   
   return st;
 }
@@ -130,6 +141,7 @@ fn _finish_updstate_avx2x4
    { requires = is_arr_init(st,0,808)
    , ensures = is_arr_init(status,0,3) }
  ]
+#[sct="{ptr: transient, val: transient} * {ptr: transient, val: secret} -> {ptr: transient, val: secret}"]
 export fn ststatus_updstate_avx2x4
 ( reg mut ptr u8[3] status
 , reg const ptr keccakx4_updstate st
@@ -137,7 +149,9 @@ export fn ststatus_updstate_avx2x4
 {
   reg ui64 r8 at;
   reg u64 ststatus;
+  _ = #init_msf();
   ststatus = st[:u64 4*25];
+  () = #declassify(ststatus); // public status word: rate, trail byte, lengths
   _, r8, at = _ststatus_data_avx2x4(ststatus);
   status[0] = (8u) (64u) r8;
   status[1] = (8u) (64u) at;
@@ -148,12 +162,14 @@ export fn ststatus_updstate_avx2x4
 #[safety =
    { ensures = is_arr_init(st,0,808) }
  ]
+#[sct="{ptr: transient, val: secret} * transient * transient -> {ptr: transient, val: secret}"]
 export fn init_updstate_avx2x4
 ( reg mut ptr keccakx4_updstate st
 , reg ui8 r64
 , reg u8 trailb
 ) -> reg ptr keccakx4_updstate
 {
+  _ = #init_msf();
   st = st;
   r64 = r64;
   trailb = trailb;
@@ -161,10 +177,12 @@ export fn init_updstate_avx2x4
   return st;
 }
 
+#[sct="{ptr: transient, val: secret} -> {ptr: transient, val: secret}"]
 export fn finish_updstate_avx2x4
 ( reg mut ptr keccakx4_updstate st
 ) -> reg ptr keccakx4_updstate /* st */
 {
+  _ = #init_msf();
   st = st;
   st = _finish_updstate_avx2x4(st);
   return st;
@@ -274,6 +292,8 @@ fn _absorb_m_bcast_updstate_avx2x4
   reg ptr keccakx4_state stk;
 
   ststatus = st[:u64 4*25];
+  () = #declassify(ststatus); // public status word: rate, trail byte, lengths
+  _ = #init_msf();
   _, r8, at = _ststatus_data_avx2x4(ststatus); // 0 < r8 < 200; r8 |% 8; 0 <= at <= r8
   stk = st[:u256 0:25];
 
@@ -287,7 +307,7 @@ fn _absorb_m_bcast_updstate_avx2x4
   len = len;
   stk, at, _ = _add_m_bcast_updstate_avx2x4(stk, at, buf, len);
   st[:u256 0:25] = stk;
-  st.[:u8 32*25] = (8u) (64u) at;
+  st.[:u8 32*25] = (8u) (64u) at; // public status word: the cursor depends only on the lengths
 
   return st;
 }
@@ -401,9 +421,9 @@ fn _add_m_updstate_avx2x4
    , ensures = is_arr_init(st,0,808) }
  ]
 fn _absorb_m_updstate_avx2x4
-( reg mut ptr keccakx4_updstate st
+( #[spill_to_mmx] reg mut ptr keccakx4_updstate st
 , reg ui64 buf0 buf1 buf2 buf3
-, reg ui64 len
+, #[spill_to_mmx] reg ui64 len
 ) -> reg ptr keccakx4_updstate /* st */
 {
   reg u64 ststatus;
@@ -411,6 +431,8 @@ fn _absorb_m_updstate_avx2x4
   reg ptr keccakx4_state stk;
 
   ststatus = st[:u64 4*25];
+  () = #declassify(ststatus); // public status word: rate, trail byte, lengths
+  _ = #init_msf();
   _, r8, at = _ststatus_data_avx2x4(ststatus); // 0 < r8 < 200; r8 |% 8; 0 <= at <= r8
   stk = st[:u256 0:25];
   () = #spill(st);
@@ -428,7 +450,7 @@ fn _absorb_m_updstate_avx2x4
   stk, at, _, _, _, _ = _add_m_updstate_avx2x4(stk, at, buf0, buf1, buf2, buf3, len);
   () = #unspill(st);
   st[:u256 0:25] = stk;
-  st.[:u8 32*25] = (8u) (64u) at;
+  st.[:u8 32*25] = (8u) (64u) at; // public status word: the cursor depends only on the lengths
 
   return st;
 }
@@ -547,6 +569,8 @@ fn _squeeze_m_updstate_avx2x4
   reg ptr keccakx4_state stk;
 
   ststatus = st[:u64 4*25];
+  () = #declassify(ststatus); // public status word: rate, trail byte, lengths
+  _ = #init_msf();
   _, r8, at = _ststatus_data_avx2x4(ststatus); // 0 < r8 < 200; r8 |% 8; 0 <= at <= r8
   stk = st[:u256 0:25];
 
@@ -568,7 +592,7 @@ fn _squeeze_m_updstate_avx2x4
 
   st[:u256 0:25] = stk;
   // if ( at == r8 ) at = 0; // avoidable because r8_at() returns 0<=at<r8
-  st.[:u8 32*25] = (8u) (64u) at;
+  st.[:u8 32*25] = (8u) (64u) at; // public status word: the cursor depends only on the lengths
 
   return st;
 }
@@ -577,12 +601,14 @@ fn _squeeze_m_updstate_avx2x4
    { requires = is_arr_init(st,0,808) && is_mem_init((64u) buf, len) && len <= 0xFFFFFFFFFFFFFF00
    , ensures = is_arr_init(st,0,808) }
  ]
+#[sct="{ptr: transient, val: secret} * transient * transient -> {ptr: transient, val: secret}"]
 export fn absorb_m_bcast_updstate_avx2x4
 ( reg mut ptr keccakx4_updstate st
 , reg ui64 buf
 , reg ui64 len
 ) -> reg ptr keccakx4_updstate /* st */
 {
+  _ = #init_msf();
   st = st;
   buf = buf;
   len = len;
@@ -595,12 +621,14 @@ export fn absorb_m_bcast_updstate_avx2x4
      && is_mem_init((64u) buf0, len) && is_mem_init((64u) buf1, len) && is_mem_init((64u) buf2, len) && is_mem_init((64u) buf3, len)
    , ensures = is_arr_init(st,0,808) }
  ]
+#[sct="{ptr: transient, val: secret} * transient * transient * transient * transient * transient -> {ptr: transient, val: secret}"]
 export fn absorb_m_updstate_avx2x4
 ( reg mut ptr keccakx4_updstate st
 , reg ui64 buf0 buf1 buf2 buf3
 , reg ui64 len
 ) -> reg ptr keccakx4_updstate /* st */
 {
+  _ = #init_msf();
   st = st;
   buf0 = buf0;
   buf1 = buf1;
@@ -616,12 +644,14 @@ export fn absorb_m_updstate_avx2x4
      && is_mem_init((64u) buf0, len) && is_mem_init((64u) buf1, len) && is_mem_init((64u) buf2, len) && is_mem_init((64u) buf3, len)
    , ensures = is_arr_init(st,0,808) }
  ]
+#[sct="{ptr: transient, val: secret} * transient * transient * transient * transient * transient -> {ptr: transient, val: secret}"]
 export fn squeeze_m_updstate_avx2x4
 ( reg mut ptr keccakx4_updstate st
 , reg ui64 buf0 buf1 buf2 buf3
 , reg ui64 len
 ) -> reg ptr keccakx4_updstate /* st */
 {
+  _ = #init_msf();
   st = st;
   buf0 = buf0;
   buf1 = buf1;

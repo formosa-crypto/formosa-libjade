@@ -1721,14 +1721,13 @@ module MM = {
           (A.set64d b_buf (offset + dELTA)
           (W64.of_int 18446744073709551615));
           buf <-
-          (A.set64d buf (offset + dELTA) (MOVV_64 (truncateu64 w)));
+          (A.set64d buf (offset + dELTA) (VPEXTR_64 w (W8.of_int 0)));
           dELTA <- (dELTA + 8);
           lEN <- (lEN - 8);
-          w <- (VPUNPCKH_2u64 w w);
+          t64 <- (VPEXTR_64 w (W8.of_int 1));
         } else {
-          
+          t64 <- (VPEXTR_64 w (W8.of_int 0));
         }
-        t64 <- (MOVV_64 (truncateu64 w));
         b_param <- b_buf;
         param_3 <- buf;
         param_2 <- offset;
