@@ -1336,16 +1336,18 @@ while (b_randombytes = BArray848.init_arr (W8.of_int 255)
   rewrite ?W64.uleE ?W64.ultE hi1 hi2 hi3 hf1 /=.
   smt().
 (* first phase: eight candidates per 24 bytes, the good ones packed by a
-   shuffle, at most four per half *)
+   shuffle, at most four per half; 32 windows, at most 32 bytes written per
+   window, so the polynomial never overflows *)
 wp.
 while (b_randombytes = BArray848.init_arr (W8.of_int 255)
     /\ to_uint bytes_filled <= 1024 /\ to_uint bytes_filled %% 4 = 0
     /\ BArray1024.is_init b_polynomial 0 (to_uint bytes_filled)
-    /\ to_uint input_offset %% 24 = 0 /\ to_uint input_offset <= 840
-    /\ condition_loop = (to_uint bytes_filled < 992 /\ to_uint input_offset < 840)
+    /\ to_uint input_offset %% 24 = 0 /\ to_uint input_offset <= 768
+    /\ 3 * to_uint bytes_filled <= 4 * to_uint input_offset
+    /\ condition_loop = (to_uint input_offset < 768)
     /\ valid trace_matrix_A__rejection_sample_multiple_blocks).
 + auto; ecall (matrix_A____bytestream_to_potential_coefficients_proof param).
-  auto => /> &hr hle hmod hinit himod hio hvalid hlt hlt2 r hv.
+  auto => /> &hr hle hmod hinit himod hio h34 hvalid hlt r hv.
   rewrite /SLH64.protect_64 -/(nibble_mask (zeroextu64 (MOVEMASK_32u8 _))).
   (* the vector terms are abstracted: only their bounds matter *)
   have hg := to_uint_nibble_mask (zeroextu64 (MOVEMASK_32u8 (VPCMPGT_8u32 modulus{hr} r.`1))).
@@ -1363,6 +1365,7 @@ while (b_randombytes = BArray848.init_arr (W8.of_int 255)
   move: (POPCNT_64 (g `>>` W8.of_int 4)).`6 hp2 => p2 hp2.
   have hb0 := W64.to_uint_cmp bytes_filled{hr}.
   have hi0 := W64.to_uint_cmp input_offset{hr}.
+  have hio744 : to_uint input_offset{hr} <= 744 by smt().
   have hio3 : to_uint input_offset{hr} + 32 <= 848 by smt().
   have hbf1 : to_uint bytes_filled{hr} + 4 * to_uint p1 + 16 <= 1024 by smt().
   have hs1 : to_uint (p1 `<<` W8.of_int 2) = 4 * to_uint p1.
@@ -1408,8 +1411,8 @@ while (b_randombytes = BArray848.init_arr (W8.of_int 255)
   smt().
 (* between the phases: the count of coefficients is the count of bytes over
    four, and the second loop runs when the polynomial and the input allow *)
-auto => />; split; first smt().
-move=> b0 bf0 cl0 io0 tr0 hcl hle hmod hinit himod hio hfalse hv.
+auto => />.
+move=> b0 bf0 cl0 io0 tr0 hcl hle hmod hinit himod hio h34 hfalse hv.
 rewrite !W64.ultE ?W64.uleE !W64.shr_div !W64.of_uintK W8.of_uintK /=.
 have hbf : 4 * (to_uint bf0 %/ 4) = to_uint bf0 by smt().
 rewrite hbf.

@@ -13996,7 +13996,6 @@ module M = {
     var bytes_filled:W64.t;
     var input_offset:W64.t;
     var modulus:W256.t;
-    var stop_sampling:W64.t;
     var condition_loop:bool;
     var potential_coefficients:W256.t;
     var compare_with_field_modulus:W256.t;
@@ -14008,6 +14007,7 @@ module M = {
     var shuffle_table_idx:W64.t;
     var shuffles:W128.t;
     var upper_coefficients:W128.t;
+    var stop_sampling:W64.t;
     var condition:bool;
     var byte0:W32.t;
     var byte1:W32.t;
@@ -14029,8 +14029,7 @@ module M = {
     bytes_filled <- (W64.of_int 0);
     input_offset <- (W64.of_int 0);
     modulus <- mODULUS_VECTOR;
-    stop_sampling <- (W64.of_int 0);
-    condition_loop <- (stop_sampling <> (W64.of_int 1));
+    condition_loop <- (input_offset \ult (W64.of_int ((256 %/ 8) * 24)));
     while (condition_loop) {
       ms <- (update_msf condition_loop ms);
       potential_coefficients <-
@@ -14094,22 +14093,7 @@ module M = {
       ( _5,  _6,  _7,  _8,  _9, good_upper) <- (POPCNT_64 good_upper);
       good_upper <- (good_upper `<<` (W8.of_int 2));
       bytes_filled <- (bytes_filled + good_upper);
-      stop_sampling <- (W64.of_int 0);
-      condition <- ((W64.of_int (((256 * 32) %/ 8) - 32)) \ule bytes_filled);
-      if (condition) {
-        ms <- (update_msf condition ms);
-        stop_sampling <- (W64.of_int 1);
-      } else {
-        ms <- (update_msf (! condition) ms);
-        condition <- ((W64.of_int (5 * 168)) \ule input_offset);
-        if (condition) {
-          ms <- (update_msf condition ms);
-          stop_sampling <- (W64.of_int 1);
-        } else {
-          ms <- (update_msf (! condition) ms);
-        }
-      }
-      condition_loop <- (stop_sampling <> (W64.of_int 1));
+      condition_loop <- (input_offset \ult (W64.of_int ((256 %/ 8) * 24)));
     }
     ms <- (update_msf (! condition_loop) ms);
     filled <- bytes_filled;
