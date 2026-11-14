@@ -1,0 +1,117 @@
+require "keccak1600x4_updstate.jinc"
+
+#[safety =
+   { requires = is_arr_init(st,0,808)
+   , ensures = is_arr_init(status,0,3) }
+ ]
+#[sct="{ptr: transient, val: transient} * {ptr: transient, val: secret} -> {ptr: transient, val: secret}"]
+export fn ststatus_updstate_avx2x4
+( reg mut ptr u8[3] status
+, reg const ptr keccakx4_updstate st
+) -> reg ptr u8[3]
+{
+  reg ui64 r8 at;
+  reg u64 ststatus;
+  _ = #init_msf();
+  ststatus = st[:u64 4*25];
+  () = #declassify(ststatus); // public status word: rate, trail byte, lengths
+  _, r8, at = _ststatus_data_avx2x4(ststatus);
+  status[0] = (8u) (64u) r8;
+  status[1] = (8u) (64u) at;
+  status[2] = st.[:u8 32*25+2];
+  return status;
+}
+
+#[safety =
+   { ensures = is_arr_init(st,0,808) }
+ ]
+#[sct="{ptr: transient, val: secret} * transient * transient -> {ptr: transient, val: secret}"]
+export fn init_updstate_avx2x4
+( reg mut ptr keccakx4_updstate st
+, reg ui8 r64
+, reg u8 trailb
+) -> reg ptr keccakx4_updstate
+{
+  _ = #init_msf();
+  st = st;
+  r64 = r64;
+  trailb = trailb;
+  st = _init_updstate_avx2x4(st, r64, trailb);
+  return st;
+}
+
+#[sct="{ptr: transient, val: secret} -> {ptr: transient, val: secret}"]
+export fn finish_updstate_avx2x4
+( reg mut ptr keccakx4_updstate st
+) -> reg ptr keccakx4_updstate /* st */
+{
+  _ = #init_msf();
+  st = st;
+  st = _finish_updstate_avx2x4(st);
+  return st;
+}
+
+#[safety =
+   { requires = is_arr_init(st,0,808) && is_mem_init((64u) buf, len) && len <= 0xFFFFFFFFFFFFFF00
+   , ensures = is_arr_init(st,0,808) }
+ ]
+#[sct="{ptr: transient, val: secret} * transient * transient -> {ptr: transient, val: secret}"]
+export fn absorb_m_bcast_updstate_avx2x4
+( reg mut ptr keccakx4_updstate st
+, reg ui64 buf
+, reg ui64 len
+) -> reg ptr keccakx4_updstate /* st */
+{
+  _ = #init_msf();
+  st = st;
+  buf = buf;
+  len = len;
+  st = _absorb_m_bcast_updstate_avx2x4(st, buf, len);
+  return st;
+}
+
+#[safety =
+   { requires = is_arr_init(st,0,808) && len <= 0xFFFFFFFFFFFFFF00
+     && is_mem_init((64u) buf0, len) && is_mem_init((64u) buf1, len) && is_mem_init((64u) buf2, len) && is_mem_init((64u) buf3, len)
+   , ensures = is_arr_init(st,0,808) }
+ ]
+#[sct="{ptr: transient, val: secret} * transient * transient * transient * transient * transient -> {ptr: transient, val: secret}"]
+export fn absorb_m_updstate_avx2x4
+( reg mut ptr keccakx4_updstate st
+, reg ui64 buf0 buf1 buf2 buf3
+, reg ui64 len
+) -> reg ptr keccakx4_updstate /* st */
+{
+  _ = #init_msf();
+  st = st;
+  buf0 = buf0;
+  buf1 = buf1;
+  buf2 = buf2;
+  buf3 = buf3;
+  len = len;
+  st = _absorb_m_updstate_avx2x4(st, buf0, buf1, buf2, buf3, len);
+  return st;
+}
+
+#[safety =
+   { requires = is_arr_init(st,0,808) && len <= 0xFFFFFFFFFFFFFF00
+     && is_mem_init((64u) buf0, len) && is_mem_init((64u) buf1, len) && is_mem_init((64u) buf2, len) && is_mem_init((64u) buf3, len)
+   , ensures = is_arr_init(st,0,808) }
+ ]
+#[sct="{ptr: transient, val: secret} * transient * transient * transient * transient * transient -> {ptr: transient, val: secret}"]
+export fn squeeze_m_updstate_avx2x4
+( reg mut ptr keccakx4_updstate st
+, reg ui64 buf0 buf1 buf2 buf3
+, reg ui64 len
+) -> reg ptr keccakx4_updstate /* st */
+{
+  _ = #init_msf();
+  st = st;
+  buf0 = buf0;
+  buf1 = buf1;
+  buf2 = buf2;
+  buf3 = buf3;
+  len = len;
+  st = _squeeze_m_updstate_avx2x4(st, buf0, buf1, buf2, buf3, len);
+  return st;
+}

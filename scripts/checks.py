@@ -15,8 +15,9 @@ commit.
 
 The checks kat, memcheck, ct and sct run on the implementations that claim
 them in their src/**/meta.toml (scripts/claims.py); the known-answer tests
-of an implementation are bench/vectors/<prim><set>[-*].json, and a vector
-file that no implementation runs fails the kat check.
+of an implementation are bench/vectors/<name>[-*].json (<name> is <prim><set>,
+or <prim> for an implementation of every parameter set, as fips202), and a
+vector file that no implementation runs fails the kat check.
 
 A result is {"check", "target", "ok", "seconds"}, with the line of the
 output that states the result as "summary" when there is one, and the last
@@ -178,9 +179,8 @@ def kat_memcheck(out):
     if impls is None:
         return 1
     for i in impls:
-        scheme = f"{i['primitive']}-{i['parameter_set']}"
         rc |= run(out, "memcheck", i["name"], ["make", "-C", "bench", "memcheck",
-                                               f"ALL_SCHEMES={scheme}"])
+                                               f"MEMCHECK_SCHEMES={i['scheme']}"])
     return rc
 
 

@@ -20049,12 +20049,15 @@ module M = {
     var result:int;
     var result_0:int;
     var result_1:W64.t;
+    var  _0:W64.t;
     var trace__finish_updstate_avx2x4:trace;
     trace__finish_updstate_avx2x4 <- [];
     trace__finish_updstate_avx2x4 <-
     (trace__finish_updstate_avx2x4 ++
     [(Assert, (BArray808.is_init b_st 0 808))]);
     ststatus <- (BArray808.get64 st 100);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
     param <- ststatus;
     (result_1, result_0, result, tmp__trace) <@ _ststatus_data_avx2x4 (
     param);
@@ -20123,124 +20126,6 @@ module M = {
     ((BArray808.get32d st 800) `&` (W32.of_int 4278255360)));
     b_st <- (BArray808.init_arr (W8.of_int 255));
     return (st, b_st, trace__finish_updstate_avx2x4);
-  }
-  proc ststatus_updstate_avx2x4 (status:BArray3.t, b_status:BArray3.t,
-                                 st:BArray808.t, b_st:BArray808.t) : 
-  BArray3.t * BArray3.t * trace = {
-    var ststatus:W64.t;
-    var r8:int;
-    var at:int;
-    var param:W64.t;
-    var result:int;
-    var result_0:int;
-    var result_1:W64.t;
-    var trace_ststatus_updstate_avx2x4:trace;
-    trace_ststatus_updstate_avx2x4 <- [];
-    trace_ststatus_updstate_avx2x4 <-
-    (trace_ststatus_updstate_avx2x4 ++
-    [(Assert, (BArray808.is_init b_st 0 808))]);
-    ststatus <- (BArray808.get64 st 100);
-    param <- ststatus;
-    (result_1, result_0, result, tmp__trace) <@ _ststatus_data_avx2x4 (
-    param);
-    trace_ststatus_updstate_avx2x4 <-
-    (trace_ststatus_updstate_avx2x4 ++ tmp__trace);
-    trace_ststatus_updstate_avx2x4 <-
-    (trace_ststatus_updstate_avx2x4 ++
-    [(Assert,
-     (((((0 < result_0) /\ (result_0 <= 200)) /\ ((result_0 %% 8) = 0)) /\
-      (0 <= result)) /\
-     (result < result_0)))]);
-    trace_ststatus_updstate_avx2x4 <-
-    (trace_ststatus_updstate_avx2x4 ++
-    [(Assert, ((0 <= result_0) /\ (result_0 <= 18446744073709551615)))]);
-    trace_ststatus_updstate_avx2x4 <-
-    (trace_ststatus_updstate_avx2x4 ++
-    [(Assert, ((0 <= result) /\ (result <= 18446744073709551615)))]);
-    r8 <- result_0;
-    at <- result;
-    trace_ststatus_updstate_avx2x4 <-
-    (trace_ststatus_updstate_avx2x4 ++
-    [(Assert, ((0 <= r8) /\ (r8 <= 18446744073709551615)))]);
-    b_status <- (BArray3.set8d b_status 0 (W8.of_int 255));
-    status <- (BArray3.set8 status 0 (truncateu8 (W64.of_int r8)));
-    trace_ststatus_updstate_avx2x4 <-
-    (trace_ststatus_updstate_avx2x4 ++
-    [(Assert, ((0 <= at) /\ (at <= 18446744073709551615)))]);
-    b_status <- (BArray3.set8d b_status 1 (W8.of_int 255));
-    status <- (BArray3.set8 status 1 (truncateu8 (W64.of_int at)));
-    b_status <- (BArray3.set8d b_status 2 (W8.of_int 255));
-    status <- (BArray3.set8 status 2 (BArray808.get8d st 802));
-    return (status, b_status, trace_ststatus_updstate_avx2x4);
-  }
-  proc init_updstate_avx2x4 (st:BArray808.t, b_st:BArray808.t, r64:int,
-                             trailb:W8.t) : BArray808.t * BArray808.t * trace = {
-    var aux:BArray808.t;
-    var aux_0:BArray808.t;
-    var param:W8.t;
-    var param_0:int;
-    var param_1:BArray808.t;
-    var result:BArray808.t;
-    var b_result:BArray808.t;
-    var b_param:BArray808.t;
-    var trace_init_updstate_avx2x4:trace;
-    b_param <- witness;
-    b_result <- witness;
-    param_1 <- witness;
-    result <- witness;
-    trace_init_updstate_avx2x4 <- [];
-    trace_init_updstate_avx2x4 <-
-    (trace_init_updstate_avx2x4 ++ [(Assert, ((0 <= r64) /\ (r64 <= 255)))]);
-    b_st <- b_st;
-    st <- st;
-    r64 <- r64;
-    trailb <- trailb;
-    b_param <- b_st;
-    param_1 <- st;
-    param_0 <- r64;
-    param <- trailb;
-    (aux, aux_0, tmp__trace) <@ _init_updstate_avx2x4 (param_1, b_param,
-    param_0, param);
-    result <- aux;
-    b_result <- aux_0;
-    trace_init_updstate_avx2x4 <- (trace_init_updstate_avx2x4 ++ tmp__trace);
-    trace_init_updstate_avx2x4 <-
-    (trace_init_updstate_avx2x4 ++
-    [(Assert, (BArray808.is_init b_result 0 808))]);
-    st <- result;
-    b_st <- (BArray808.init_arr (W8.of_int 255));
-    return (st, b_st, trace_init_updstate_avx2x4);
-  }
-  proc finish_updstate_avx2x4 (st:BArray808.t, b_st:BArray808.t) : BArray808.t *
-                                                                   BArray808.t *
-                                                                   trace = {
-    var aux:BArray808.t;
-    var aux_0:BArray808.t;
-    var param:BArray808.t;
-    var result:BArray808.t;
-    var b_result:BArray808.t;
-    var trace_finish_updstate_avx2x4:trace;
-    b_result <- witness;
-    param <- witness;
-    result <- witness;
-    trace_finish_updstate_avx2x4 <- [];
-    trace_finish_updstate_avx2x4 <-
-    (trace_finish_updstate_avx2x4 ++
-    [(Assert, (BArray808.is_init b_st 0 808))]);
-    st <- st;
-    param <- st;
-    (aux, aux_0, tmp__trace) <@ _finish_updstate_avx2x4 (param,
-    (BArray808.init_arr (W8.of_int 255)));
-    result <- aux;
-    b_result <- aux_0;
-    trace_finish_updstate_avx2x4 <-
-    (trace_finish_updstate_avx2x4 ++ tmp__trace);
-    trace_finish_updstate_avx2x4 <-
-    (trace_finish_updstate_avx2x4 ++
-    [(Assert, (BArray808.is_init b_result 0 808))]);
-    st <- result;
-    b_st <- (BArray808.init_arr (W8.of_int 255));
-    return (st, b_st, trace_finish_updstate_avx2x4);
   }
   proc _add_m_bcast_updstate_avx2x4 (st:BArray800.t, b_st:BArray800.t,
                                      at:int, buf:int, upto:int) : BArray800.t *
@@ -20497,6 +20382,7 @@ module M = {
     var b_result_0:BArray800.t;
     var b_result_1:BArray800.t;
     var b_param_0:BArray800.t;
+    var  _0:W64.t;
     var trace__absorb_m_bcast_updstate_avx2x4:trace;
     b_param <- witness;
     b_param_0 <- witness;
@@ -20526,6 +20412,8 @@ module M = {
     (trace__absorb_m_bcast_updstate_avx2x4 ++
     [(Assert, ((0 <= len) /\ (len <= 18446744073709551615)))]);
     ststatus <- (BArray808.get64 st 100);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
     param <- ststatus;
     (result_1, result_0, result, tmp__trace) <@ _ststatus_data_avx2x4 (
     param);
@@ -21331,6 +21219,7 @@ module M = {
     var b_result_0:BArray800.t;
     var b_result_1:BArray800.t;
     var b_param_0:BArray800.t;
+    var  _0:W64.t;
     var trace__absorb_m_updstate_avx2x4:trace;
     b_param <- witness;
     b_param_0 <- witness;
@@ -21374,6 +21263,8 @@ module M = {
     (trace__absorb_m_updstate_avx2x4 ++
     [(Assert, ((0 <= len) /\ (len <= 18446744073709551615)))]);
     ststatus <- (BArray808.get64 st 100);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
     param <- ststatus;
     (result_1, result_0, result, tmp__trace) <@ _ststatus_data_avx2x4 (
     param);
@@ -22194,6 +22085,7 @@ module M = {
     var b_param_1:BArray800.t;
     var b_result_0:BArray800.t;
     var b_param_2:BArray800.t;
+    var  _0:W64.t;
     var trace__squeeze_m_updstate_avx2x4:trace;
     b_param <- witness;
     b_param_0 <- witness;
@@ -22238,6 +22130,8 @@ module M = {
     (trace__squeeze_m_updstate_avx2x4 ++
     [(Assert, ((0 <= len) /\ (len <= 18446744073709551615)))]);
     ststatus <- (BArray808.get64 st 100);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
     param <- ststatus;
     (result_1, result_0, result, tmp__trace) <@ _ststatus_data_avx2x4 (
     param);
@@ -22417,6 +22311,131 @@ module M = {
     st <- (BArray808.set8d st 800 (truncateu8 (W64.of_int at)));
     return (st, b_st, trace__squeeze_m_updstate_avx2x4);
   }
+  proc ststatus_updstate_avx2x4 (status:BArray3.t, b_status:BArray3.t,
+                                 st:BArray808.t, b_st:BArray808.t) : 
+  BArray3.t * BArray3.t * trace = {
+    var ststatus:W64.t;
+    var r8:int;
+    var at:int;
+    var param:W64.t;
+    var result:int;
+    var result_0:int;
+    var result_1:W64.t;
+    var  _0:W64.t;
+    var trace_ststatus_updstate_avx2x4:trace;
+    trace_ststatus_updstate_avx2x4 <- [];
+    trace_ststatus_updstate_avx2x4 <-
+    (trace_ststatus_updstate_avx2x4 ++
+    [(Assert, (BArray808.is_init b_st 0 808))]);
+     _0 <- (init_msf);
+    ststatus <- (BArray808.get64 st 100);
+    (* Erased call to declassify *)
+    param <- ststatus;
+    (result_1, result_0, result, tmp__trace) <@ _ststatus_data_avx2x4 (
+    param);
+    trace_ststatus_updstate_avx2x4 <-
+    (trace_ststatus_updstate_avx2x4 ++ tmp__trace);
+    trace_ststatus_updstate_avx2x4 <-
+    (trace_ststatus_updstate_avx2x4 ++
+    [(Assert,
+     (((((0 < result_0) /\ (result_0 <= 200)) /\ ((result_0 %% 8) = 0)) /\
+      (0 <= result)) /\
+     (result < result_0)))]);
+    trace_ststatus_updstate_avx2x4 <-
+    (trace_ststatus_updstate_avx2x4 ++
+    [(Assert, ((0 <= result_0) /\ (result_0 <= 18446744073709551615)))]);
+    trace_ststatus_updstate_avx2x4 <-
+    (trace_ststatus_updstate_avx2x4 ++
+    [(Assert, ((0 <= result) /\ (result <= 18446744073709551615)))]);
+    r8 <- result_0;
+    at <- result;
+    trace_ststatus_updstate_avx2x4 <-
+    (trace_ststatus_updstate_avx2x4 ++
+    [(Assert, ((0 <= r8) /\ (r8 <= 18446744073709551615)))]);
+    b_status <- (BArray3.set8d b_status 0 (W8.of_int 255));
+    status <- (BArray3.set8 status 0 (truncateu8 (W64.of_int r8)));
+    trace_ststatus_updstate_avx2x4 <-
+    (trace_ststatus_updstate_avx2x4 ++
+    [(Assert, ((0 <= at) /\ (at <= 18446744073709551615)))]);
+    b_status <- (BArray3.set8d b_status 1 (W8.of_int 255));
+    status <- (BArray3.set8 status 1 (truncateu8 (W64.of_int at)));
+    b_status <- (BArray3.set8d b_status 2 (W8.of_int 255));
+    status <- (BArray3.set8 status 2 (BArray808.get8d st 802));
+    return (status, b_status, trace_ststatus_updstate_avx2x4);
+  }
+  proc init_updstate_avx2x4 (st:BArray808.t, b_st:BArray808.t, r64:int,
+                             trailb:W8.t) : BArray808.t * BArray808.t * trace = {
+    var aux:BArray808.t;
+    var aux_0:BArray808.t;
+    var param:W8.t;
+    var param_0:int;
+    var param_1:BArray808.t;
+    var result:BArray808.t;
+    var b_result:BArray808.t;
+    var b_param:BArray808.t;
+    var  _0:W64.t;
+    var trace_init_updstate_avx2x4:trace;
+    b_param <- witness;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_init_updstate_avx2x4 <- [];
+    trace_init_updstate_avx2x4 <-
+    (trace_init_updstate_avx2x4 ++ [(Assert, ((0 <= r64) /\ (r64 <= 255)))]);
+     _0 <- (init_msf);
+    b_st <- b_st;
+    st <- st;
+    r64 <- r64;
+    trailb <- trailb;
+    b_param <- b_st;
+    param_1 <- st;
+    param_0 <- r64;
+    param <- trailb;
+    (aux, aux_0, tmp__trace) <@ _init_updstate_avx2x4 (param_1, b_param,
+    param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_init_updstate_avx2x4 <- (trace_init_updstate_avx2x4 ++ tmp__trace);
+    trace_init_updstate_avx2x4 <-
+    (trace_init_updstate_avx2x4 ++
+    [(Assert, (BArray808.is_init b_result 0 808))]);
+    st <- result;
+    b_st <- (BArray808.init_arr (W8.of_int 255));
+    return (st, b_st, trace_init_updstate_avx2x4);
+  }
+  proc finish_updstate_avx2x4 (st:BArray808.t, b_st:BArray808.t) : BArray808.t *
+                                                                   BArray808.t *
+                                                                   trace = {
+    var aux:BArray808.t;
+    var aux_0:BArray808.t;
+    var param:BArray808.t;
+    var result:BArray808.t;
+    var b_result:BArray808.t;
+    var  _0:W64.t;
+    var trace_finish_updstate_avx2x4:trace;
+    b_result <- witness;
+    param <- witness;
+    result <- witness;
+    trace_finish_updstate_avx2x4 <- [];
+    trace_finish_updstate_avx2x4 <-
+    (trace_finish_updstate_avx2x4 ++
+    [(Assert, (BArray808.is_init b_st 0 808))]);
+     _0 <- (init_msf);
+    st <- st;
+    param <- st;
+    (aux, aux_0, tmp__trace) <@ _finish_updstate_avx2x4 (param,
+    (BArray808.init_arr (W8.of_int 255)));
+    result <- aux;
+    b_result <- aux_0;
+    trace_finish_updstate_avx2x4 <-
+    (trace_finish_updstate_avx2x4 ++ tmp__trace);
+    trace_finish_updstate_avx2x4 <-
+    (trace_finish_updstate_avx2x4 ++
+    [(Assert, (BArray808.is_init b_result 0 808))]);
+    st <- result;
+    b_st <- (BArray808.init_arr (W8.of_int 255));
+    return (st, b_st, trace_finish_updstate_avx2x4);
+  }
   proc absorb_m_bcast_updstate_avx2x4 (st:BArray808.t, b_st:BArray808.t,
                                        buf:int, len:int) : BArray808.t *
                                                            BArray808.t *
@@ -22428,6 +22447,7 @@ module M = {
     var param_1:BArray808.t;
     var result:BArray808.t;
     var b_result:BArray808.t;
+    var  _0:W64.t;
     var trace_absorb_m_bcast_updstate_avx2x4:trace;
     b_result <- witness;
     param_1 <- witness;
@@ -22446,6 +22466,7 @@ module M = {
     trace_absorb_m_bcast_updstate_avx2x4 <-
     (trace_absorb_m_bcast_updstate_avx2x4 ++
     [(Assert, ((0 <= len) /\ (len <= 18446744073709551615)))]);
+     _0 <- (init_msf);
     st <- st;
     buf <- buf;
     len <- len;
@@ -22478,6 +22499,7 @@ module M = {
     var param_4:BArray808.t;
     var result:BArray808.t;
     var b_result:BArray808.t;
+    var  _0:W64.t;
     var trace_absorb_m_updstate_avx2x4:trace;
     b_result <- witness;
     param_4 <- witness;
@@ -22510,6 +22532,7 @@ module M = {
     trace_absorb_m_updstate_avx2x4 <-
     (trace_absorb_m_updstate_avx2x4 ++
     [(Assert, ((0 <= len) /\ (len <= 18446744073709551615)))]);
+     _0 <- (init_msf);
     st <- st;
     buf0 <- buf0;
     buf1 <- buf1;
@@ -22549,6 +22572,7 @@ module M = {
     var param_4:BArray808.t;
     var result:BArray808.t;
     var b_result:BArray808.t;
+    var  _0:W64.t;
     var trace_squeeze_m_updstate_avx2x4:trace;
     b_result <- witness;
     param_4 <- witness;
@@ -22581,6 +22605,7 @@ module M = {
     trace_squeeze_m_updstate_avx2x4 <-
     (trace_squeeze_m_updstate_avx2x4 ++
     [(Assert, ((0 <= len) /\ (len <= 18446744073709551615)))]);
+     _0 <- (init_msf);
     st <- st;
     buf0 <- buf0;
     buf1 <- buf1;
@@ -22606,6 +22631,1088 @@ module M = {
     st <- result;
     b_st <- (BArray808.init_arr (W8.of_int 255));
     return (st, b_st, trace_squeeze_m_updstate_avx2x4);
+  }
+  proc __sha3 (out:int, inp:int, inlen:int, _RATE64:int, _OUTLEN:int) : trace = {
+    var aux:BArray208.t;
+    var aux_0:BArray208.t;
+    var _st:BArray208.t;
+    var st:BArray208.t;
+    var trailb:W8.t;
+    var r64:int;
+    var olen:int;
+    var param:W8.t;
+    var param_0:int;
+    var param_1:BArray208.t;
+    var result:BArray208.t;
+    var param_2:int;
+    var param_3:int;
+    var param_4:BArray208.t;
+    var result_0:BArray208.t;
+    var param_5:BArray208.t;
+    var result_1:BArray208.t;
+    var param_6:int;
+    var param_7:int;
+    var param_8:BArray208.t;
+    var result_2:BArray208.t;
+    var b_st:BArray208.t;
+    var b_result:BArray208.t;
+    var b_result_0:BArray208.t;
+    var b_result_1:BArray208.t;
+    var b_result_2:BArray208.t;
+    var b_param:BArray208.t;
+    var b__st:BArray208.t;
+    var trace___sha3:trace;
+    _st <- witness;
+    b__st <- witness;
+    b_param <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    b_result_1 <- witness;
+    b_result_2 <- witness;
+    b_st <- witness;
+    param_1 <- witness;
+    param_4 <- witness;
+    param_5 <- witness;
+    param_8 <- witness;
+    result <- witness;
+    result_0 <- witness;
+    result_1 <- witness;
+    result_2 <- witness;
+    st <- witness;
+    trace___sha3 <- [];
+    b__st <- (BArray208.init_arr (W8.of_int 0));
+    b_st <- b__st;
+    st <- _st;
+    trace___sha3 <-
+    (trace___sha3 ++ [(Assert, ((0 <= _RATE64) /\ (_RATE64 <= 255)))]);
+    r64 <- _RATE64;
+    trailb <- (W8.of_int 6);
+    b_param <- b_st;
+    param_1 <- st;
+    param_0 <- r64;
+    param <- trailb;
+    (aux, aux_0, tmp__trace) <@ _init_updstate (param_1, b_param, param_0,
+    param);
+    result <- aux;
+    b_result_2 <- aux_0;
+    trace___sha3 <- (trace___sha3 ++ tmp__trace);
+    trace___sha3 <-
+    (trace___sha3 ++ [(Assert, (BArray208.is_init b_result_2 0 208))]);
+    st <- result;
+    (* Erased call to spill *)
+    param_4 <- st;
+    param_3 <- inp;
+    param_2 <- inlen;
+    (aux, aux_0, tmp__trace) <@ _absorb_m_updstate (param_4,
+    (BArray208.init_arr (W8.of_int 255)), param_3, param_2);
+    result_0 <- aux;
+    b_result_1 <- aux_0;
+    trace___sha3 <- (trace___sha3 ++ tmp__trace);
+    trace___sha3 <-
+    (trace___sha3 ++ [(Assert, (BArray208.is_init b_result_1 0 208))]);
+    st <- result_0;
+    param_5 <- st;
+    (aux, aux_0, tmp__trace) <@ _finish_updstate (param_5,
+    (BArray208.init_arr (W8.of_int 255)));
+    result_1 <- aux;
+    b_result_0 <- aux_0;
+    trace___sha3 <- (trace___sha3 ++ tmp__trace);
+    trace___sha3 <-
+    (trace___sha3 ++ [(Assert, (BArray208.is_init b_result_0 0 208))]);
+    st <- result_1;
+    (* Erased call to unspill *)
+    trace___sha3 <-
+    (trace___sha3 ++
+    [(Assert, ((0 <= _OUTLEN) /\ (_OUTLEN <= 18446744073709551615)))]);
+    olen <- _OUTLEN;
+    param_8 <- st;
+    param_7 <- out;
+    param_6 <- olen;
+    (aux, aux_0, tmp__trace) <@ _squeeze_m_updstate (param_8,
+    (BArray208.init_arr (W8.of_int 255)), param_7, param_6);
+    result_2 <- aux;
+    b_result <- aux_0;
+    trace___sha3 <- (trace___sha3 ++ tmp__trace);
+    trace___sha3 <-
+    (trace___sha3 ++ [(Assert, (BArray208.is_init b_result 0 208))]);
+    return (trace___sha3);
+  }
+  proc jkcp_sha3_224 (out:int, inp:int, inlen:int) : trace = {
+    var param:int;
+    var param_0:int;
+    var param_1:int;
+    var param_2:int;
+    var param_3:int;
+    var trace_jkcp_sha3_224:trace;
+    trace_jkcp_sha3_224 <- [];
+    param_3 <- out;
+    param_2 <- inp;
+    param_1 <- inlen;
+    param_0 <- 18;
+    param <- 28;
+    tmp__trace <@ __sha3 (param_3, param_2, param_1, param_0, param);
+    trace_jkcp_sha3_224 <- (trace_jkcp_sha3_224 ++ tmp__trace);
+    return (trace_jkcp_sha3_224);
+  }
+  proc jkcp_sha3_256 (out:int, inp:int, inlen:int) : trace = {
+    var param:int;
+    var param_0:int;
+    var param_1:int;
+    var param_2:int;
+    var param_3:int;
+    var trace_jkcp_sha3_256:trace;
+    trace_jkcp_sha3_256 <- [];
+    param_3 <- out;
+    param_2 <- inp;
+    param_1 <- inlen;
+    param_0 <- 17;
+    param <- 32;
+    tmp__trace <@ __sha3 (param_3, param_2, param_1, param_0, param);
+    trace_jkcp_sha3_256 <- (trace_jkcp_sha3_256 ++ tmp__trace);
+    return (trace_jkcp_sha3_256);
+  }
+  proc jkcp_sha3_384 (out:int, inp:int, inlen:int) : trace = {
+    var param:int;
+    var param_0:int;
+    var param_1:int;
+    var param_2:int;
+    var param_3:int;
+    var trace_jkcp_sha3_384:trace;
+    trace_jkcp_sha3_384 <- [];
+    param_3 <- out;
+    param_2 <- inp;
+    param_1 <- inlen;
+    param_0 <- 13;
+    param <- 48;
+    tmp__trace <@ __sha3 (param_3, param_2, param_1, param_0, param);
+    trace_jkcp_sha3_384 <- (trace_jkcp_sha3_384 ++ tmp__trace);
+    return (trace_jkcp_sha3_384);
+  }
+  proc jkcp_sha3_512 (out:int, inp:int, inlen:int) : trace = {
+    var param:int;
+    var param_0:int;
+    var param_1:int;
+    var param_2:int;
+    var param_3:int;
+    var trace_jkcp_sha3_512:trace;
+    trace_jkcp_sha3_512 <- [];
+    param_3 <- out;
+    param_2 <- inp;
+    param_1 <- inlen;
+    param_0 <- 9;
+    param <- 64;
+    tmp__trace <@ __sha3 (param_3, param_2, param_1, param_0, param);
+    trace_jkcp_sha3_512 <- (trace_jkcp_sha3_512 ++ tmp__trace);
+    return (trace_jkcp_sha3_512);
+  }
+  proc __shake (out:int, outlen:int, inp:int, inlen:int, _RATE64:int) : trace = {
+    var aux:BArray208.t;
+    var aux_0:BArray208.t;
+    var _st:BArray208.t;
+    var st:BArray208.t;
+    var trailb:W8.t;
+    var r64:int;
+    var param:W8.t;
+    var param_0:int;
+    var param_1:BArray208.t;
+    var result:BArray208.t;
+    var param_2:int;
+    var param_3:int;
+    var param_4:BArray208.t;
+    var result_0:BArray208.t;
+    var param_5:BArray208.t;
+    var result_1:BArray208.t;
+    var param_6:int;
+    var param_7:int;
+    var param_8:BArray208.t;
+    var result_2:BArray208.t;
+    var b_st:BArray208.t;
+    var b_result:BArray208.t;
+    var b_result_0:BArray208.t;
+    var b_result_1:BArray208.t;
+    var b_result_2:BArray208.t;
+    var b_param:BArray208.t;
+    var b__st:BArray208.t;
+    var trace___shake:trace;
+    _st <- witness;
+    b__st <- witness;
+    b_param <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    b_result_1 <- witness;
+    b_result_2 <- witness;
+    b_st <- witness;
+    param_1 <- witness;
+    param_4 <- witness;
+    param_5 <- witness;
+    param_8 <- witness;
+    result <- witness;
+    result_0 <- witness;
+    result_1 <- witness;
+    result_2 <- witness;
+    st <- witness;
+    trace___shake <- [];
+    b__st <- (BArray208.init_arr (W8.of_int 0));
+    b_st <- b__st;
+    st <- _st;
+    trace___shake <-
+    (trace___shake ++ [(Assert, ((0 <= _RATE64) /\ (_RATE64 <= 255)))]);
+    r64 <- _RATE64;
+    trailb <- (W8.of_int 31);
+    b_param <- b_st;
+    param_1 <- st;
+    param_0 <- r64;
+    param <- trailb;
+    (aux, aux_0, tmp__trace) <@ _init_updstate (param_1, b_param, param_0,
+    param);
+    result <- aux;
+    b_result_2 <- aux_0;
+    trace___shake <- (trace___shake ++ tmp__trace);
+    trace___shake <-
+    (trace___shake ++ [(Assert, (BArray208.is_init b_result_2 0 208))]);
+    st <- result;
+    (* Erased call to spill *)
+    param_4 <- st;
+    param_3 <- inp;
+    param_2 <- inlen;
+    (aux, aux_0, tmp__trace) <@ _absorb_m_updstate (param_4,
+    (BArray208.init_arr (W8.of_int 255)), param_3, param_2);
+    result_0 <- aux;
+    b_result_1 <- aux_0;
+    trace___shake <- (trace___shake ++ tmp__trace);
+    trace___shake <-
+    (trace___shake ++ [(Assert, (BArray208.is_init b_result_1 0 208))]);
+    st <- result_0;
+    param_5 <- st;
+    (aux, aux_0, tmp__trace) <@ _finish_updstate (param_5,
+    (BArray208.init_arr (W8.of_int 255)));
+    result_1 <- aux;
+    b_result_0 <- aux_0;
+    trace___shake <- (trace___shake ++ tmp__trace);
+    trace___shake <-
+    (trace___shake ++ [(Assert, (BArray208.is_init b_result_0 0 208))]);
+    st <- result_1;
+    (* Erased call to unspill *)
+    param_8 <- st;
+    param_7 <- out;
+    param_6 <- outlen;
+    (aux, aux_0, tmp__trace) <@ _squeeze_m_updstate (param_8,
+    (BArray208.init_arr (W8.of_int 255)), param_7, param_6);
+    result_2 <- aux;
+    b_result <- aux_0;
+    trace___shake <- (trace___shake ++ tmp__trace);
+    trace___shake <-
+    (trace___shake ++ [(Assert, (BArray208.is_init b_result 0 208))]);
+    return (trace___shake);
+  }
+  proc jkcp_shake128 (out:int, outlen:int, inp:int, inlen:int) : trace = {
+    var param:int;
+    var param_0:int;
+    var param_1:int;
+    var param_2:int;
+    var param_3:int;
+    var trace_jkcp_shake128:trace;
+    trace_jkcp_shake128 <- [];
+    param_3 <- out;
+    param_2 <- outlen;
+    param_1 <- inp;
+    param_0 <- inlen;
+    param <- 21;
+    tmp__trace <@ __shake (param_3, param_2, param_1, param_0, param);
+    trace_jkcp_shake128 <- (trace_jkcp_shake128 ++ tmp__trace);
+    return (trace_jkcp_shake128);
+  }
+  proc jkcp_shake256 (out:int, outlen:int, inp:int, inlen:int) : trace = {
+    var param:int;
+    var param_0:int;
+    var param_1:int;
+    var param_2:int;
+    var param_3:int;
+    var trace_jkcp_shake256:trace;
+    trace_jkcp_shake256 <- [];
+    param_3 <- out;
+    param_2 <- outlen;
+    param_1 <- inp;
+    param_0 <- inlen;
+    param <- 17;
+    tmp__trace <@ __shake (param_3, param_2, param_1, param_0, param);
+    trace_jkcp_shake256 <- (trace_jkcp_shake256 ++ tmp__trace);
+    return (trace_jkcp_shake256);
+  }
+  proc __keccak_init (st:BArray208.t, b_st:BArray208.t, _RATE64:int,
+                      _TRAILB:int) : BArray208.t * BArray208.t * trace = {
+    var aux:BArray208.t;
+    var aux_0:BArray208.t;
+    var trailb:W8.t;
+    var r64:int;
+    var param:W8.t;
+    var param_0:int;
+    var param_1:BArray208.t;
+    var result:BArray208.t;
+    var b_result:BArray208.t;
+    var trace___keccak_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace___keccak_init <- [];
+    trace___keccak_init <-
+    (trace___keccak_init ++ [(Assert, (BArray208.is_init b_st 0 208))]);
+    trace___keccak_init <-
+    (trace___keccak_init ++ [(Assert, ((0 <= _RATE64) /\ (_RATE64 <= 255)))]);
+    r64 <- _RATE64;
+    trailb <- (W8.of_int _TRAILB);
+    param_1 <- st;
+    param_0 <- r64;
+    param <- trailb;
+    (aux, aux_0, tmp__trace) <@ _init_updstate (param_1,
+    (BArray208.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace___keccak_init <- (trace___keccak_init ++ tmp__trace);
+    trace___keccak_init <-
+    (trace___keccak_init ++ [(Assert, (BArray208.is_init b_result 0 208))]);
+    st <- result;
+    b_st <- (BArray208.init_arr (W8.of_int 255));
+    return (st, b_st, trace___keccak_init);
+  }
+  proc jkcp_sha3_224_init (st:BArray208.t, b_st:BArray208.t) : BArray208.t *
+                                                               BArray208.t *
+                                                               trace = {
+    var aux:BArray208.t;
+    var aux_0:BArray208.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray208.t;
+    var result:BArray208.t;
+    var b_result:BArray208.t;
+    var  _0:W64.t;
+    var trace_jkcp_sha3_224_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_sha3_224_init <- [];
+    trace_jkcp_sha3_224_init <-
+    (trace_jkcp_sha3_224_init ++ [(Assert, (BArray208.is_init b_st 0 208))]);
+     _0 <- (init_msf);
+    st <- st;
+    param_1 <- st;
+    param_0 <- 18;
+    param <- 6;
+    (aux, aux_0, tmp__trace) <@ __keccak_init (param_1,
+    (BArray208.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_sha3_224_init <- (trace_jkcp_sha3_224_init ++ tmp__trace);
+    trace_jkcp_sha3_224_init <-
+    (trace_jkcp_sha3_224_init ++
+    [(Assert, (BArray208.is_init b_result 0 208))]);
+    st <- result;
+    b_st <- (BArray208.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_sha3_224_init);
+  }
+  proc jkcp_sha3_256_init (st:BArray208.t, b_st:BArray208.t) : BArray208.t *
+                                                               BArray208.t *
+                                                               trace = {
+    var aux:BArray208.t;
+    var aux_0:BArray208.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray208.t;
+    var result:BArray208.t;
+    var b_result:BArray208.t;
+    var  _0:W64.t;
+    var trace_jkcp_sha3_256_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_sha3_256_init <- [];
+    trace_jkcp_sha3_256_init <-
+    (trace_jkcp_sha3_256_init ++ [(Assert, (BArray208.is_init b_st 0 208))]);
+     _0 <- (init_msf);
+    st <- st;
+    param_1 <- st;
+    param_0 <- 17;
+    param <- 6;
+    (aux, aux_0, tmp__trace) <@ __keccak_init (param_1,
+    (BArray208.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_sha3_256_init <- (trace_jkcp_sha3_256_init ++ tmp__trace);
+    trace_jkcp_sha3_256_init <-
+    (trace_jkcp_sha3_256_init ++
+    [(Assert, (BArray208.is_init b_result 0 208))]);
+    st <- result;
+    b_st <- (BArray208.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_sha3_256_init);
+  }
+  proc jkcp_sha3_384_init (st:BArray208.t, b_st:BArray208.t) : BArray208.t *
+                                                               BArray208.t *
+                                                               trace = {
+    var aux:BArray208.t;
+    var aux_0:BArray208.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray208.t;
+    var result:BArray208.t;
+    var b_result:BArray208.t;
+    var  _0:W64.t;
+    var trace_jkcp_sha3_384_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_sha3_384_init <- [];
+    trace_jkcp_sha3_384_init <-
+    (trace_jkcp_sha3_384_init ++ [(Assert, (BArray208.is_init b_st 0 208))]);
+     _0 <- (init_msf);
+    st <- st;
+    param_1 <- st;
+    param_0 <- 13;
+    param <- 6;
+    (aux, aux_0, tmp__trace) <@ __keccak_init (param_1,
+    (BArray208.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_sha3_384_init <- (trace_jkcp_sha3_384_init ++ tmp__trace);
+    trace_jkcp_sha3_384_init <-
+    (trace_jkcp_sha3_384_init ++
+    [(Assert, (BArray208.is_init b_result 0 208))]);
+    st <- result;
+    b_st <- (BArray208.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_sha3_384_init);
+  }
+  proc jkcp_sha3_512_init (st:BArray208.t, b_st:BArray208.t) : BArray208.t *
+                                                               BArray208.t *
+                                                               trace = {
+    var aux:BArray208.t;
+    var aux_0:BArray208.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray208.t;
+    var result:BArray208.t;
+    var b_result:BArray208.t;
+    var  _0:W64.t;
+    var trace_jkcp_sha3_512_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_sha3_512_init <- [];
+    trace_jkcp_sha3_512_init <-
+    (trace_jkcp_sha3_512_init ++ [(Assert, (BArray208.is_init b_st 0 208))]);
+     _0 <- (init_msf);
+    st <- st;
+    param_1 <- st;
+    param_0 <- 9;
+    param <- 6;
+    (aux, aux_0, tmp__trace) <@ __keccak_init (param_1,
+    (BArray208.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_sha3_512_init <- (trace_jkcp_sha3_512_init ++ tmp__trace);
+    trace_jkcp_sha3_512_init <-
+    (trace_jkcp_sha3_512_init ++
+    [(Assert, (BArray208.is_init b_result 0 208))]);
+    st <- result;
+    b_st <- (BArray208.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_sha3_512_init);
+  }
+  proc jkcp_shake128_init (st:BArray208.t, b_st:BArray208.t) : BArray208.t *
+                                                               BArray208.t *
+                                                               trace = {
+    var aux:BArray208.t;
+    var aux_0:BArray208.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray208.t;
+    var result:BArray208.t;
+    var b_result:BArray208.t;
+    var  _0:W64.t;
+    var trace_jkcp_shake128_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_shake128_init <- [];
+    trace_jkcp_shake128_init <-
+    (trace_jkcp_shake128_init ++ [(Assert, (BArray208.is_init b_st 0 208))]);
+     _0 <- (init_msf);
+    st <- st;
+    param_1 <- st;
+    param_0 <- 21;
+    param <- 31;
+    (aux, aux_0, tmp__trace) <@ __keccak_init (param_1,
+    (BArray208.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_shake128_init <- (trace_jkcp_shake128_init ++ tmp__trace);
+    trace_jkcp_shake128_init <-
+    (trace_jkcp_shake128_init ++
+    [(Assert, (BArray208.is_init b_result 0 208))]);
+    st <- result;
+    b_st <- (BArray208.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_shake128_init);
+  }
+  proc jkcp_shake256_init (st:BArray208.t, b_st:BArray208.t) : BArray208.t *
+                                                               BArray208.t *
+                                                               trace = {
+    var aux:BArray208.t;
+    var aux_0:BArray208.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray208.t;
+    var result:BArray208.t;
+    var b_result:BArray208.t;
+    var  _0:W64.t;
+    var trace_jkcp_shake256_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_shake256_init <- [];
+    trace_jkcp_shake256_init <-
+    (trace_jkcp_shake256_init ++ [(Assert, (BArray208.is_init b_st 0 208))]);
+     _0 <- (init_msf);
+    st <- st;
+    param_1 <- st;
+    param_0 <- 17;
+    param <- 31;
+    (aux, aux_0, tmp__trace) <@ __keccak_init (param_1,
+    (BArray208.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_shake256_init <- (trace_jkcp_shake256_init ++ tmp__trace);
+    trace_jkcp_shake256_init <-
+    (trace_jkcp_shake256_init ++
+    [(Assert, (BArray208.is_init b_result 0 208))]);
+    st <- result;
+    b_st <- (BArray208.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_shake256_init);
+  }
+  proc jkcp_keccak_absorb (st:BArray208.t, b_st:BArray208.t, buf:int, len:int) : 
+  BArray208.t * BArray208.t * trace = {
+    var aux:BArray208.t;
+    var aux_0:BArray208.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray208.t;
+    var result:BArray208.t;
+    var b_result:BArray208.t;
+    var  _0:W64.t;
+    var trace_jkcp_keccak_absorb:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_keccak_absorb <- [];
+    trace_jkcp_keccak_absorb <-
+    (trace_jkcp_keccak_absorb ++ [(Assert, (BArray208.is_init b_st 0 208))]);
+     _0 <- (init_msf);
+    st <- st;
+    buf <- buf;
+    param_1 <- st;
+    param_0 <- buf;
+    param <- len;
+    (aux, aux_0, tmp__trace) <@ _absorb_m_updstate (param_1,
+    (BArray208.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_keccak_absorb <- (trace_jkcp_keccak_absorb ++ tmp__trace);
+    trace_jkcp_keccak_absorb <-
+    (trace_jkcp_keccak_absorb ++
+    [(Assert, (BArray208.is_init b_result 0 208))]);
+    st <- result;
+    b_st <- (BArray208.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_keccak_absorb);
+  }
+  proc jkcp_keccak_squeeze (st:BArray208.t, b_st:BArray208.t, buf:int,
+                            len:int) : BArray208.t * BArray208.t * trace = {
+    var aux:BArray208.t;
+    var aux_0:BArray208.t;
+    var ms:W64.t;
+    var nonempty:bool;
+    var ststatus:W64.t;
+    var trailb:W8.t;
+    var param:BArray208.t;
+    var result:BArray208.t;
+    var param_0:int;
+    var param_1:int;
+    var param_2:BArray208.t;
+    var result_0:BArray208.t;
+    var b_result:BArray208.t;
+    var b_result_0:BArray208.t;
+    var trace_jkcp_keccak_squeeze:trace;
+    b_result <- witness;
+    b_result_0 <- witness;
+    param <- witness;
+    param_2 <- witness;
+    result <- witness;
+    result_0 <- witness;
+    trace_jkcp_keccak_squeeze <- [];
+    trace_jkcp_keccak_squeeze <-
+    (trace_jkcp_keccak_squeeze ++ [(Assert, (BArray208.is_init b_st 0 208))]);
+    ms <- (init_msf);
+    st <- st;
+    buf <- buf;
+    nonempty <- (0 < len);
+    if (nonempty) {
+      ms <- (update_msf nonempty ms);
+      ststatus <- (BArray208.get64 st 25);
+      (* Erased call to declassify *)
+      ststatus <- (protect_64 ststatus ms);
+      ststatus <- (ststatus `>>` (W8.of_int 16));
+      trailb <- (truncateu8 ststatus);
+      if ((trailb <> (W8.of_int 0))) {
+        param <- st;
+        (aux, aux_0, tmp__trace) <@ _finish_updstate (param,
+        (BArray208.init_arr (W8.of_int 255)));
+        result <- aux;
+        b_result_0 <- aux_0;
+        trace_jkcp_keccak_squeeze <-
+        (trace_jkcp_keccak_squeeze ++ tmp__trace);
+        trace_jkcp_keccak_squeeze <-
+        (trace_jkcp_keccak_squeeze ++
+        [(Assert, (BArray208.is_init b_result_0 0 208))]);
+        st <- result;
+      } else {
+        
+      }
+      param_2 <- st;
+      param_1 <- buf;
+      param_0 <- len;
+      (aux, aux_0, tmp__trace) <@ _squeeze_m_updstate (param_2,
+      (BArray208.init_arr (W8.of_int 255)), param_1, param_0);
+      result_0 <- aux;
+      b_result <- aux_0;
+      trace_jkcp_keccak_squeeze <- (trace_jkcp_keccak_squeeze ++ tmp__trace);
+      trace_jkcp_keccak_squeeze <-
+      (trace_jkcp_keccak_squeeze ++
+      [(Assert, (BArray208.is_init b_result 0 208))]);
+      st <- result_0;
+    } else {
+      
+    }
+    b_st <- (BArray208.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_keccak_squeeze);
+  }
+  proc __keccakx4_init (st:BArray808.t, b_st:BArray808.t, _RATE64:int,
+                        _TRAILB:int) : BArray808.t * BArray808.t * trace = {
+    var aux:BArray808.t;
+    var aux_0:BArray808.t;
+    var trailb:W8.t;
+    var r64:int;
+    var param:W8.t;
+    var param_0:int;
+    var param_1:BArray808.t;
+    var result:BArray808.t;
+    var b_result:BArray808.t;
+    var trace___keccakx4_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace___keccakx4_init <- [];
+    trace___keccakx4_init <-
+    (trace___keccakx4_init ++ [(Assert, (BArray808.is_init b_st 0 808))]);
+    trace___keccakx4_init <-
+    (trace___keccakx4_init ++
+    [(Assert, ((0 <= _RATE64) /\ (_RATE64 <= 255)))]);
+    r64 <- _RATE64;
+    trailb <- (W8.of_int _TRAILB);
+    param_1 <- st;
+    param_0 <- r64;
+    param <- trailb;
+    (aux, aux_0, tmp__trace) <@ _init_updstate_avx2x4 (param_1,
+    (BArray808.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace___keccakx4_init <- (trace___keccakx4_init ++ tmp__trace);
+    trace___keccakx4_init <-
+    (trace___keccakx4_init ++ [(Assert, (BArray808.is_init b_result 0 808))]);
+    st <- result;
+    b_st <- (BArray808.init_arr (W8.of_int 255));
+    return (st, b_st, trace___keccakx4_init);
+  }
+  proc jkcp_sha3_224x4_init (st:BArray808.t, b_st:BArray808.t) : BArray808.t *
+                                                                 BArray808.t *
+                                                                 trace = {
+    var aux:BArray808.t;
+    var aux_0:BArray808.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray808.t;
+    var result:BArray808.t;
+    var b_result:BArray808.t;
+    var  _0:W64.t;
+    var trace_jkcp_sha3_224x4_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_sha3_224x4_init <- [];
+    trace_jkcp_sha3_224x4_init <-
+    (trace_jkcp_sha3_224x4_init ++
+    [(Assert, (BArray808.is_init b_st 0 808))]);
+     _0 <- (init_msf);
+    st <- st;
+    param_1 <- st;
+    param_0 <- 18;
+    param <- 6;
+    (aux, aux_0, tmp__trace) <@ __keccakx4_init (param_1,
+    (BArray808.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_sha3_224x4_init <- (trace_jkcp_sha3_224x4_init ++ tmp__trace);
+    trace_jkcp_sha3_224x4_init <-
+    (trace_jkcp_sha3_224x4_init ++
+    [(Assert, (BArray808.is_init b_result 0 808))]);
+    st <- result;
+    b_st <- (BArray808.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_sha3_224x4_init);
+  }
+  proc jkcp_sha3_256x4_init (st:BArray808.t, b_st:BArray808.t) : BArray808.t *
+                                                                 BArray808.t *
+                                                                 trace = {
+    var aux:BArray808.t;
+    var aux_0:BArray808.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray808.t;
+    var result:BArray808.t;
+    var b_result:BArray808.t;
+    var  _0:W64.t;
+    var trace_jkcp_sha3_256x4_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_sha3_256x4_init <- [];
+    trace_jkcp_sha3_256x4_init <-
+    (trace_jkcp_sha3_256x4_init ++
+    [(Assert, (BArray808.is_init b_st 0 808))]);
+     _0 <- (init_msf);
+    st <- st;
+    param_1 <- st;
+    param_0 <- 17;
+    param <- 6;
+    (aux, aux_0, tmp__trace) <@ __keccakx4_init (param_1,
+    (BArray808.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_sha3_256x4_init <- (trace_jkcp_sha3_256x4_init ++ tmp__trace);
+    trace_jkcp_sha3_256x4_init <-
+    (trace_jkcp_sha3_256x4_init ++
+    [(Assert, (BArray808.is_init b_result 0 808))]);
+    st <- result;
+    b_st <- (BArray808.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_sha3_256x4_init);
+  }
+  proc jkcp_sha3_384x4_init (st:BArray808.t, b_st:BArray808.t) : BArray808.t *
+                                                                 BArray808.t *
+                                                                 trace = {
+    var aux:BArray808.t;
+    var aux_0:BArray808.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray808.t;
+    var result:BArray808.t;
+    var b_result:BArray808.t;
+    var  _0:W64.t;
+    var trace_jkcp_sha3_384x4_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_sha3_384x4_init <- [];
+    trace_jkcp_sha3_384x4_init <-
+    (trace_jkcp_sha3_384x4_init ++
+    [(Assert, (BArray808.is_init b_st 0 808))]);
+     _0 <- (init_msf);
+    st <- st;
+    param_1 <- st;
+    param_0 <- 13;
+    param <- 6;
+    (aux, aux_0, tmp__trace) <@ __keccakx4_init (param_1,
+    (BArray808.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_sha3_384x4_init <- (trace_jkcp_sha3_384x4_init ++ tmp__trace);
+    trace_jkcp_sha3_384x4_init <-
+    (trace_jkcp_sha3_384x4_init ++
+    [(Assert, (BArray808.is_init b_result 0 808))]);
+    st <- result;
+    b_st <- (BArray808.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_sha3_384x4_init);
+  }
+  proc jkcp_sha3_512x4_init (st:BArray808.t, b_st:BArray808.t) : BArray808.t *
+                                                                 BArray808.t *
+                                                                 trace = {
+    var aux:BArray808.t;
+    var aux_0:BArray808.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray808.t;
+    var result:BArray808.t;
+    var b_result:BArray808.t;
+    var  _0:W64.t;
+    var trace_jkcp_sha3_512x4_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_sha3_512x4_init <- [];
+    trace_jkcp_sha3_512x4_init <-
+    (trace_jkcp_sha3_512x4_init ++
+    [(Assert, (BArray808.is_init b_st 0 808))]);
+     _0 <- (init_msf);
+    st <- st;
+    param_1 <- st;
+    param_0 <- 9;
+    param <- 6;
+    (aux, aux_0, tmp__trace) <@ __keccakx4_init (param_1,
+    (BArray808.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_sha3_512x4_init <- (trace_jkcp_sha3_512x4_init ++ tmp__trace);
+    trace_jkcp_sha3_512x4_init <-
+    (trace_jkcp_sha3_512x4_init ++
+    [(Assert, (BArray808.is_init b_result 0 808))]);
+    st <- result;
+    b_st <- (BArray808.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_sha3_512x4_init);
+  }
+  proc jkcp_shake128x4_init (st:BArray808.t, b_st:BArray808.t) : BArray808.t *
+                                                                 BArray808.t *
+                                                                 trace = {
+    var aux:BArray808.t;
+    var aux_0:BArray808.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray808.t;
+    var result:BArray808.t;
+    var b_result:BArray808.t;
+    var  _0:W64.t;
+    var trace_jkcp_shake128x4_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_shake128x4_init <- [];
+    trace_jkcp_shake128x4_init <-
+    (trace_jkcp_shake128x4_init ++
+    [(Assert, (BArray808.is_init b_st 0 808))]);
+     _0 <- (init_msf);
+    st <- st;
+    param_1 <- st;
+    param_0 <- 21;
+    param <- 31;
+    (aux, aux_0, tmp__trace) <@ __keccakx4_init (param_1,
+    (BArray808.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_shake128x4_init <- (trace_jkcp_shake128x4_init ++ tmp__trace);
+    trace_jkcp_shake128x4_init <-
+    (trace_jkcp_shake128x4_init ++
+    [(Assert, (BArray808.is_init b_result 0 808))]);
+    st <- result;
+    b_st <- (BArray808.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_shake128x4_init);
+  }
+  proc jkcp_shake256x4_init (st:BArray808.t, b_st:BArray808.t) : BArray808.t *
+                                                                 BArray808.t *
+                                                                 trace = {
+    var aux:BArray808.t;
+    var aux_0:BArray808.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray808.t;
+    var result:BArray808.t;
+    var b_result:BArray808.t;
+    var  _0:W64.t;
+    var trace_jkcp_shake256x4_init:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_shake256x4_init <- [];
+    trace_jkcp_shake256x4_init <-
+    (trace_jkcp_shake256x4_init ++
+    [(Assert, (BArray808.is_init b_st 0 808))]);
+     _0 <- (init_msf);
+    st <- st;
+    param_1 <- st;
+    param_0 <- 17;
+    param <- 31;
+    (aux, aux_0, tmp__trace) <@ __keccakx4_init (param_1,
+    (BArray808.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_shake256x4_init <- (trace_jkcp_shake256x4_init ++ tmp__trace);
+    trace_jkcp_shake256x4_init <-
+    (trace_jkcp_shake256x4_init ++
+    [(Assert, (BArray808.is_init b_result 0 808))]);
+    st <- result;
+    b_st <- (BArray808.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_shake256x4_init);
+  }
+  proc jkcp_keccakx4_absorb_bcast (st:BArray808.t, b_st:BArray808.t, buf:int,
+                                   len:int) : BArray808.t * BArray808.t *
+                                              trace = {
+    var aux:BArray808.t;
+    var aux_0:BArray808.t;
+    var param:int;
+    var param_0:int;
+    var param_1:BArray808.t;
+    var result:BArray808.t;
+    var b_result:BArray808.t;
+    var  _0:W64.t;
+    var trace_jkcp_keccakx4_absorb_bcast:trace;
+    b_result <- witness;
+    param_1 <- witness;
+    result <- witness;
+    trace_jkcp_keccakx4_absorb_bcast <- [];
+    trace_jkcp_keccakx4_absorb_bcast <-
+    (trace_jkcp_keccakx4_absorb_bcast ++
+    [(Assert, (BArray808.is_init b_st 0 808))]);
+     _0 <- (init_msf);
+    st <- st;
+    buf <- buf;
+    len <- len;
+    param_1 <- st;
+    param_0 <- buf;
+    param <- len;
+    (aux, aux_0, tmp__trace) <@ _absorb_m_bcast_updstate_avx2x4 (param_1,
+    (BArray808.init_arr (W8.of_int 255)), param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_keccakx4_absorb_bcast <-
+    (trace_jkcp_keccakx4_absorb_bcast ++ tmp__trace);
+    trace_jkcp_keccakx4_absorb_bcast <-
+    (trace_jkcp_keccakx4_absorb_bcast ++
+    [(Assert, (BArray808.is_init b_result 0 808))]);
+    st <- result;
+    b_st <- (BArray808.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_keccakx4_absorb_bcast);
+  }
+  proc jkcp_keccakx4_absorb (st:BArray808.t, b_st:BArray808.t, buf0:int,
+                             buf1:int, buf2:int, buf3:int, len:int) : 
+  BArray808.t * BArray808.t * trace = {
+    var aux:BArray808.t;
+    var aux_0:BArray808.t;
+    var param:int;
+    var param_0:int;
+    var param_1:int;
+    var param_2:int;
+    var param_3:int;
+    var param_4:BArray808.t;
+    var result:BArray808.t;
+    var b_result:BArray808.t;
+    var  _0:W64.t;
+    var trace_jkcp_keccakx4_absorb:trace;
+    b_result <- witness;
+    param_4 <- witness;
+    result <- witness;
+    trace_jkcp_keccakx4_absorb <- [];
+    trace_jkcp_keccakx4_absorb <-
+    (trace_jkcp_keccakx4_absorb ++
+    [(Assert, (BArray808.is_init b_st 0 808))]);
+     _0 <- (init_msf);
+    st <- st;
+    buf0 <- buf0;
+    buf1 <- buf1;
+    buf2 <- buf2;
+    buf3 <- buf3;
+    len <- len;
+    param_4 <- st;
+    param_3 <- buf0;
+    param_2 <- buf1;
+    param_1 <- buf2;
+    param_0 <- buf3;
+    param <- len;
+    (aux, aux_0, tmp__trace) <@ _absorb_m_updstate_avx2x4 (param_4,
+    (BArray808.init_arr (W8.of_int 255)), param_3, param_2, param_1, 
+    param_0, param);
+    result <- aux;
+    b_result <- aux_0;
+    trace_jkcp_keccakx4_absorb <- (trace_jkcp_keccakx4_absorb ++ tmp__trace);
+    trace_jkcp_keccakx4_absorb <-
+    (trace_jkcp_keccakx4_absorb ++
+    [(Assert, (BArray808.is_init b_result 0 808))]);
+    st <- result;
+    b_st <- (BArray808.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_keccakx4_absorb);
+  }
+  proc jkcp_keccakx4_squeeze (st:BArray808.t, b_st:BArray808.t, buf0:int,
+                              buf1:int, buf2:int, buf3:int, len:int) : 
+  BArray808.t * BArray808.t * trace = {
+    var aux:BArray808.t;
+    var aux_0:BArray808.t;
+    var ms:W64.t;
+    var nonempty:bool;
+    var ststatus:W64.t;
+    var trailb:W8.t;
+    var param:BArray808.t;
+    var result:BArray808.t;
+    var param_0:int;
+    var param_1:int;
+    var param_2:int;
+    var param_3:int;
+    var param_4:int;
+    var param_5:BArray808.t;
+    var result_0:BArray808.t;
+    var b_result:BArray808.t;
+    var b_result_0:BArray808.t;
+    var trace_jkcp_keccakx4_squeeze:trace;
+    b_result <- witness;
+    b_result_0 <- witness;
+    param <- witness;
+    param_5 <- witness;
+    result <- witness;
+    result_0 <- witness;
+    trace_jkcp_keccakx4_squeeze <- [];
+    trace_jkcp_keccakx4_squeeze <-
+    (trace_jkcp_keccakx4_squeeze ++
+    [(Assert, (BArray808.is_init b_st 0 808))]);
+    ms <- (init_msf);
+    st <- st;
+    buf0 <- buf0;
+    buf1 <- buf1;
+    buf2 <- buf2;
+    buf3 <- buf3;
+    len <- len;
+    nonempty <- (0 < len);
+    if (nonempty) {
+      ms <- (update_msf nonempty ms);
+      ststatus <- (BArray808.get64 st 100);
+      (* Erased call to declassify *)
+      ststatus <- (protect_64 ststatus ms);
+      ststatus <- (ststatus `>>` (W8.of_int 16));
+      trailb <- (truncateu8 ststatus);
+      if ((trailb <> (W8.of_int 0))) {
+        param <- st;
+        (aux, aux_0, tmp__trace) <@ _finish_updstate_avx2x4 (param,
+        (BArray808.init_arr (W8.of_int 255)));
+        result <- aux;
+        b_result_0 <- aux_0;
+        trace_jkcp_keccakx4_squeeze <-
+        (trace_jkcp_keccakx4_squeeze ++ tmp__trace);
+        trace_jkcp_keccakx4_squeeze <-
+        (trace_jkcp_keccakx4_squeeze ++
+        [(Assert, (BArray808.is_init b_result_0 0 808))]);
+        st <- result;
+      } else {
+        
+      }
+      param_5 <- st;
+      param_4 <- buf0;
+      param_3 <- buf1;
+      param_2 <- buf2;
+      param_1 <- buf3;
+      param_0 <- len;
+      (aux, aux_0, tmp__trace) <@ _squeeze_m_updstate_avx2x4 (param_5,
+      (BArray808.init_arr (W8.of_int 255)), param_4, param_3, param_2,
+      param_1, param_0);
+      result_0 <- aux;
+      b_result <- aux_0;
+      trace_jkcp_keccakx4_squeeze <-
+      (trace_jkcp_keccakx4_squeeze ++ tmp__trace);
+      trace_jkcp_keccakx4_squeeze <-
+      (trace_jkcp_keccakx4_squeeze ++
+      [(Assert, (BArray808.is_init b_result 0 808))]);
+      st <- result_0;
+    } else {
+      
+    }
+    b_st <- (BArray808.init_arr (W8.of_int 255));
+    return (st, b_st, trace_jkcp_keccakx4_squeeze);
   }
 }.
 
@@ -24908,24 +26015,6 @@ op _finish_updstate_avx2x4_spec _st _b_st =
    (((_b_st = b_st) /\ (_st = st)) /\ (BArray808.is_init _b_st 0 808)) ==>
    ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
 
-op ststatus_updstate_avx2x4_spec _status _b_status _st _b_st =
-   hoare [M.ststatus_updstate_avx2x4 :
-   (((_b_st = b_st) /\
-    ((_st = st) /\ ((_b_status = b_status) /\ (_status = status)))) /\
-   (BArray808.is_init _b_st 0 808)) ==>
-   ((BArray3.is_init res.`2 0 3) /\ (valid res.`3))].
-
-op init_updstate_avx2x4_spec _st _b_st _r64 _trailb =
-   hoare [M.init_updstate_avx2x4 :
-   (((_trailb = trailb) /\ ((_r64 = r64) /\ ((_b_st = b_st) /\ (_st = st)))) /\
-   (true /\ (true /\ ((0 <= _r64) /\ (_r64 <= 255))))) ==>
-   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
-
-op finish_updstate_avx2x4_spec _st _b_st =
-   hoare [M.finish_updstate_avx2x4 :
-   (((_b_st = b_st) /\ (_st = st)) /\ (BArray808.is_init _b_st 0 808)) ==>
-   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
-
 op _add_m_bcast_updstate_avx2x4_spec _st _b_st _at _buf _upto =
    hoare [M._add_m_bcast_updstate_avx2x4 :
    (((_upto = upto) /\
@@ -25344,6 +26433,24 @@ op _squeeze_m_updstate_avx2x4_spec _st _b_st _buf0 _buf1 _buf2 _buf3 _len =
    (is_valid ptr_modulus Glob.mem_v _buf3 _len)))))))))))))))))))))) ==>
    ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
 
+op ststatus_updstate_avx2x4_spec _status _b_status _st _b_st =
+   hoare [M.ststatus_updstate_avx2x4 :
+   (((_b_st = b_st) /\
+    ((_st = st) /\ ((_b_status = b_status) /\ (_status = status)))) /\
+   (BArray808.is_init _b_st 0 808)) ==>
+   ((BArray3.is_init res.`2 0 3) /\ (valid res.`3))].
+
+op init_updstate_avx2x4_spec _st _b_st _r64 _trailb =
+   hoare [M.init_updstate_avx2x4 :
+   (((_trailb = trailb) /\ ((_r64 = r64) /\ ((_b_st = b_st) /\ (_st = st)))) /\
+   (true /\ (true /\ ((0 <= _r64) /\ (_r64 <= 255))))) ==>
+   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
+
+op finish_updstate_avx2x4_spec _st _b_st =
+   hoare [M.finish_updstate_avx2x4 :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray808.is_init _b_st 0 808)) ==>
+   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
+
 op absorb_m_bcast_updstate_avx2x4_spec _st _b_st _buf _len =
    hoare [M.absorb_m_bcast_updstate_avx2x4 :
    (((_len = len) /\ ((_buf = buf) /\ ((_b_st = b_st) /\ (_st = st)))) /\
@@ -25424,4 +26531,160 @@ op squeeze_m_updstate_avx2x4_spec _st _b_st _buf0 _buf1 _buf2 _buf3 _len =
      (is_valid ptr_modulus Glob.mem_v _buf1 _len)) /\
     (is_valid ptr_modulus Glob.mem_v _buf2 _len)) /\
    (is_valid ptr_modulus Glob.mem_v _buf3 _len)))))))))))))))))))))) ==>
+   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
+
+op __sha3_spec _out _inp _inlen __RATE64 __OUTLEN =
+   hoare [M.__sha3 :
+   (((__OUTLEN = _OUTLEN) /\
+    ((__RATE64 = _RATE64) /\
+    ((_inlen = inlen) /\ ((_inp = inp) /\ (_out = out))))) /\
+   true) ==> (true /\ (valid res))].
+
+op jkcp_sha3_224_spec _out _inp _inlen =
+   hoare [M.jkcp_sha3_224 :
+   (((_inlen = inlen) /\ ((_inp = inp) /\ (_out = out))) /\ true) ==>
+   (true /\ (valid res))].
+
+op jkcp_sha3_256_spec _out _inp _inlen =
+   hoare [M.jkcp_sha3_256 :
+   (((_inlen = inlen) /\ ((_inp = inp) /\ (_out = out))) /\ true) ==>
+   (true /\ (valid res))].
+
+op jkcp_sha3_384_spec _out _inp _inlen =
+   hoare [M.jkcp_sha3_384 :
+   (((_inlen = inlen) /\ ((_inp = inp) /\ (_out = out))) /\ true) ==>
+   (true /\ (valid res))].
+
+op jkcp_sha3_512_spec _out _inp _inlen =
+   hoare [M.jkcp_sha3_512 :
+   (((_inlen = inlen) /\ ((_inp = inp) /\ (_out = out))) /\ true) ==>
+   (true /\ (valid res))].
+
+op __shake_spec _out _outlen _inp _inlen __RATE64 =
+   hoare [M.__shake :
+   (((__RATE64 = _RATE64) /\
+    ((_inlen = inlen) /\
+    ((_inp = inp) /\ ((_outlen = outlen) /\ (_out = out))))) /\
+   true) ==> (true /\ (valid res))].
+
+op jkcp_shake128_spec _out _outlen _inp _inlen =
+   hoare [M.jkcp_shake128 :
+   (((_inlen = inlen) /\
+    ((_inp = inp) /\ ((_outlen = outlen) /\ (_out = out)))) /\
+   true) ==> (true /\ (valid res))].
+
+op jkcp_shake256_spec _out _outlen _inp _inlen =
+   hoare [M.jkcp_shake256 :
+   (((_inlen = inlen) /\
+    ((_inp = inp) /\ ((_outlen = outlen) /\ (_out = out)))) /\
+   true) ==> (true /\ (valid res))].
+
+op __keccak_init_spec _st _b_st __RATE64 __TRAILB =
+   hoare [M.__keccak_init :
+   (((__TRAILB = _TRAILB) /\
+    ((__RATE64 = _RATE64) /\ ((_b_st = b_st) /\ (_st = st)))) /\
+   (BArray208.is_init _b_st 0 208)) ==>
+   ((BArray208.is_init res.`2 0 208) /\ (valid res.`3))].
+
+op jkcp_sha3_224_init_spec _st _b_st =
+   hoare [M.jkcp_sha3_224_init :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray208.is_init _b_st 0 208)) ==>
+   ((BArray208.is_init res.`2 0 208) /\ (valid res.`3))].
+
+op jkcp_sha3_256_init_spec _st _b_st =
+   hoare [M.jkcp_sha3_256_init :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray208.is_init _b_st 0 208)) ==>
+   ((BArray208.is_init res.`2 0 208) /\ (valid res.`3))].
+
+op jkcp_sha3_384_init_spec _st _b_st =
+   hoare [M.jkcp_sha3_384_init :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray208.is_init _b_st 0 208)) ==>
+   ((BArray208.is_init res.`2 0 208) /\ (valid res.`3))].
+
+op jkcp_sha3_512_init_spec _st _b_st =
+   hoare [M.jkcp_sha3_512_init :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray208.is_init _b_st 0 208)) ==>
+   ((BArray208.is_init res.`2 0 208) /\ (valid res.`3))].
+
+op jkcp_shake128_init_spec _st _b_st =
+   hoare [M.jkcp_shake128_init :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray208.is_init _b_st 0 208)) ==>
+   ((BArray208.is_init res.`2 0 208) /\ (valid res.`3))].
+
+op jkcp_shake256_init_spec _st _b_st =
+   hoare [M.jkcp_shake256_init :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray208.is_init _b_st 0 208)) ==>
+   ((BArray208.is_init res.`2 0 208) /\ (valid res.`3))].
+
+op jkcp_keccak_absorb_spec _st _b_st _buf _len =
+   hoare [M.jkcp_keccak_absorb :
+   (((_len = len) /\ ((_buf = buf) /\ ((_b_st = b_st) /\ (_st = st)))) /\
+   (BArray208.is_init _b_st 0 208)) ==>
+   ((BArray208.is_init res.`2 0 208) /\ (valid res.`3))].
+
+op jkcp_keccak_squeeze_spec _st _b_st _buf _len =
+   hoare [M.jkcp_keccak_squeeze :
+   (((_len = len) /\ ((_buf = buf) /\ ((_b_st = b_st) /\ (_st = st)))) /\
+   (BArray208.is_init _b_st 0 208)) ==>
+   ((BArray208.is_init res.`2 0 208) /\ (valid res.`3))].
+
+op __keccakx4_init_spec _st _b_st __RATE64 __TRAILB =
+   hoare [M.__keccakx4_init :
+   (((__TRAILB = _TRAILB) /\
+    ((__RATE64 = _RATE64) /\ ((_b_st = b_st) /\ (_st = st)))) /\
+   (BArray808.is_init _b_st 0 808)) ==>
+   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
+
+op jkcp_sha3_224x4_init_spec _st _b_st =
+   hoare [M.jkcp_sha3_224x4_init :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray808.is_init _b_st 0 808)) ==>
+   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
+
+op jkcp_sha3_256x4_init_spec _st _b_st =
+   hoare [M.jkcp_sha3_256x4_init :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray808.is_init _b_st 0 808)) ==>
+   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
+
+op jkcp_sha3_384x4_init_spec _st _b_st =
+   hoare [M.jkcp_sha3_384x4_init :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray808.is_init _b_st 0 808)) ==>
+   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
+
+op jkcp_sha3_512x4_init_spec _st _b_st =
+   hoare [M.jkcp_sha3_512x4_init :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray808.is_init _b_st 0 808)) ==>
+   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
+
+op jkcp_shake128x4_init_spec _st _b_st =
+   hoare [M.jkcp_shake128x4_init :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray808.is_init _b_st 0 808)) ==>
+   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
+
+op jkcp_shake256x4_init_spec _st _b_st =
+   hoare [M.jkcp_shake256x4_init :
+   (((_b_st = b_st) /\ (_st = st)) /\ (BArray808.is_init _b_st 0 808)) ==>
+   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
+
+op jkcp_keccakx4_absorb_bcast_spec _st _b_st _buf _len =
+   hoare [M.jkcp_keccakx4_absorb_bcast :
+   (((_len = len) /\ ((_buf = buf) /\ ((_b_st = b_st) /\ (_st = st)))) /\
+   (BArray808.is_init _b_st 0 808)) ==>
+   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
+
+op jkcp_keccakx4_absorb_spec _st _b_st _buf0 _buf1 _buf2 _buf3 _len =
+   hoare [M.jkcp_keccakx4_absorb :
+   (((_len = len) /\
+    ((_buf3 = buf3) /\
+    ((_buf2 = buf2) /\
+    ((_buf1 = buf1) /\ ((_buf0 = buf0) /\ ((_b_st = b_st) /\ (_st = st))))))) /\
+   (BArray808.is_init _b_st 0 808)) ==>
+   ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].
+
+op jkcp_keccakx4_squeeze_spec _st _b_st _buf0 _buf1 _buf2 _buf3 _len =
+   hoare [M.jkcp_keccakx4_squeeze :
+   (((_len = len) /\
+    ((_buf3 = buf3) /\
+    ((_buf2 = buf2) /\
+    ((_buf1 = buf1) /\ ((_buf0 = buf0) /\ ((_b_st = b_st) /\ (_st = st))))))) /\
+   (BArray808.is_init _b_st 0 808)) ==>
    ((BArray808.is_init res.`2 0 808) /\ (valid res.`3))].

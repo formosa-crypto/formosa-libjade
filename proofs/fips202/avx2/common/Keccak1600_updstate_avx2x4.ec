@@ -294,7 +294,7 @@ hoare finish_updstate_avx2x4_spec_h _st:
   : st = _st
   ==> res = finish_updstate_avx2x4_spec _st.
 proof.
-proc; seq 2 : (st = _st /\ trailb = zeroextu64 (ststatus_trailb _st.[100]) /\ r8 = ststatus_r8 _st.[100] /\ at = ststatus_at_norm _st.[100]).
+proc; seq 3 : (st = _st /\ trailb = zeroextu64 (ststatus_trailb _st.[100]) /\ r8 = ststatus_r8 _st.[100] /\ at = ststatus_at_norm _st.[100]).
 + by inline *; auto => />; exact (ststatus_data_avx2x4P _st.[100]).
 wp; skip => &hr [#] -> -> -> -> /=.
 have S5 : forall x, (x `|>>` 3) `<<` 5 = 32 * (x %/ 8) by move=> x; rewrite /(`|>>`) /(`<<`) /= /#.
@@ -744,7 +744,7 @@ proof. by conseq add_m_updstate_avx2x4_ll (add_m_updstate_avx2x4_h _mem _st _at 
 
 lemma absorb_m_bcast_updstate_avx2x4_ll: islossless M._absorb_m_bcast_updstate_avx2x4.
 proof.
-proc; seq 5: (8 <= r8).
+proc; seq 6: (8 <= r8).
 + by wp; ecall (ststatus_data_avx2x4_bnd_h); auto.
 + by wp; call ststatus_data_avx2x4_bnd_ph; auto.
 + seq 1: true => //.
@@ -764,7 +764,7 @@ hoare absorb_m_bcast_updstate_avx2x4_h _mem _r8 _tb _l0 _l1 _l2 _l3 _buf _len:
                               (_l2 ++ memread _mem _buf _len) (_l3 ++ memread _mem _buf _len) res.
 proof.
 proc => /=; exlim st => _st.
-seq 5 : (Glob.mem = _mem /\ st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len
+seq 6 : (Glob.mem = _mem /\ st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len
          /\ r8 = _r8 /\ buf = _buf
          /\ stk = A101u64toA25u256 _st /\ at = size _l0 %% _r8 /\ len = _len + at).
 + wp; ecall (ststatus_data_avx2x4_h st.[100]); auto => &hr [#] <- -> -> -> Habs H0 r [-> ->] /=.
@@ -844,7 +844,7 @@ proof. by conseq absorb_m_bcast_updstate_avx2x4_ll (absorb_m_bcast_updstate_avx2
 
 lemma absorb_m_updstate_avx2x4_ll: islossless M._absorb_m_updstate_avx2x4.
 proof.
-proc; seq 5: (8 <= r8).
+proc; seq 6: (8 <= r8).
 + by wp; ecall (ststatus_data_avx2x4_bnd_h); auto.
 + by wp; call ststatus_data_avx2x4_bnd_ph; auto.
 + seq 1: true => //.
@@ -864,7 +864,7 @@ hoare absorb_m_updstate_avx2x4_h _mem _r8 _tb _l0 _l1 _l2 _l3 _buf0 _buf1 _buf2 
                               (_l2 ++ memread _mem _buf2 _len) (_l3 ++ memread _mem _buf3 _len) res.
 proof.
 proc => /=; exlim st => _st.
-seq 5 : (Glob.mem = _mem /\ st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len
+seq 6 : (Glob.mem = _mem /\ st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len
          /\ r8 = _r8 /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
          /\ stk = A101u64toA25u256 _st /\ at = size _l0 %% _r8 /\ len = _len + at).
 + wp; ecall (ststatus_data_avx2x4_h st.[100]); auto => &hr [#] <- -> -> -> -> -> -> Habs H0 r [-> ->] /=.
@@ -1111,7 +1111,7 @@ proof. by conseq dump_m_updstate_avx2x4_ll (dump_m_updstate_avx2x4_h _mem _buf0 
 
 lemma squeeze_m_updstate_avx2x4_ll: islossless M._squeeze_m_updstate_avx2x4.
 proof.
-proc; seq 4: (8 <= r8).
+proc; seq 5: (8 <= r8).
 + by wp; ecall (ststatus_data_avx2x4_bnd_h); auto.
 + by wp; call ststatus_data_avx2x4_bnd_ph; auto.
 + seq 2: (8 <= r8) => //.
@@ -1135,7 +1135,7 @@ hoare squeeze_m_updstate_avx2x4_h _mem _r8 _s0 _k _buf0 _buf1 _buf2 _buf3 _len:
    /\ squeezing_spec4 _r8 _s0 (_k + _len) res.
 proof.
 proc => /=; exlim st => _st.
-seq 4 : (Glob.mem = _mem /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3 /\ len = _len
+seq 5 : (Glob.mem = _mem /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3 /\ len = _len
          /\ squeezing_spec4 _r8 _s0 _k _st /\ 0 < _len /\ disj4 _buf0 _buf1 _buf2 _buf3 _len
          /\ st = _st /\ r8 = _r8 /\ at = _k %% _r8 /\ stk = iter ((_k - 1) %/ _r8 + 1) keccak_f1600_x4 _s0).
 + wp; ecall (ststatus_data_avx2x4_h st.[100]); auto => &hr [#] <- -> -> -> -> -> -> Hsq H0 D r [-> ->] /=.
@@ -1404,10 +1404,13 @@ module MM = {
     var at:int;
     var off:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
+    var  _2:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ M._ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (SLH64.init_msf);
+    ( _1, r8, at) <@ M._ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -1420,7 +1423,7 @@ module MM = {
       at <- 0;
     }
     len <- len;
-    (stk, at,  _1) <@ _add_bcast_updstate_avx2x4 (stk, at, buf, off, len);
+    (stk, at,  _2) <@ _add_bcast_updstate_avx2x4 (stk, at, buf, off, len);
     st <-
     (Array101.init
     (WArray808.get64
@@ -1610,10 +1613,13 @@ module MM = {
     var at:int;
     var off:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
+    var  _2:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ M._ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (SLH64.init_msf);
+    ( _1, r8, at) <@ M._ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -1630,7 +1636,7 @@ module MM = {
       at <- 0;
     }
     len <- len;
-    (stk, at,  _1) <@ _add_updstate_avx2x4 (stk, at, buf0, buf1, buf2, 
+    (stk, at,  _2) <@ _add_updstate_avx2x4 (stk, at, buf0, buf1, buf2, 
     buf3, off, len);
     (* Erased call to unspill *)
     st <-
@@ -1781,10 +1787,13 @@ module MM = {
     var at:int;
     var off:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
+    var  _2:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ M._ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (SLH64.init_msf);
+    ( _1, r8, at) <@ M._ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -1803,7 +1812,7 @@ module MM = {
       at <- 0;
     }
     len <- len;
-    (buf0, buf1, buf2, buf3,  _1, at) <@ _dump_updstate_avx2x4 (buf0, 
+    (buf0, buf1, buf2, buf3,  _2, at) <@ _dump_updstate_avx2x4 (buf0, 
     buf1, buf2, buf3, off, stk, at, len);
     st <-
     (Array101.init
@@ -2167,7 +2176,7 @@ proof. by conseq add_bcast_updstate_avx2x4_ll (add_bcast_updstate_avx2x4_h _st _
 
 lemma absorb_updstate_avx2x4_ll: islossless MM._absorb_updstate_avx2x4.
 proof.
-proc; seq 6: (8 <= r8).
+proc; seq 7: (8 <= r8).
 + by wp; ecall (ststatus_data_avx2x4_bnd_h); auto.
 + by wp; call ststatus_data_avx2x4_bnd_ph; auto.
 + seq 1: true => //.
@@ -2186,7 +2195,7 @@ hoare absorb_updstate_avx2x4_h _r8 _tb _l0 _l1 _l2 _l3 _buf0 _buf1 _buf2 _buf3 _
                              (_l2 ++ sub _buf2 0 _len) (_l3 ++ sub _buf3 0 _len) res.
 proof.
 proc => /=; exlim st => _st.
-seq 6 : (st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len <= _ASIZE
+seq 7 : (st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len <= _ASIZE
          /\ r8 = _r8 /\ buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3
          /\ off = 0 /\ stk = A101u64toA25u256 _st /\ at = size _l0 %% _r8 /\ len = _len + at).
 + wp; ecall (ststatus_data_avx2x4_h st.[100]); auto => &hr [#] <- -> -> -> -> -> Habs H0 H1 r [-> ->] /=.
@@ -2264,7 +2273,7 @@ proof. by conseq absorb_updstate_avx2x4_ll (absorb_updstate_avx2x4_h _r8 _tb _l0
 
 lemma absorb_bcast_updstate_avx2x4_ll: islossless MM._absorb_bcast_updstate_avx2x4.
 proof.
-proc; seq 6: (8 <= r8).
+proc; seq 7: (8 <= r8).
 + by wp; ecall (ststatus_data_avx2x4_bnd_h); auto.
 + by wp; call ststatus_data_avx2x4_bnd_ph; auto.
 + seq 1: true => //.
@@ -2283,7 +2292,7 @@ hoare absorb_bcast_updstate_avx2x4_h _r8 _tb _l0 _l1 _l2 _l3 _buf _len:
                              (_l2 ++ sub _buf 0 _len) (_l3 ++ sub _buf 0 _len) res.
 proof.
 proc => /=; exlim st => _st.
-seq 6 : (st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len <= _ASIZE
+seq 7 : (st = _st /\ absorbing_spec4 _r8 _tb _l0 _l1 _l2 _l3 _st /\ 0 <= _len <= _ASIZE
          /\ r8 = _r8 /\ buf = _buf
          /\ off = 0 /\ stk = A101u64toA25u256 _st /\ at = size _l0 %% _r8 /\ len = _len + at).
 + wp; ecall (ststatus_data_avx2x4_h st.[100]); auto => &hr [#] <- -> -> Habs H0 H1 r [-> ->] /=.
@@ -2488,7 +2497,7 @@ proof. by conseq dump_updstate_avx2x4_ll (dump_updstate_avx2x4_h _buf0 _buf1 _bu
 
 lemma squeeze_updstate_avx2x4_ll: islossless MM._squeeze_updstate_avx2x4.
 proof.
-proc; seq 4: (8 <= r8).
+proc; seq 5: (8 <= r8).
 + by wp; ecall (ststatus_data_avx2x4_bnd_h); auto.
 + by wp; call ststatus_data_avx2x4_bnd_ph; auto.
 + seq 3: (8 <= r8) => //.
@@ -2513,7 +2522,7 @@ hoare squeeze_updstate_avx2x4_h _r8 _s0 _k _buf0 _buf1 _buf2 _buf3 _len:
    /\ squeezing_spec4 _r8 _s0 (_k + _len) res.`1.
 proof.
 proc => /=; exlim st => _st.
-seq 4 : (buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3 /\ len = _len
+seq 5 : (buf0 = _buf0 /\ buf1 = _buf1 /\ buf2 = _buf2 /\ buf3 = _buf3 /\ len = _len
          /\ squeezing_spec4 _r8 _s0 _k _st /\ 0 < _len <= _ASIZE
          /\ st = _st /\ r8 = _r8 /\ at = _k %% _r8 /\ stk = iter ((_k - 1) %/ _r8 + 1) keccak_f1600_x4 _s0).
 + wp; ecall (ststatus_data_avx2x4_h st.[100]); auto => &hr [#] <- -> -> -> -> -> Hsq H0 H1 r [-> ->] /=.
