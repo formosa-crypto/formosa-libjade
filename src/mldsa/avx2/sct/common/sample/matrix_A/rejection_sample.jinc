@@ -50,7 +50,6 @@ fn rejection_sample_multiple_blocks(
     reg u128 shuffles lower_coefficients upper_coefficients;
 
     reg u64 input_offset;
-    reg u32 good_bytes;
     reg u64 good_lower good_upper good;
     reg u64 filled bytes_filled;
 
@@ -87,30 +86,11 @@ fn rejection_sample_multiple_blocks(
         input_offset += 24;
 
         compare_with_field_modulus = #VPCMPGT_8u32(modulus, potential_coefficients);
-        // MOVEMASK_32u8 is DOIT (MOVEMASK_8u32 is not): bit 4j+3 of the byte
-        // mask is the outcome of the rejection test of candidate j.
-        good_bytes = #MOVEMASK_32u8(compare_with_field_modulus);
-        good = (64u)good_bytes;
+        good = __lane_signs(compare_with_field_modulus);
         // Model item: the candidates of ExpandA (cands_leak); this mask, the
         // outcome of the rejection test of 8 candidates, is a function of them.
         () = #declassify(good);
         good = #protect(good, ms);
-
-        // One bit per candidate: bit 4j+3 to bit j. In each half, the bits at
-        // 0, 4, 8, 12 times 0x1248 land in bits 12..15, with no carries.
-        good >>= 3;
-        good &= 0x11111111;
-        good_upper = good;
-        good_upper >>= 16;
-        good_upper *= 0x1248;
-        good_upper >>= 12;
-        good_upper &= 0xF;
-        good_upper <<= 4;
-        good &= 0x1111;
-        good *= 0x1248;
-        good >>= 12;
-        good &= 0xF;
-        good |= good_upper;
 
         // Do the lower 4 coefficients first.
         lower_coefficients = #VEXTRACTI128(potential_coefficients, 0);

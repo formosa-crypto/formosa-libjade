@@ -1081,6 +1081,19 @@ abbrev [-printing] mODULUS_VECTOR =
 
 module M = {
   var tmp__trace : trace
+  proc __lane_signs (lanes:W256.t) : W64.t * trace = {
+    var signs:W64.t;
+    var bytes:W32.t;
+    var trace___lane_signs:trace;
+    trace___lane_signs <- [];
+    lanes <- (VPACKSS_8u32 lanes lanes);
+    lanes <- (VPERMQ lanes (W8.of_int 216));
+    lanes <- (VPACKSS_16u16 lanes lanes);
+    bytes <- (MOVEMASK_32u8 lanes);
+    signs <- (zeroextu64 bytes);
+    signs <- (signs `&` (W64.of_int 255));
+    return (signs, trace___lane_signs);
+  }
   proc error_polynomial__encode_eta4 (encoded:BArray128.t,
                                       b_encoded:BArray128.t,
                                       polynomial:BArray1024.t,
@@ -2243,7 +2256,6 @@ module M = {
     var condition_group:bool;
     var coefficients:W256.t;
     var positive:W256.t;
-    var mask32:W32.t;
     var mask:W64.t;
     var condition_bit:bool;
     var position:W64.t;
@@ -2251,6 +2263,10 @@ module M = {
     var n_minus:int;
     var offset:int;
     var j:int;
+    var param:W256.t;
+    var result:W64.t;
+    var param_0:W256.t;
+    var result_0:W64.t;
     var b_positions:BArray200.t;
     var  _0:bool;
     var  _1:bool;
@@ -2284,10 +2300,16 @@ module M = {
       (trace_polynomial____challenge_positions ++
       [(Assert, ((0 <= offset) /\ ((offset + 32) <= 1024)))]);
       coefficients <- (BArray1024.get256d challenge offset);
-      coefficients <- (protect_256 coefficients ms);
       positive <- (VPCMPGT_8u32 coefficients zeros);
-      mask32 <- (MOVEMASK_8u32 positive);
-      mask <- (zeroextu64 mask32);
+      param <- positive;
+      (result, tmp__trace) <@ __lane_signs (param);
+      trace_polynomial____challenge_positions <-
+      (trace_polynomial____challenge_positions ++ tmp__trace);
+      trace_polynomial____challenge_positions <-
+      (trace_polynomial____challenge_positions ++
+      [(Assert, (result \ule (W64.of_int 255)))]);
+      mask <- result;
+      mask <- (protect_64 mask ms);
       condition_bit <- (mask <> (W64.of_int 0));
       while (condition_bit) {
         ms <- (update_msf condition_bit ms);
@@ -2315,8 +2337,15 @@ module M = {
       }
       ms <- (update_msf (! condition_bit) ms);
       negative <- (VPCMPGT_8u32 zeros coefficients);
-      mask32 <- (MOVEMASK_8u32 negative);
-      mask <- (zeroextu64 mask32);
+      param_0 <- negative;
+      (result_0, tmp__trace) <@ __lane_signs (param_0);
+      trace_polynomial____challenge_positions <-
+      (trace_polynomial____challenge_positions ++ tmp__trace);
+      trace_polynomial____challenge_positions <-
+      (trace_polynomial____challenge_positions ++
+      [(Assert, (result_0 \ule (W64.of_int 255)))]);
+      mask <- result_0;
+      mask <- (protect_64 mask ms);
       condition_bit <- (mask <> (W64.of_int 0));
       while (condition_bit) {
         ms <- (update_msf condition_bit ms);
@@ -48316,14 +48345,13 @@ module M = {
     var condition_loop:bool;
     var potential_coefficients:W256.t;
     var compare_with_field_modulus:W256.t;
-    var good_bytes:W32.t;
     var good:W64.t;
-    var good_upper:W64.t;
     var lower_coefficients:W128.t;
     var good_lower:W64.t;
     var shuffle_table_idx:W64.t;
     var shuffles:W128.t;
     var upper_coefficients:W128.t;
+    var good_upper:W64.t;
     var stop_sampling:W64.t;
     var condition:bool;
     var byte0:W32.t;
@@ -48332,6 +48360,8 @@ module M = {
     var coeff:W32.t;
     var param:W256.t;
     var result:W256.t;
+    var param_0:W256.t;
+    var result_0:W64.t;
     var  _0:bool;
     var  _1:bool;
     var  _2:bool;
@@ -48372,23 +48402,16 @@ module M = {
       input_offset <- (input_offset + (W64.of_int 24));
       compare_with_field_modulus <-
       (VPCMPGT_8u32 modulus potential_coefficients);
-      good_bytes <- (MOVEMASK_32u8 compare_with_field_modulus);
-      good <- (zeroextu64 good_bytes);
+      param_0 <- compare_with_field_modulus;
+      (result_0, tmp__trace) <@ __lane_signs (param_0);
+      trace_matrix_A__rejection_sample_multiple_blocks <-
+      (trace_matrix_A__rejection_sample_multiple_blocks ++ tmp__trace);
+      trace_matrix_A__rejection_sample_multiple_blocks <-
+      (trace_matrix_A__rejection_sample_multiple_blocks ++
+      [(Assert, (result_0 \ule (W64.of_int 255)))]);
+      good <- result_0;
       (* Erased call to declassify *)
       good <- (protect_64 good ms);
-      good <- (good `>>` (W8.of_int 3));
-      good <- (good `&` (W64.of_int 286331153));
-      good_upper <- good;
-      good_upper <- (good_upper `>>` (W8.of_int 16));
-      good_upper <- (good_upper * (W64.of_int 4680));
-      good_upper <- (good_upper `>>` (W8.of_int 12));
-      good_upper <- (good_upper `&` (W64.of_int 15));
-      good_upper <- (good_upper `<<` (W8.of_int 4));
-      good <- (good `&` (W64.of_int 4369));
-      good <- (good * (W64.of_int 4680));
-      good <- (good `>>` (W8.of_int 12));
-      good <- (good `&` (W64.of_int 15));
-      good <- (good `|` good_upper);
       lower_coefficients <-
       (VEXTRACTI128 potential_coefficients (W8.of_int 0));
       good_lower <- good;
@@ -51893,7 +51916,6 @@ module M = {
     var condition_group:bool;
     var coefficients:W256.t;
     var equal_to_zero:W256.t;
-    var mask:W32.t;
     var nonzero:W64.t;
     var condition_bit:bool;
     var position:W64.t;
@@ -51903,6 +51925,8 @@ module M = {
     var offset:int;
     var bound:int;
     var j:int;
+    var param:W256.t;
+    var result:W64.t;
     var  _0:bool;
     var  _1:bool;
     var  _2:bool;
@@ -51966,11 +51990,17 @@ module M = {
         (trace_signature____encode_hint ++
         [(Assert, ((0 <= offset) /\ ((offset + 32) <= 6144)))]);
         coefficients <- (BArray6144.get256d hint_0 offset);
-        coefficients <- (protect_256 coefficients ms);
         equal_to_zero <- (VPCMPEQ_8u32 coefficients zeros);
-        mask <- (MOVEMASK_8u32 equal_to_zero);
-        nonzero <- (zeroextu64 mask);
+        param <- equal_to_zero;
+        (result, tmp__trace) <@ __lane_signs (param);
+        trace_signature____encode_hint <-
+        (trace_signature____encode_hint ++ tmp__trace);
+        trace_signature____encode_hint <-
+        (trace_signature____encode_hint ++
+        [(Assert, (result \ule (W64.of_int 255)))]);
+        nonzero <- result;
         nonzero <- (nonzero `^` (W64.of_int 255));
+        nonzero <- (protect_64 nonzero ms);
         condition_bit <- (nonzero <> (W64.of_int 0));
         while (condition_bit) {
           ms <- (update_msf condition_bit ms);
@@ -57959,6 +57989,11 @@ module M = {
 }.
 
 (* The post and trace are valid. *)
+
+op __lane_signs_spec _lanes =
+   hoare [M.__lane_signs :
+   ((_lanes = lanes) /\ true) ==>
+   ((true /\ (res.`1 \ule (W64.of_int 255))) /\ (valid res.`2))].
 
 op error_polynomial__encode_eta4_spec _encoded _b_encoded _polynomial _b_polynomial =
    hoare [M.error_polynomial__encode_eta4 :

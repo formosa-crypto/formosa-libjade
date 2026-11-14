@@ -6,7 +6,7 @@ import BitChunking.
 (* -------------------------------------------------------------------- *)
 from Jasmin require import JWord JModel_x86.
 
-require import CircuitBindings Bindings JModelExtra.
+require import JModelExtra.
 require import Agree.
 require import Avx2red.
 require import Prefixarray.
@@ -18,11 +18,6 @@ require import WArray2 WArray256 WArray848 WArray1024.
 require import XArray256.
 require import MldsaConstants.
 require BaseT Sha3x4.
-
-(* the lane mask of a comparison, from its byte mask                    *)
-lemma nibble_mask_movemask (c : W256.t) :
-  nibble_mask (zeroextu64 (MOVEMASK_32u8 c)) = zeroextu64 (MOVEMASK_8u32 c).
-proof. by rewrite /nibble_mask /=; circuit. qed.
 
 (* -------------------------------------------------------------------- *)
 (* The sampling of the matrix A (ExpandA): the four-lane rejection
@@ -367,13 +362,13 @@ have -> : w2bits (W32.bits2w (map accept cs)) = map accept cs ++ nseq 24 false.
 by rewrite bs2int_cat bs2int_nseq_false.
 qed.
 
-(* the same mask, from the byte mask of the comparison                  *)
-lemma to_uint_nibble_good (cs : W32.t list) :
-  size cs = 8 => (forall w, w \in cs => 0 <= to_uint w < 2 ^ 23) =>
-    to_uint (nibble_mask (zeroextu64 (MOVEMASK_32u8
-      (VPCMPGT_8u32 MODULUS8u32 (W8u32.pack8 cs)))))
-  = bs2int (map accept cs).
-proof. by rewrite nibble_mask_movemask; apply to_uint_good. qed.
+(* the lane mask of lane_signs.jinc                                     *)
+lemma __lane_signs_ll : islossless M.__lane_signs.
+proof. by proc; auto. qed.
+
+lemma __lane_signsP (c : W256.t) :
+  hoare [M.__lane_signs : lanes = c ==> res = zeroextu64 (MOVEMASK_8u32 c)].
+proof. by proc; auto => />; rewrite -lane_signs_movemask. qed.
 
 (* -------------------------------------------------------------------- *)
 (* the two 128-bit halves of the packed candidates                      *)
@@ -739,7 +734,7 @@ seq 1: (
     /\ potential_coefficients = W8u32.pack8 (cands (Array848.sub buf (to_uint off0) 24))
     /\ to_uint good = bs2int (map accept (cands (Array848.sub buf (to_uint off0) 24)))
   ).
-  - auto=> &hr |> hs hio hdvd hne.
+  - wp; ecall (__lane_signsP compare_with_field_modulus); auto=> &hr |> hs hio hdvd hne.
     have hoff : to_uint input_offset{hr} < 768 by move: hne; rewrite ultE of_uintK.
     have hle : to_uint input_offset{hr} <= 744 by move: hdvd hoff => /dvdzP [q ->] /#.
     move: hs => @/vsampled [#] hio0 hdvd0 hble hsz hag.
@@ -747,7 +742,7 @@ seq 1: (
     - by smt(W64.to_uint_cmp).
     move=> hrs; split; 1: smt().
     rewrite hoff /=.
-    by rewrite /SLH64.protect_64 -(to_uint_nibble_good _ _ (cands_uint_lt _))
+    by rewrite /SLH64.protect_64 -(to_uint_good _ _ (cands_uint_lt _))
        1:size_cands 1:size_sub.
 
   (* b. compact-store the accepted low half; bytes_filled counts it    *)
@@ -1066,7 +1061,8 @@ wp.
 while (   to_uint input_offset <= 768 /\ 24 %| to_uint input_offset
        /\ condition_loop = (to_uint input_offset < 768))
       (768 - to_uint input_offset).
-- move=> z; wp; call matrix_A____bytestream_to_potential_coefficients_ll.
+- move=> z; wp; call __lane_signs_ll; wp.
+  call matrix_A____bytestream_to_potential_coefficients_ll.
   auto=> &hr |> hle hdvd hc.
   have h744 : to_uint input_offset{hr} <= 744.
   - by move: hdvd hc => /dvdzP [q ->] /#.

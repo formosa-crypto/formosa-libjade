@@ -1,0 +1,21 @@
+// The sign bits of the eight 32-bit lanes of a vector, as the 8-bit mask
+// of MOVEMASK_8u32, from DOIT instructions only (MOVEMASK_8u32 is not
+// DOIT): the signed packs keep the signs, and the permutation puts the
+// eight lanes in order in the low half, so that the byte mask holds their
+// signs in bits 0..7.
+#[safety = { ensures = signs <= 255 }]
+inline
+fn __lane_signs(reg u256 lanes) -> reg u64
+{
+    reg u32 bytes;
+    reg u64 signs;
+
+    lanes = #VPACKSS_8u32(lanes, lanes);
+    lanes = #VPERMQ(lanes, 0b11_01_10_00);
+    lanes = #VPACKSS_16u16(lanes, lanes);
+    bytes = #MOVEMASK_32u8(lanes);
+    signs = (64u)bytes;
+    signs &= 0xFF;
+
+    return signs;
+}
