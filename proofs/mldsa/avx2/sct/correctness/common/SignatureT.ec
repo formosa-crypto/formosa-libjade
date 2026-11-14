@@ -422,6 +422,18 @@ by rewrite (_ : (hint_off + k = hint_off + c0 + size l) = (c0 + size l = k)) 1:/
 qed.
 
 
+(* the lane mask of lane_signs.jinc                                     *)
+lemma __lane_signs_ll : islossless M.__lane_signs.
+proof. by proc; auto. qed.
+
+lemma __lane_signsP (c : W256.t) :
+  hoare [M.__lane_signs : lanes = c ==> res = zeroextu64 (MOVEMASK_8u32 c)].
+proof. by proc; auto => />; rewrite -lane_signs_movemask. qed.
+
+lemma __lane_signs_ph (c : W256.t) :
+  phoare [M.__lane_signs : lanes = c ==> res = zeroextu64 (MOVEMASK_8u32 c)] = 1%r.
+proof. by conseq __lane_signs_ll (__lane_signsP c). qed.
+
 lemma encode_hint _signature _hint :
     equiv [ HintPackUnpack.hintBitPack ~ M.signature____encode_hint :
        wpolykvec_urng (kvec_unflatten256 hint_0{2}) 2
@@ -536,12 +548,13 @@ while {2} (
     + by rewrite W64.of_uintK /= pmod_small /#.
     rewrite W64.of_uintK /= pmod_small 1:/#.
     by rewrite addzA (addzC p) hint_upd_rcons //; smt(gt0_k).
+  wp; ecall (__lane_signs_ph equal_to_zero).
   auto => /> &hr hi0 hi1 hr hc hle hj0 hj1 hj8 hcg.
   have hjn : j{hr} < 256 by smt().
   have hkb : kpolys_bytes = 1024 * kvec by rewrite /kpolys_bytes /kpolys; ring.
   split.
   + split; 1: done.
-    exists 0 => /=; move=> b; rewrite /SLH64.protect_256 -W64.xorwE mask_nz.
+    exists 0 => /=; move=> b; rewrite /SLH64.protect_64 mask_nz.
     case: (0 <= b < 8) => hb //=.
     rewrite WAE_kpolys_bytes.get256_direct_init32_bits32 1..4:/#.
     rewrite (_ : (1024 * i{hr} + 4 * j{hr}) %/ 4 + b = i{hr} * n + (j{hr} + b)) 1:/#.
@@ -614,6 +627,7 @@ while (0 <= i <= kvec /\ condition_row = (i < kvec)) (kvec - i).
   + move=> z'; wp.
     while (condition_bit = (nonzero <> W64.zero)) (to_uint nonzero).
     + by move=> z''; auto => /> &hr hnz; apply WE64.blsr_lt.
+    wp; call __lane_signs_ll.
     by auto => />; smt(W64.to_uint_eq W64.to_uint0 W64.to_uint_cmp).
   by auto => /> /#.
 wp; while true (inc - k); 1: by move=> z; auto => /#.

@@ -1,6 +1,8 @@
 // The ML-DSA implementation, for the parameter set of the including
 // mldsa.jazz (its parameters.jinc must be required first).
 
+from Common require "lane_signs.jinc"
+
 from Common require "encoding/error_polynomial.jinc"
 from Common require "encoding/gamma1.jinc"
 from Common require "arithmetic/decompose.jinc"

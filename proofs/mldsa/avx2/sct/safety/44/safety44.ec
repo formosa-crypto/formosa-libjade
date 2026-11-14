@@ -1267,6 +1267,24 @@ auto; ecall (polynomial____invert_ntt_layers_0_to_4_proof param_0 ((BArray1024.i
 by auto => /> *.
 qed.
 
+lemma __lane_signs_proof _lanes : __lane_signs_spec _lanes.
+proof.
+hint +safety.
+rewrite /__lane_signs_spec; proc.
+by auto => />; rewrite -/(lane_signs _) lane_signs_ule.
+qed.
+
+(* the mask itself, for the scans of the challenge positions *)
+lemma __lane_signs_exact _lanes :
+  hoare [M.__lane_signs : lanes = _lanes
+    ==> res.`1 = zeroextu64 (MOVEMASK_8u32 _lanes) /\ res.`1 \ule W64.of_int 255
+     /\ valid res.`2].
+proof.
+hint +safety.
+proc; auto => />; rewrite -lane_signs_movemask /=.
+by rewrite -/(lane_signs _) lane_signs_ule.
+qed.
+
 lemma matrix_A____bytestream_to_potential_coefficients_proof _bytestream :
       (matrix_A____bytestream_to_potential_coefficients_spec _bytestream).
 proof.
@@ -1324,12 +1342,12 @@ while (b_randombytes = BArray848.init_arr (W8.of_int 255)
     /\ 3 * to_uint bytes_filled <= 4 * to_uint input_offset
     /\ condition_loop = (to_uint input_offset < 768)
     /\ valid trace_matrix_A__rejection_sample_multiple_blocks).
-+ auto; ecall (matrix_A____bytestream_to_potential_coefficients_proof param).
-  auto => /> &hr hle hmod hinit himod hio h34 hvalid hlt r hv.
-  rewrite /SLH64.protect_64 -/(nibble_mask (zeroextu64 (MOVEMASK_32u8 _))).
-  (* the vector terms are abstracted: only their bounds matter *)
-  have hg := to_uint_nibble_mask (zeroextu64 (MOVEMASK_32u8 (VPCMPGT_8u32 modulus{hr} r.`1))).
-  move: (nibble_mask (zeroextu64 (MOVEMASK_32u8 (VPCMPGT_8u32 modulus{hr} r.`1)))) hg => g hg.
++ auto; ecall (__lane_signs_proof param_0); auto.
+  ecall (matrix_A____bytestream_to_potential_coefficients_proof param).
+  auto => /> &hr hle hmod hinit himod hio h34 hvalid hlt r hv g hg hvg.
+  rewrite /SLH64.protect_64.
+  case: g hg hvg => g tg /= hg _.
+  have {hg} hg : to_uint g < 256 by move: hg; rewrite W64.uleE /#.
   have hgl : to_uint (g `&` W64.of_int 15) < 16.
   + have -> : W64.of_int 15 = W64.of_int (2 ^ 4 - 1) by done.
     by rewrite W64.to_uint_and_mod //; smt(modz_cmp).
@@ -1861,8 +1879,9 @@ seq 15 : (j = 256 /\ challenge = _challenge /\ cnz _challenge = 39
       rewrite (mulzC (n_minus{hr} - 1) 4).
       apply (slots_set _ _ (to_uint n_plus{hr}) n_minus{hr}) => //; 1,2: smt().
       by move=> m hm; smt().
-    (* the scan of the +1 *)
-    wp; while (0 <= j < 256 /\ j %% 8 = 0 /\ offset = 4 * j
+    (* the mask of the -1, then the scan of the +1 *)
+    wp; ecall (__lane_signs_exact param_0); wp.
+    while (0 <= j < 256 /\ j %% 8 = 0 /\ offset = 4 * j
         /\ challenge = _challenge /\ zeros = W256.zero /\ cnz _challenge = 39
         /\ coefficients = BArray1024.get256d _challenge offset
         /\ n_minus = 39 - size (ipos Pm j)
@@ -1895,6 +1914,7 @@ seq 15 : (j = 256 /\ challenge = _challenge /\ cnz _challenge = 39
       apply (slots_set _ _ (to_uint n_plus{hr}) n_minus{hr}) => //; 1,2: smt().
       by move=> m hm; smt().
     (* the masks of a group, and the ends of the scans *)
+    wp; ecall (__lane_signs_exact param).
     auto => &hr [#] hj0 hj1 hj8 hoff hcgd -> -> hc hnp hnm hsl hv hcg.
     have hj : j{hr} < 256 by smt().
     have hcoef : forall b, 0 <= b < 8 =>
@@ -1907,23 +1927,25 @@ seq 15 : (j = 256 /\ challenge = _challenge /\ cnz _challenge = 39
     have hmn : forall b, (zeroextu64 (MOVEMASK_8u32 (VPCMPGT_8u32 W256.zero
         (BArray1024.get256d _challenge offset{hr})))).[b] = (0 <= b < 8 /\ Pm (j{hr} + b)).
     + by move=> b; rewrite mask_neg; case: (0 <= b < 8) => // hb; rewrite hcoef.
-    rewrite /SLH64.protect_256 /=.
+    move=> /= [r tr] /= [-> [hle hvr]]; rewrite /SLH64.protect_64 /=.
     split.
     + do 5! (split; 1: smt()).
       split; 1: by exists 0 => /=; split; [exact hmp | ].
-      by do 2! (split; 1: done); smt().
+      by do ! split => //; clear hle hmp hmn hcoef; smt().
     move=> bp0 cb0 mask0 np0 pos0 tr0 hcb0 [#] _ _ _ _ _ _ hcbe [t [#] ht0 ht1 hbt hnp0] hsl0 hv0.
     rewrite (_ : mask0 = W64.zero) 1:/# in hbt.
     have e1 := scan_end Pp _ _ hj0 _ hbt; 1: smt().
+    move=> [r' tr'] /= [-> [hle' hvr']].
     split.
     + do 4! (split; 1: smt()).
       split; 1: by rewrite e1.
       split; 1: by exists 0 => /=; split; [exact hmn | ].
-      by split.
+      by do ! split => //; clear hle hle' hmp hmn hcoef; smt().
     move=> bp1 cb1 mask2 nm0 pos1 tr1 hcb1 [#] _ _ _ _ _ hnp1 hcbe1
       [t' [#] ht0' ht1' hbt' hnm1] hsl1 hv1.
     rewrite (_ : mask2 = W64.zero) 1:/# in hbt'.
     have e2 := scan_end Pm _ _ hj0 _ hbt'; 1: smt().
+    clear hle hle'.
     do 5! (split; 1: smt()).
     split; 1: by rewrite e2.
     by split => //; smt().
@@ -2755,6 +2777,7 @@ while (b_hint = BArray4096.init_arr (W8.of_int 255) /\ BArray2420.is_init b_sign
       rewrite BI2420.is_init_set8_in 1,2:/# /=.
       split; last smt().
       smt(BI2420.is_init_sub).
+    wp; ecall (__lane_signs_proof param).
     auto => /> &hr hinit hw0 hw hi0 hi hj0 hj ho0 hmod hob hvalid hlt.
     smt().
   auto => /> &hr hinit hw0 hw hi0 hi hvalid hlt.

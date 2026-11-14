@@ -190,18 +190,100 @@ by move: h; rewrite W2u32.to_uint_zeroextu64 W32.uleE /=; smt(W32.to_uint_cmp).
 qed.
 
 (* -------------------------------------------------------------------- *)
-(* The lane mask of a block from its byte mask (MOVEMASK_32u8)          *)
+(* The lane mask of a block from DOIT instructions (lane_signs.jinc)    *)
 (* -------------------------------------------------------------------- *)
 
-(* bit 4j+3 of a byte mask to bit j, for j < 8 *)
-op nibble_mask (g : W64.t) : W64.t =
-  (((((g `>>` W8.of_int 3) `&` W64.of_int 286331153) `&` W64.of_int 4369)
-     * W64.of_int 4680 `>>` W8.of_int 12) `&` W64.of_int 15)
-  `|` ((((((g `>>` W8.of_int 3) `&` W64.of_int 286331153) `>>` W8.of_int 16)
-        * W64.of_int 4680 `>>` W8.of_int 12) `&` W64.of_int 15) `<<` W8.of_int 4).
+(* the low byte of the byte mask *)
+op lane_signs (g : W64.t) : W64.t = g `&` W64.of_int 255.
 
-lemma to_uint_nibble_mask (g : W64.t) : to_uint (nibble_mask g) < 256.
+lemma lane_signs_ule (g : W64.t) : lane_signs g \ule W64.of_int 255.
+proof. by rewrite /lane_signs /=; circuit. qed.
+
+(* the signed saturation of VPACKSS_16u16 *)
+op sat8 (x : W16.t) : W8.t =
+  if x \slt W16.of_int W8.min_sint then W8.of_int W8.min_sint
+  else if W16.of_int W8.max_sint \sle x then W8.of_int W8.max_sint
+  else x \bits8 0.
+
+lemma bits8_16 (a : W128.t) (j : int) :
+  a \bits8 (2 * j) = (a \bits16 j) \bits8 0.
 proof.
-have h : nibble_mask g \ult W64.of_int 256 by rewrite /nibble_mask /=; circuit.
-by move: h; rewrite W64.ultE.
+apply W8.wordP => b hb.
+by rewrite W16u8.bits8iE // W2u8.bits8iE // W8u16.bits16iE 1:/#; congr; smt().
+qed.
+
+lemma bits8_128 (w : W256.t) (k : int) : 0 <= k < 32 =>
+  w \bits8 k = (w \bits128 (k %/ 16)) \bits8 (k %% 16).
+proof.
+move=> hk; apply W8.wordP => b hb.
+by rewrite W32u8.bits8iE // W16u8.bits8iE // W2u128.bits128iE 1:/#; congr; smt().
+qed.
+
+lemma packss_bits8 (a : W128.t) (j : int) : 0 <= j < 8 =>
+  packss_8u16 a \bits8 j = sat8 (a \bits16 j).
+proof.
+move=> hj; rewrite /packss_8u16.
+have : j = 0 \/ j = 1 \/ j = 2 \/ j = 3 \/ j = 4 \/ j = 5 \/ j = 6 \/ j = 7 by smt().
+by move=> [|[|[|[|[|[|[|]]]]]]] -> /=; rewrite /sat8 -bits8_16 /=.
+qed.
+
+lemma packss16_bits8 (w1 w2 : W256.t) (k : int) : 0 <= k < 32 =>
+  VPACKSS_16u16 w1 w2 \bits8 k =
+  sat8 ((if k %% 16 < 8 then w1 else w2) \bits16 (8 * (k %/ 16) + k %% 8)).
+proof.
+move=> hk; rewrite bits8_128 // /VPACKSS_16u16 W2u128.map2bE 1:/# /VPACKSS_8u16.
+rewrite bits8_W2u64 (_ : 0 <= k %% 16 < 16) 1:/# /=.
+case: (k %% 16 < 8) => h.
++ rewrite (_ : k %% 16 %/ 8 = 0) 1:/# /= packss_bits8 1:/# (bits16_128 w1) 1:/#.
+  by congr; congr; smt().
+rewrite (_ : k %% 16 %/ 8 = 1) 1:/# /= packss_bits8 1:/# (bits16_128 w2) 1:/#.
+by congr; congr; smt().
+qed.
+
+lemma msb_sat16 (x : W32.t) : msb (sat16 x) = msb x.
+proof.
+rewrite eq_iff W16_msb_sign W32_msb_sign.
+case: (-32768 <= W32.to_sint x <= 32767) => hx; 1: by rewrite sat16E.
+rewrite /sat16 /(\slt) /(\sle) !W32.of_sintK /= /smod /=.
+case: (W32.to_sint x < -32768) => h /=.
++ by rewrite W16.to_sintE W16.of_uintK /smod /= /#.
+case: (32767 <= W32.to_sint x) => h' /=.
++ by rewrite W16.to_sintE W16.of_uintK /smod /= /#.
+smt().
+qed.
+
+lemma msb_sat8 (x : W16.t) : msb (sat8 x) = msb x.
+proof.
+rewrite eq_iff W16_msb_sign /sat8 /(\slt) /(\sle) !W16.of_sintK /= /smod /=.
+case: (W16.to_sint x < -128) => h1 /=.
++ by rewrite /W8.msb W8.of_uintK /= /#.
+case: (127 <= W16.to_sint x) => h2 /=.
++ by rewrite /W8.msb W8.of_uintK /= /#.
+rewrite /W8.msb W2u8.bits8_div // /=.
+by move: h1 h2; rewrite W16.to_sintE /smod /=; have := W16.to_uint_cmp x; smt().
+qed.
+
+lemma movemask_32u8_bit (x : W256.t) (k : int) :
+  (zeroextu64 (MOVEMASK_32u8 x)).[k] = (0 <= k < 32 /\ msb (x \bits8 k)).
+proof.
+rewrite zeroextu64_bit /MOVEMASK_32u8 /=.
+case: (0 <= k < 32) => hk //=.
+rewrite W32.get_bits2w // -(nth_mkseq false (fun i => msb (x \bits8 i)) 32 k) //.
+by rewrite /mkseq -iotaredE.
+qed.
+
+(* the mask of lane_signs.jinc is that of MOVEMASK_8u32 *)
+lemma lane_signs_movemask (c : W256.t) :
+  lane_signs (zeroextu64 (MOVEMASK_32u8 (VPACKSS_16u16
+      (VPERMQ (VPACKSS_8u32 c c) (W8.of_int 216))
+      (VPERMQ (VPACKSS_8u32 c c) (W8.of_int 216)))))
+  = zeroextu64 (MOVEMASK_8u32 c).
+proof.
+apply W64.wordP => b hb.
+rewrite /lane_signs W64.andwE (_ : 255 = 2 ^ 8 - 1) // W64.of_int_powm1 //.
+rewrite movemask_8u32_bit movemask_32u8_bit.
+case: (0 <= b < 8) => hb8 /=; last by smt().
+rewrite (_ : 0 <= b < 32) 1:/# /= packss16_bits8 1:/# (_ : b %% 16 < 8) 1:/# /=.
+rewrite msb_sat8 (_ : 8 * (b %/ 16) + b %% 8 = b) 1:/# packss_permq_bits16 1:/#.
+by rewrite (_ : b < 8) 1:/# /= msb_sat16 hb.
 qed.
