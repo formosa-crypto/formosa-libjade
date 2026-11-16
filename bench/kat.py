@@ -47,6 +47,10 @@ SCHEMES = {
     "SHA2-384": _hash("fips180sha384", 48, 208),
     "SHA2-512/224": _hash("fips180sha512_224", 28, 208),
     "SHA2-512/256": _hash("fips180sha512_256", 32, 208),
+    # the multi-way sets through bench/adapters/jasmin/hash_x_shim.c, whose
+    # context is the multi-way one followed by one single-way one per lane
+    "SHA2-256 (8-way)": _hash("fips180sha256x8", 32, 784 + 8 * 112),
+    "SHA2-512 (4-way)": _hash("fips180sha512x4", 64, 784 + 4 * 208),
 }
 
 

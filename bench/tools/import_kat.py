@@ -18,7 +18,8 @@ Three sources, each downloaded at a fixed version:
 - the SHA-2 test vectors of NIST CAVP (SHAVS, CAVS 11.1, byte-oriented),
   each file checked against its SHA-256: ShortMsg, LongMsg and Monte of
   SHA-224, SHA-256, SHA-384, SHA-512, SHA-512/224 and SHA-512/256
-  (fips180<set>.json). --cavp-dir reads the .rsp files from a directory
+  (fips180<set>.json), and those of SHA-256 and SHA-512 again for the
+  8-way and 4-way sets. --cavp-dir reads the .rsp files from a directory
   instead of the archive.
 
     python3 tools/import_kat.py --out vectors --acvp-version v1.1.0.43
@@ -60,13 +61,15 @@ CAVP_SHA2_FILES = {
     "SHA512_256LongMsg.rsp": "d2454ce8dfcd7ea9b9ffbe44d35564ca82d2d6744fb4b36f5e056c6064fb0792",
     "SHA512_256Monte.rsp": "f84e3c0296202e06a5c9654df94f89b62906fcf16f7e1a640c28d838353b0a42",
 }
-# CAVP file prefix -> (algorithm, implementation name: src/fips180/avx2/sct/<set>)
-CAVP_SHA2_SETS = {"SHA256": ("SHA2-256", "fips180sha256"),
-                  "SHA512": ("SHA2-512", "fips180sha512"),
-                  "SHA224": ("SHA2-224", "fips180sha224"),
-                  "SHA384": ("SHA2-384", "fips180sha384"),
-                  "SHA512_224": ("SHA2-512/224", "fips180sha512_224"),
-                  "SHA512_256": ("SHA2-512/256", "fips180sha512_256")}
+# (CAVP file prefix, algorithm, implementation name: src/fips180/avx2/sct/<set>)
+CAVP_SHA2_SETS = [("SHA256", "SHA2-256", "fips180sha256"),
+                  ("SHA512", "SHA2-512", "fips180sha512"),
+                  ("SHA224", "SHA2-224", "fips180sha224"),
+                  ("SHA384", "SHA2-384", "fips180sha384"),
+                  ("SHA512_224", "SHA2-512/224", "fips180sha512_224"),
+                  ("SHA512_256", "SHA2-512/256", "fips180sha512_256"),
+                  ("SHA256", "SHA2-256 (8-way)", "fips180sha256x8"),
+                  ("SHA512", "SHA2-512 (4-way)", "fips180sha512x4")]
 
 
 def base_name(algo):
@@ -311,7 +314,7 @@ def rsp_fields(text):
 
 def import_sha2(out_dir, cache, cavp_dir):
     files = cavp_files(cache, cavp_dir)
-    for prefix, (algo, name) in CAVP_SHA2_SETS.items():
+    for prefix, algo, name in CAVP_SHA2_SETS:
         tests, count = [], 0
         for kind in ("ShortMsg", "LongMsg"):
             length = None

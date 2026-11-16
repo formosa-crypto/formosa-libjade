@@ -1,0 +1,120 @@
+from Hash require "context_x.jinc"
+
+#[ct = "secret × public × public -> secret"]
+#[sct = "{ ptr: transient, val: secret } × { ptr: transient, val: transient } × transient →
+         { ptr: transient, val: secret }"]
+#[safety =
+   { requires = len < (64u) 2305843009213693952 && is_arr_init(in, 0, 64)
+       && is_mem_init((64u) in[0], (64u) len)
+       && is_mem_init((64u) in[1], (64u) len)
+       && is_mem_init((64u) in[2], (64u) len)
+       && is_mem_init((64u) in[3], (64u) len)
+       && is_mem_init((64u) in[4], (64u) len)
+       && is_mem_init((64u) in[5], (64u) len)
+       && is_mem_init((64u) in[6], (64u) len)
+       && is_mem_init((64u) in[7], (64u) len)
+   , res = { out_out }
+   , ensures = is_arr_init(out_out, 0, 256)
+   }
+ ]
+export fn jade_hash_sha256x8_amd64_avx2(reg mut ptr u8[256] out, reg const ptr u64[8] in, reg u64 len)
+  -> reg ptr u8[256]
+{
+  reg u64 ms;
+
+  ms = #init_msf();
+
+  out, ms = _sha256_x8_lanes(out, in, len, ms);
+
+  return out;
+}
+
+#[ct = "secret -> secret"]
+#[sct = "{ ptr: transient, val: secret } → { ptr: transient, val: secret }"]
+#[safety =
+   { res = { ctx_out }
+   , ensures = is_arr_init(ctx_out, 0, SHA256_X8_CTX_BYTES)
+   }
+ ]
+export fn jade_hash_sha256x8_amd64_avx2_init(reg mut ptr u8[SHA256_X8_CTX_BYTES] ctx) -> reg ptr u8[SHA256_X8_CTX_BYTES]
+{
+  reg u64 ms;
+
+  ms = #init_msf();
+
+  ctx = __sha256_x8_ctx_init(ctx);
+
+  return ctx;
+}
+
+#[ct = "secret × secret -> secret × public"]
+#[sct = "{ ptr: transient, val: secret } × { ptr: transient, val: secret } →
+         { ptr: transient, val: secret } × public"]
+#[safety =
+   { requires = is_arr_init(src, 0, SHA256_CTX_BYTES)
+   , res = { ctx_out, status }
+   , ensures = is_arr_init(ctx_out, 0, status == SHA2_STATUS_OK ? SHA256_X8_CTX_BYTES : 0)
+   }
+ ]
+export fn jade_hash_sha256x8_amd64_avx2_init_from(reg mut ptr u8[SHA256_X8_CTX_BYTES] ctx, reg const ptr u8[SHA256_CTX_BYTES] src)
+  -> reg ptr u8[SHA256_X8_CTX_BYTES], reg u64
+{
+  reg u64 ms status;
+
+  ms = #init_msf();
+
+  ctx, status, ms = _sha256_x8_ctx_from(ctx, src, ms);
+
+  return ctx, status;
+}
+
+#[ct = "secret × public × public -> secret × public"]
+#[sct = "{ ptr: transient, val: secret } × { ptr: transient, val: transient } × transient →
+         { ptr: transient, val: secret } × public"]
+#[safety =
+   { requires = is_arr_init(ctx, 0, SHA256_X8_CTX_BYTES) && is_arr_init(in, 0, 64)
+       && is_mem_init((64u) in[0], (64u) inlen)
+       && is_mem_init((64u) in[1], (64u) inlen)
+       && is_mem_init((64u) in[2], (64u) inlen)
+       && is_mem_init((64u) in[3], (64u) inlen)
+       && is_mem_init((64u) in[4], (64u) inlen)
+       && is_mem_init((64u) in[5], (64u) inlen)
+       && is_mem_init((64u) in[6], (64u) inlen)
+       && is_mem_init((64u) in[7], (64u) inlen)
+   , res = { ctx_out, status }
+   , ensures = is_arr_init(ctx_out, 0, SHA256_X8_CTX_BYTES)
+   }
+ ]
+export fn jade_hash_sha256x8_amd64_avx2_update(reg mut ptr u8[SHA256_X8_CTX_BYTES] ctx, reg const ptr u64[8] in, reg u64 inlen)
+  -> reg ptr u8[SHA256_X8_CTX_BYTES], reg u64
+{
+  reg u64 ms status;
+
+  ms = #init_msf();
+
+  ctx, status, ms = _sha256_x8_ctx_update(ctx, in, inlen, ms);
+
+  return ctx, status;
+}
+
+#[ct = "secret × secret -> secret × secret × public"]
+#[sct = "{ ptr: transient, val: secret } × { ptr: transient, val: secret } →
+         { ptr: transient, val: secret } × { ptr: transient, val: secret } × public"]
+#[safety =
+   { requires = is_arr_init(ctx, 0, SHA256_X8_CTX_BYTES)
+   , res = { ctx_out, out_out, status }
+   , ensures = is_arr_init(ctx_out, 0, SHA256_X8_CTX_BYTES)
+       && is_arr_init(out_out, 0, status == SHA2_STATUS_OK ? 256 : 0)
+   }
+ ]
+export fn jade_hash_sha256x8_amd64_avx2_final(reg mut ptr u8[SHA256_X8_CTX_BYTES] ctx, reg mut ptr u8[256] out)
+  -> reg ptr u8[SHA256_X8_CTX_BYTES], reg ptr u8[256], reg u64
+{
+  reg u64 ms status;
+
+  ms = #init_msf();
+
+  ctx, out, status, ms = _sha256_x8_ctx_final(ctx, out, ms);
+
+  return ctx, out, status;
+}

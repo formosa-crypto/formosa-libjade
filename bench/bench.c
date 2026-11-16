@@ -52,6 +52,9 @@ static const scheme_t SCHEMES[] = {
     {"FIPS-180-sha384", HASH, 48, 128, 16384},
     {"FIPS-180-sha512_224", HASH, 28, 128, 16384},
     {"FIPS-180-sha512_256", HASH, 32, 128, 16384},
+    /* the multi-way sets: the digests of every lane */
+    {"FIPS-180-sha256x8", HASH, 8 * 32, 64, 16384},
+    {"FIPS-180-sha512x4", HASH, 4 * 64, 128, 16384},
 };
 
 /* ---- common ABI signatures ---- */
@@ -64,6 +67,7 @@ typedef int (*sig_sign_t)(uint8_t *, const uint8_t *, const uint8_t *, size_t,
 typedef int (*sig_verify_t)(const uint8_t *, const uint8_t *, size_t,
                             const uint8_t *, size_t, const uint8_t *);
 typedef void (*hash_digest_t)(uint8_t *, const uint8_t *, size_t);
+typedef void (*hash_digest_x_t)(uint8_t *, const uint8_t *const *, size_t);
 
 static uint64_t prng_state = 0x1234567;
 static void fill(uint8_t *p, size_t n) {
@@ -189,10 +193,19 @@ static void bench_backend(const char *path, const scheme_t *s, size_t iters,
     report(path, s, m0, m1, m2);
   } else if (s->kind == HASH) {
     hash_digest_t dg = dlsym(h, "hash_digest");
+    /* a multi-way set: the multi-way call itself, every lane on C */
+    hash_digest_x_t dx = dlsym(h, "hash_digest_x");
+    const uint8_t *lanes[8] = {C, C, C, C, C, C, C, C};
     fill(C, (size_t)s->c);                            /* C=message, A=digest */
-    BENCH(iters, samples, &m0, (void)0, dg(A, C, 64));
-    BENCH(iters, samples, &m1, (void)0, dg(A, C, 1024));
-    BENCH(iters, samples, &m2, (void)0, dg(A, C, 16384));
+    if (dx) {
+      BENCH(iters, samples, &m0, (void)0, dx(A, lanes, 64));
+      BENCH(iters, samples, &m1, (void)0, dx(A, lanes, 1024));
+      BENCH(iters, samples, &m2, (void)0, dx(A, lanes, 16384));
+    } else {
+      BENCH(iters, samples, &m0, (void)0, dg(A, C, 64));
+      BENCH(iters, samples, &m1, (void)0, dg(A, C, 1024));
+      BENCH(iters, samples, &m2, (void)0, dg(A, C, 16384));
+    }
     report(path, s, m0, m1, m2);
   } else {
     sig_keygen_t kg = dlsym(h, "sig_keygen");

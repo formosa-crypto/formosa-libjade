@@ -48,6 +48,8 @@ static const scheme_t SCHEMES[] = {
     {"FIPS-180-sha384", HASH, 48, 128, 208},
     {"FIPS-180-sha512_224", HASH, 28, 128, 208},
     {"FIPS-180-sha512_256", HASH, 32, 128, 208},
+    {"FIPS-180-sha256x8", HASH, 32, 64, 784 + 8 * 112},
+    {"FIPS-180-sha512x4", HASH, 64, 128, 784 + 4 * 208},
 };
 
 typedef int (*kem_keypair_t)(uint8_t *, uint8_t *, const uint8_t *);

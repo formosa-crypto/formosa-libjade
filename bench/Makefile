@@ -93,6 +93,20 @@ $(BUILD)/jasmin_fips180%.so: $(ADAPTERS)/jasmin/hash_shim.c $(SRC_BUILD)/fips180
 	$(CC) $(XARCH) -O2 -fPIC -shared -I$(ADAPTERS) \
 	    -DJASMIN_HASH_FN=jade_hash_$*_amd64_avx2 -o $@ $^
 
+# The multi-way sets: the multi-way shim, linked with the single-way hash it
+# checks every lane against.
+$(BUILD)/jasmin_fips180sha256x8.so: $(ADAPTERS)/jasmin/hash_x_shim.c \
+    $(SRC_BUILD)/fips180sha256x8_avx2.s $(SRC_BUILD)/fips180sha256_avx2.s | $(BUILD)
+	$(CC) $(XARCH) -O2 -fPIC -shared -I$(ADAPTERS) -DLANES=8 -DDIGEST_BYTES=32 \
+	    -DCTX_X_BYTES=784 -DCTX_REF_BYTES=112 -DJASMIN_HASH_X_FN=jade_hash_sha256x8_amd64_avx2 \
+	    -DJASMIN_HASH_REF_FN=jade_hash_sha256_amd64_avx2 -o $@ $^
+
+$(BUILD)/jasmin_fips180sha512x4.so: $(ADAPTERS)/jasmin/hash_x_shim.c \
+    $(SRC_BUILD)/fips180sha512x4_avx2.s $(SRC_BUILD)/fips180sha512_avx2.s | $(BUILD)
+	$(CC) $(XARCH) -O2 -fPIC -shared -I$(ADAPTERS) -DLANES=4 -DDIGEST_BYTES=64 \
+	    -DCTX_X_BYTES=784 -DCTX_REF_BYTES=208 -DJASMIN_HASH_X_FN=jade_hash_sha512x4_amd64_avx2 \
+	    -DJASMIN_HASH_REF_FN=jade_hash_sha512_amd64_avx2 -o $@ $^
+
 # ---- mlkem-native backend: shim + monolithic source + asm, AVX2 backend --
 # mlkem_native_asm.S bundles the x86_64 backend assembly; NO_RANDOMIZED_API
 # drops the non-derand keypair/enc (and their randombytes dependency).
@@ -187,7 +201,7 @@ N        ?= 100
 SCHEME_BASE = $(shell echo $(SCHEME) | tr -d '-' | tr 'A-Z' 'a-z')
 ALL_SCHEMES ?= ML-KEM-512 ML-KEM-768 ML-KEM-1024 ML-DSA-44 ML-DSA-65 ML-DSA-87 \
                FIPS-180-sha256 FIPS-180-sha512 FIPS-180-sha224 FIPS-180-sha384 \
-               FIPS-180-sha512_224 FIPS-180-sha512_256
+               FIPS-180-sha512_224 FIPS-180-sha512_256 FIPS-180-sha256x8 FIPS-180-sha512x4
 
 REPORT  ?= bench.md
 # machine-readable report (aggregated results + run metadata) next to REPORT
