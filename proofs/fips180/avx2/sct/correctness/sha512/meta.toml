@@ -1,0 +1,1 @@
+hash = { file = "correctness_sha512.ec", lemma = "hash_correct" }
