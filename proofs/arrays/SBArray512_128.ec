@@ -1,5 +1,3 @@
-require import Int.
-
 from Jasmin require import JByte_array.
 
 require import BArray128 BArray512.

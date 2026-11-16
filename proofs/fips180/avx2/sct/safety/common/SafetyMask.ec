@@ -12,7 +12,7 @@
 require import AllCore IntDiv CoreMap List.
 from Jasmin require import JWord JUtils.
 require import SafetyEclib.
-require import BArray16 BArray28 BArray32 BArray48 BArray64 BArray112 BArray128 BArray144 BArray208 BArray256 BArray272 BArray512 BArray640.
+require import BArray16 BArray28 BArray32 BArray48 BArray64 BArray112 BArray128 BArray144 BArray208 BArray256 BArray272 BArray512 BArray640 BArray784.
 
 (* ------------------------------------------------------------------ *)
 abbrev full16 = BArray16.init_arr (W8.of_int 255).
@@ -695,3 +695,57 @@ apply full640E => j hj0 hj1.
 rewrite BInit640.is_init_cellP; case: (_ /\ _) => // _.
 by rewrite BArray640.initiE /#.
 qed.
+
+(* ------------------------------------------------------------------ *)
+abbrev full784 = BArray784.init_arr (W8.of_int 255).
+
+lemma full784E (m : BArray784.t) : BArray784.is_init m 0 784 => m = full784.
+proof.
+move=> hm; rewrite BArray784.tP => j hj.
+rewrite /BArray784.init_arr BArray784.initiE //=.
+by have := hm j _ _; rewrite /BArray784.is_init_cell /#.
+qed.
+
+lemma full784_init a l : BArray784.is_init full784 a l.
+proof. by move=> j _ _; apply (BArray784.init_arrP witness). qed.
+
+lemma mask784_le (m : BArray784.t) a b : BArray784.is_init m 0 b => a <= b => BArray784.is_init m 0 a.
+proof. by move=> hm hab j hj0 hj; apply hm => /#. qed.
+
+lemma full784_set32d k : BArray784.set32d full784 k (W32.of_int 4294967295) = full784.
+proof.
+apply full784E => j _ _.
+by rewrite BArray784.is_init_cell_set32d; right; apply (BArray784.init_arrP witness).
+qed.
+
+(* Word i written into a mask initialised below word i. *)
+lemma mask784_set32 (m : BArray784.t) i :
+  BArray784.is_init m 0 (4 * i) => 0 <= i => 4 * (i + 1) <= 784 =>
+  BArray784.is_init (BArray784.set32 m i (W32.of_int 4294967295)) 0 (4 * (i + 1)).
+proof.
+move=> hm hi hb j hj0 hj; rewrite BArray784.is_init_cell_set32d.
+by case: (j < 4 * i) => hji; [right; apply hm | left] => /#.
+qed.
+
+lemma full784_set64d k : BArray784.set64d full784 k (W64.of_int 18446744073709551615) = full784.
+proof.
+apply full784E => j _ _.
+by rewrite BArray784.is_init_cell_set64d; right; apply (BArray784.init_arrP witness).
+qed.
+
+(* Word i written into a mask initialised below word i. *)
+lemma mask784_set64 (m : BArray784.t) i :
+  BArray784.is_init m 0 (8 * i) => 0 <= i => 8 * (i + 1) <= 784 =>
+  BArray784.is_init (BArray784.set64 m i (W64.of_int 18446744073709551615)) 0 (8 * (i + 1)).
+proof.
+move=> hm hi hb j hj0 hj; rewrite BArray784.is_init_cell_set64d.
+by case: (j < 8 * i) => hji; [right; apply hm | left] => /#.
+qed.
+
+lemma full784_set8 k : BArray784.set8 full784 k (W8.of_int 255) = full784.
+proof.
+apply full784E => j hj0 hj1.
+rewrite BInit784.is_init_cellP; case: (_ /\ _) => // _.
+by rewrite BArray784.initiE /#.
+qed.
+

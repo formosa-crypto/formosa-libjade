@@ -12,8 +12,9 @@
 require import AllCore IntDiv CoreMap List.
 from Jasmin require import JWord JUtils.
 require import SafetyEclib.
-require import BArray16 BArray32 BArray64 BArray112 BArray128 BArray144 BArray208 BArray256 BArray272 BArray512.
-require import SBArray112_16 SBArray112_32 SBArray112_64 SBArray144_112 SBArray144_16 SBArray208_128 SBArray208_16 SBArray208_64 SBArray272_16 SBArray272_208.
+require import BArray16 BArray32 BArray64 BArray112 BArray128 BArray144 BArray208 BArray256 BArray272 BArray512 BArray784.
+require import SBArray112_16 SBArray112_32 SBArray112_64 SBArray144_112 SBArray144_16 SBArray208_128 SBArray208_16 SBArray208_64 SBArray272_16 SBArray272_208
+  SBArray512_128 SBArray512_64 SBArray784_16 SBArray784_256 SBArray784_512.
 
 (* ------------------------------------------------------------------ *)
 lemma sub112_16_get (t : BArray112.t) o x l :
@@ -264,3 +265,129 @@ proof.
 move=> ht hout j hj0 hj; rewrite SBArray272_208.is_init_cell_set.
 by rewrite ifF 1:/#; apply ht.
 qed.
+
+(* ------------------------------------------------------------------ *)
+lemma sub512_128_get (t : BArray512.t) o x l :
+  BArray512.is_init t (o + x) l => 0 <= o => o + 128 <= 512 => 0 <= x => x + l <= 128 =>
+  BArray128.is_init (SBArray512_128.get_sub t o) x l.
+proof.
+move=> ht ho hob hx hxl j hj0 hj; rewrite SBArray512_128.is_init_cell_get 1,2:/#.
+by apply ht => /#.
+qed.
+
+lemma sub512_128_set_in (t : BArray512.t) (s : BArray128.t) o x l :
+  BArray128.is_init s x l => 0 <= o => o + 128 <= 512 => 0 <= x => x + l <= 128 =>
+  BArray512.is_init (SBArray512_128.set_sub t o s) (o + x) l.
+proof.
+move=> hs ho hob hx hxl j hj0 hj; rewrite SBArray512_128.is_init_cell_set.
+by rewrite ifT 1:/#; apply hs => /#.
+qed.
+
+lemma sub512_128_set_out (t : BArray512.t) (s : BArray128.t) o x l :
+  BArray512.is_init t x l => (x + l <= o \/ o + 128 <= x) =>
+  BArray512.is_init (SBArray512_128.set_sub t o s) x l.
+proof.
+move=> ht hout j hj0 hj; rewrite SBArray512_128.is_init_cell_set.
+by rewrite ifF 1:/#; apply ht.
+qed.
+
+(* ------------------------------------------------------------------ *)
+lemma sub512_64_get (t : BArray512.t) o x l :
+  BArray512.is_init t (o + x) l => 0 <= o => o + 64 <= 512 => 0 <= x => x + l <= 64 =>
+  BArray64.is_init (SBArray512_64.get_sub t o) x l.
+proof.
+move=> ht ho hob hx hxl j hj0 hj; rewrite SBArray512_64.is_init_cell_get 1,2:/#.
+by apply ht => /#.
+qed.
+
+lemma sub512_64_set_in (t : BArray512.t) (s : BArray64.t) o x l :
+  BArray64.is_init s x l => 0 <= o => o + 64 <= 512 => 0 <= x => x + l <= 64 =>
+  BArray512.is_init (SBArray512_64.set_sub t o s) (o + x) l.
+proof.
+move=> hs ho hob hx hxl j hj0 hj; rewrite SBArray512_64.is_init_cell_set.
+by rewrite ifT 1:/#; apply hs => /#.
+qed.
+
+lemma sub512_64_set_out (t : BArray512.t) (s : BArray64.t) o x l :
+  BArray512.is_init t x l => (x + l <= o \/ o + 64 <= x) =>
+  BArray512.is_init (SBArray512_64.set_sub t o s) x l.
+proof.
+move=> ht hout j hj0 hj; rewrite SBArray512_64.is_init_cell_set.
+by rewrite ifF 1:/#; apply ht.
+qed.
+
+(* ------------------------------------------------------------------ *)
+lemma sub784_16_get (t : BArray784.t) o x l :
+  BArray784.is_init t (o + x) l => 0 <= o => o + 16 <= 784 => 0 <= x => x + l <= 16 =>
+  BArray16.is_init (SBArray784_16.get_sub t o) x l.
+proof.
+move=> ht ho hob hx hxl j hj0 hj; rewrite SBArray784_16.is_init_cell_get 1,2:/#.
+by apply ht => /#.
+qed.
+
+lemma sub784_16_set_in (t : BArray784.t) (s : BArray16.t) o x l :
+  BArray16.is_init s x l => 0 <= o => o + 16 <= 784 => 0 <= x => x + l <= 16 =>
+  BArray784.is_init (SBArray784_16.set_sub t o s) (o + x) l.
+proof.
+move=> hs ho hob hx hxl j hj0 hj; rewrite SBArray784_16.is_init_cell_set.
+by rewrite ifT 1:/#; apply hs => /#.
+qed.
+
+lemma sub784_16_set_out (t : BArray784.t) (s : BArray16.t) o x l :
+  BArray784.is_init t x l => (x + l <= o \/ o + 16 <= x) =>
+  BArray784.is_init (SBArray784_16.set_sub t o s) x l.
+proof.
+move=> ht hout j hj0 hj; rewrite SBArray784_16.is_init_cell_set.
+by rewrite ifF 1:/#; apply ht.
+qed.
+
+(* ------------------------------------------------------------------ *)
+lemma sub784_256_get (t : BArray784.t) o x l :
+  BArray784.is_init t (o + x) l => 0 <= o => o + 256 <= 784 => 0 <= x => x + l <= 256 =>
+  BArray256.is_init (SBArray784_256.get_sub t o) x l.
+proof.
+move=> ht ho hob hx hxl j hj0 hj; rewrite SBArray784_256.is_init_cell_get 1,2:/#.
+by apply ht => /#.
+qed.
+
+lemma sub784_256_set_in (t : BArray784.t) (s : BArray256.t) o x l :
+  BArray256.is_init s x l => 0 <= o => o + 256 <= 784 => 0 <= x => x + l <= 256 =>
+  BArray784.is_init (SBArray784_256.set_sub t o s) (o + x) l.
+proof.
+move=> hs ho hob hx hxl j hj0 hj; rewrite SBArray784_256.is_init_cell_set.
+by rewrite ifT 1:/#; apply hs => /#.
+qed.
+
+lemma sub784_256_set_out (t : BArray784.t) (s : BArray256.t) o x l :
+  BArray784.is_init t x l => (x + l <= o \/ o + 256 <= x) =>
+  BArray784.is_init (SBArray784_256.set_sub t o s) x l.
+proof.
+move=> ht hout j hj0 hj; rewrite SBArray784_256.is_init_cell_set.
+by rewrite ifF 1:/#; apply ht.
+qed.
+
+(* ------------------------------------------------------------------ *)
+lemma sub784_512_get (t : BArray784.t) o x l :
+  BArray784.is_init t (o + x) l => 0 <= o => o + 512 <= 784 => 0 <= x => x + l <= 512 =>
+  BArray512.is_init (SBArray784_512.get_sub t o) x l.
+proof.
+move=> ht ho hob hx hxl j hj0 hj; rewrite SBArray784_512.is_init_cell_get 1,2:/#.
+by apply ht => /#.
+qed.
+
+lemma sub784_512_set_in (t : BArray784.t) (s : BArray512.t) o x l :
+  BArray512.is_init s x l => 0 <= o => o + 512 <= 784 => 0 <= x => x + l <= 512 =>
+  BArray784.is_init (SBArray784_512.set_sub t o s) (o + x) l.
+proof.
+move=> hs ho hob hx hxl j hj0 hj; rewrite SBArray784_512.is_init_cell_set.
+by rewrite ifT 1:/#; apply hs => /#.
+qed.
+
+lemma sub784_512_set_out (t : BArray784.t) (s : BArray512.t) o x l :
+  BArray784.is_init t x l => (x + l <= o \/ o + 512 <= x) =>
+  BArray784.is_init (SBArray784_512.set_sub t o s) x l.
+proof.
+move=> ht hout j hj0 hj; rewrite SBArray784_512.is_init_cell_set.
+by rewrite ifF 1:/#; apply ht.
+qed.
+

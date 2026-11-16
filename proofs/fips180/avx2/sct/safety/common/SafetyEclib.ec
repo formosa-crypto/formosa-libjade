@@ -10,7 +10,7 @@
 
 require import AllCore IntDiv.
 from Jasmin require import JWord JMemory JByte_array.
-require import BArray8 BArray16 BArray28 BArray32 BArray48 BArray64 BArray112 BArray128 BArray144 BArray208 BArray256 BArray272 BArray512 BArray640 BArray1280.
+require import BArray8 BArray16 BArray28 BArray32 BArray48 BArray64 BArray112 BArray128 BArray144 BArray208 BArray256 BArray272 BArray512 BArray640 BArray784 BArray1280 BArray2048 BArray2560.
 
 lemma is_validP (mod : int) (mem_v : global_mem_v_t) (a : address) (l : int) :
   is_valid mod mem_v a l <=>
@@ -63,4 +63,10 @@ clone ByteInit as BInit512 with theory A <= BArray512.
 
 clone ByteInit as BInit640 with theory A <= BArray640.
 
+clone ByteInit as BInit784 with theory A <= BArray784.
+
 clone ByteInit as BInit1280 with theory A <= BArray1280.
+
+clone ByteInit as BInit2048 with theory A <= BArray2048.
+
+clone ByteInit as BInit2560 with theory A <= BArray2560.
