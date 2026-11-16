@@ -43,6 +43,10 @@ SCHEMES = {
     "ML-KEM-1024": _mlkem("mlkem1024", 1568, 3168, 1568),
     "SHA2-256": _hash("fips180sha256", 32, 112),
     "SHA2-512": _hash("fips180sha512", 64, 208),
+    "SHA2-224": _hash("fips180sha224", 28, 112),
+    "SHA2-384": _hash("fips180sha384", 48, 208),
+    "SHA2-512/224": _hash("fips180sha512_224", 28, 208),
+    "SHA2-512/256": _hash("fips180sha512_256", 32, 208),
 }
 
 

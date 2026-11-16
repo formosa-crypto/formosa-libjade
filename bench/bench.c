@@ -48,6 +48,10 @@ static const scheme_t SCHEMES[] = {
     {"ML-DSA-87", SIG, 2592, 4896, 4627},
     {"FIPS-180-sha256", HASH, 32, 64, 16384},
     {"FIPS-180-sha512", HASH, 64, 128, 16384},
+    {"FIPS-180-sha224", HASH, 28, 64, 16384},
+    {"FIPS-180-sha384", HASH, 48, 128, 16384},
+    {"FIPS-180-sha512_224", HASH, 28, 128, 16384},
+    {"FIPS-180-sha512_256", HASH, 32, 128, 16384},
 };
 
 /* ---- common ABI signatures ---- */

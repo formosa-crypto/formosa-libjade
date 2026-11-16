@@ -186,7 +186,8 @@ SCHEME   ?= ML-KEM-768
 N        ?= 100
 SCHEME_BASE = $(shell echo $(SCHEME) | tr -d '-' | tr 'A-Z' 'a-z')
 ALL_SCHEMES ?= ML-KEM-512 ML-KEM-768 ML-KEM-1024 ML-DSA-44 ML-DSA-65 ML-DSA-87 \
-               FIPS-180-sha256 FIPS-180-sha512
+               FIPS-180-sha256 FIPS-180-sha512 FIPS-180-sha224 FIPS-180-sha384 \
+               FIPS-180-sha512_224 FIPS-180-sha512_256
 
 REPORT  ?= bench.md
 # machine-readable report (aggregated results + run metadata) next to REPORT
