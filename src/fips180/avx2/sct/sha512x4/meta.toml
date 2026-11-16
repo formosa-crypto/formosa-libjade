@@ -1,1 +1,1 @@
-claims = ["kat", "memcheck", "ct", "sct"]
+claims = ["kat", "memcheck", "ct", "sct", "safety", "correctness"]
