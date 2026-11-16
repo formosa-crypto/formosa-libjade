@@ -1,0 +1,243 @@
+/*
+ * sha256.jinc
+ * ===========
+ *
+ * SHA-256 and SHA-224 (FIPS 180-4 sections 5 and 6.2-6.3), portable scalar
+ * Jasmin shared by x86-64 and AArch64.
+ *
+ * Responsibilities:
+ *
+ *     __sha256_init         initial hash values of SHA-256 and SHA-224
+ *     _sha256_absorb_mem    incremental input from memory
+ *     _sha256_finalize      padding, last compressions, big-endian digest,
+ *                           one instance per digest length
+ *                           (sha256_DSIZE.jinc)
+ *     _sha256_mem           one-shot SHA-256 and SHA-224 from memory
+ *
+ * Representation:
+ *
+ *     h      u32[8], H_0 .. H_7 as native words
+ *     buf    u8[64], the first (total mod 64) bytes are pending input
+ *     total  bytes absorbed so far, compressed or pending
+ *
+ * The compression function comes from the Sha256Kernel include root
+ * (sha256_compress.jinc): the kernels of the target, in
+ * src/fips180/<target>/<profile>/common.
+ *
+ * Security: message, chaining value and digest are secret. Every branch,
+ * loop bound and address depends only on total, lengths, pointers and
+ * compile-time round indices.
+ */
+
+from HashWord require "word.jinc"
+from Hash require "fill.jinc"
+from Sha256Kernel require "sha256_compress.jinc"
+
+/*
+ * Initial hash values. SHA-256 (section 5.3.3): the first 32 bits of the
+ * fractional parts of the square roots of the first eight primes. SHA-224
+ * (section 5.3.2): the second 32 bits of the fractional parts of the square
+ * roots of the ninth to sixteenth primes.
+ */
+u32[8] SHA256_IV = {
+  0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+};
+
+u32[8] SHA224_IV = {
+  0xc1059ed8, 0x367cd507, 0x3070dd17, 0xf70e5939, 0xffc00b31, 0x68581511, 0x64f98fa7, 0xbefa4fa4
+};
+
+#[safety = { res = { h_out }, ensures = is_arr_init(h_out, 0, 32) }]
+inline fn __sha256_init(reg mut ptr u32[8] h) -> reg ptr u32[8]
+{
+  reg ptr u32[8] iv;
+  reg u32 t;
+  inline int i;
+
+  iv = SHA256_IV;
+  for i = 0 to 8 {
+    t = iv[i];
+    h[i] = t;
+  }
+  return h;
+}
+
+#[safety = { res = { h_out }, ensures = is_arr_init(h_out, 0, 32) }]
+inline fn __sha224_init(reg mut ptr u32[8] h) -> reg ptr u32[8]
+{
+  reg ptr u32[8] iv;
+  reg u32 t;
+  inline int i;
+
+  iv = SHA224_IV;
+  for i = 0 to 8 {
+    t = iv[i];
+    h[i] = t;
+  }
+  return h;
+}
+
+/*
+ * Append inlen bytes from memory at in.
+ *
+ * Pending bytes in buf are completed first; whole blocks then compress
+ * straight from memory; the remainder (< 64 bytes) is left in buf.
+ * Afterwards total has grown by inlen and buf holds total mod 64 bytes.
+ */
+/*
+ * Safety: h is initialised, buf holds its total mod 64 pending bytes, and
+ * inlen bytes at in are readable. On return buf holds the new total mod 64
+ * pending bytes, and the new total is total + inlen.
+ */
+#[safety =
+   { requires = is_arr_init(h, 0, 32) && is_arr_init(buf, 0, (64u) total % 64)
+       && is_mem_init((64u) in, (64u) inlen)
+   , res = { h_out, buf_out, total_out, ms_out }
+   , ensures = is_arr_init(h_out, 0, 32)
+       && is_arr_init(buf_out, 0, (64u) total_out % 64)
+       && total_out == total + inlen
+   }
+ ]
+#[sct = "{ ptr: public, val: secret } × { ptr: public, val: secret } ×
+         public × public × public ×
+         msf →
+         { ptr: public, val: secret } × { ptr: public, val: secret } × public × msf"]
+fn _sha256_absorb_mem(
+  reg mut ptr u32[8] h,
+  reg mut ptr u8[64] buf,
+  reg u64 total in inlen,
+  reg u64 ms
+) -> reg ptr u32[8], reg ptr u8[64], reg u64, reg u64
+{
+  reg u64 fill n off;
+  reg bool more full;
+
+  fill = total;
+  fill &= 63;
+  total += inlen;
+
+  /*
+   * Complete a partly filled block. When nothing is pending the step is
+   * skipped, so that whole blocks compress straight from memory below.
+   */
+
+  n = 64;
+  n -= fill;
+  n = inlen < n ? inlen : n;
+  n = fill == 0 ? fill : n;
+  inlen -= n;
+  buf, ms = __fill64_mem(buf, fill, in, n, ms);
+  fill += n;
+  in += n;
+
+  full = fill == 64;
+  if (full) {
+    ms = #update_msf(full, ms);
+    /*
+     * Values needed after a compression call cross it through the stack. A
+     * reloaded value is only transient under the speculative model, so it
+     * is protected before it is used as an address, bound or length again.
+     */
+    () = #spill(total, in, inlen, buf);
+    h, ms = _sha256_compress(h, buf, ms);
+    () = #unspill(total, in, inlen, buf);
+    total = #protect(total, ms);
+    in = #protect(in, ms);
+    inlen = #protect(inlen, ms);
+    buf = #protect_ptr(buf, ms);
+    fill = 0;
+  } else {
+    ms = #update_msf(!full, ms);
+  }
+
+  /*
+   * Whole blocks straight from memory, in one kernel call made only when
+   * there is at least one. Either nothing was pending on entry, or the
+   * block above completed, or inlen is now 0, so fill is 0 whenever a
+   * block is compressed here. The values needed after the call cross it
+   * through the stack and are protected on reload.
+   */
+
+  off = 0;
+  n = inlen;
+  n >>= 6;
+  more = n != 0;
+  if (more) {
+    ms = #update_msf(more, ms);
+    () = #spill(total, in, inlen, buf);
+    h, ms = _sha256_compress_blocks(h, in, n, ms);
+    () = #unspill(total, in, inlen, buf);
+    total = #protect(total, ms);
+    in = #protect(in, ms);
+    inlen = #protect(inlen, ms);
+    buf = #protect_ptr(buf, ms);
+    off = inlen;
+    off >>= 6;
+    off <<= 6;
+    fill = 0;
+  } else {
+    ms = #update_msf(!more, ms);
+  }
+
+  /*
+   * Keep the remainder, inlen - off = inlen mod 64 bytes after the whole
+   * blocks, behind the fill pending bytes. It is empty unless fill is 0.
+   */
+
+  inlen -= off;
+  in += off;
+  buf, ms = __fill64_mem(buf, fill, in, inlen, ms);
+
+  return h, buf, total, ms;
+}
+
+/*
+ * Padding and output, once per digest length (sha256_DSIZE.jinc). The
+ * namespace names the function whose digest it writes; its finalize is
+ * _sha256::_sha256_finalize or _sha224::_sha256_finalize.
+ */
+namespace _sha256 {
+  param int _DSIZE = 32;
+  from Hash require "sha256_DSIZE.jinc"
+}
+
+namespace _sha224 {
+  param int _DSIZE = 28;
+  from Hash require "sha256_DSIZE.jinc"
+}
+
+#[safety =
+   { requires = is_mem_init((64u) in, (64u) inlen)
+   , res = { out_out, ms_out }
+   , ensures = is_arr_init(out_out, 0, 32)
+   }
+ ]
+#[sct = "{ ptr: public, val: secret } × public × public × msf →
+         { ptr: public, val: secret } × msf"]
+fn _sha256_mem(reg mut ptr u8[32] out, reg u64 in inlen, reg u64 ms) -> reg ptr u8[32], reg u64
+{
+  stack u32[8] h;
+
+  h = __sha256_init(h);
+  out, ms = _sha256::__sha256_mem_from(out, h, in, inlen, ms);
+
+  return out, ms;
+}
+
+#[safety =
+   { requires = is_mem_init((64u) in, (64u) inlen)
+   , res = { out_out, ms_out }
+   , ensures = is_arr_init(out_out, 0, 28)
+   }
+ ]
+#[sct = "{ ptr: public, val: secret } × public × public × msf →
+         { ptr: public, val: secret } × msf"]
+fn _sha224_mem(reg mut ptr u8[28] out, reg u64 in inlen, reg u64 ms) -> reg ptr u8[28], reg u64
+{
+  stack u32[8] h;
+
+  h = __sha224_init(h);
+  out, ms = _sha224::__sha256_mem_from(out, h, in, inlen, ms);
+
+  return out, ms;
+}

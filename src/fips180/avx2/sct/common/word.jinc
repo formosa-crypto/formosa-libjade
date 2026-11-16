@@ -1,0 +1,19 @@
+/*
+ * word.jinc (x86-64)
+ * ==================
+ *
+ * Word operations for the hash kernels: the byte reversal of a 32-bit and
+ * of a 64-bit word.
+ */
+
+inline fn __bswap32(reg u32 x) -> reg u32
+{
+  x = #BSWAP_32(x);
+  return x;
+}
+
+inline fn __bswap64(reg u64 x) -> reg u64
+{
+  x = #BSWAP_64(x);
+  return x;
+}
