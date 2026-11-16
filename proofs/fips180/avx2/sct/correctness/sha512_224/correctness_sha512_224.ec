@@ -8,14 +8,14 @@ require BitEncoding.
 import BitEncoding.BitChunking.
 from Jasmin require import JWord JUtils JMemory JByte_array.
 require import BArray28 BArray32 BArray48 BArray64 BArray112 BArray128 BArray144 BArray208 BArray256.
-require import BArray272 BArray512.
+require import BArray272 BArray512 BArray784.
 require import SBArray112_32 SBArray112_64 SBArray144_112 SBArray208_64 SBArray208_128 SBArray272_208.
-
+require import SBArray512_64 SBArray512_128 SBArray784_256 SBArray784_512.
 require import Jsha2 Theorems.
 require import Bytes FIPS180_SHA2 FIPS198_HMAC.
 require JWordList.
 require StreamSpec State K256 K512 SHA256_Stream SHA512_Stream HMAC_SHA256 HMAC_SHA512 Ctx256 Ctx512 CtxHmac256 CtxHmac512.
-require StdOrder.
+require Lanes SHA256_X8 SHA512_X4 CtxX8 CtxX4 StdOrder.
 
 
 

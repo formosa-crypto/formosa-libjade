@@ -1,0 +1,5 @@
+hash = { file = "correctness_sha256x8.ec", lemma = "hash_correct" }
+init = { file = "correctness_sha256x8.ec", lemma = "init_correct" }
+init_from = { file = "correctness_sha256x8.ec", lemma = "init_from_correct" }
+update = { file = "correctness_sha256x8.ec", lemma = "update_correct" }
+final = { file = "correctness_sha256x8.ec", lemma = "final_correct" }

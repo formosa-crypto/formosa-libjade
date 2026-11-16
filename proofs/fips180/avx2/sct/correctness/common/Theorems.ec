@@ -13,8 +13,10 @@
  * spec/Bytes.ec, and memread of the JWordList theory for the
  * bytes of memory. Where a call carries state between calls (a stream or
  * a context), the state is described here in those same terms (the ops
- * sha256_state, sha512_state, sha256_ctx and sha512_ctx below), and each
- * description is proved equal to the one the proofs use.
+ * sha256_state, sha512_state, sha256_ctx and sha512_ctx below, and for
+ * the multi-way hashes sha256_x8_state, sha512_x4_state, sha256_x8_ctx
+ * and sha512_x4_ctx), and each description is proved equal to the one the
+ * proofs use.
  *
  * What the caller provides.
  *
@@ -30,6 +32,10 @@
  *     2^61 - 128) bytes, the length of the inner hash input.
  *   - Outputs. An output array of the digest size of the function; the
  *     statement fixes all of its bytes.
+ *   - Multi-way inputs. An array of eight (SHA-256) or four (SHA-512)
+ *     pointers, each with the common length l readable and not wrapping
+ *     the address space. Lane k's digest is bytes [32 k, 32 k + 32)
+ *     (SHA-512: [64 k, 64 k + 64)) of the output.
  *   - The misspeculation flag. Every procedure takes ms and returns it.
  *     A consumer that relies on speculative constant time passes a flag
  *     from #init_msf, protects the pointers and lengths it passes
@@ -48,14 +54,14 @@ require BitEncoding.
 import BitEncoding.BitChunking.
 from Jasmin require import JWord JUtils JMemory JByte_array.
 require import BArray28 BArray32 BArray48 BArray64 BArray112 BArray128 BArray144 BArray208 BArray256.
-require import BArray272 BArray512.
+require import BArray272 BArray512 BArray784.
 require import SBArray112_32 SBArray112_64 SBArray144_112 SBArray208_64 SBArray208_128 SBArray272_208.
-
+require import SBArray512_64 SBArray512_128 SBArray784_256 SBArray784_512.
 require import Jsha2.
 require import Bytes FIPS180_SHA2 FIPS198_HMAC.
 require JWordList.
 require StreamSpec State K256 K512 SHA256_Stream SHA512_Stream HMAC_SHA256 HMAC_SHA512 Ctx256 Ctx512 CtxHmac256 CtxHmac512.
-require StdOrder.
+require Lanes SHA256_X8 SHA512_X4 CtxX8 CtxX4 StdOrder.
 
 abbrev memread = JWordList.memread.
 
@@ -587,9 +593,317 @@ conseq (CtxHmac512.hmac_sha512_ctx_final_total c0 o0 k text) => // &m _ r.
 by rewrite ?words256E ?words512E ?hmac256_tagE ?hmac512_tagE ?hmac256_ctxE ?hmac512_ctxE ?sha256_ctxE ?sha512_ctxE.
 qed.
 
+(* ------------------------------------------------------------------ *)
+(* The multi-way hashes                                               *)
+
+(* Lane k of a lane-major chaining value: word j at cell 8 j + k (u32,
+   eight lanes) or 4 j + k (u64, four lanes). *)
+op lane256 (h : BArray256.t) (k : int) : W32.t list = map (fun j => BArray256.get32 h (8 * j + k)) (iota_ 0 8).
+op lane512 (h : BArray256.t) (k : int) : W64.t list = map (fun j => BArray256.get64 h (4 * j + k)) (iota_ 0 8).
+
+(* An 8-way SHA-256 state after the messages ms 0, ..., ms 7 of one common
+   length from h0: total is that length; lane k of h is compress folded
+   over the complete blocks of ms k; bytes [64 k, 64 k + 64) of buf begin
+   with the bytes of ms k after them. *)
+op sha256_x8_state (h0 : W32.t list) (ms : int -> bytes) (h : BArray256.t) (buf : BArray512.t) (total : W64.t) =
+  forall k, 0 <= k < 8 =>
+     W64.to_uint total = size (ms k)
+  /\ lane256 h k = foldl SHA256.compress h0 (SHA256.parse (ms k))
+  /\ forall i, 0 <= i < size (ms k) %% 64 =>
+       BArray512.get8 buf (64 * k + i) = nth W8.zero (ms k) (64 * (size (ms k) %/ 64) + i).
+
+(* The 4-way SHA-512 state: four lanes of 128-byte blocks. *)
+op sha512_x4_state (h0 : W64.t list) (ms : int -> bytes) (h : BArray256.t) (buf : BArray512.t) (total : W64.t) =
+  forall k, 0 <= k < 4 =>
+     W64.to_uint total = size (ms k)
+  /\ lane512 h k = foldl SHA512.compress h0 (SHA512.parse (ms k))
+  /\ forall i, 0 <= i < size (ms k) %% 128 =>
+       BArray512.get8 buf (128 * k + i) = nth W8.zero (ms k) (128 * (size (ms k) %/ 128) + i).
+
 (* The tag __sha2_tag f writes into a context: f is 1 to 6 for SHA-224,
    SHA-256, SHA-384, SHA-512, SHA-512/224 and SHA-512/256, 7 and 8 for
    HMAC-SHA-256 and HMAC-SHA-512, 9 and 10 for the 8-way and 4-way
    contexts. *)
 op sha2_tag (f : int) : W64.t = W64.of_int (1100356872307 + (f `<<` 32)).
+
+(* A multi-way context of 784 bytes: [0, 8) the tag, [8, 16) the common
+   length, [16, 272) the chaining values, [272, 784) the pending blocks. *)
+op sha256_x8_ctx (h0 : W32.t list) (ms : int -> bytes) (c : BArray784.t) =
+     BArray784.get64d c 0 = sha2_tag 9 /\ W64.to_uint (BArray784.get64d c 8) < 2^61
+  /\ sha256_x8_state h0 ms (SBArray784_256.get_sub32 c 4) (SBArray784_512.get_sub8 c 272) (BArray784.get64d c 8).
+
+op sha512_x4_ctx (h0 : W64.t list) (ms : int -> bytes) (c : BArray784.t) =
+     BArray784.get64d c 0 = sha2_tag 10 /\ W64.to_uint (BArray784.get64d c 8) < 2^61
+  /\ sha512_x4_state h0 ms (SBArray784_256.get_sub64 c 2) (SBArray784_512.get_sub8 c 272) (BArray784.get64d c 8).
+
+lemma lane256E h k : lane256 h k = SHA256_X8.l8 h k.
+proof. by rewrite /lane256 /Lanes.lane. qed.
+
+lemma lane512E h k : lane512 h k = SHA512_X4.l4 h k.
+proof. by rewrite /lane512 /Lanes.lane. qed.
+
+lemma sha256_x8_stateE h0 ms h buf total :
+  sha256_x8_state h0 ms h buf total <=> SHA256_X8.stream8 h0 ms h buf total.
+proof.
+rewrite /sha256_x8_state /SHA256_X8.stream8 /SHA256_X8.lanes8 /SHA256_Stream.pending.
+split.
++ move=> H; split => k hk; have [ht [hh hp]] := H k hk => //.
+  split; first by rewrite -lane256E.
+  move=> i; rewrite StreamSpec.size_tail // => hi.
+  rewrite SBArray512_64.get8_get_sub ifT 1:/# hp // /StreamSpec.tail nth_drop //.
+  + smt(divz_ge0 size_ge0).
+  smt().
+move=> [hs hl] k hk; have [hh hp] := hl k hk.
+split; first exact (hs k hk).
+split; first by rewrite lane256E.
+move=> i hi; have := hp i _; first by rewrite StreamSpec.size_tail.
+rewrite SBArray512_64.get8_get_sub ifT 1:/# /StreamSpec.tail nth_drop //.
++ smt(divz_ge0 size_ge0).
+smt().
+qed.
+
+lemma sha512_x4_stateE h0 ms h buf total :
+  sha512_x4_state h0 ms h buf total <=> SHA512_X4.stream4 h0 ms h buf total.
+proof.
+rewrite /sha512_x4_state /SHA512_X4.stream4 /SHA512_X4.lanes4 /SHA512_Stream.pend512.
+split.
++ move=> H; split => k hk; have [ht [hh hp]] := H k hk => //.
+  split; first by rewrite -lane512E.
+  move=> i; rewrite StreamSpec.size_tail // => hi.
+  rewrite SBArray512_128.get8_get_sub ifT 1:/# hp // /StreamSpec.tail nth_drop //.
+  + smt(divz_ge0 size_ge0).
+  smt().
+move=> [hs hl] k hk; have [hh hp] := hl k hk.
+split; first exact (hs k hk).
+split; first by rewrite lane512E.
+move=> i hi; have := hp i _; first by rewrite StreamSpec.size_tail.
+rewrite SBArray512_128.get8_get_sub ifT 1:/# /StreamSpec.tail nth_drop //.
++ smt(divz_ge0 size_ge0).
+smt().
+qed.
+
+lemma sha256_x8_ctxE h0 ms c : sha256_x8_ctx h0 ms c <=> CtxX8.ctx8 h0 ms c.
+proof. by rewrite /sha256_x8_ctx /CtxX8.ctx8 sha256_x8_stateE. qed.
+
+lemma sha512_x4_ctxE h0 ms c : sha512_x4_ctx h0 ms c <=> CtxX4.ctx4 h0 ms c.
+proof. by rewrite /sha512_x4_ctx /CtxX4.ctx4 sha512_x4_stateE. qed.
+
+lemma sha2_tagE f : sha2_tag f = W64.of_int (1100356872307 + (f `<<` 32)).
+proof. by []. qed.
+
+lemma tag2E : sha2_tag 2 = CtxX8.tag256.
+proof. by rewrite /sha2_tag /CtxX8.tag256. qed.
+
+lemma tag9E : sha2_tag 9 = CtxX8.tagx8.
+proof. by rewrite /sha2_tag /CtxX8.tagx8. qed.
+
+lemma tag4E : sha2_tag 4 = CtxX4.tag512.
+proof. by rewrite /sha2_tag /CtxX4.tag512. qed.
+
+lemma tag10E : sha2_tag 10 = CtxX4.tagx4.
+proof. by rewrite /sha2_tag /CtxX4.tagx4. qed.
+
+(* 8-way SHA-256 *)
+
+lemma sha256_x8_init_total :
+  phoare [M.__sha256_x8_init : true ==> forall k, 0 <= k < 8 => lane256 res k = SHA256.H0_256] = 1%r.
+proof.
+conseq SHA256_X8.sha256_x8_init_total => // &m _ r.
+by split => h k hk; [rewrite -lane256E | rewrite lane256E]; exact (h k hk).
+qed.
+
+lemma sha256_x8_from_total (hs0 : BArray32.t) (bs0 : BArray64.t) :
+  phoare [M.__sha256_x8_from :
+           hs = hs0 /\ bs = bs0 ==>
+           (forall k, 0 <= k < 8 => lane256 res.`1 k = words256 hs0) /\
+           (forall k, 0 <= k < 8 => SBArray512_64.get_sub8 res.`2 (64 * k) = bs0)] = 1%r.
+proof.
+conseq (SHA256_X8.sha256_x8_from_total hs0 bs0) => // &m _ r; rewrite words256E.
+by split => -[h1 h2]; split => // k hk.
+qed.
+
+lemma sha256_x8_absorb_total (h0 : W32.t list) (ms0 : int -> bytes) (in0 : BArray64.t) (l0 : W64.t) :
+  phoare [M._sha256_x8_absorb_lanes :
+           sha256_x8_state h0 ms0 h buf total /\ in_0 = in0 /\ inlen = l0 /\
+           (forall q, 0 <= q < 8 =>
+              W64.to_uint (BArray64.get64 in0 q) + W64.to_uint l0 < W64.modulus) /\
+           W64.to_uint total + W64.to_uint l0 < W64.modulus ==>
+           sha256_x8_state h0
+             (fun k => ms0 k ++ memread Glob.mem (W64.to_uint (BArray64.get64 in0 k)) (W64.to_uint l0))
+             res.`1 res.`2 res.`3] = 1%r.
+proof. by conseq (SHA256_X8.sha256_x8_absorb_total h0 ms0 in0 l0) => &m; smt(sha256_x8_stateE). qed.
+
+lemma sha256_x8_finalize_total (h0 : W32.t list) (ms0 : int -> bytes) :
+  phoare [M._sha256_x8_finalize :
+           sha256_x8_state h0 ms0 h buf total /\ W64.to_uint total < 2^61 ==>
+           forall k, 0 <= k < 8 =>
+             take 32 (drop (32 * k) (BArray256.to_list res.`1))
+             = flatten (map w32_be (SHA256.hash h0 (ms0 k)))] = 1%r.
+proof.
+conseq (SHA256_X8.sha256_x8_finalize_total h0 ms0).
++ by move=> &m [hs ht]; rewrite -sha256_x8_stateE.
+by move=> &m _ r; rewrite /Lanes.lane_block.
+qed.
+
+lemma sha256_x8_lanes_total (in0 : BArray64.t) (l0 : W64.t) :
+  phoare [M._sha256_x8_lanes :
+           in_0 = in0 /\ len = l0 /\
+           (forall q, 0 <= q < 8 =>
+              W64.to_uint (BArray64.get64 in0 q) + W64.to_uint l0 < W64.modulus) /\
+           W64.to_uint l0 < 2^61 ==>
+           forall k, 0 <= k < 8 =>
+             take 32 (drop (32 * k) (BArray256.to_list res.`1))
+             = SHA256.sha256 (memread Glob.mem (W64.to_uint (BArray64.get64 in0 k)) (W64.to_uint l0))] = 1%r.
+proof. exact (SHA256_X8.sha256_x8_lanes_total in0 l0). qed.
+
+lemma sha256_x8_ctx_init_total :
+  phoare [M.__sha256_x8_ctx_init : true ==> sha256_x8_ctx SHA256.H0_256 (fun _ => []) res] = 1%r.
+proof. by conseq CtxX8.sha256_x8_ctx_init_total => &m _ r; rewrite sha256_x8_ctxE. qed.
+
+lemma sha256_x8_ctx_from_total (c0 : BArray784.t) (s0 : BArray112.t) (h0 : W32.t list) (m : bytes) :
+  phoare [M._sha256_x8_ctx_from :
+           ctx = c0 /\ src = s0 ==>
+           (BArray112.get64d s0 0 <> sha2_tag 2 => res.`2 = W64.one /\ res.`1 = c0) /\
+           (sha256_ctx (sha2_tag 2) h0 m s0 => res.`2 = W64.zero /\ sha256_x8_ctx h0 (fun _ => m) res.`1)] = 1%r.
+proof.
+conseq (CtxX8.sha256_x8_ctx_from_total c0 s0 h0 m) => // &m _ r.
+by rewrite sha256_x8_ctxE sha256_ctxE tag2E.
+qed.
+
+lemma sha256_x8_ctx_update_total (c0 : BArray784.t) (h0 : W32.t list) (ms0 : int -> bytes)
+  (in0 : BArray64.t) (l0 : W64.t) :
+  phoare [M._sha256_x8_ctx_update :
+           ctx = c0 /\ in_0 = in0 /\ inlen = l0 /\
+           (forall q, 0 <= q < 8 =>
+              W64.to_uint (BArray64.get64 in0 q) + W64.to_uint l0 < W64.modulus) ==>
+           (res.`2 <> W64.zero => res.`1 = c0) /\
+           (BArray784.get64d c0 0 <> sha2_tag 9 => res.`2 = W64.one) /\
+           (sha256_x8_ctx h0 ms0 c0 =>
+              if size (ms0 0) + W64.to_uint l0 < 2^61
+              then res.`2 = W64.zero /\
+                   sha256_x8_ctx h0
+                     (fun k => ms0 k ++ memread Glob.mem (W64.to_uint (BArray64.get64 in0 k)) (W64.to_uint l0))
+                     res.`1
+              else res.`2 = W64.of_int 2)] = 1%r.
+proof.
+conseq (CtxX8.sha256_x8_ctx_update_total c0 h0 ms0 in0 l0) => // &m _ r.
+by rewrite !sha256_x8_ctxE tag9E.
+qed.
+
+lemma sha256_x8_ctx_final_total (c0 : BArray784.t) (d0 : BArray256.t) (h0 : W32.t list) (ms0 : int -> bytes) :
+  phoare [M._sha256_x8_ctx_final :
+           ctx = c0 /\ out = d0 ==>
+           (BArray784.get64d c0 0 <> sha2_tag 9 => res.`3 = W64.one /\ res.`1 = c0 /\ res.`2 = d0) /\
+           (sha256_x8_ctx h0 ms0 c0 =>
+              res.`3 = W64.zero /\
+              (forall k, 0 <= k < 8 =>
+                 take 32 (drop (32 * k) (BArray256.to_list res.`2))
+                 = flatten (map w32_be (SHA256.hash h0 (ms0 k)))) /\
+              forall i, 0 <= i < 784 => BArray784.get8 res.`1 i = W8.zero)] = 1%r.
+proof.
+conseq (CtxX8.sha256_x8_ctx_final_total c0 d0 h0 ms0) => // &m _ r.
+by rewrite sha256_x8_ctxE tag9E /Lanes.lane_block.
+qed.
+
+(* 4-way SHA-512 *)
+
+lemma sha512_x4_init_total :
+  phoare [M.__sha512_x4_init : true ==> forall k, 0 <= k < 4 => lane512 res k = SHA512.H0_512] = 1%r.
+proof.
+conseq SHA512_X4.sha512_x4_init_total => // &m _ r.
+by split => h k hk; [rewrite -lane512E | rewrite lane512E]; exact (h k hk).
+qed.
+
+lemma sha512_x4_from_total (hs0 : BArray64.t) (bs0 : BArray128.t) :
+  phoare [M.__sha512_x4_from :
+           hs = hs0 /\ bs = bs0 ==>
+           (forall k, 0 <= k < 4 => lane512 res.`1 k = words512 hs0) /\
+           (forall k, 0 <= k < 4 => SBArray512_128.get_sub8 res.`2 (128 * k) = bs0)] = 1%r.
+proof.
+conseq (SHA512_X4.sha512_x4_from_total hs0 bs0) => // &m _ r; rewrite words512E.
+by split => -[h1 h2]; split => // k hk.
+qed.
+
+lemma sha512_x4_absorb_total (h0 : W64.t list) (ms0 : int -> bytes) (in0 : BArray32.t) (l0 : W64.t) :
+  phoare [M._sha512_x4_absorb_lanes :
+           sha512_x4_state h0 ms0 h buf total /\ in_0 = in0 /\ inlen = l0 /\
+           (forall q, 0 <= q < 4 =>
+              W64.to_uint (BArray32.get64 in0 q) + W64.to_uint l0 < W64.modulus) /\
+           W64.to_uint total + W64.to_uint l0 < W64.modulus ==>
+           sha512_x4_state h0
+             (fun k => ms0 k ++ memread Glob.mem (W64.to_uint (BArray32.get64 in0 k)) (W64.to_uint l0))
+             res.`1 res.`2 res.`3] = 1%r.
+proof. by conseq (SHA512_X4.sha512_x4_absorb_total h0 ms0 in0 l0) => &m; smt(sha512_x4_stateE). qed.
+
+lemma sha512_x4_finalize_total (h0 : W64.t list) (ms0 : int -> bytes) :
+  phoare [M._sha512_x4_finalize :
+           sha512_x4_state h0 ms0 h buf total /\ W64.to_uint total < 2^61 ==>
+           forall k, 0 <= k < 4 =>
+             take 64 (drop (64 * k) (BArray256.to_list res.`1))
+             = flatten (map w64_be (SHA512.hash h0 (ms0 k)))] = 1%r.
+proof.
+conseq (SHA512_X4.sha512_x4_finalize_total h0 ms0).
++ by move=> &m [hs ht]; rewrite -sha512_x4_stateE.
+by move=> &m _ r; rewrite /Lanes.lane_block.
+qed.
+
+lemma sha512_x4_lanes_total (in0 : BArray32.t) (l0 : W64.t) :
+  phoare [M._sha512_x4_lanes :
+           in_0 = in0 /\ len = l0 /\
+           (forall q, 0 <= q < 4 =>
+              W64.to_uint (BArray32.get64 in0 q) + W64.to_uint l0 < W64.modulus) /\
+           W64.to_uint l0 < 2^61 ==>
+           forall k, 0 <= k < 4 =>
+             take 64 (drop (64 * k) (BArray256.to_list res.`1))
+             = SHA512.sha512 (memread Glob.mem (W64.to_uint (BArray32.get64 in0 k)) (W64.to_uint l0))] = 1%r.
+proof. exact (SHA512_X4.sha512_x4_lanes_total in0 l0). qed.
+
+lemma sha512_x4_ctx_init_total :
+  phoare [M.__sha512_x4_ctx_init : true ==> sha512_x4_ctx SHA512.H0_512 (fun _ => []) res] = 1%r.
+proof. by conseq CtxX4.sha512_x4_ctx_init_total => &m _ r; rewrite sha512_x4_ctxE. qed.
+
+lemma sha512_x4_ctx_from_total (c0 : BArray784.t) (s0 : BArray208.t) (h0 : W64.t list) (m : bytes) :
+  phoare [M._sha512_x4_ctx_from :
+           ctx = c0 /\ src = s0 ==>
+           (BArray208.get64d s0 0 <> sha2_tag 4 => res.`2 = W64.one /\ res.`1 = c0) /\
+           (sha512_ctx (sha2_tag 4) h0 m s0 => res.`2 = W64.zero /\ sha512_x4_ctx h0 (fun _ => m) res.`1)] = 1%r.
+proof.
+conseq (CtxX4.sha512_x4_ctx_from_total c0 s0 h0 m) => // &m _ r.
+by rewrite sha512_x4_ctxE sha512_ctxE tag4E.
+qed.
+
+lemma sha512_x4_ctx_update_total (c0 : BArray784.t) (h0 : W64.t list) (ms0 : int -> bytes)
+  (in0 : BArray32.t) (l0 : W64.t) :
+  phoare [M._sha512_x4_ctx_update :
+           ctx = c0 /\ in_0 = in0 /\ inlen = l0 /\
+           (forall q, 0 <= q < 4 =>
+              W64.to_uint (BArray32.get64 in0 q) + W64.to_uint l0 < W64.modulus) ==>
+           (res.`2 <> W64.zero => res.`1 = c0) /\
+           (BArray784.get64d c0 0 <> sha2_tag 10 => res.`2 = W64.one) /\
+           (sha512_x4_ctx h0 ms0 c0 =>
+              if size (ms0 0) + W64.to_uint l0 < 2^61
+              then res.`2 = W64.zero /\
+                   sha512_x4_ctx h0
+                     (fun k => ms0 k ++ memread Glob.mem (W64.to_uint (BArray32.get64 in0 k)) (W64.to_uint l0))
+                     res.`1
+              else res.`2 = W64.of_int 2)] = 1%r.
+proof.
+conseq (CtxX4.sha512_x4_ctx_update_total c0 h0 ms0 in0 l0) => // &m _ r.
+by rewrite !sha512_x4_ctxE tag10E.
+qed.
+
+lemma sha512_x4_ctx_final_total (c0 : BArray784.t) (d0 : BArray256.t) (h0 : W64.t list) (ms0 : int -> bytes) :
+  phoare [M._sha512_x4_ctx_final :
+           ctx = c0 /\ out = d0 ==>
+           (BArray784.get64d c0 0 <> sha2_tag 10 => res.`3 = W64.one /\ res.`1 = c0 /\ res.`2 = d0) /\
+           (sha512_x4_ctx h0 ms0 c0 =>
+              res.`3 = W64.zero /\
+              (forall k, 0 <= k < 4 =>
+                 take 64 (drop (64 * k) (BArray256.to_list res.`2))
+                 = flatten (map w64_be (SHA512.hash h0 (ms0 k)))) /\
+              forall i, 0 <= i < 784 => BArray784.get8 res.`1 i = W8.zero)] = 1%r.
+proof.
+conseq (CtxX4.sha512_x4_ctx_final_total c0 d0 h0 ms0) => // &m _ r.
+by rewrite sha512_x4_ctxE tag10E /Lanes.lane_block.
+qed.
 
