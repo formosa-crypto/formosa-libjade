@@ -16483,6 +16483,404 @@ module M = {
     b_out <- (BArray64.init_arr (W8.of_int 255));
     return (out, b_out, ms, trace__hmac_sha512_mem);
   }
+  proc jade_mac_hmac_sha256_amd64_avx2 (out:BArray32.t, b_out:BArray32.t,
+                                        key:W64.t, keylen:W64.t, msg:W64.t,
+                                        msglen:W64.t) : BArray32.t *
+                                                        BArray32.t * trace = {
+    var ms:W64.t;
+    var param:W64.t;
+    var param_0:W64.t;
+    var param_1:W64.t;
+    var param_2:W64.t;
+    var param_3:W64.t;
+    var param_4:BArray32.t;
+    var result:W64.t;
+    var result_0:BArray32.t;
+    var b_result:BArray32.t;
+    var b_param:BArray32.t;
+    var trace_jade_mac_hmac_sha256_amd64_avx2:trace;
+    b_param <- witness;
+    b_result <- witness;
+    param_4 <- witness;
+    result_0 <- witness;
+    trace_jade_mac_hmac_sha256_amd64_avx2 <- [];
+    trace_jade_mac_hmac_sha256_amd64_avx2 <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2 ++
+    [(Assert,
+     ((is_valid ptr_modulus Glob.mem_v (W64.to_uint key) (W64.to_uint keylen)
+      ) /\
+     (is_valid ptr_modulus Glob.mem_v (W64.to_uint msg) (W64.to_uint msglen))))]);
+    ms <- (init_msf);
+    b_param <- b_out;
+    param_4 <- out;
+    param_3 <- key;
+    param_2 <- keylen;
+    param_1 <- msg;
+    param_0 <- msglen;
+    param <- ms;
+    (result_0, b_result, result, tmp__trace) <@ _hmac_sha256_mem (param_4,
+    b_param, param_3, param_2, param_1, param_0, param);
+    trace_jade_mac_hmac_sha256_amd64_avx2 <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2 ++ tmp__trace);
+    trace_jade_mac_hmac_sha256_amd64_avx2 <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2 ++
+    [(Assert, (BArray32.is_init b_result 0 32))]);
+    out <- result_0;
+    b_out <- (BArray32.init_arr (W8.of_int 255));
+    return (out, b_out, trace_jade_mac_hmac_sha256_amd64_avx2);
+  }
+  proc jade_mac_hmac_sha256_amd64_avx2_init (ctx:BArray144.t,
+                                             b_ctx:BArray144.t, key:W64.t,
+                                             keylen:W64.t) : BArray144.t *
+                                                             BArray144.t *
+                                                             trace = {
+    var ms:W64.t;
+    var param:W64.t;
+    var param_0:W64.t;
+    var param_1:W64.t;
+    var param_2:BArray144.t;
+    var result:W64.t;
+    var result_0:BArray144.t;
+    var b_result:BArray144.t;
+    var b_param:BArray144.t;
+    var trace_jade_mac_hmac_sha256_amd64_avx2_init:trace;
+    b_param <- witness;
+    b_result <- witness;
+    param_2 <- witness;
+    result_0 <- witness;
+    trace_jade_mac_hmac_sha256_amd64_avx2_init <- [];
+    trace_jade_mac_hmac_sha256_amd64_avx2_init <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2_init ++
+    [(Assert,
+     (is_valid ptr_modulus Glob.mem_v (W64.to_uint key) (W64.to_uint keylen)))]);
+    ms <- (init_msf);
+    b_param <- b_ctx;
+    param_2 <- ctx;
+    param_1 <- key;
+    param_0 <- keylen;
+    param <- ms;
+    (result_0, b_result, result, tmp__trace) <@ __hmac_sha256_ctx_init (
+    param_2, b_param, param_1, param_0, param);
+    trace_jade_mac_hmac_sha256_amd64_avx2_init <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2_init ++ tmp__trace);
+    trace_jade_mac_hmac_sha256_amd64_avx2_init <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2_init ++
+    [(Assert, (BArray144.is_init b_result 0 144))]);
+    ctx <- result_0;
+    b_ctx <- (BArray144.init_arr (W8.of_int 255));
+    return (ctx, b_ctx, trace_jade_mac_hmac_sha256_amd64_avx2_init);
+  }
+  proc jade_mac_hmac_sha256_amd64_avx2_update (ctx:BArray144.t,
+                                               b_ctx:BArray144.t, in_0:W64.t,
+                                               inlen:W64.t) : BArray144.t *
+                                                              BArray144.t *
+                                                              W64.t * trace = {
+    var status:W64.t;
+    var ms:W64.t;
+    var expect_0:W64.t;
+    var param:int;
+    var result:W64.t;
+    var param_0:W64.t;
+    var param_1:W64.t;
+    var param_2:W64.t;
+    var param_3:W64.t;
+    var param_4:BArray112.t;
+    var result_0:W64.t;
+    var result_1:W64.t;
+    var result_2:BArray112.t;
+    var b_result:BArray112.t;
+    var b_param:BArray112.t;
+    var trace_jade_mac_hmac_sha256_amd64_avx2_update:trace;
+    b_param <- witness;
+    b_result <- witness;
+    param_4 <- witness;
+    result_2 <- witness;
+    trace_jade_mac_hmac_sha256_amd64_avx2_update <- [];
+    trace_jade_mac_hmac_sha256_amd64_avx2_update <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2_update ++
+    [(Assert,
+     ((BArray144.is_init b_ctx 0 144) /\
+     (is_valid ptr_modulus Glob.mem_v (W64.to_uint in_0) (W64.to_uint inlen))))]);
+    ms <- (init_msf);
+    param <- 7;
+    (result, tmp__trace) <@ __sha2_tag (param);
+    trace_jade_mac_hmac_sha256_amd64_avx2_update <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2_update ++ tmp__trace);
+    expect_0 <- result;
+    b_param <- (SBArray144_112.get_sub8 b_ctx 0);
+    param_4 <- (SBArray144_112.get_sub8 ctx 0);
+    param_3 <- in_0;
+    param_2 <- inlen;
+    param_1 <- expect_0;
+    param_0 <- ms;
+    (result_2, b_result, result_1, result_0, tmp__trace) <@ _sha256_ctx_update (
+    param_4, b_param, param_3, param_2, param_1, param_0);
+    trace_jade_mac_hmac_sha256_amd64_avx2_update <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2_update ++ tmp__trace);
+    trace_jade_mac_hmac_sha256_amd64_avx2_update <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2_update ++
+    [(Assert, (BArray112.is_init b_result 0 112))]);
+    b_ctx <-
+    (SBArray144_112.set_sub8 b_ctx 0 (BArray112.init_arr (W8.of_int 255)));
+    ctx <- (SBArray144_112.set_sub8 ctx 0 result_2);
+    status <- result_1;
+    return (ctx, b_ctx, status, trace_jade_mac_hmac_sha256_amd64_avx2_update);
+  }
+  proc jade_mac_hmac_sha256_amd64_avx2_final (ctx:BArray144.t,
+                                              b_ctx:BArray144.t,
+                                              out:BArray32.t,
+                                              b_out:BArray32.t) : BArray144.t *
+                                                                  BArray144.t *
+                                                                  BArray32.t *
+                                                                  BArray32.t *
+                                                                  W64.t *
+                                                                  trace = {
+    var status:W64.t;
+    var ms:W64.t;
+    var param:W64.t;
+    var param_0:BArray32.t;
+    var param_1:BArray144.t;
+    var result:W64.t;
+    var result_0:W64.t;
+    var result_1:BArray32.t;
+    var result_2:BArray144.t;
+    var b_result:BArray32.t;
+    var b_result_0:BArray144.t;
+    var b_param:BArray32.t;
+    var trace_jade_mac_hmac_sha256_amd64_avx2_final:trace;
+    b_param <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    param_0 <- witness;
+    param_1 <- witness;
+    result_1 <- witness;
+    result_2 <- witness;
+    trace_jade_mac_hmac_sha256_amd64_avx2_final <- [];
+    trace_jade_mac_hmac_sha256_amd64_avx2_final <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2_final ++
+    [(Assert, (BArray144.is_init b_ctx 0 144))]);
+    ms <- (init_msf);
+    param_1 <- ctx;
+    b_param <- b_out;
+    param_0 <- out;
+    param <- ms;
+    (result_2, b_result_0, result_1, b_result, result_0, result, tmp__trace) <@ 
+    __hmac_sha256_ctx_final (param_1, (BArray144.init_arr (W8.of_int 255)),
+    param_0, b_param, param);
+    trace_jade_mac_hmac_sha256_amd64_avx2_final <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2_final ++ tmp__trace);
+    trace_jade_mac_hmac_sha256_amd64_avx2_final <-
+    (trace_jade_mac_hmac_sha256_amd64_avx2_final ++
+    [(Assert,
+     ((BArray144.is_init b_result_0 0 144) /\
+     (BArray32.is_init b_result 0 ((result_0 = (W64.of_int 0)) ? 32 : 0))))]);
+    ctx <- result_2;
+    b_out <- b_result;
+    out <- result_1;
+    status <- result_0;
+    b_ctx <- (BArray144.init_arr (W8.of_int 255));
+    return (ctx, b_ctx, out, b_out, status,
+           trace_jade_mac_hmac_sha256_amd64_avx2_final);
+  }
+  proc jade_mac_hmac_sha512_amd64_avx2 (out:BArray64.t, b_out:BArray64.t,
+                                        key:W64.t, keylen:W64.t, msg:W64.t,
+                                        msglen:W64.t) : BArray64.t *
+                                                        BArray64.t * trace = {
+    var ms:W64.t;
+    var param:W64.t;
+    var param_0:W64.t;
+    var param_1:W64.t;
+    var param_2:W64.t;
+    var param_3:W64.t;
+    var param_4:BArray64.t;
+    var result:W64.t;
+    var result_0:BArray64.t;
+    var b_result:BArray64.t;
+    var b_param:BArray64.t;
+    var trace_jade_mac_hmac_sha512_amd64_avx2:trace;
+    b_param <- witness;
+    b_result <- witness;
+    param_4 <- witness;
+    result_0 <- witness;
+    trace_jade_mac_hmac_sha512_amd64_avx2 <- [];
+    trace_jade_mac_hmac_sha512_amd64_avx2 <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2 ++
+    [(Assert,
+     ((is_valid ptr_modulus Glob.mem_v (W64.to_uint key) (W64.to_uint keylen)
+      ) /\
+     (is_valid ptr_modulus Glob.mem_v (W64.to_uint msg) (W64.to_uint msglen))))]);
+    ms <- (init_msf);
+    b_param <- b_out;
+    param_4 <- out;
+    param_3 <- key;
+    param_2 <- keylen;
+    param_1 <- msg;
+    param_0 <- msglen;
+    param <- ms;
+    (result_0, b_result, result, tmp__trace) <@ _hmac_sha512_mem (param_4,
+    b_param, param_3, param_2, param_1, param_0, param);
+    trace_jade_mac_hmac_sha512_amd64_avx2 <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2 ++ tmp__trace);
+    trace_jade_mac_hmac_sha512_amd64_avx2 <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2 ++
+    [(Assert, (BArray64.is_init b_result 0 64))]);
+    out <- result_0;
+    b_out <- (BArray64.init_arr (W8.of_int 255));
+    return (out, b_out, trace_jade_mac_hmac_sha512_amd64_avx2);
+  }
+  proc jade_mac_hmac_sha512_amd64_avx2_init (ctx:BArray272.t,
+                                             b_ctx:BArray272.t, key:W64.t,
+                                             keylen:W64.t) : BArray272.t *
+                                                             BArray272.t *
+                                                             trace = {
+    var ms:W64.t;
+    var param:W64.t;
+    var param_0:W64.t;
+    var param_1:W64.t;
+    var param_2:BArray272.t;
+    var result:W64.t;
+    var result_0:BArray272.t;
+    var b_result:BArray272.t;
+    var b_param:BArray272.t;
+    var trace_jade_mac_hmac_sha512_amd64_avx2_init:trace;
+    b_param <- witness;
+    b_result <- witness;
+    param_2 <- witness;
+    result_0 <- witness;
+    trace_jade_mac_hmac_sha512_amd64_avx2_init <- [];
+    trace_jade_mac_hmac_sha512_amd64_avx2_init <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2_init ++
+    [(Assert,
+     (is_valid ptr_modulus Glob.mem_v (W64.to_uint key) (W64.to_uint keylen)))]);
+    ms <- (init_msf);
+    b_param <- b_ctx;
+    param_2 <- ctx;
+    param_1 <- key;
+    param_0 <- keylen;
+    param <- ms;
+    (result_0, b_result, result, tmp__trace) <@ __hmac_sha512_ctx_init (
+    param_2, b_param, param_1, param_0, param);
+    trace_jade_mac_hmac_sha512_amd64_avx2_init <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2_init ++ tmp__trace);
+    trace_jade_mac_hmac_sha512_amd64_avx2_init <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2_init ++
+    [(Assert, (BArray272.is_init b_result 0 272))]);
+    ctx <- result_0;
+    b_ctx <- (BArray272.init_arr (W8.of_int 255));
+    return (ctx, b_ctx, trace_jade_mac_hmac_sha512_amd64_avx2_init);
+  }
+  proc jade_mac_hmac_sha512_amd64_avx2_update (ctx:BArray272.t,
+                                               b_ctx:BArray272.t, in_0:W64.t,
+                                               inlen:W64.t) : BArray272.t *
+                                                              BArray272.t *
+                                                              W64.t * trace = {
+    var status:W64.t;
+    var ms:W64.t;
+    var expect_0:W64.t;
+    var param:int;
+    var result:W64.t;
+    var param_0:W64.t;
+    var param_1:W64.t;
+    var param_2:W64.t;
+    var param_3:W64.t;
+    var param_4:BArray208.t;
+    var result_0:W64.t;
+    var result_1:W64.t;
+    var result_2:BArray208.t;
+    var b_result:BArray208.t;
+    var b_param:BArray208.t;
+    var trace_jade_mac_hmac_sha512_amd64_avx2_update:trace;
+    b_param <- witness;
+    b_result <- witness;
+    param_4 <- witness;
+    result_2 <- witness;
+    trace_jade_mac_hmac_sha512_amd64_avx2_update <- [];
+    trace_jade_mac_hmac_sha512_amd64_avx2_update <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2_update ++
+    [(Assert,
+     ((BArray272.is_init b_ctx 0 272) /\
+     (is_valid ptr_modulus Glob.mem_v (W64.to_uint in_0) (W64.to_uint inlen))))]);
+    ms <- (init_msf);
+    param <- 8;
+    (result, tmp__trace) <@ __sha2_tag (param);
+    trace_jade_mac_hmac_sha512_amd64_avx2_update <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2_update ++ tmp__trace);
+    expect_0 <- result;
+    b_param <- (SBArray272_208.get_sub8 b_ctx 0);
+    param_4 <- (SBArray272_208.get_sub8 ctx 0);
+    param_3 <- in_0;
+    param_2 <- inlen;
+    param_1 <- expect_0;
+    param_0 <- ms;
+    (result_2, b_result, result_1, result_0, tmp__trace) <@ _sha512_ctx_update (
+    param_4, b_param, param_3, param_2, param_1, param_0);
+    trace_jade_mac_hmac_sha512_amd64_avx2_update <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2_update ++ tmp__trace);
+    trace_jade_mac_hmac_sha512_amd64_avx2_update <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2_update ++
+    [(Assert, (BArray208.is_init b_result 0 208))]);
+    b_ctx <-
+    (SBArray272_208.set_sub8 b_ctx 0 (BArray208.init_arr (W8.of_int 255)));
+    ctx <- (SBArray272_208.set_sub8 ctx 0 result_2);
+    status <- result_1;
+    return (ctx, b_ctx, status, trace_jade_mac_hmac_sha512_amd64_avx2_update);
+  }
+  proc jade_mac_hmac_sha512_amd64_avx2_final (ctx:BArray272.t,
+                                              b_ctx:BArray272.t,
+                                              out:BArray64.t,
+                                              b_out:BArray64.t) : BArray272.t *
+                                                                  BArray272.t *
+                                                                  BArray64.t *
+                                                                  BArray64.t *
+                                                                  W64.t *
+                                                                  trace = {
+    var status:W64.t;
+    var ms:W64.t;
+    var param:W64.t;
+    var param_0:BArray64.t;
+    var param_1:BArray272.t;
+    var result:W64.t;
+    var result_0:W64.t;
+    var result_1:BArray64.t;
+    var result_2:BArray272.t;
+    var b_result:BArray64.t;
+    var b_result_0:BArray272.t;
+    var b_param:BArray64.t;
+    var trace_jade_mac_hmac_sha512_amd64_avx2_final:trace;
+    b_param <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    param_0 <- witness;
+    param_1 <- witness;
+    result_1 <- witness;
+    result_2 <- witness;
+    trace_jade_mac_hmac_sha512_amd64_avx2_final <- [];
+    trace_jade_mac_hmac_sha512_amd64_avx2_final <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2_final ++
+    [(Assert, (BArray272.is_init b_ctx 0 272))]);
+    ms <- (init_msf);
+    param_1 <- ctx;
+    b_param <- b_out;
+    param_0 <- out;
+    param <- ms;
+    (result_2, b_result_0, result_1, b_result, result_0, result, tmp__trace) <@ 
+    __hmac_sha512_ctx_final (param_1, (BArray272.init_arr (W8.of_int 255)),
+    param_0, b_param, param);
+    trace_jade_mac_hmac_sha512_amd64_avx2_final <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2_final ++ tmp__trace);
+    trace_jade_mac_hmac_sha512_amd64_avx2_final <-
+    (trace_jade_mac_hmac_sha512_amd64_avx2_final ++
+    [(Assert,
+     ((BArray272.is_init b_result_0 0 272) /\
+     (BArray64.is_init b_result 0 ((result_0 = (W64.of_int 0)) ? 64 : 0))))]);
+    ctx <- result_2;
+    b_out <- b_result;
+    out <- result_1;
+    status <- result_0;
+    b_ctx <- (BArray272.init_arr (W8.of_int 255));
+    return (ctx, b_ctx, out, b_out, status,
+           trace_jade_mac_hmac_sha512_amd64_avx2_final);
+  }
 }.
 
 (* The post and trace are valid. *)
@@ -18502,3 +18900,91 @@ op _hmac_sha512_mem_spec _out _b_out _key _keylen _msg _msglen _ms =
     ) /\
    (is_valid ptr_modulus Glob.mem_v (W64.to_uint _msg) (W64.to_uint _msglen)))))))) ==>
    ((BArray64.is_init res.`2 0 64) /\ (valid res.`4))].
+
+op jade_mac_hmac_sha256_amd64_avx2_spec _out _b_out _key _keylen _msg _msglen =
+   hoare [M.jade_mac_hmac_sha256_amd64_avx2 :
+   (((_msglen = msglen) /\
+    ((_msg = msg) /\
+    ((_keylen = keylen) /\
+    ((_key = key) /\ ((_b_out = b_out) /\ (_out = out)))))) /\
+   (true /\
+   (true /\
+   (true /\
+   (true /\
+   ((is_valid ptr_modulus Glob.mem_v (W64.to_uint _key) (W64.to_uint _keylen)
+    ) /\
+   (is_valid ptr_modulus Glob.mem_v (W64.to_uint _msg) (W64.to_uint _msglen)))))))) ==>
+   ((BArray32.is_init res.`2 0 32) /\ (valid res.`3))].
+
+op jade_mac_hmac_sha256_amd64_avx2_init_spec _ctx _b_ctx _key _keylen =
+   hoare [M.jade_mac_hmac_sha256_amd64_avx2_init :
+   (((_keylen = keylen) /\
+    ((_key = key) /\ ((_b_ctx = b_ctx) /\ (_ctx = ctx)))) /\
+   (true /\
+   (true /\
+   (is_valid ptr_modulus Glob.mem_v (W64.to_uint _key) (W64.to_uint _keylen))))) ==>
+   ((BArray144.is_init res.`2 0 144) /\ (valid res.`3))].
+
+op jade_mac_hmac_sha256_amd64_avx2_update_spec _ctx _b_ctx _in _inlen =
+   hoare [M.jade_mac_hmac_sha256_amd64_avx2_update :
+   (((_inlen = inlen) /\
+    ((_in = in_0) /\ ((_b_ctx = b_ctx) /\ (_ctx = ctx)))) /\
+   (true /\
+   (true /\
+   ((BArray144.is_init _b_ctx 0 144) /\
+   (is_valid ptr_modulus Glob.mem_v (W64.to_uint _in) (W64.to_uint _inlen)))))) ==>
+   ((BArray144.is_init res.`2 0 144) /\ (valid res.`4))].
+
+op jade_mac_hmac_sha256_amd64_avx2_final_spec _ctx _b_ctx _out _b_out =
+   hoare [M.jade_mac_hmac_sha256_amd64_avx2_final :
+   (((_b_out = b_out) /\
+    ((_out = out) /\ ((_b_ctx = b_ctx) /\ (_ctx = ctx)))) /\
+   (BArray144.is_init _b_ctx 0 144)) ==>
+   ((true /\
+    ((BArray144.is_init res.`2 0 144) /\
+    (BArray32.is_init res.`4 0 ((res.`5 = (W64.of_int 0)) ? 32 : 0)))) /\
+   (valid res.`6))].
+
+op jade_mac_hmac_sha512_amd64_avx2_spec _out _b_out _key _keylen _msg _msglen =
+   hoare [M.jade_mac_hmac_sha512_amd64_avx2 :
+   (((_msglen = msglen) /\
+    ((_msg = msg) /\
+    ((_keylen = keylen) /\
+    ((_key = key) /\ ((_b_out = b_out) /\ (_out = out)))))) /\
+   (true /\
+   (true /\
+   (true /\
+   (true /\
+   ((is_valid ptr_modulus Glob.mem_v (W64.to_uint _key) (W64.to_uint _keylen)
+    ) /\
+   (is_valid ptr_modulus Glob.mem_v (W64.to_uint _msg) (W64.to_uint _msglen)))))))) ==>
+   ((BArray64.is_init res.`2 0 64) /\ (valid res.`3))].
+
+op jade_mac_hmac_sha512_amd64_avx2_init_spec _ctx _b_ctx _key _keylen =
+   hoare [M.jade_mac_hmac_sha512_amd64_avx2_init :
+   (((_keylen = keylen) /\
+    ((_key = key) /\ ((_b_ctx = b_ctx) /\ (_ctx = ctx)))) /\
+   (true /\
+   (true /\
+   (is_valid ptr_modulus Glob.mem_v (W64.to_uint _key) (W64.to_uint _keylen))))) ==>
+   ((BArray272.is_init res.`2 0 272) /\ (valid res.`3))].
+
+op jade_mac_hmac_sha512_amd64_avx2_update_spec _ctx _b_ctx _in _inlen =
+   hoare [M.jade_mac_hmac_sha512_amd64_avx2_update :
+   (((_inlen = inlen) /\
+    ((_in = in_0) /\ ((_b_ctx = b_ctx) /\ (_ctx = ctx)))) /\
+   (true /\
+   (true /\
+   ((BArray272.is_init _b_ctx 0 272) /\
+   (is_valid ptr_modulus Glob.mem_v (W64.to_uint _in) (W64.to_uint _inlen)))))) ==>
+   ((BArray272.is_init res.`2 0 272) /\ (valid res.`4))].
+
+op jade_mac_hmac_sha512_amd64_avx2_final_spec _ctx _b_ctx _out _b_out =
+   hoare [M.jade_mac_hmac_sha512_amd64_avx2_final :
+   (((_b_out = b_out) /\
+    ((_out = out) /\ ((_b_ctx = b_ctx) /\ (_ctx = ctx)))) /\
+   (BArray272.is_init _b_ctx 0 272)) ==>
+   ((true /\
+    ((BArray272.is_init res.`2 0 272) /\
+    (BArray64.is_init res.`4 0 ((res.`5 = (W64.of_int 0)) ? 64 : 0)))) /\
+   (valid res.`6))].
