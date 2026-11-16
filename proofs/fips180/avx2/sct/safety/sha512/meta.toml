@@ -1,0 +1,1 @@
+hash = { file = "safety_sha512.ec", lemma = "jade_hash_sha512_amd64_avx2_proof" }

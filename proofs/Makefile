@@ -22,7 +22,7 @@ ECRUNTEST := env ECMEM_LOG=$(abspath $(MEMORY)) ECMEM_EASYCRYPT=$(shell command 
 endif
 
 CONFIG    := tests.config
-SCENARIOS := core fips202 mldsa mlkem mlkem-avx2-generic mlkem-avx2-512 mlkem-avx2-768 mlkem-avx2-1024 mlkem-safety mldsa-safety fips202-safety fips180 fips180-avx2
+SCENARIOS := core fips202 mldsa mlkem mlkem-avx2-generic mlkem-avx2-512 mlkem-avx2-768 mlkem-avx2-1024 mlkem-safety mldsa-safety fips202-safety fips180 fips180-avx2 fips180-safety
 
 # --------------------------------------------------------------------
 .PHONY: default check all $(SCENARIOS) clean
@@ -124,6 +124,14 @@ extract-safety:
 	    -f $${p}_keypair_derand -f $${p}_enc_derand -f $${p}_dec \
 	    -f $${p}_check_pk -f $${p}_check_sk || exit 1; \
 	done
+	$(MAKE) --no-print-directory extract-safety-fips180
+
+# SHA-2: one safety model of the code of every set (the harness of its
+# extraction directory), every function with its contract
+.PHONY: extract-safety-fips180
+extract-safety-fips180:
+	$(SAFETY) $(SHA2) fips180/avx2/sct/safety/extraction/toEC_sha2.jazz \
+	  -o fips180/avx2/sct/safety/extraction/Jsha2_safety.ec
 
 check-extraction: extract
 	@$(MAKE) --no-print-directory extraction-unchanged
