@@ -1,4 +1,5 @@
 from Hash require "sha256.jinc"
+from Hash require "context.jinc"
 
 #[ct = "secret × public × public -> secret"]
 #[sct = "{ ptr: transient, val: secret } × transient × transient →
@@ -18,4 +19,70 @@ export fn jade_hash_sha256_amd64_avx2(reg mut ptr u8[32] out, reg u64 in inlen) 
   out, ms = _sha256_mem(out, in, inlen, ms);
 
   return out;
+}
+
+#[ct = "secret -> secret"]
+#[sct = "{ ptr: transient, val: secret } → { ptr: transient, val: secret }"]
+#[safety =
+   { res = { ctx_out }
+   , ensures = is_arr_init(ctx_out, 0, SHA256_CTX_BYTES)
+   }
+ ]
+export fn jade_hash_sha256_amd64_avx2_init(reg mut ptr u8[SHA256_CTX_BYTES] ctx) -> reg ptr u8[SHA256_CTX_BYTES]
+{
+  stack u32[8] h;
+  reg u64 ms tag total;
+
+  ms = #init_msf();
+
+  h = __sha256_init(h);
+  tag = __sha2_tag(SHA2_FN_SHA256);
+  total = 0;
+  ctx = __sha256_ctx_init(ctx, h, tag, total);
+
+  return ctx;
+}
+
+#[ct = "secret × public × public -> secret × public"]
+#[sct = "{ ptr: transient, val: secret } × transient × transient →
+         { ptr: transient, val: secret } × public"]
+#[safety =
+   { requires = is_arr_init(ctx, 0, SHA256_CTX_BYTES) && is_mem_init((64u) in, (64u) inlen)
+   , res = { ctx_out, status }
+   , ensures = is_arr_init(ctx_out, 0, SHA256_CTX_BYTES)
+   }
+ ]
+export fn jade_hash_sha256_amd64_avx2_update(reg mut ptr u8[SHA256_CTX_BYTES] ctx, reg u64 in inlen) -> reg ptr u8[SHA256_CTX_BYTES], reg u64
+{
+  reg u64 ms expect status;
+
+  ms = #init_msf();
+
+  expect = __sha2_tag(SHA2_FN_SHA256);
+  ctx, status, ms = _sha256_ctx_update(ctx, in, inlen, expect, ms);
+
+  return ctx, status;
+}
+
+#[ct = "secret × secret -> secret × secret × public"]
+#[sct = "{ ptr: transient, val: secret } × { ptr: transient, val: secret } →
+         { ptr: transient, val: secret } × { ptr: transient, val: secret } × public"]
+#[safety =
+   { requires = is_arr_init(ctx, 0, SHA256_CTX_BYTES)
+   , res = { ctx_out, out_out, status }
+   , ensures = is_arr_init(ctx_out, 0, SHA256_CTX_BYTES)
+       && is_arr_init(out_out, 0, status == SHA2_STATUS_OK ? 32 : 0)
+   }
+ ]
+export fn jade_hash_sha256_amd64_avx2_final(reg mut ptr u8[SHA256_CTX_BYTES] ctx, reg mut ptr u8[32] out)
+  -> reg ptr u8[SHA256_CTX_BYTES], reg ptr u8[32], reg u64
+{
+  reg u64 ms expect status;
+
+  ms = #init_msf();
+
+  expect = __sha2_tag(SHA2_FN_SHA256);
+  ctx, out, status, ms = _sha256_ctx::_sha2_ctx_final(ctx, out, expect, ms);
+
+  return ctx, out, status;
 }

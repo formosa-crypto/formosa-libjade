@@ -31,7 +31,7 @@ typedef enum { KEM, SIG, HASH } kind_t;
 typedef struct {
   const char *name;
   kind_t kind;
-  /* KEM: pk, sk, ct; SIG: vk, sk, sig; HASH: digest, block */
+  /* KEM: pk, sk, ct; SIG: vk, sk, sig; HASH: digest, block, context */
   size_t a, b, c;
 } scheme_t;
 
@@ -42,8 +42,8 @@ static const scheme_t SCHEMES[] = {
     {"ML-DSA-44", SIG, 1312, 2560, 2420},
     {"ML-DSA-65", SIG, 1952, 4032, 3309},
     {"ML-DSA-87", SIG, 2592, 4896, 4627},
-    {"FIPS-180-sha256", HASH, 32, 64, 0},
-    {"FIPS-180-sha512", HASH, 64, 128, 0},
+    {"FIPS-180-sha256", HASH, 32, 64, 112},
+    {"FIPS-180-sha512", HASH, 64, 128, 208},
 };
 
 typedef int (*kem_keypair_t)(uint8_t *, uint8_t *, const uint8_t *);
@@ -56,6 +56,9 @@ typedef int (*sig_sign_t)(uint8_t *, const uint8_t *, const uint8_t *, size_t,
 typedef int (*sig_verify_t)(const uint8_t *, const uint8_t *, size_t,
                             const uint8_t *, size_t, const uint8_t *);
 typedef void (*hash_digest_t)(uint8_t *, const uint8_t *, size_t);
+typedef void (*hash_init_t)(uint8_t *);
+typedef int (*hash_update_t)(uint8_t *, const uint8_t *, size_t);
+typedef int (*hash_final_t)(uint8_t *, uint8_t *);
 
 static int g_failures;
 
@@ -181,6 +184,9 @@ static void run_sig(void *h, const scheme_t *s) {
  * SHA-512), whole and partial blocks, and the empty message */
 static void run_hash(void *h, const scheme_t *s) {
   hash_digest_t digest = (hash_digest_t)sym(h, "hash_digest", 1);
+  hash_init_t init = (hash_init_t)sym(h, "hash_init", 0);
+  hash_update_t update = (hash_update_t)sym(h, "hash_update", 0);
+  hash_final_t final = (hash_final_t)sym(h, "hash_final", 0);
   static const size_t LONG_LENS[] = {1000, 4096, 10007};
   size_t nlen = 3 * s->b + 1 + sizeof LONG_LENS / sizeof *LONG_LENS;
   for (size_t i = 0; i < nlen; i++) {
@@ -190,6 +196,22 @@ static void run_hash(void *h, const scheme_t *s) {
     defined("hash: digest", md, s->a);
     digest(md2, msg, len);
     if (memcmp(md, md2, s->a) != 0) fail("hash: two digests of one message differ");
+    if (init) {
+      /* the message in two parts, each in its own exact-size buffer */
+      size_t cut = len / 3;
+      uint8_t *ctx = buf(s->c), *lo = buf(cut), *hi = buf(len - cut);
+      memcpy(lo, msg, cut), memcpy(hi, msg + cut, len - cut);
+      init(ctx);
+      defined("init: context", ctx, s->c);
+      if (update(ctx, lo, cut) != 0 || update(ctx, hi, len - cut) != 0)
+        fail("update failed");
+      defined("update: context", ctx, s->c);
+      if (final(ctx, md2) != 0) fail("final failed");
+      defined("final: digest", md2, s->a);
+      if (memcmp(md, md2, s->a) != 0) fail("final: digest differs from the one-shot one");
+      if (final(ctx, md2) == 0) fail("final accepts a finalised context");
+      free(ctx), free(lo), free(hi);
+    }
     free(msg), free(md), free(md2);
   }
 }

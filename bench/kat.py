@@ -30,8 +30,8 @@ def _mlkem(base, pk, sk, ct):
             "shared_secret": 32}
 
 
-def _hash(base, digest):
-    return {"kind": "hash", "base": base, "digest": digest}
+def _hash(base, digest, ctx):
+    return {"kind": "hash", "base": base, "digest": digest, "ctx": ctx}
 
 
 SCHEMES = {
@@ -41,8 +41,8 @@ SCHEMES = {
     "ML-KEM-512": _mlkem("mlkem512", 800, 1632, 768),
     "ML-KEM-768": _mlkem("mlkem768", 1184, 2400, 1088),
     "ML-KEM-1024": _mlkem("mlkem1024", 1568, 3168, 1568),
-    "SHA2-256": _hash("fips180sha256", 32),
-    "SHA2-512": _hash("fips180sha512", 64),
+    "SHA2-256": _hash("fips180sha256", 32, 112),
+    "SHA2-512": _hash("fips180sha512", 64, 208),
 }
 
 
@@ -269,14 +269,39 @@ class Hash(Scheme):
     def bind(self, lib):
         self.hash_fn = lib.hash_digest
         self.hash_fn.restype, self.hash_fn.argtypes = None, [c_void_p, c_void_p, c_size_t]
+        # the incremental functions are optional in the ABI
+        self.stream = getattr(lib, "hash_init", None) is not None
+        if self.stream:
+            lib.hash_init.restype, lib.hash_init.argtypes = None, [c_void_p]
+            lib.hash_update.restype = c_int
+            lib.hash_update.argtypes = [c_void_p, c_void_p, c_size_t]
+            lib.hash_final.restype, lib.hash_final.argtypes = c_int, [c_void_p, c_void_p]
+            self.lib = lib
 
     def digest(self, msg):
         out = out_buf(self.spec["digest"])
         self.hash_fn(out, in_buf(msg), len(msg))
         return out.raw
 
+    # the message in parts, cut at each split point
+    def stream_digest(self, msg, cuts):
+        ctx, out = out_buf(self.spec["ctx"]), out_buf(self.spec["digest"])
+        self.lib.hash_init(ctx)
+        r, prev = 0, 0
+        for c in cuts + [len(msg)]:
+            r |= self.lib.hash_update(ctx, in_buf(msg[prev:c]), c - prev)
+            prev = c
+        r |= self.lib.hash_final(ctx, out)
+        return r, out.raw
+
     def hash(self, b, rep):
-        rep.check_output(self.label("hash"), b, "digest", self.digest(h(b, "message")))
+        msg = h(b, "message")
+        rep.check_output(self.label("hash"), b, "digest", self.digest(msg))
+        if self.stream:
+            for cuts in ([], [len(msg) // 3, 2 * len(msg) // 3]):
+                r, md = self.stream_digest(msg, cuts)
+                rep.check(self.label("hash") + f".stream{len(cuts)}.result", r == 0, f"got {r}")
+                rep.check_output(self.label("hash") + f".stream{len(cuts)}", b, "digest", md)
 
     # the Monte Carlo test of the SHAVS (CAVP): from the seed, 100 checkpoints
     # of 1000 chained hashes, each of the last three digests
