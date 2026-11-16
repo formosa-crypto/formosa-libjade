@@ -1,0 +1,5 @@
+primitive      = "FIPS-180"
+standard       = "FIPS 180-4"
+spec           = "FIPS180_SHA2.ec"
+operations     = ["hash"]
+parameter_sets = ["sha256", "sha512"]
