@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Import KAT vectors into the bench/ JSON schema.
 
-Two sources, both downloaded at a fixed version:
+Three sources, each downloaded at a fixed version:
 
 - NIST ACVP (usnistgov/ACVP-Server), converted to full-value vectors:
   ML-KEM-keyGen / ML-KEM-encapDecap, the encapsulation and decapsulation key
@@ -15,6 +15,10 @@ Two sources, both downloaded at a fixed version:
   (mlkem<n>-pqc.json, the first PQC_TESTS records), keygen, encapsulation,
   decapsulation of its ciphertext, then of an invalid ciphertext (implicit
   rejection).
+- the SHA-2 test vectors of NIST CAVP (SHAVS, CAVS 11.1, byte-oriented),
+  each file checked against its SHA-256: SHA-256 and SHA-512 ShortMsg,
+  LongMsg and Monte (fips180<set>.json). --cavp-dir reads the .rsp files
+  from a directory instead of the archive.
 
     python3 tools/import_kat.py --out vectors --acvp-version v1.1.0.43
 """
@@ -24,6 +28,7 @@ import hashlib
 import json
 import sys
 import urllib.request
+import zipfile
 from pathlib import Path
 
 ACVP_BASE = "https://raw.githubusercontent.com/usnistgov/ACVP-Server/{v}/gen-val/json-files"
@@ -32,6 +37,19 @@ ACVP_MLDSA = ["ML-DSA-keyGen-FIPS204", "ML-DSA-sigGen-FIPS204", "ML-DSA-sigVer-F
 PQC_COMMIT = "f238e347b1323344208eb316df9993c923334817"
 PQC_BASE = f"https://raw.githubusercontent.com/post-quantum-cryptography/KAT/{PQC_COMMIT}"
 PQC_TESTS = 100  # ML-KEM records kept per parameter set (the files have 1000)
+CAVP_SHA2 = ("https://csrc.nist.gov/CSRC/media/Projects/"
+             "Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip")
+CAVP_SHA2_FILES = {
+    "SHA256ShortMsg.rsp": "75e1cb83994638481808e225b9eb0c1ebd0c232d952ac42b61abce6363be283c",
+    "SHA256LongMsg.rsp": "6fac36f37360bcf74ffcf4465c18e30d6d5a04cc90885b901fc3130c16060974",
+    "SHA256Monte.rsp": "29ea30c6bb4b84e425fb8c1d731c6bb852dac935825f2bd1143e5d3c4f10bfb9",
+    "SHA512ShortMsg.rsp": "e53a36c03609e5a3e3cc4b6e117a499db7864c23ec825c6cec99503a45f40764",
+    "SHA512LongMsg.rsp": "b1f3f05d5c209777954d49521d7ea1349447c36a0c52849e044bc397a27dd410",
+    "SHA512Monte.rsp": "8ca78659286c2f01667a98fc7accd32fc171ae7b24ac00f1a8ce6b77770247fa",
+}
+# CAVP file prefix -> (algorithm, implementation name: src/fips180/avx2/sct/<set>)
+CAVP_SHA2_SETS = {"SHA256": ("SHA2-256", "fips180sha256"),
+                  "SHA512": ("SHA2-512", "fips180sha512")}
 
 
 def base_name(algo):
@@ -241,18 +259,85 @@ def import_mldsa_acvp(version, out_dir, cache):
         write_scheme(out_dir, algo, tests, f"NIST ACVP {version}", suffix="-acvp")
 
 
+# --------------------------------------------------------------------------
+# NIST CAVP SHAVS (SHA-2) -> schema
+# --------------------------------------------------------------------------
+def cavp_files(cache, cavp_dir):
+    """{name: text} of the pinned .rsp files, from cavp_dir or the archive"""
+    if cavp_dir is None:
+        cache.mkdir(parents=True, exist_ok=True)
+        archive = cache / "shabytetestvectors.zip"
+        if not archive.exists():
+            print(f"  downloading {CAVP_SHA2}")
+            urllib.request.urlretrieve(CAVP_SHA2, archive)
+        with zipfile.ZipFile(archive) as z:
+            members = {Path(n).name: n for n in z.namelist()}
+            data = {f: z.read(members[f]) for f in CAVP_SHA2_FILES if f in members}
+    else:
+        data = {f: (cavp_dir / f).read_bytes() for f in CAVP_SHA2_FILES
+                if (cavp_dir / f).exists()}
+    for f, digest in CAVP_SHA2_FILES.items():
+        if f not in data:
+            raise SystemExit(f"CAVP: no {f}")
+        if hashlib.sha256(data[f]).hexdigest() != digest:
+            raise SystemExit(f"CAVP: {f}: SHA-256 differs from the pinned one")
+    return {f: d.decode() for f, d in data.items()}
+
+
+def rsp_fields(text):
+    """the (key, value) pairs of a CAVP .rsp file, in order"""
+    for line in text.splitlines():
+        if " = " in line and not line.startswith("#"):
+            key, value = (x.strip() for x in line.split(" = ", 1))
+            yield key, value
+
+
+def import_sha2(out_dir, cache, cavp_dir):
+    files = cavp_files(cache, cavp_dir)
+    for prefix, (algo, name) in CAVP_SHA2_SETS.items():
+        tests, count = [], 0
+        for kind in ("ShortMsg", "LongMsg"):
+            length = None
+            for key, value in rsp_fields(files[f"{prefix}{kind}.rsp"]):
+                if key == "Len":
+                    length = int(value)
+                elif key == "Msg":
+                    msg = value[: length // 4]  # Len 0 is written as Msg = 00
+                elif key == "MD":
+                    tests.append({"count": count, "hash": {"message": msg, "digest": value}})
+                    count += 1
+        seed, digests = None, []
+        for key, value in rsp_fields(files[f"{prefix}Monte.rsp"]):
+            if key == "Seed":
+                seed = value
+            elif key == "MD":
+                digests.append(value)
+        tests.append({"count": count, "monte": {"seed": seed, "digests": digests}})
+        path = out_dir / f"{name}.json"
+        path.write_text(json.dumps({"algorithm": algo, "source": "NIST CAVP SHAVS (CAVS 11.1)",
+                                    "tests": tests}, indent=1))
+        print(f"  {path.name}: {len(tests)} test(s)")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     here = Path(__file__).resolve().parent.parent
     ap.add_argument("--out", type=Path, default=here / "vectors")
     ap.add_argument("--acvp-version", default="v1.1.0.43")
-    ap.add_argument("--only", choices=("mldsa", "mlkem"))
+    ap.add_argument("--only", choices=("mldsa", "mlkem", "sha2"))
+    ap.add_argument("--cavp-dir", type=Path,
+                    help="directory of the CAVP SHA-2 .rsp files (default: the archive)")
     args = ap.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)
 
     cache = args.out / ".cache"
     acvp = cache / "acvp" / args.acvp_version
+    if args.only in (None, "sha2"):
+        print("SHA-2 (NIST CAVP):")
+        import_sha2(args.out, cache / "cavp", args.cavp_dir)
+    if args.only == "sha2":
+        return 0
     if args.only != "mlkem":
         print("ML-DSA (post-quantum-cryptography/KAT):")
         import_mldsa_pqc(args.out, cache / "pqc")

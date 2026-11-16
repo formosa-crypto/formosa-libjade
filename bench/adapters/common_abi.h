@@ -40,4 +40,8 @@ int sig_verify(const uint8_t *verification_key,
                const uint8_t *message, size_t message_len,
                const uint8_t *signature);
 
+/* ---- HASH (SHA-2) -- one-shot ----
+ * out receives the digest of the inlen bytes at in. */
+void hash_digest(uint8_t *out, const uint8_t *in, size_t inlen);
+
 #endif /* BENCH_COMMON_ABI_H */

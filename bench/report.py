@@ -33,7 +33,8 @@ BACKEND_ORDER = ["jasmin", "mlkem-native", "mldsa-native", "pqcrystals",
                  "pqcrystals-ref"]
 # operation order per kind, keyed by a signature operation present in the data
 OPS = {"keypair": ["keypair", "encaps", "decaps"],   # KEM
-       "keygen": ["keygen", "sign", "verify"]}       # SIG
+       "keygen": ["keygen", "sign", "verify"],       # SIG
+       "hash-64": ["hash-64", "hash-1024", "hash-16384"]}  # HASH
 
 
 def load(stream):

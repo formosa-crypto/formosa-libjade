@@ -3,7 +3,7 @@
 
 Loads _build/<backend>_<scheme>.so (built by `make libs`) and replays the KAT
 vectors through the common derand ABI (adapters/common_abi.h): kem_* for ML-KEM,
-sig_* for ML-DSA; selects the library by backend.
+sig_* for ML-DSA, hash_* for SHA-2; selects the library by backend.
 
 Usage:
     python3 kat.py --backend jasmin vectors/*.json
@@ -30,6 +30,10 @@ def _mlkem(base, pk, sk, ct):
             "shared_secret": 32}
 
 
+def _hash(base, digest):
+    return {"kind": "hash", "base": base, "digest": digest}
+
+
 SCHEMES = {
     "ML-DSA-44": _mldsa("mldsa44", 1312, 2560, 2420),
     "ML-DSA-65": _mldsa("mldsa65", 1952, 4032, 3309),
@@ -37,6 +41,8 @@ SCHEMES = {
     "ML-KEM-512": _mlkem("mlkem512", 800, 1632, 768),
     "ML-KEM-768": _mlkem("mlkem768", 1184, 2400, 1088),
     "ML-KEM-1024": _mlkem("mlkem1024", 1568, 3168, 1568),
+    "SHA2-256": _hash("fips180sha256", 32),
+    "SHA2-512": _hash("fips180sha512", 64),
 }
 
 
@@ -254,6 +260,35 @@ class MLKEM(Scheme):
             ssb = out_buf(self.spec["shared_secret"])
             r = self.dec_fn(ssb, in_buf(bytes(self.spec["ciphertext"])), sk)
             rep.check(self.label("check_sk") + ".decaps", r == want, f"got {r}")
+
+
+@runner("hash")
+class Hash(Scheme):
+    OPS = ("hash", "monte")
+
+    def bind(self, lib):
+        self.hash_fn = lib.hash_digest
+        self.hash_fn.restype, self.hash_fn.argtypes = None, [c_void_p, c_void_p, c_size_t]
+
+    def digest(self, msg):
+        out = out_buf(self.spec["digest"])
+        self.hash_fn(out, in_buf(msg), len(msg))
+        return out.raw
+
+    def hash(self, b, rep):
+        rep.check_output(self.label("hash"), b, "digest", self.digest(h(b, "message")))
+
+    # the Monte Carlo test of the SHAVS (CAVP): from the seed, 100 checkpoints
+    # of 1000 chained hashes, each of the last three digests
+    def monte(self, b, rep):
+        seed = h(b, "seed")
+        for j, want in enumerate(b["digests"]):
+            md = [seed, seed, seed]
+            for _ in range(1000):
+                md = [md[1], md[2], self.digest(md[0] + md[1] + md[2])]
+            seed = md[2]
+            rep.check(f"{self.label('monte')}.{j}", seed.hex() == want.lower(),
+                      f"expected {want[:24]}..., got {seed.hex()[:24]}...")
 
 
 def load_backend(backend, scheme_base, lib_dir):

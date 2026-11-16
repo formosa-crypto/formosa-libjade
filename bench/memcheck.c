@@ -10,7 +10,8 @@
  * checks when the backend exports them; signing and verification with
  * messages and contexts of several lengths (including 0 and 255, and a
  * context of 256 bytes, which signing rejects), and verification of a
- * modified signature. x86-64 + AVX2 only. */
+ * modified signature; hashing of messages of every length around the block
+ * and padding boundaries. x86-64 + AVX2 only. */
 
 #include <dlfcn.h>
 #include <stdint.h>
@@ -26,11 +27,11 @@
 #define VALGRIND_CHECK_MEM_IS_DEFINED(p, n) 0
 #endif
 
-typedef enum { KEM, SIG } kind_t;
+typedef enum { KEM, SIG, HASH } kind_t;
 typedef struct {
   const char *name;
   kind_t kind;
-  /* KEM: pk, sk, ct; SIG: vk, sk, sig */
+  /* KEM: pk, sk, ct; SIG: vk, sk, sig; HASH: digest, block */
   size_t a, b, c;
 } scheme_t;
 
@@ -41,6 +42,8 @@ static const scheme_t SCHEMES[] = {
     {"ML-DSA-44", SIG, 1312, 2560, 2420},
     {"ML-DSA-65", SIG, 1952, 4032, 3309},
     {"ML-DSA-87", SIG, 2592, 4896, 4627},
+    {"FIPS-180-sha256", HASH, 32, 64, 0},
+    {"FIPS-180-sha512", HASH, 64, 128, 0},
 };
 
 typedef int (*kem_keypair_t)(uint8_t *, uint8_t *, const uint8_t *);
@@ -52,6 +55,7 @@ typedef int (*sig_sign_t)(uint8_t *, const uint8_t *, const uint8_t *, size_t,
                           const uint8_t *, size_t, const uint8_t *);
 typedef int (*sig_verify_t)(const uint8_t *, const uint8_t *, size_t,
                             const uint8_t *, size_t, const uint8_t *);
+typedef void (*hash_digest_t)(uint8_t *, const uint8_t *, size_t);
 
 static int g_failures;
 
@@ -172,6 +176,24 @@ static void run_sig(void *h, const scheme_t *s) {
   free(vk), free(sk), free(sig), free(seed);
 }
 
+/* every length up to three blocks, then a few long messages: the padding
+ * boundaries (block - 9, block - 8 for SHA-256; block - 17, block - 16 for
+ * SHA-512), whole and partial blocks, and the empty message */
+static void run_hash(void *h, const scheme_t *s) {
+  hash_digest_t digest = (hash_digest_t)sym(h, "hash_digest", 1);
+  static const size_t LONG_LENS[] = {1000, 4096, 10007};
+  size_t nlen = 3 * s->b + 1 + sizeof LONG_LENS / sizeof *LONG_LENS;
+  for (size_t i = 0; i < nlen; i++) {
+    size_t len = i <= 3 * s->b ? i : LONG_LENS[i - 3 * s->b - 1];
+    uint8_t *msg = input(len), *md = buf(s->a), *md2 = buf(s->a);
+    digest(md, msg, len);
+    defined("hash: digest", md, s->a);
+    digest(md2, msg, len);
+    if (memcmp(md, md2, s->a) != 0) fail("hash: two digests of one message differ");
+    free(msg), free(md), free(md2);
+  }
+}
+
 int main(int argc, char **argv) {
   if (argc != 3) {
     fprintf(stderr, "usage: %s <scheme> <backend.so>\n", argv[0]);
@@ -191,8 +213,10 @@ int main(int argc, char **argv) {
   }
   if (s->kind == KEM)
     run_kem(h, s);
-  else
+  else if (s->kind == SIG)
     run_sig(h, s);
+  else
+    run_hash(h, s);
   printf("%s %s: %s\n", s->name, argv[2], g_failures ? "FAILED" : "ok");
   return g_failures != 0;
 }

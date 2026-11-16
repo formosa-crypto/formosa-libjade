@@ -7,7 +7,8 @@
  * rdtsc. Each iteration runs on fresh inputs, made untimed beforehand: the
  * randomness of keypair, encaps, keygen and sign comes from a xorshift reset
  * to a fixed seed at the start of each operation's bench, and decaps and
- * verify take the ciphertext or signature of a fresh encaps or sign. The
+ * verify take the ciphertext or signature of a fresh encaps or sign. A hash
+ * is timed on messages of 64, 1024 and 16384 bytes. The
  * medians then cover the spread of the rejection loops, while every backend
  * and commit runs on the same inputs. One backend per process:
  * different .so files can define the same global symbols (e.g. randombytes),
@@ -28,12 +29,13 @@
 #include <x86intrin.h>
 
 /* ---- scheme table ---- */
-typedef enum { KEM, SIG } kind_t;
+typedef enum { KEM, SIG, HASH } kind_t;
 typedef struct {
   const char *name;
   kind_t kind;
   /* KEM: pk, sk, ct, ss=32, kp_coins=64, enc_coins=32
-   * SIG: vk(pk), sk, sig, seed=32, rnd=32 */
+   * SIG: vk(pk), sk, sig, seed=32, rnd=32
+   * HASH: digest, block, longest message */
   int a, b, c;
 } scheme_t;
 
@@ -44,6 +46,8 @@ static const scheme_t SCHEMES[] = {
     {"ML-DSA-44", SIG, 1312, 2560, 2420},
     {"ML-DSA-65", SIG, 1952, 4032, 3309},
     {"ML-DSA-87", SIG, 2592, 4896, 4627},
+    {"FIPS-180-sha256", HASH, 32, 64, 16384},
+    {"FIPS-180-sha512", HASH, 64, 128, 16384},
 };
 
 /* ---- common ABI signatures ---- */
@@ -55,6 +59,7 @@ typedef int (*sig_sign_t)(uint8_t *, const uint8_t *, const uint8_t *, size_t,
                           const uint8_t *, size_t, const uint8_t *);
 typedef int (*sig_verify_t)(const uint8_t *, const uint8_t *, size_t,
                             const uint8_t *, size_t, const uint8_t *);
+typedef void (*hash_digest_t)(uint8_t *, const uint8_t *, size_t);
 
 static uint64_t prng_state = 0x1234567;
 static void fill(uint8_t *p, size_t n) {
@@ -85,9 +90,10 @@ static void lib_backend(const char *path, char *out, size_t n) {
 
 static void report(const char *path, const scheme_t *s, uint64_t m0,
                    uint64_t m1, uint64_t m2) {
-  const char *o0 = s->kind == KEM ? "keypair" : "keygen";
-  const char *o1 = s->kind == KEM ? "encaps" : "sign";
-  const char *o2 = s->kind == KEM ? "decaps" : "verify";
+  static const char *OPS[][3] = {{"keypair", "encaps", "decaps"},
+                                 {"keygen", "sign", "verify"},
+                                 {"hash-64", "hash-1024", "hash-16384"}};
+  const char *o0 = OPS[s->kind][0], *o1 = OPS[s->kind][1], *o2 = OPS[s->kind][2];
   if (g_csv) {
     char bk[64];
     lib_backend(path, bk, sizeof bk);
@@ -176,6 +182,13 @@ static void bench_backend(const char *path, const scheme_t *s, size_t iters,
     BENCH(iters, samples, &m1, next_rnd(coins, 32), enc(C, ss, A, coins));
     BENCH(iters, samples, &m2, (next_rnd(coins, 32), enc(C, ss, A, coins)),
           dec(ss, C, B));
+    report(path, s, m0, m1, m2);
+  } else if (s->kind == HASH) {
+    hash_digest_t dg = dlsym(h, "hash_digest");
+    fill(C, (size_t)s->c);                            /* C=message, A=digest */
+    BENCH(iters, samples, &m0, (void)0, dg(A, C, 64));
+    BENCH(iters, samples, &m1, (void)0, dg(A, C, 1024));
+    BENCH(iters, samples, &m2, (void)0, dg(A, C, 16384));
     report(path, s, m0, m1, m2);
   } else {
     sig_keygen_t kg = dlsym(h, "sig_keygen");
