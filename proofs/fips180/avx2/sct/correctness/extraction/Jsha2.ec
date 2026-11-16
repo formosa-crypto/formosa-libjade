@@ -5,8 +5,10 @@ from Jasmin require import JModel_x86.
 import SLH64.
 
 require import
-BArray8 BArray16 BArray28 BArray32 BArray48 BArray64 BArray128 BArray256
-BArray512 BArray640 BArray1280.
+BArray8 BArray16 BArray28 BArray32 BArray48 BArray64 BArray112 BArray128
+BArray144 BArray208 BArray256 BArray272 BArray512 BArray640 BArray1280
+SBArray112_16 SBArray144_16 SBArray208_16 SBArray272_16 SBArray112_32
+SBArray112_64 SBArray208_64 SBArray144_112 SBArray208_128 SBArray272_208.
 
 abbrev sHA512_256_IV =
 (BArray64.of_list64
@@ -919,13 +921,6 @@ module M = {
     (out, ms) <@ _sha224____sha256_mem_from (out, h, in_0, inlen, ms);
     return (out, ms);
   }
-  proc jade_hash_sha256_amd64_avx2 (out:BArray32.t, in_0:W64.t, inlen:W64.t) : 
-  BArray32.t = {
-    var ms:W64.t;
-    ms <- (init_msf);
-    (out, ms) <@ _sha256_mem (out, in_0, inlen, ms);
-    return out;
-  }
   proc __sha512_avx2_round (v:BArray64.t, m:BArray16.t, s:W64.t, t:int,
                             x:BArray256.t, j:int, ph:int) : BArray64.t *
                                                             BArray16.t *
@@ -1702,11 +1697,995 @@ module M = {
     (out, ms) <@ _sha512_256____sha512_mem_from (out, h, in_0, inlen, ms);
     return (out, ms);
   }
+  proc _hmac_sha256_keyblock_mem (k0:BArray64.t, key:W64.t, keylen:W64.t,
+                                  ms:W64.t) : BArray64.t * W64.t = {
+    var long:bool;
+    var i:W64.t;
+    var digest:BArray32.t;
+    var j:int;
+    var t:W64.t;
+    var hi:W64.t;
+    digest <- witness;
+    long <- ((W64.of_int 64) \ult keylen);
+    if (long) {
+      ms <- (update_msf long ms);
+      (* Erased call to spill *)
+      (digest, ms) <@ _sha256_mem (digest, key, keylen, ms);
+      (* Erased call to unspill *)
+      k0 <- (protect_ptr k0 ms);
+      j <- 0;
+      while ((j < 4)) {
+        t <- (BArray32.get64 digest j);
+        k0 <- (BArray64.set64 k0 j t);
+        j <- (j + 1);
+      }
+      i <- (W64.of_int 32);
+    } else {
+      ms <- (update_msf (! long) ms);
+      i <- (W64.of_int 0);
+      (k0, ms) <@ __fill64_mem (k0, i, key, keylen, ms);
+      i <- keylen;
+    }
+    hi <- (W64.of_int 64);
+    (k0, ms) <@ __zero64 (k0, i, hi, ms);
+    return (k0, ms);
+  }
+  proc _hmac_sha512_keyblock_mem (k0:BArray128.t, key:W64.t, keylen:W64.t,
+                                  ms:W64.t) : BArray128.t * W64.t = {
+    var long:bool;
+    var i:W64.t;
+    var digest:BArray64.t;
+    var j:int;
+    var t:W64.t;
+    var hi:W64.t;
+    digest <- witness;
+    long <- ((W64.of_int 128) \ult keylen);
+    if (long) {
+      ms <- (update_msf long ms);
+      (* Erased call to spill *)
+      (digest, ms) <@ _sha512_mem (digest, key, keylen, ms);
+      (* Erased call to unspill *)
+      k0 <- (protect_ptr k0 ms);
+      j <- 0;
+      while ((j < 8)) {
+        t <- (BArray64.get64 digest j);
+        k0 <- (BArray128.set64 k0 j t);
+        j <- (j + 1);
+      }
+      i <- (W64.of_int 64);
+    } else {
+      ms <- (update_msf (! long) ms);
+      i <- (W64.of_int 0);
+      (k0, ms) <@ __fill128_mem (k0, i, key, keylen, ms);
+      i <- keylen;
+    }
+    hi <- (W64.of_int 128);
+    (k0, ms) <@ __zero128 (k0, i, hi, ms);
+    return (k0, ms);
+  }
+  proc __hmac_sha256_init (inner:BArray32.t, outer:BArray32.t, k0:BArray64.t,
+                           ms:W64.t) : BArray32.t * BArray32.t * W64.t = {
+    var mi:W64.t;
+    var mo:W64.t;
+    var i:int;
+    var t:W64.t;
+    var u:W64.t;
+    var ipad:BArray64.t;
+    var opad:BArray64.t;
+    ipad <- witness;
+    opad <- witness;
+    mi <- (W64.of_int 3906369333256140342);
+    mo <- (W64.of_int 6655295901103053916);
+    i <- 0;
+    while ((i < 8)) {
+      t <- (BArray64.get64 k0 i);
+      u <- t;
+      t <- (t `^` mi);
+      u <- (u `^` mo);
+      ipad <- (BArray64.set64 ipad i t);
+      opad <- (BArray64.set64 opad i u);
+      i <- (i + 1);
+    }
+    inner <@ __sha256_init (inner);
+    (inner, ms) <@ _sha256_compress (inner, ipad, ms);
+    outer <@ __sha256_init (outer);
+    (outer, ms) <@ _sha256_compress (outer, opad, ms);
+    return (inner, outer, ms);
+  }
+  proc __hmac_sha512_init (inner:BArray64.t, outer:BArray64.t,
+                           k0:BArray128.t, ms:W64.t) : BArray64.t *
+                                                       BArray64.t * W64.t = {
+    var mi:W64.t;
+    var mo:W64.t;
+    var i:int;
+    var t:W64.t;
+    var u:W64.t;
+    var ipad:BArray128.t;
+    var opad:BArray128.t;
+    ipad <- witness;
+    opad <- witness;
+    mi <- (W64.of_int 3906369333256140342);
+    mo <- (W64.of_int 6655295901103053916);
+    i <- 0;
+    while ((i < 16)) {
+      t <- (BArray128.get64 k0 i);
+      u <- t;
+      t <- (t `^` mi);
+      u <- (u `^` mo);
+      ipad <- (BArray128.set64 ipad i t);
+      opad <- (BArray128.set64 opad i u);
+      i <- (i + 1);
+    }
+    inner <@ __sha512_init (inner);
+    (inner, ms) <@ _sha512_compress (inner, ipad, ms);
+    outer <@ __sha512_init (outer);
+    (outer, ms) <@ _sha512_compress (outer, opad, ms);
+    return (inner, outer, ms);
+  }
+  proc __hmac_sha256_outer (inner:BArray32.t, buf:BArray64.t, total:W64.t,
+                            outer:BArray32.t, ms:W64.t) : BArray32.t *
+                                                          BArray64.t *
+                                                          W64.t * W64.t = {
+    var digest:BArray32.t;
+    var i:int;
+    var x:W32.t;
+    var t:W64.t;
+    digest <- witness;
+    (digest, inner, buf, ms) <@ _sha256___sha256_finalize (digest, inner,
+    buf, total, ms);
+    i <- 0;
+    while ((i < 8)) {
+      x <- (BArray32.get32 outer i);
+      inner <- (BArray32.set32 inner i x);
+      i <- (i + 1);
+    }
+    i <- 0;
+    while ((i < 4)) {
+      t <- (BArray32.get64 digest i);
+      buf <- (BArray64.set64 buf i t);
+      i <- (i + 1);
+    }
+    total <- (W64.of_int (64 + 32));
+    return (inner, buf, total, ms);
+  }
+  proc __hmac_sha256_finalize (out:BArray32.t, inner:BArray32.t,
+                               buf:BArray64.t, total:W64.t, outer:BArray32.t,
+                               ms:W64.t) : BArray32.t * BArray32.t *
+                                           BArray64.t * W64.t = {
+    
+    (inner, buf, total, ms) <@ __hmac_sha256_outer (inner, buf, total, 
+    outer, ms);
+    (out, inner, buf, ms) <@ _sha256___sha256_finalize (out, inner, buf,
+    total, ms);
+    return (out, inner, buf, ms);
+  }
+  proc __hmac_sha512_outer (inner:BArray64.t, buf:BArray128.t, total:W64.t,
+                            outer:BArray64.t, ms:W64.t) : BArray64.t *
+                                                          BArray128.t *
+                                                          W64.t * W64.t = {
+    var digest:BArray64.t;
+    var i:int;
+    var t:W64.t;
+    digest <- witness;
+    (digest, inner, buf, ms) <@ _sha512___sha512_finalize (digest, inner,
+    buf, total, ms);
+    i <- 0;
+    while ((i < 8)) {
+      t <- (BArray64.get64 outer i);
+      inner <- (BArray64.set64 inner i t);
+      i <- (i + 1);
+    }
+    i <- 0;
+    while ((i < 8)) {
+      t <- (BArray64.get64 digest i);
+      buf <- (BArray128.set64 buf i t);
+      i <- (i + 1);
+    }
+    total <- (W64.of_int (128 + 64));
+    return (inner, buf, total, ms);
+  }
+  proc __hmac_sha512_finalize (out:BArray64.t, inner:BArray64.t,
+                               buf:BArray128.t, total:W64.t,
+                               outer:BArray64.t, ms:W64.t) : BArray64.t *
+                                                             BArray64.t *
+                                                             BArray128.t *
+                                                             W64.t = {
+    
+    (inner, buf, total, ms) <@ __hmac_sha512_outer (inner, buf, total, 
+    outer, ms);
+    (out, inner, buf, ms) <@ _sha512___sha512_finalize (out, inner, buf,
+    total, ms);
+    return (out, inner, buf, ms);
+  }
+  proc __sha2_tag (f:int) : W64.t = {
+    var tag:W64.t;
+    tag <- (W64.of_int (1100356872307 + (f `<<` 32)));
+    return tag;
+  }
+  proc __sha2_ctx_open (head:BArray16.t, ms:W64.t) : W64.t * W64.t = {
+    var tag:W64.t;
+    var total:W64.t;
+    tag <- (BArray16.get64d head 0);
+    total <- (BArray16.get64d head 8);
+    (* Erased call to declassify *)
+    (* Erased call to declassify *)
+    tag <- (protect_64 tag ms);
+    total <- (protect_64 total ms);
+    return (tag, total);
+  }
+  proc __sha2_room (total:W64.t) : W64.t = {
+    var room:W64.t;
+    var limit:W64.t;
+    var zero:W64.t;
+    limit <- (W64.of_int 2305843009213693952);
+    zero <- (W64.of_int 0);
+    room <- limit;
+    room <- (room - total);
+    room <- ((total \ult limit) ? room : zero);
+    return room;
+  }
+  proc __sha256_ctx_load (h:BArray32.t, buf:BArray64.t, ctx:BArray112.t) : 
+  BArray32.t * BArray64.t = {
+    var i:int;
+    var x:W32.t;
+    var t:W64.t;
+    i <- 0;
+    while ((i < 8)) {
+      x <- (BArray112.get32d ctx (16 + (4 * i)));
+      h <- (BArray32.set32 h i x);
+      i <- (i + 1);
+    }
+    i <- 0;
+    while ((i < 8)) {
+      t <- (BArray112.get64d ctx (48 + (8 * i)));
+      buf <- (BArray64.set64d buf (8 * i) t);
+      i <- (i + 1);
+    }
+    return (h, buf);
+  }
+  proc __sha512_ctx_load (h:BArray64.t, buf:BArray128.t, ctx:BArray208.t) : 
+  BArray64.t * BArray128.t = {
+    var i:int;
+    var t:W64.t;
+    i <- 0;
+    while ((i < 8)) {
+      t <- (BArray208.get64d ctx (16 + (8 * i)));
+      h <- (BArray64.set64 h i t);
+      i <- (i + 1);
+    }
+    i <- 0;
+    while ((i < 16)) {
+      t <- (BArray208.get64d ctx (80 + (8 * i)));
+      buf <- (BArray128.set64d buf (8 * i) t);
+      i <- (i + 1);
+    }
+    return (h, buf);
+  }
+  proc __sha256_ctx_init (ctx:BArray112.t, h:BArray32.t, tag:W64.t,
+                          total:W64.t) : BArray112.t = {
+    var i:int;
+    var x:W32.t;
+    var z:W64.t;
+    ctx <- (BArray112.set64d ctx 0 tag);
+    ctx <- (BArray112.set64d ctx 8 total);
+    i <- 0;
+    while ((i < 8)) {
+      x <- (BArray32.get32 h i);
+      ctx <- (BArray112.set32d ctx (16 + (4 * i)) x);
+      i <- (i + 1);
+    }
+    z <- (W64.of_int 0);
+    i <- 0;
+    while ((i < 8)) {
+      ctx <- (BArray112.set64d ctx (48 + (8 * i)) z);
+      i <- (i + 1);
+    }
+    return ctx;
+  }
+  proc __sha512_ctx_init (ctx:BArray208.t, h:BArray64.t, tag:W64.t,
+                          total:W64.t) : BArray208.t = {
+    var i:int;
+    var t:W64.t;
+    var z:W64.t;
+    ctx <- (BArray208.set64d ctx 0 tag);
+    ctx <- (BArray208.set64d ctx 8 total);
+    i <- 0;
+    while ((i < 8)) {
+      t <- (BArray64.get64 h i);
+      ctx <- (BArray208.set64d ctx (16 + (8 * i)) t);
+      i <- (i + 1);
+    }
+    z <- (W64.of_int 0);
+    i <- 0;
+    while ((i < 16)) {
+      ctx <- (BArray208.set64d ctx (80 + (8 * i)) z);
+      i <- (i + 1);
+    }
+    return ctx;
+  }
+  proc _sha256_ctx_update (ctx:BArray112.t, in_0:W64.t, inlen:W64.t,
+                           expect_0:W64.t, ms:W64.t) : BArray112.t * W64.t *
+                                                       W64.t = {
+    var aux:BArray32.t;
+    var aux_0:BArray64.t;
+    var aux_1:W64.t;
+    var aux_2:W64.t;
+    var status:W64.t;
+    var tag:W64.t;
+    var total:W64.t;
+    var ok:bool;
+    var room:W64.t;
+    (tag, total) <@ __sha2_ctx_open ((SBArray112_16.get_sub8 ctx 0), ms);
+    status <- (W64.of_int 1);
+    ok <- (tag = expect_0);
+    if (ok) {
+      ms <- (update_msf ok ms);
+      room <@ __sha2_room (total);
+      status <- (W64.of_int 2);
+      ok <- (inlen \ult room);
+      if (ok) {
+        ms <- (update_msf ok ms);
+        (aux, aux_0, aux_1, aux_2) <@ _sha256_absorb_mem ((
+                                                          SBArray112_32.get_sub32
+                                                          ctx 4),
+        (SBArray112_64.get_sub8 ctx 48), total, in_0, inlen, ms);
+        ctx <- (SBArray112_32.set_sub32 ctx 4 aux);
+        ctx <- (SBArray112_64.set_sub8 ctx 48 aux_0);
+        total <- aux_1;
+        ms <- aux_2;
+        ctx <- (BArray112.set64d ctx 8 total);
+        status <- (W64.of_int 0);
+      } else {
+        ms <- (update_msf (! ok) ms);
+      }
+    } else {
+      ms <- (update_msf (! ok) ms);
+    }
+    return (ctx, status, ms);
+  }
+  proc _sha512_ctx_update (ctx:BArray208.t, in_0:W64.t, inlen:W64.t,
+                           expect_0:W64.t, ms:W64.t) : BArray208.t * W64.t *
+                                                       W64.t = {
+    var aux_0:BArray128.t;
+    var aux:BArray64.t;
+    var aux_1:W64.t;
+    var aux_2:W64.t;
+    var status:W64.t;
+    var tag:W64.t;
+    var total:W64.t;
+    var ok:bool;
+    var room:W64.t;
+    (tag, total) <@ __sha2_ctx_open ((SBArray208_16.get_sub8 ctx 0), ms);
+    status <- (W64.of_int 1);
+    ok <- (tag = expect_0);
+    if (ok) {
+      ms <- (update_msf ok ms);
+      room <@ __sha2_room (total);
+      status <- (W64.of_int 2);
+      ok <- (inlen \ult room);
+      if (ok) {
+        ms <- (update_msf ok ms);
+        (aux, aux_0, aux_1, aux_2) <@ _sha512_absorb_mem ((
+                                                          SBArray208_64.get_sub64
+                                                          ctx 2),
+        (SBArray208_128.get_sub8 ctx 80), total, in_0, inlen, ms);
+        ctx <- (SBArray208_64.set_sub64 ctx 2 aux);
+        ctx <- (SBArray208_128.set_sub8 ctx 80 aux_0);
+        total <- aux_1;
+        ms <- aux_2;
+        ctx <- (BArray208.set64d ctx 8 total);
+        status <- (W64.of_int 0);
+      } else {
+        ms <- (update_msf (! ok) ms);
+      }
+    } else {
+      ms <- (update_msf (! ok) ms);
+    }
+    return (ctx, status, ms);
+  }
+  proc _sha224_ctx____ctx_finalize (ctx:BArray112.t, digest:BArray28.t,
+                                    total:W64.t, ms:W64.t) : BArray112.t *
+                                                             BArray28.t *
+                                                             W64.t = {
+    var aux:BArray28.t;
+    var aux_0:BArray32.t;
+    var aux_1:BArray64.t;
+    var aux_2:W64.t;
+    (aux, aux_0, aux_1, aux_2) <@ _sha224___sha256_finalize (digest,
+    (SBArray112_32.get_sub32 ctx 4), (SBArray112_64.get_sub8 ctx 48), 
+    total, ms);
+    digest <- aux;
+    ctx <- (SBArray112_32.set_sub32 ctx 4 aux_0);
+    ctx <- (SBArray112_64.set_sub8 ctx 48 aux_1);
+    ms <- aux_2;
+    return (ctx, digest, ms);
+  }
+  proc _sha224_ctx___sha2_ctx_final (ctx:BArray112.t, digest:BArray28.t,
+                                     expect_0:W64.t, ms:W64.t) : BArray112.t *
+                                                                 BArray28.t *
+                                                                 W64.t *
+                                                                 W64.t = {
+    var inc:int;
+    var status:W64.t;
+    var tag:W64.t;
+    var total:W64.t;
+    var ok:bool;
+    var z:W64.t;
+    var i:int;
+    (tag, total) <@ __sha2_ctx_open ((SBArray112_16.get_sub8 ctx 0), ms);
+    status <- (W64.of_int 1);
+    ok <- (tag = expect_0);
+    if (ok) {
+      ms <- (update_msf ok ms);
+      (ctx, digest, ms) <@ _sha224_ctx____ctx_finalize (ctx, digest, 
+      total, ms);
+      z <- (W64.of_int 0);
+      inc <- (112 %/ 8);
+      i <- 0;
+      while ((i < inc)) {
+        ctx <- (BArray112.set64d ctx (8 * i) z);
+        i <- (i + 1);
+      }
+      status <- (W64.of_int 0);
+    } else {
+      ms <- (update_msf (! ok) ms);
+    }
+    return (ctx, digest, status, ms);
+  }
+  proc _sha256_ctx____ctx_finalize (ctx:BArray112.t, digest:BArray32.t,
+                                    total:W64.t, ms:W64.t) : BArray112.t *
+                                                             BArray32.t *
+                                                             W64.t = {
+    var aux:BArray32.t;
+    var aux_0:BArray32.t;
+    var aux_1:BArray64.t;
+    var aux_2:W64.t;
+    (aux, aux_0, aux_1, aux_2) <@ _sha256___sha256_finalize (digest,
+    (SBArray112_32.get_sub32 ctx 4), (SBArray112_64.get_sub8 ctx 48), 
+    total, ms);
+    digest <- aux;
+    ctx <- (SBArray112_32.set_sub32 ctx 4 aux_0);
+    ctx <- (SBArray112_64.set_sub8 ctx 48 aux_1);
+    ms <- aux_2;
+    return (ctx, digest, ms);
+  }
+  proc _sha256_ctx___sha2_ctx_final (ctx:BArray112.t, digest:BArray32.t,
+                                     expect_0:W64.t, ms:W64.t) : BArray112.t *
+                                                                 BArray32.t *
+                                                                 W64.t *
+                                                                 W64.t = {
+    var inc:int;
+    var status:W64.t;
+    var tag:W64.t;
+    var total:W64.t;
+    var ok:bool;
+    var z:W64.t;
+    var i:int;
+    (tag, total) <@ __sha2_ctx_open ((SBArray112_16.get_sub8 ctx 0), ms);
+    status <- (W64.of_int 1);
+    ok <- (tag = expect_0);
+    if (ok) {
+      ms <- (update_msf ok ms);
+      (ctx, digest, ms) <@ _sha256_ctx____ctx_finalize (ctx, digest, 
+      total, ms);
+      z <- (W64.of_int 0);
+      inc <- (112 %/ 8);
+      i <- 0;
+      while ((i < inc)) {
+        ctx <- (BArray112.set64d ctx (8 * i) z);
+        i <- (i + 1);
+      }
+      status <- (W64.of_int 0);
+    } else {
+      ms <- (update_msf (! ok) ms);
+    }
+    return (ctx, digest, status, ms);
+  }
+  proc _sha384_ctx____ctx_finalize (ctx:BArray208.t, digest:BArray48.t,
+                                    total:W64.t, ms:W64.t) : BArray208.t *
+                                                             BArray48.t *
+                                                             W64.t = {
+    var aux_1:BArray128.t;
+    var aux:BArray48.t;
+    var aux_0:BArray64.t;
+    var aux_2:W64.t;
+    (aux, aux_0, aux_1, aux_2) <@ _sha384___sha512_finalize (digest,
+    (SBArray208_64.get_sub64 ctx 2), (SBArray208_128.get_sub8 ctx 80), 
+    total, ms);
+    digest <- aux;
+    ctx <- (SBArray208_64.set_sub64 ctx 2 aux_0);
+    ctx <- (SBArray208_128.set_sub8 ctx 80 aux_1);
+    ms <- aux_2;
+    return (ctx, digest, ms);
+  }
+  proc _sha384_ctx___sha2_ctx_final (ctx:BArray208.t, digest:BArray48.t,
+                                     expect_0:W64.t, ms:W64.t) : BArray208.t *
+                                                                 BArray48.t *
+                                                                 W64.t *
+                                                                 W64.t = {
+    var inc:int;
+    var status:W64.t;
+    var tag:W64.t;
+    var total:W64.t;
+    var ok:bool;
+    var z:W64.t;
+    var i:int;
+    (tag, total) <@ __sha2_ctx_open ((SBArray208_16.get_sub8 ctx 0), ms);
+    status <- (W64.of_int 1);
+    ok <- (tag = expect_0);
+    if (ok) {
+      ms <- (update_msf ok ms);
+      (ctx, digest, ms) <@ _sha384_ctx____ctx_finalize (ctx, digest, 
+      total, ms);
+      z <- (W64.of_int 0);
+      inc <- (208 %/ 8);
+      i <- 0;
+      while ((i < inc)) {
+        ctx <- (BArray208.set64d ctx (8 * i) z);
+        i <- (i + 1);
+      }
+      status <- (W64.of_int 0);
+    } else {
+      ms <- (update_msf (! ok) ms);
+    }
+    return (ctx, digest, status, ms);
+  }
+  proc _sha512_ctx____ctx_finalize (ctx:BArray208.t, digest:BArray64.t,
+                                    total:W64.t, ms:W64.t) : BArray208.t *
+                                                             BArray64.t *
+                                                             W64.t = {
+    var aux_1:BArray128.t;
+    var aux:BArray64.t;
+    var aux_0:BArray64.t;
+    var aux_2:W64.t;
+    (aux, aux_0, aux_1, aux_2) <@ _sha512___sha512_finalize (digest,
+    (SBArray208_64.get_sub64 ctx 2), (SBArray208_128.get_sub8 ctx 80), 
+    total, ms);
+    digest <- aux;
+    ctx <- (SBArray208_64.set_sub64 ctx 2 aux_0);
+    ctx <- (SBArray208_128.set_sub8 ctx 80 aux_1);
+    ms <- aux_2;
+    return (ctx, digest, ms);
+  }
+  proc _sha512_ctx___sha2_ctx_final (ctx:BArray208.t, digest:BArray64.t,
+                                     expect_0:W64.t, ms:W64.t) : BArray208.t *
+                                                                 BArray64.t *
+                                                                 W64.t *
+                                                                 W64.t = {
+    var inc:int;
+    var status:W64.t;
+    var tag:W64.t;
+    var total:W64.t;
+    var ok:bool;
+    var z:W64.t;
+    var i:int;
+    (tag, total) <@ __sha2_ctx_open ((SBArray208_16.get_sub8 ctx 0), ms);
+    status <- (W64.of_int 1);
+    ok <- (tag = expect_0);
+    if (ok) {
+      ms <- (update_msf ok ms);
+      (ctx, digest, ms) <@ _sha512_ctx____ctx_finalize (ctx, digest, 
+      total, ms);
+      z <- (W64.of_int 0);
+      inc <- (208 %/ 8);
+      i <- 0;
+      while ((i < inc)) {
+        ctx <- (BArray208.set64d ctx (8 * i) z);
+        i <- (i + 1);
+      }
+      status <- (W64.of_int 0);
+    } else {
+      ms <- (update_msf (! ok) ms);
+    }
+    return (ctx, digest, status, ms);
+  }
+  proc _sha512_224_ctx____ctx_finalize (ctx:BArray208.t, digest:BArray28.t,
+                                        total:W64.t, ms:W64.t) : BArray208.t *
+                                                                 BArray28.t *
+                                                                 W64.t = {
+    var aux_1:BArray128.t;
+    var aux:BArray28.t;
+    var aux_0:BArray64.t;
+    var aux_2:W64.t;
+    (aux, aux_0, aux_1, aux_2) <@ _sha512_224___sha512_finalize (digest,
+    (SBArray208_64.get_sub64 ctx 2), (SBArray208_128.get_sub8 ctx 80), 
+    total, ms);
+    digest <- aux;
+    ctx <- (SBArray208_64.set_sub64 ctx 2 aux_0);
+    ctx <- (SBArray208_128.set_sub8 ctx 80 aux_1);
+    ms <- aux_2;
+    return (ctx, digest, ms);
+  }
+  proc _sha512_224_ctx___sha2_ctx_final (ctx:BArray208.t, digest:BArray28.t,
+                                         expect_0:W64.t, ms:W64.t) : 
+  BArray208.t * BArray28.t * W64.t * W64.t = {
+    var inc:int;
+    var status:W64.t;
+    var tag:W64.t;
+    var total:W64.t;
+    var ok:bool;
+    var z:W64.t;
+    var i:int;
+    (tag, total) <@ __sha2_ctx_open ((SBArray208_16.get_sub8 ctx 0), ms);
+    status <- (W64.of_int 1);
+    ok <- (tag = expect_0);
+    if (ok) {
+      ms <- (update_msf ok ms);
+      (ctx, digest, ms) <@ _sha512_224_ctx____ctx_finalize (ctx, digest,
+      total, ms);
+      z <- (W64.of_int 0);
+      inc <- (208 %/ 8);
+      i <- 0;
+      while ((i < inc)) {
+        ctx <- (BArray208.set64d ctx (8 * i) z);
+        i <- (i + 1);
+      }
+      status <- (W64.of_int 0);
+    } else {
+      ms <- (update_msf (! ok) ms);
+    }
+    return (ctx, digest, status, ms);
+  }
+  proc _sha512_256_ctx____ctx_finalize (ctx:BArray208.t, digest:BArray32.t,
+                                        total:W64.t, ms:W64.t) : BArray208.t *
+                                                                 BArray32.t *
+                                                                 W64.t = {
+    var aux_1:BArray128.t;
+    var aux:BArray32.t;
+    var aux_0:BArray64.t;
+    var aux_2:W64.t;
+    (aux, aux_0, aux_1, aux_2) <@ _sha512_256___sha512_finalize (digest,
+    (SBArray208_64.get_sub64 ctx 2), (SBArray208_128.get_sub8 ctx 80), 
+    total, ms);
+    digest <- aux;
+    ctx <- (SBArray208_64.set_sub64 ctx 2 aux_0);
+    ctx <- (SBArray208_128.set_sub8 ctx 80 aux_1);
+    ms <- aux_2;
+    return (ctx, digest, ms);
+  }
+  proc _sha512_256_ctx___sha2_ctx_final (ctx:BArray208.t, digest:BArray32.t,
+                                         expect_0:W64.t, ms:W64.t) : 
+  BArray208.t * BArray32.t * W64.t * W64.t = {
+    var inc:int;
+    var status:W64.t;
+    var tag:W64.t;
+    var total:W64.t;
+    var ok:bool;
+    var z:W64.t;
+    var i:int;
+    (tag, total) <@ __sha2_ctx_open ((SBArray208_16.get_sub8 ctx 0), ms);
+    status <- (W64.of_int 1);
+    ok <- (tag = expect_0);
+    if (ok) {
+      ms <- (update_msf ok ms);
+      (ctx, digest, ms) <@ _sha512_256_ctx____ctx_finalize (ctx, digest,
+      total, ms);
+      z <- (W64.of_int 0);
+      inc <- (208 %/ 8);
+      i <- 0;
+      while ((i < inc)) {
+        ctx <- (BArray208.set64d ctx (8 * i) z);
+        i <- (i + 1);
+      }
+      status <- (W64.of_int 0);
+    } else {
+      ms <- (update_msf (! ok) ms);
+    }
+    return (ctx, digest, status, ms);
+  }
+  proc __hmac_sha256_ctx_init (ctx:BArray144.t, key:W64.t, keylen:W64.t,
+                               ms:W64.t) : BArray144.t * W64.t = {
+    var aux:BArray112.t;
+    var k0:BArray64.t;
+    var inner:BArray32.t;
+    var outer:BArray32.t;
+    var tag:W64.t;
+    var total:W64.t;
+    var i:int;
+    var x:W32.t;
+    inner <- witness;
+    k0 <- witness;
+    outer <- witness;
+    (* Erased call to spill *)
+    (k0, ms) <@ _hmac_sha256_keyblock_mem (k0, key, keylen, ms);
+    (inner, outer, ms) <@ __hmac_sha256_init (inner, outer, k0, ms);
+    (* Erased call to unspill *)
+    ctx <- (protect_ptr ctx ms);
+    tag <@ __sha2_tag (7);
+    total <- (W64.of_int 64);
+    aux <@ __sha256_ctx_init ((SBArray144_112.get_sub8 ctx 0), inner, 
+    tag, total);
+    ctx <- (SBArray144_112.set_sub8 ctx 0 aux);
+    i <- 0;
+    while ((i < 8)) {
+      x <- (BArray32.get32 outer i);
+      ctx <- (BArray144.set32d ctx (112 + (4 * i)) x);
+      i <- (i + 1);
+    }
+    return (ctx, ms);
+  }
+  proc __hmac_sha512_ctx_init (ctx:BArray272.t, key:W64.t, keylen:W64.t,
+                               ms:W64.t) : BArray272.t * W64.t = {
+    var aux:BArray208.t;
+    var k0:BArray128.t;
+    var inner:BArray64.t;
+    var outer:BArray64.t;
+    var tag:W64.t;
+    var total:W64.t;
+    var i:int;
+    var t:W64.t;
+    inner <- witness;
+    k0 <- witness;
+    outer <- witness;
+    (* Erased call to spill *)
+    (k0, ms) <@ _hmac_sha512_keyblock_mem (k0, key, keylen, ms);
+    (inner, outer, ms) <@ __hmac_sha512_init (inner, outer, k0, ms);
+    (* Erased call to unspill *)
+    ctx <- (protect_ptr ctx ms);
+    tag <@ __sha2_tag (8);
+    total <- (W64.of_int 128);
+    aux <@ __sha512_ctx_init ((SBArray272_208.get_sub8 ctx 0), inner, 
+    tag, total);
+    ctx <- (SBArray272_208.set_sub8 ctx 0 aux);
+    i <- 0;
+    while ((i < 8)) {
+      t <- (BArray64.get64 outer i);
+      ctx <- (BArray272.set64d ctx (208 + (8 * i)) t);
+      i <- (i + 1);
+    }
+    return (ctx, ms);
+  }
+  proc __hmac_sha256_ctx_final (ctx:BArray144.t, out:BArray32.t, ms:W64.t) : 
+  BArray144.t * BArray32.t * W64.t * W64.t = {
+    var inc:int;
+    var status:W64.t;
+    var tag:W64.t;
+    var total:W64.t;
+    var expect_0:W64.t;
+    var ok:bool;
+    var inner:BArray32.t;
+    var buf:BArray64.t;
+    var i:int;
+    var x:W32.t;
+    var outer:BArray32.t;
+    var mac:BArray32.t;
+    var t:W64.t;
+    var z:W64.t;
+    buf <- witness;
+    inner <- witness;
+    mac <- witness;
+    outer <- witness;
+    (tag, total) <@ __sha2_ctx_open ((SBArray144_16.get_sub8 ctx 0), ms);
+    expect_0 <@ __sha2_tag (7);
+    status <- (W64.of_int 1);
+    ok <- (tag = expect_0);
+    if (ok) {
+      ms <- (update_msf ok ms);
+      (inner, buf) <@ __sha256_ctx_load (inner, buf,
+      (SBArray144_112.get_sub8 ctx 0));
+      i <- 0;
+      while ((i < 8)) {
+        x <- (BArray144.get32d ctx (112 + (4 * i)));
+        outer <- (BArray32.set32 outer i x);
+        i <- (i + 1);
+      }
+      (* Erased call to spill *)
+      (mac, inner, buf, ms) <@ __hmac_sha256_finalize (mac, inner, buf,
+      total, outer, ms);
+      (* Erased call to unspill *)
+      ctx <- (protect_ptr ctx ms);
+      out <- (protect_ptr out ms);
+      i <- 0;
+      while ((i < 4)) {
+        t <- (BArray32.get64 mac i);
+        out <- (BArray32.set64 out i t);
+        i <- (i + 1);
+      }
+      z <- (W64.of_int 0);
+      inc <- (144 %/ 8);
+      i <- 0;
+      while ((i < inc)) {
+        ctx <- (BArray144.set64d ctx (8 * i) z);
+        i <- (i + 1);
+      }
+      status <- (W64.of_int 0);
+    } else {
+      ms <- (update_msf (! ok) ms);
+    }
+    return (ctx, out, status, ms);
+  }
+  proc __hmac_sha512_ctx_final (ctx:BArray272.t, out:BArray64.t, ms:W64.t) : 
+  BArray272.t * BArray64.t * W64.t * W64.t = {
+    var inc:int;
+    var status:W64.t;
+    var tag:W64.t;
+    var total:W64.t;
+    var expect_0:W64.t;
+    var ok:bool;
+    var inner:BArray64.t;
+    var buf:BArray128.t;
+    var i:int;
+    var t:W64.t;
+    var outer:BArray64.t;
+    var mac:BArray64.t;
+    var z:W64.t;
+    buf <- witness;
+    inner <- witness;
+    mac <- witness;
+    outer <- witness;
+    (tag, total) <@ __sha2_ctx_open ((SBArray272_16.get_sub8 ctx 0), ms);
+    expect_0 <@ __sha2_tag (8);
+    status <- (W64.of_int 1);
+    ok <- (tag = expect_0);
+    if (ok) {
+      ms <- (update_msf ok ms);
+      (inner, buf) <@ __sha512_ctx_load (inner, buf,
+      (SBArray272_208.get_sub8 ctx 0));
+      i <- 0;
+      while ((i < 8)) {
+        t <- (BArray272.get64d ctx (208 + (8 * i)));
+        outer <- (BArray64.set64 outer i t);
+        i <- (i + 1);
+      }
+      (* Erased call to spill *)
+      (mac, inner, buf, ms) <@ __hmac_sha512_finalize (mac, inner, buf,
+      total, outer, ms);
+      (* Erased call to unspill *)
+      ctx <- (protect_ptr ctx ms);
+      out <- (protect_ptr out ms);
+      i <- 0;
+      while ((i < 8)) {
+        t <- (BArray64.get64 mac i);
+        out <- (BArray64.set64 out i t);
+        i <- (i + 1);
+      }
+      z <- (W64.of_int 0);
+      inc <- (272 %/ 8);
+      i <- 0;
+      while ((i < inc)) {
+        ctx <- (BArray272.set64d ctx (8 * i) z);
+        i <- (i + 1);
+      }
+      status <- (W64.of_int 0);
+    } else {
+      ms <- (update_msf (! ok) ms);
+    }
+    return (ctx, out, status, ms);
+  }
+  proc jade_hash_sha256_amd64_avx2 (out:BArray32.t, in_0:W64.t, inlen:W64.t) : 
+  BArray32.t = {
+    var ms:W64.t;
+    ms <- (init_msf);
+    (out, ms) <@ _sha256_mem (out, in_0, inlen, ms);
+    return out;
+  }
+  proc jade_hash_sha256_amd64_avx2_init (ctx:BArray112.t) : BArray112.t = {
+    var ms:W64.t;
+    var h:BArray32.t;
+    var tag:W64.t;
+    var total:W64.t;
+    h <- witness;
+    ms <- (init_msf);
+    h <@ __sha256_init (h);
+    tag <@ __sha2_tag (2);
+    total <- (W64.of_int 0);
+    ctx <@ __sha256_ctx_init (ctx, h, tag, total);
+    return ctx;
+  }
+  proc jade_hash_sha256_amd64_avx2_update (ctx:BArray112.t, in_0:W64.t,
+                                           inlen:W64.t) : BArray112.t * W64.t = {
+    var status:W64.t;
+    var ms:W64.t;
+    var expect_0:W64.t;
+    ms <- (init_msf);
+    expect_0 <@ __sha2_tag (2);
+    (ctx, status, ms) <@ _sha256_ctx_update (ctx, in_0, inlen, expect_0, ms);
+    return (ctx, status);
+  }
+  proc jade_hash_sha256_amd64_avx2_final (ctx:BArray112.t, out:BArray32.t) : 
+  BArray112.t * BArray32.t * W64.t = {
+    var status:W64.t;
+    var ms:W64.t;
+    var expect_0:W64.t;
+    ms <- (init_msf);
+    expect_0 <@ __sha2_tag (2);
+    (ctx, out, status, ms) <@ _sha256_ctx___sha2_ctx_final (ctx, out,
+    expect_0, ms);
+    return (ctx, out, status);
+  }
   proc jade_hash_sha512_amd64_avx2 (out:BArray64.t, in_0:W64.t, inlen:W64.t) : 
   BArray64.t = {
     var ms:W64.t;
     ms <- (init_msf);
     (out, ms) <@ _sha512_mem (out, in_0, inlen, ms);
     return out;
+  }
+  proc jade_hash_sha512_amd64_avx2_init (ctx:BArray208.t) : BArray208.t = {
+    var ms:W64.t;
+    var h:BArray64.t;
+    var tag:W64.t;
+    var total:W64.t;
+    h <- witness;
+    ms <- (init_msf);
+    h <@ __sha512_init (h);
+    tag <@ __sha2_tag (4);
+    total <- (W64.of_int 0);
+    ctx <@ __sha512_ctx_init (ctx, h, tag, total);
+    return ctx;
+  }
+  proc jade_hash_sha512_amd64_avx2_update (ctx:BArray208.t, in_0:W64.t,
+                                           inlen:W64.t) : BArray208.t * W64.t = {
+    var status:W64.t;
+    var ms:W64.t;
+    var expect_0:W64.t;
+    ms <- (init_msf);
+    expect_0 <@ __sha2_tag (4);
+    (ctx, status, ms) <@ _sha512_ctx_update (ctx, in_0, inlen, expect_0, ms);
+    return (ctx, status);
+  }
+  proc jade_hash_sha512_amd64_avx2_final (ctx:BArray208.t, out:BArray64.t) : 
+  BArray208.t * BArray64.t * W64.t = {
+    var status:W64.t;
+    var ms:W64.t;
+    var expect_0:W64.t;
+    ms <- (init_msf);
+    expect_0 <@ __sha2_tag (4);
+    (ctx, out, status, ms) <@ _sha512_ctx___sha2_ctx_final (ctx, out,
+    expect_0, ms);
+    return (ctx, out, status);
+  }
+  proc _hmac_sha256_mem (out:BArray32.t, key:W64.t, keylen:W64.t, msg:W64.t,
+                         msglen:W64.t, ms:W64.t) : BArray32.t * W64.t = {
+    var k0:BArray64.t;
+    var inner:BArray32.t;
+    var outer:BArray32.t;
+    var total:W64.t;
+    var buf:BArray64.t;
+    buf <- witness;
+    inner <- witness;
+    k0 <- witness;
+    outer <- witness;
+    (* Erased call to spill *)
+    (k0, ms) <@ _hmac_sha256_keyblock_mem (k0, key, keylen, ms);
+    (inner, outer, ms) <@ __hmac_sha256_init (inner, outer, k0, ms);
+    (* Erased call to unspill *)
+    msg <- (protect_64 msg ms);
+    msglen <- (protect_64 msglen ms);
+    total <- (W64.of_int 64);
+    (inner, buf, total, ms) <@ _sha256_absorb_mem (inner, buf, total, 
+    msg, msglen, ms);
+    (inner, buf, total, ms) <@ __hmac_sha256_outer (inner, buf, total, 
+    outer, ms);
+    (* Erased call to unspill *)
+    (out, inner, buf, ms) <@ _sha256___sha256_finalize (out, inner, buf,
+    total, ms);
+    return (out, ms);
+  }
+  proc _hmac_sha512_mem (out:BArray64.t, key:W64.t, keylen:W64.t, msg:W64.t,
+                         msglen:W64.t, ms:W64.t) : BArray64.t * W64.t = {
+    var k0:BArray128.t;
+    var inner:BArray64.t;
+    var outer:BArray64.t;
+    var total:W64.t;
+    var buf:BArray128.t;
+    buf <- witness;
+    inner <- witness;
+    k0 <- witness;
+    outer <- witness;
+    (* Erased call to spill *)
+    (k0, ms) <@ _hmac_sha512_keyblock_mem (k0, key, keylen, ms);
+    (inner, outer, ms) <@ __hmac_sha512_init (inner, outer, k0, ms);
+    (* Erased call to unspill *)
+    msg <- (protect_64 msg ms);
+    msglen <- (protect_64 msglen ms);
+    total <- (W64.of_int 128);
+    (inner, buf, total, ms) <@ _sha512_absorb_mem (inner, buf, total, 
+    msg, msglen, ms);
+    (inner, buf, total, ms) <@ __hmac_sha512_outer (inner, buf, total, 
+    outer, ms);
+    (* Erased call to unspill *)
+    (out, inner, buf, ms) <@ _sha512___sha512_finalize (out, inner, buf,
+    total, ms);
+    return (out, ms);
   }
 }.

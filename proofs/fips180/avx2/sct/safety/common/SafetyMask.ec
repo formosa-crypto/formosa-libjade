@@ -12,7 +12,7 @@
 require import AllCore IntDiv CoreMap List.
 from Jasmin require import JWord JUtils.
 require import SafetyEclib.
-require import BArray16 BArray28 BArray32 BArray48 BArray64 BArray128 BArray208 BArray256 BArray272 BArray512 BArray640.
+require import BArray16 BArray28 BArray32 BArray48 BArray64 BArray112 BArray128 BArray144 BArray208 BArray256 BArray272 BArray512 BArray640.
 
 (* ------------------------------------------------------------------ *)
 abbrev full16 = BArray16.init_arr (W8.of_int 255).
@@ -273,6 +273,59 @@ by rewrite BArray64.initiE /#.
 qed.
 
 (* ------------------------------------------------------------------ *)
+abbrev full112 = BArray112.init_arr (W8.of_int 255).
+
+lemma full112E (m : BArray112.t) : BArray112.is_init m 0 112 => m = full112.
+proof.
+move=> hm; rewrite BArray112.tP => j hj.
+rewrite /BArray112.init_arr BArray112.initiE //=.
+by have := hm j _ _; rewrite /BArray112.is_init_cell /#.
+qed.
+
+lemma full112_init a l : BArray112.is_init full112 a l.
+proof. by move=> j _ _; apply (BArray112.init_arrP witness). qed.
+
+lemma mask112_le (m : BArray112.t) a b : BArray112.is_init m 0 b => a <= b => BArray112.is_init m 0 a.
+proof. by move=> hm hab j hj0 hj; apply hm => /#. qed.
+
+lemma full112_set32d k : BArray112.set32d full112 k (W32.of_int 4294967295) = full112.
+proof.
+apply full112E => j _ _.
+by rewrite BArray112.is_init_cell_set32d; right; apply (BArray112.init_arrP witness).
+qed.
+
+(* Word i written into a mask initialised below word i. *)
+lemma mask112_set32 (m : BArray112.t) i :
+  BArray112.is_init m 0 (4 * i) => 0 <= i => 4 * (i + 1) <= 112 =>
+  BArray112.is_init (BArray112.set32 m i (W32.of_int 4294967295)) 0 (4 * (i + 1)).
+proof.
+move=> hm hi hb j hj0 hj; rewrite BArray112.is_init_cell_set32d.
+by case: (j < 4 * i) => hji; [right; apply hm | left] => /#.
+qed.
+
+lemma full112_set64d k : BArray112.set64d full112 k (W64.of_int 18446744073709551615) = full112.
+proof.
+apply full112E => j _ _.
+by rewrite BArray112.is_init_cell_set64d; right; apply (BArray112.init_arrP witness).
+qed.
+
+(* Word i written into a mask initialised below word i. *)
+lemma mask112_set64 (m : BArray112.t) i :
+  BArray112.is_init m 0 (8 * i) => 0 <= i => 8 * (i + 1) <= 112 =>
+  BArray112.is_init (BArray112.set64 m i (W64.of_int 18446744073709551615)) 0 (8 * (i + 1)).
+proof.
+move=> hm hi hb j hj0 hj; rewrite BArray112.is_init_cell_set64d.
+by case: (j < 8 * i) => hji; [right; apply hm | left] => /#.
+qed.
+
+lemma full112_set8 k : BArray112.set8 full112 k (W8.of_int 255) = full112.
+proof.
+apply full112E => j hj0 hj1.
+rewrite BInit112.is_init_cellP; case: (_ /\ _) => // _.
+by rewrite BArray112.initiE /#.
+qed.
+
+(* ------------------------------------------------------------------ *)
 abbrev full128 = BArray128.init_arr (W8.of_int 255).
 
 lemma full128E (m : BArray128.t) : BArray128.is_init m 0 128 => m = full128.
@@ -323,6 +376,59 @@ proof.
 apply full128E => j hj0 hj1.
 rewrite BInit128.is_init_cellP; case: (_ /\ _) => // _.
 by rewrite BArray128.initiE /#.
+qed.
+
+(* ------------------------------------------------------------------ *)
+abbrev full144 = BArray144.init_arr (W8.of_int 255).
+
+lemma full144E (m : BArray144.t) : BArray144.is_init m 0 144 => m = full144.
+proof.
+move=> hm; rewrite BArray144.tP => j hj.
+rewrite /BArray144.init_arr BArray144.initiE //=.
+by have := hm j _ _; rewrite /BArray144.is_init_cell /#.
+qed.
+
+lemma full144_init a l : BArray144.is_init full144 a l.
+proof. by move=> j _ _; apply (BArray144.init_arrP witness). qed.
+
+lemma mask144_le (m : BArray144.t) a b : BArray144.is_init m 0 b => a <= b => BArray144.is_init m 0 a.
+proof. by move=> hm hab j hj0 hj; apply hm => /#. qed.
+
+lemma full144_set32d k : BArray144.set32d full144 k (W32.of_int 4294967295) = full144.
+proof.
+apply full144E => j _ _.
+by rewrite BArray144.is_init_cell_set32d; right; apply (BArray144.init_arrP witness).
+qed.
+
+(* Word i written into a mask initialised below word i. *)
+lemma mask144_set32 (m : BArray144.t) i :
+  BArray144.is_init m 0 (4 * i) => 0 <= i => 4 * (i + 1) <= 144 =>
+  BArray144.is_init (BArray144.set32 m i (W32.of_int 4294967295)) 0 (4 * (i + 1)).
+proof.
+move=> hm hi hb j hj0 hj; rewrite BArray144.is_init_cell_set32d.
+by case: (j < 4 * i) => hji; [right; apply hm | left] => /#.
+qed.
+
+lemma full144_set64d k : BArray144.set64d full144 k (W64.of_int 18446744073709551615) = full144.
+proof.
+apply full144E => j _ _.
+by rewrite BArray144.is_init_cell_set64d; right; apply (BArray144.init_arrP witness).
+qed.
+
+(* Word i written into a mask initialised below word i. *)
+lemma mask144_set64 (m : BArray144.t) i :
+  BArray144.is_init m 0 (8 * i) => 0 <= i => 8 * (i + 1) <= 144 =>
+  BArray144.is_init (BArray144.set64 m i (W64.of_int 18446744073709551615)) 0 (8 * (i + 1)).
+proof.
+move=> hm hi hb j hj0 hj; rewrite BArray144.is_init_cell_set64d.
+by case: (j < 8 * i) => hji; [right; apply hm | left] => /#.
+qed.
+
+lemma full144_set8 k : BArray144.set8 full144 k (W8.of_int 255) = full144.
+proof.
+apply full144E => j hj0 hj1.
+rewrite BInit144.is_init_cellP; case: (_ /\ _) => // _.
+by rewrite BArray144.initiE /#.
 qed.
 
 (* ------------------------------------------------------------------ *)

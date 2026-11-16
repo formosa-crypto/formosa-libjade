@@ -1,4 +1,6 @@
-/* The SHA-2 sets extracted as one safety model: the proofs share the code of the
-   sets, so one model holds every entry point. */
+/* The SHA-2 sets extracted as one safety model: the proofs share the code
+   of the sets, so one model holds every entry point, and the shared code
+   that no entry point of the sets calls yet (hmac_mem.jinc). */
 require "../../../../../../src/fips180/avx2/sct/sha256/fips180.jazz"
 require "../../../../../../src/fips180/avx2/sct/sha512/fips180.jazz"
+from Hash require "hmac_mem.jinc"
