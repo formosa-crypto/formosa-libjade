@@ -34,6 +34,9 @@ JASMIN_SIG := $(patsubst ../src/mldsa/avx2/sct/%/mldsa.jazz,$(BUILD)/jasmin_mlds
 # SHA-2: src/fips180/avx2/sct/<set>/fips180.jazz
 JASMIN_HASH := $(patsubst ../src/fips180/avx2/sct/%/fips180.jazz,$(BUILD)/jasmin_fips180%.so,\
                  $(wildcard ../src/fips180/avx2/sct/*/fips180.jazz))
+# HMAC: src/fips198/avx2/sct/<set>/fips198.jazz
+JASMIN_MAC := $(patsubst ../src/fips198/avx2/sct/%/fips198.jazz,$(BUILD)/jasmin_fips198%.so,\
+                $(wildcard ../src/fips198/avx2/sct/*/fips198.jazz))
 # native reference libraries: all parameter sets.
 MLKN_KEM   := $(BUILD)/mlkem-native_mlkem512.so \
               $(BUILD)/mlkem-native_mlkem768.so \
@@ -57,7 +60,7 @@ PQCR_SIG   := $(BUILD)/pqcrystals-ref_mldsa44.so \
               $(BUILD)/pqcrystals-ref_mldsa87.so
 
 # the libraries of each backend (BACKENDS names them)
-LIBS_jasmin         := $(JASMIN_KEM) $(JASMIN_SIG) $(JASMIN_HASH)
+LIBS_jasmin         := $(JASMIN_KEM) $(JASMIN_SIG) $(JASMIN_HASH) $(JASMIN_MAC)
 LIBS_mlkem-native   := $(MLKN_KEM)
 LIBS_mldsa-native   := $(MLDN_SIG)
 LIBS_pqcrystals     := $(PQC_KEM) $(PQC_SIG)
@@ -92,6 +95,13 @@ $(SRC_BUILD)/fips180%_avx2.s:
 $(BUILD)/jasmin_fips180%.so: $(ADAPTERS)/jasmin/hash_shim.c $(SRC_BUILD)/fips180%_avx2.s | $(BUILD)
 	$(CC) $(XARCH) -O2 -fPIC -shared -I$(ADAPTERS) \
 	    -DJASMIN_HASH_FN=jade_hash_$*_amd64_avx2 -o $@ $^
+
+$(SRC_BUILD)/fips198%_avx2.s:
+	$(MAKE) -C ../src _build/fips198$*_avx2.s
+
+$(BUILD)/jasmin_fips198%.so: $(ADAPTERS)/jasmin/mac_shim.c $(SRC_BUILD)/fips198%_avx2.s | $(BUILD)
+	$(CC) $(XARCH) -O2 -fPIC -shared -I$(ADAPTERS) \
+	    -DJASMIN_MAC_FN=jade_mac_hmac_$*_amd64_avx2 -o $@ $^
 
 # The multi-way sets: the multi-way shim, linked with the single-way hash it
 # checks every lane against.
@@ -201,7 +211,8 @@ N        ?= 100
 SCHEME_BASE = $(shell echo $(SCHEME) | tr -d '-' | tr 'A-Z' 'a-z')
 ALL_SCHEMES ?= ML-KEM-512 ML-KEM-768 ML-KEM-1024 ML-DSA-44 ML-DSA-65 ML-DSA-87 \
                FIPS-180-sha256 FIPS-180-sha512 FIPS-180-sha224 FIPS-180-sha384 \
-               FIPS-180-sha512_224 FIPS-180-sha512_256 FIPS-180-sha256x8 FIPS-180-sha512x4
+               FIPS-180-sha512_224 FIPS-180-sha512_256 FIPS-180-sha256x8 FIPS-180-sha512x4 \
+               FIPS-198-sha256 FIPS-198-sha512
 
 REPORT  ?= bench.md
 # machine-readable report (aggregated results + run metadata) next to REPORT

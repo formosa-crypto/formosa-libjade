@@ -1,0 +1,5 @@
+primitive      = "FIPS-198"
+standard       = "FIPS 198-1"
+spec           = "../../fips180/spec/FIPS198_HMAC.ec"
+operations     = ["mac", "init", "update", "final"]
+parameter_sets = ["sha256", "sha512"]

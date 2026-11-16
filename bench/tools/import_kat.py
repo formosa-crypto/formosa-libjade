@@ -19,8 +19,10 @@ Three sources, each downloaded at a fixed version:
   each file checked against its SHA-256: ShortMsg, LongMsg and Monte of
   SHA-224, SHA-256, SHA-384, SHA-512, SHA-512/224 and SHA-512/256
   (fips180<set>.json), and those of SHA-256 and SHA-512 again for the
-  8-way and 4-way sets. --cavp-dir reads the .rsp files from a directory
-  instead of the archive.
+  8-way and 4-way sets; the HMAC test vectors of NIST CAVP (CAVS 11.0),
+  checked the same way: those of HMAC-SHA-256 and HMAC-SHA-512 (L = 32 and
+  64 of HMAC.rsp, fips198<set>.json), their tags truncated to Tlen bytes.
+  --cavp-dir reads the .rsp files from a directory instead of the archives.
 
     python3 tools/import_kat.py --out vectors --acvp-version v1.1.0.43
 """
@@ -61,6 +63,14 @@ CAVP_SHA2_FILES = {
     "SHA512_256LongMsg.rsp": "d2454ce8dfcd7ea9b9ffbe44d35564ca82d2d6744fb4b36f5e056c6064fb0792",
     "SHA512_256Monte.rsp": "f84e3c0296202e06a5c9654df94f89b62906fcf16f7e1a640c28d838353b0a42",
 }
+CAVP_HMAC = ("https://csrc.nist.gov/CSRC/media/Projects/"
+             "Cryptographic-Algorithm-Validation-Program/documents/mac/hmactestvectors.zip")
+CAVP_HMAC_FILES = {
+    "HMAC.rsp": "cf27b6ad24fc3d72f8d18f8cee8a2b366302395cc50f5d9e607fbce4e98001eb",
+}
+# (digest length L of HMAC.rsp, algorithm, implementation name: src/fips198/avx2/sct/<set>)
+CAVP_HMAC_SETS = [(32, "HMAC-SHA2-256", "fips198sha256"),
+                  (64, "HMAC-SHA2-512", "fips198sha512")]
 # (CAVP file prefix, algorithm, implementation name: src/fips180/avx2/sct/<set>)
 CAVP_SHA2_SETS = [("SHA256", "SHA2-256", "fips180sha256"),
                   ("SHA512", "SHA2-512", "fips180sha512"),
@@ -282,21 +292,21 @@ def import_mldsa_acvp(version, out_dir, cache):
 # --------------------------------------------------------------------------
 # NIST CAVP SHAVS (SHA-2) -> schema
 # --------------------------------------------------------------------------
-def cavp_files(cache, cavp_dir):
+def cavp_files(cache, cavp_dir, url=CAVP_SHA2, pinned=CAVP_SHA2_FILES):
     """{name: text} of the pinned .rsp files, from cavp_dir or the archive"""
     if cavp_dir is None:
         cache.mkdir(parents=True, exist_ok=True)
-        archive = cache / "shabytetestvectors.zip"
+        archive = cache / url.rsplit("/", 1)[1]
         if not archive.exists():
-            print(f"  downloading {CAVP_SHA2}")
-            urllib.request.urlretrieve(CAVP_SHA2, archive)
+            print(f"  downloading {url}")
+            urllib.request.urlretrieve(url, archive)
         with zipfile.ZipFile(archive) as z:
             members = {Path(n).name: n for n in z.namelist()}
-            data = {f: z.read(members[f]) for f in CAVP_SHA2_FILES if f in members}
+            data = {f: z.read(members[f]) for f in pinned if f in members}
     else:
-        data = {f: (cavp_dir / f).read_bytes() for f in CAVP_SHA2_FILES
+        data = {f: (cavp_dir / f).read_bytes() for f in pinned
                 if (cavp_dir / f).exists()}
-    for f, digest in CAVP_SHA2_FILES.items():
+    for f, digest in pinned.items():
         if f not in data:
             raise SystemExit(f"CAVP: no {f}")
         if hashlib.sha256(data[f]).hexdigest() != digest:
@@ -339,15 +349,39 @@ def import_sha2(out_dir, cache, cavp_dir):
         print(f"  {path.name}: {len(tests)} test(s)")
 
 
+def import_hmac(out_dir, cache, cavp_dir):
+    text = cavp_files(cache, cavp_dir, CAVP_HMAC, CAVP_HMAC_FILES)["HMAC.rsp"]
+    by_len, length, rec = {}, None, {}
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("[L="):
+            length = int(line[3:-1])
+        elif " = " in line and not line.startswith("#"):
+            key, value = (x.strip() for x in line.split(" = ", 1))
+            rec[key] = value
+            if key == "Mac":
+                tlen = int(rec["Tlen"])
+                assert len(value) == 2 * tlen and len(rec["Key"]) == 2 * int(rec["Klen"])
+                by_len.setdefault(length, []).append(
+                    {"key": rec["Key"], "message": rec["Msg"], "tag": value})
+                rec = {}
+    for length, algo, name in CAVP_HMAC_SETS:
+        tests = [{"count": i, "mac": v} for i, v in enumerate(by_len[length])]
+        path = out_dir / f"{name}.json"
+        path.write_text(json.dumps({"algorithm": algo, "source": "NIST CAVP HMAC (CAVS 11.0)",
+                                    "tests": tests}, indent=1))
+        print(f"  {path.name}: {len(tests)} test(s)")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     here = Path(__file__).resolve().parent.parent
     ap.add_argument("--out", type=Path, default=here / "vectors")
     ap.add_argument("--acvp-version", default="v1.1.0.43")
-    ap.add_argument("--only", choices=("mldsa", "mlkem", "sha2"))
+    ap.add_argument("--only", choices=("mldsa", "mlkem", "sha2", "hmac"))
     ap.add_argument("--cavp-dir", type=Path,
-                    help="directory of the CAVP SHA-2 .rsp files (default: the archive)")
+                    help="directory of the CAVP SHA-2 and HMAC .rsp files (default: the archives)")
     args = ap.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)
 
@@ -356,7 +390,10 @@ def main(argv=None):
     if args.only in (None, "sha2"):
         print("SHA-2 (NIST CAVP):")
         import_sha2(args.out, cache / "cavp", args.cavp_dir)
-    if args.only == "sha2":
+    if args.only in (None, "hmac"):
+        print("HMAC (NIST CAVP):")
+        import_hmac(args.out, cache / "cavp", args.cavp_dir)
+    if args.only in ("sha2", "hmac"):
         return 0
     if args.only != "mlkem":
         print("ML-DSA (post-quantum-cryptography/KAT):")

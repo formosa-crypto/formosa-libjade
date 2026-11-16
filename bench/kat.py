@@ -3,7 +3,7 @@
 
 Loads _build/<backend>_<scheme>.so (built by `make libs`) and replays the KAT
 vectors through the common derand ABI (adapters/common_abi.h): kem_* for ML-KEM,
-sig_* for ML-DSA, hash_* for SHA-2; selects the library by backend.
+sig_* for ML-DSA, hash_* for SHA-2, mac_* for HMAC; selects the library by backend.
 
 Usage:
     python3 kat.py --backend jasmin vectors/*.json
@@ -34,6 +34,10 @@ def _hash(base, digest, ctx):
     return {"kind": "hash", "base": base, "digest": digest, "ctx": ctx}
 
 
+def _mac(base, tag, ctx):
+    return {"kind": "mac", "base": base, "tag": tag, "ctx": ctx}
+
+
 SCHEMES = {
     "ML-DSA-44": _mldsa("mldsa44", 1312, 2560, 2420),
     "ML-DSA-65": _mldsa("mldsa65", 1952, 4032, 3309),
@@ -51,6 +55,8 @@ SCHEMES = {
     # context is the multi-way one followed by one single-way one per lane
     "SHA2-256 (8-way)": _hash("fips180sha256x8", 32, 784 + 8 * 112),
     "SHA2-512 (4-way)": _hash("fips180sha512x4", 64, 784 + 4 * 208),
+    "HMAC-SHA2-256": _mac("fips198sha256", 32, 144),
+    "HMAC-SHA2-512": _mac("fips198sha512", 64, 272),
 }
 
 
@@ -322,6 +328,51 @@ class Hash(Scheme):
             seed = md[2]
             rep.check(f"{self.label('monte')}.{j}", seed.hex() == want.lower(),
                       f"expected {want[:24]}..., got {seed.hex()[:24]}...")
+
+
+@runner("mac")
+class MAC(Scheme):
+    OPS = ("mac",)
+
+    def bind(self, lib):
+        self.lib = lib
+        lib.mac_tag.restype = None
+        lib.mac_tag.argtypes = [c_void_p, c_void_p, c_size_t, c_void_p, c_size_t]
+        lib.mac_init.restype, lib.mac_init.argtypes = None, [c_void_p, c_void_p, c_size_t]
+        lib.mac_update.restype = c_int
+        lib.mac_update.argtypes = [c_void_p, c_void_p, c_size_t]
+        lib.mac_final.restype, lib.mac_final.argtypes = c_int, [c_void_p, c_void_p]
+
+    def tag(self, key, msg):
+        out = out_buf(self.spec["tag"])
+        self.lib.mac_tag(out, in_buf(key), len(key), in_buf(msg), len(msg))
+        return out.raw
+
+    # the message in parts, cut at each split point
+    def stream_tag(self, key, msg, cuts):
+        ctx, out = out_buf(self.spec["ctx"]), out_buf(self.spec["tag"])
+        self.lib.mac_init(ctx, in_buf(key), len(key))
+        r, prev = 0, 0
+        for c in cuts + [len(msg)]:
+            r |= self.lib.mac_update(ctx, in_buf(msg[prev:c]), c - prev)
+            prev = c
+        r |= self.lib.mac_final(ctx, out)
+        return r, out.raw
+
+    # a vector's tag may be truncated (the Tlen of the CAVP HMAC vectors):
+    # it is compared with the first bytes of the tag
+    def check_tag(self, label, b, actual, rep):
+        want = b["tag"].lower()
+        got = actual[: len(want) // 2].hex()
+        rep.check(f"{label}.tag", got == want, f"expected {want[:24]}..., got {got[:24]}...")
+
+    def mac(self, b, rep):
+        key, msg = h(b, "key"), h(b, "message")
+        self.check_tag(self.label("mac"), b, self.tag(key, msg), rep)
+        for cuts in ([], [len(msg) // 3, 2 * len(msg) // 3]):
+            r, t = self.stream_tag(key, msg, cuts)
+            rep.check(self.label("mac") + f".stream{len(cuts)}.result", r == 0, f"got {r}")
+            self.check_tag(self.label("mac") + f".stream{len(cuts)}", b, t, rep)
 
 
 def load_backend(backend, scheme_base, lib_dir):

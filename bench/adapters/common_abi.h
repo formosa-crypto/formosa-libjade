@@ -50,4 +50,16 @@ void hash_init(uint8_t *ctx);
 int hash_update(uint8_t *ctx, const uint8_t *in, size_t inlen);
 int hash_final(uint8_t *ctx, uint8_t *out);
 
+/* ---- MAC (HMAC) -- one-shot ----
+ * out receives the tag of the msglen bytes at msg under the keylen bytes at
+ * key. */
+void mac_tag(uint8_t *out, const uint8_t *key, size_t keylen,
+             const uint8_t *msg, size_t msglen);
+
+/* incremental: ctx is a context of the scheme's size (owned by the
+ * drivers); update and final return 0 on success. */
+void mac_init(uint8_t *ctx, const uint8_t *key, size_t keylen);
+int mac_update(uint8_t *ctx, const uint8_t *in, size_t inlen);
+int mac_final(uint8_t *ctx, uint8_t *out);
+
 #endif /* BENCH_COMMON_ABI_H */

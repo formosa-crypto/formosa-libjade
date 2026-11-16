@@ -8,7 +8,8 @@
  * randomness of keypair, encaps, keygen and sign comes from a xorshift reset
  * to a fixed seed at the start of each operation's bench, and decaps and
  * verify take the ciphertext or signature of a fresh encaps or sign. A hash
- * is timed on messages of 64, 1024 and 16384 bytes. The
+ * or a MAC (under a 32-byte key) is timed on messages of 64, 1024 and
+ * 16384 bytes. The
  * medians then cover the spread of the rejection loops, while every backend
  * and commit runs on the same inputs. One backend per process:
  * different .so files can define the same global symbols (e.g. randombytes),
@@ -29,13 +30,13 @@
 #include <x86intrin.h>
 
 /* ---- scheme table ---- */
-typedef enum { KEM, SIG, HASH } kind_t;
+typedef enum { KEM, SIG, HASH, MAC } kind_t;
 typedef struct {
   const char *name;
   kind_t kind;
   /* KEM: pk, sk, ct, ss=32, kp_coins=64, enc_coins=32
    * SIG: vk(pk), sk, sig, seed=32, rnd=32
-   * HASH: digest, block, longest message */
+   * HASH, MAC: digest or tag, block, longest message */
   int a, b, c;
 } scheme_t;
 
@@ -55,6 +56,8 @@ static const scheme_t SCHEMES[] = {
     /* the multi-way sets: the digests of every lane */
     {"FIPS-180-sha256x8", HASH, 8 * 32, 64, 16384},
     {"FIPS-180-sha512x4", HASH, 4 * 64, 128, 16384},
+    {"FIPS-198-sha256", MAC, 32, 64, 16384},
+    {"FIPS-198-sha512", MAC, 64, 128, 16384},
 };
 
 /* ---- common ABI signatures ---- */
@@ -68,6 +71,7 @@ typedef int (*sig_verify_t)(const uint8_t *, const uint8_t *, size_t,
                             const uint8_t *, size_t, const uint8_t *);
 typedef void (*hash_digest_t)(uint8_t *, const uint8_t *, size_t);
 typedef void (*hash_digest_x_t)(uint8_t *, const uint8_t *const *, size_t);
+typedef void (*mac_tag_t)(uint8_t *, const uint8_t *, size_t, const uint8_t *, size_t);
 
 static uint64_t prng_state = 0x1234567;
 static void fill(uint8_t *p, size_t n) {
@@ -100,7 +104,8 @@ static void report(const char *path, const scheme_t *s, uint64_t m0,
                    uint64_t m1, uint64_t m2) {
   static const char *OPS[][3] = {{"keypair", "encaps", "decaps"},
                                  {"keygen", "sign", "verify"},
-                                 {"hash-64", "hash-1024", "hash-16384"}};
+                                 {"hash-64", "hash-1024", "hash-16384"},
+                                 {"mac-64", "mac-1024", "mac-16384"}};
   const char *o0 = OPS[s->kind][0], *o1 = OPS[s->kind][1], *o2 = OPS[s->kind][2];
   if (g_csv) {
     char bk[64];
@@ -206,6 +211,13 @@ static void bench_backend(const char *path, const scheme_t *s, size_t iters,
       BENCH(iters, samples, &m1, (void)0, dg(A, C, 1024));
       BENCH(iters, samples, &m2, (void)0, dg(A, C, 16384));
     }
+    report(path, s, m0, m1, m2);
+  } else if (s->kind == MAC) {
+    mac_tag_t tg = dlsym(h, "mac_tag");
+    fill(C, (size_t)s->c);                            /* C=message, A=tag */
+    BENCH(iters, samples, &m0, (void)0, tg(A, seed, 32, C, 64));
+    BENCH(iters, samples, &m1, (void)0, tg(A, seed, 32, C, 1024));
+    BENCH(iters, samples, &m2, (void)0, tg(A, seed, 32, C, 16384));
     report(path, s, m0, m1, m2);
   } else {
     sig_keygen_t kg = dlsym(h, "sig_keygen");

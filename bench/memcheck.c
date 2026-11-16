@@ -11,7 +11,8 @@
  * messages and contexts of several lengths (including 0 and 255, and a
  * context of 256 bytes, which signing rejects), and verification of a
  * modified signature; hashing of messages of every length around the block
- * and padding boundaries. x86-64 + AVX2 only. */
+ * and padding boundaries; MACs under keys of lengths around the block size
+ * (a longer key is hashed first). x86-64 + AVX2 only. */
 
 #include <dlfcn.h>
 #include <stdint.h>
@@ -27,11 +28,12 @@
 #define VALGRIND_CHECK_MEM_IS_DEFINED(p, n) 0
 #endif
 
-typedef enum { KEM, SIG, HASH } kind_t;
+typedef enum { KEM, SIG, HASH, MAC } kind_t;
 typedef struct {
   const char *name;
   kind_t kind;
-  /* KEM: pk, sk, ct; SIG: vk, sk, sig; HASH: digest, block, context */
+  /* KEM: pk, sk, ct; SIG: vk, sk, sig; HASH, MAC: digest or tag, block,
+   * context */
   size_t a, b, c;
 } scheme_t;
 
@@ -50,6 +52,8 @@ static const scheme_t SCHEMES[] = {
     {"FIPS-180-sha512_256", HASH, 32, 128, 208},
     {"FIPS-180-sha256x8", HASH, 32, 64, 784 + 8 * 112},
     {"FIPS-180-sha512x4", HASH, 64, 128, 784 + 4 * 208},
+    {"FIPS-198-sha256", MAC, 32, 64, 144},
+    {"FIPS-198-sha512", MAC, 64, 128, 272},
 };
 
 typedef int (*kem_keypair_t)(uint8_t *, uint8_t *, const uint8_t *);
@@ -65,6 +69,8 @@ typedef void (*hash_digest_t)(uint8_t *, const uint8_t *, size_t);
 typedef void (*hash_init_t)(uint8_t *);
 typedef int (*hash_update_t)(uint8_t *, const uint8_t *, size_t);
 typedef int (*hash_final_t)(uint8_t *, uint8_t *);
+typedef void (*mac_tag_t)(uint8_t *, const uint8_t *, size_t, const uint8_t *, size_t);
+typedef void (*mac_init_t)(uint8_t *, const uint8_t *, size_t);
 
 static int g_failures;
 
@@ -222,6 +228,40 @@ static void run_hash(void *h, const scheme_t *s) {
   }
 }
 
+/* keys of lengths around the block size (a longer key is hashed first), each
+ * with messages of every length up to two blocks and a long one; the
+ * incremental MAC in two parts must give the one-shot tag */
+static void run_mac(void *h, const scheme_t *s) {
+  mac_tag_t tag = (mac_tag_t)sym(h, "mac_tag", 1);
+  mac_init_t init = (mac_init_t)sym(h, "mac_init", 1);
+  hash_update_t update = (hash_update_t)sym(h, "mac_update", 1);
+  hash_final_t final = (hash_final_t)sym(h, "mac_final", 1);
+  const size_t klens[] = {0, 1, s->b - 1, s->b, s->b + 1, 3 * s->b + 5};
+  for (size_t k = 0; k < sizeof klens / sizeof *klens; k++) {
+    uint8_t *key = input(klens[k]);
+    for (size_t i = 0; i <= 2 * s->b + 1; i++) {
+      size_t len = i <= 2 * s->b ? i : 4099;
+      uint8_t *msg = input(len), *t = buf(s->a), *t2 = buf(s->a);
+      tag(t, key, klens[k], msg, len);
+      defined("mac: tag", t, s->a);
+      size_t cut = len / 3;
+      uint8_t *ctx = buf(s->c), *lo = buf(cut), *hi = buf(len - cut);
+      memcpy(lo, msg, cut), memcpy(hi, msg + cut, len - cut);
+      init(ctx, key, klens[k]);
+      defined("init: context", ctx, s->c);
+      if (update(ctx, lo, cut) != 0 || update(ctx, hi, len - cut) != 0)
+        fail("update failed");
+      defined("update: context", ctx, s->c);
+      if (final(ctx, t2) != 0) fail("final failed");
+      defined("final: tag", t2, s->a);
+      if (memcmp(t, t2, s->a) != 0) fail("final: tag differs from the one-shot one");
+      if (final(ctx, t2) == 0) fail("final accepts a finalised context");
+      free(ctx), free(lo), free(hi), free(msg), free(t), free(t2);
+    }
+    free(key);
+  }
+}
+
 int main(int argc, char **argv) {
   if (argc != 3) {
     fprintf(stderr, "usage: %s <scheme> <backend.so>\n", argv[0]);
@@ -243,8 +283,10 @@ int main(int argc, char **argv) {
     run_kem(h, s);
   else if (s->kind == SIG)
     run_sig(h, s);
-  else
+  else if (s->kind == HASH)
     run_hash(h, s);
+  else
+    run_mac(h, s);
   printf("%s %s: %s\n", s->name, argv[2], g_failures ? "FAILED" : "ok");
   return g_failures != 0;
 }
