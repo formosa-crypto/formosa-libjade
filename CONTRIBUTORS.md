@@ -18,6 +18,7 @@
 
 ## Other contributors
 
+- Rifat Ahmed
 - Gilles Barthe
 - Lionel Blatter
 - Gaëtan Cassiers
@@ -41,3 +42,4 @@
 - Antoine Séré
 - Basavesh Ammanaghatta Shivakumar
 - Xingyu Xie
+- H.M. Yousuf
