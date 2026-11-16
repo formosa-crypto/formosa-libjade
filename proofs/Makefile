@@ -146,5 +146,19 @@ extraction-unchanged:
 	@echo "extracted models up to date"
 
 # --------------------------------------------------------------------
+# The SHA-2 specification evaluated on CAVP vectors: the files
+# fips180/spec/validation/CAVP_*.ec are generated from ../bench/vectors.
+#   make spec-vectors        write them again
+#   make check-spec-vectors  fail if one differs from a fresh generation
+SPEC_VECTORS := python3 fips180/spec/validation/spec_vectors.py
+
+.PHONY: spec-vectors check-spec-vectors
+spec-vectors:
+	$(SPEC_VECTORS) write ../bench/vectors fips180/spec/validation
+
+check-spec-vectors:
+	$(SPEC_VECTORS) check ../bench/vectors fips180/spec/validation
+
+# --------------------------------------------------------------------
 clean:
 	find . -name '*.eco' -print0 | xargs -0 rm -f
