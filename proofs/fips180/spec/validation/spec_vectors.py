@@ -63,6 +63,12 @@ require import Bytes FIPS180_SHA2 FIPS198_HMAC SpecEval.
 HASHES = [
     ("CAVP_SHA256", "SHA-256", "SHA256.sha256", "sha256", "fips180sha256.json", 64),
     ("CAVP_SHA512", "SHA-512", "SHA512.sha512", "sha512", "fips180sha512.json", 128),
+    ("CAVP_SHA224", "SHA-224", "SHA256.sha224", "sha224", "fips180sha224.json", 64),
+    ("CAVP_SHA384", "SHA-384", "SHA512.sha384", "sha384", "fips180sha384.json", 128),
+    ("CAVP_SHA512_224", "SHA-512/224", "SHA512.sha512_224", "sha512_224",
+     "fips180sha512_224.json", 128),
+    ("CAVP_SHA512_256", "SHA-512/256", "SHA512.sha512_256", "sha512_256",
+     "fips180sha512_256.json", 128),
 ]
 
 

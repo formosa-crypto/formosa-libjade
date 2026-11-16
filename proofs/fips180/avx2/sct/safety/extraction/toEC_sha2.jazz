@@ -3,4 +3,8 @@
    that no entry point of the sets calls yet (hmac_mem.jinc). */
 require "../../../../../../src/fips180/avx2/sct/sha256/fips180.jazz"
 require "../../../../../../src/fips180/avx2/sct/sha512/fips180.jazz"
+require "../../../../../../src/fips180/avx2/sct/sha224/fips180.jazz"
+require "../../../../../../src/fips180/avx2/sct/sha384/fips180.jazz"
+require "../../../../../../src/fips180/avx2/sct/sha512_224/fips180.jazz"
+require "../../../../../../src/fips180/avx2/sct/sha512_256/fips180.jazz"
 from Hash require "hmac_mem.jinc"
