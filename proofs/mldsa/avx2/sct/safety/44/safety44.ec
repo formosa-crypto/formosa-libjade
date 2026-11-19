@@ -1285,8 +1285,10 @@ proc; auto => />; rewrite -lane_signs_movemask /=.
 by rewrite -/(lane_signs _) lane_signs_ule.
 qed.
 
-lemma matrix_A____bytestream_to_potential_coefficients_proof _bytestream :
-      (matrix_A____bytestream_to_potential_coefficients_spec _bytestream).
+lemma matrix_A____bytestream_to_potential_coefficients_proof _bytestream _byte_shuffle
+    _coefficient_mask :
+  matrix_A____bytestream_to_potential_coefficients_spec _bytestream _byte_shuffle
+    _coefficient_mask.
 proof.
 hint +safety.
 rewrite /matrix_A____bytestream_to_potential_coefficients_spec; proc.
@@ -1332,8 +1334,8 @@ while (b_randombytes = BArray848.init_arr (W8.of_int 255)
   rewrite ?W64.uleE ?W64.ultE hi1 hi2 hi3 hf1 /=.
   smt().
 (* first phase: eight candidates per 24 bytes, the good ones packed by a
-   shuffle, at most four per half; 32 windows, at most 32 bytes written per
-   window, so the polynomial never overflows *)
+   VPERMD and stored with one 32-byte write; 32 windows, so the polynomial
+   never overflows *)
 wp.
 while (b_randombytes = BArray848.init_arr (W8.of_int 255)
     /\ to_uint bytes_filled <= 1024 /\ to_uint bytes_filled %% 4 = 0
@@ -1342,68 +1344,43 @@ while (b_randombytes = BArray848.init_arr (W8.of_int 255)
     /\ 3 * to_uint bytes_filled <= 4 * to_uint input_offset
     /\ condition_loop = (to_uint input_offset < 768)
     /\ valid trace_matrix_A__rejection_sample_multiple_blocks).
-+ auto; ecall (__lane_signs_proof param_0); auto.
-  ecall (matrix_A____bytestream_to_potential_coefficients_proof param).
++ auto; ecall (__lane_signs_proof param_2); auto.
+  ecall (matrix_A____bytestream_to_potential_coefficients_proof param_1 param_0 param).
   auto => /> &hr hle hmod hinit himod hio h34 hvalid hlt r hv g hg hvg.
   rewrite /SLH64.protect_64.
   case: g hg hvg => g tg /= hg _.
   have {hg} hg : to_uint g < 256 by move: hg; rewrite W64.uleE /#.
-  have hgl : to_uint (g `&` W64.of_int 15) < 16.
-  + have -> : W64.of_int 15 = W64.of_int (2 ^ 4 - 1) by done.
-    by rewrite W64.to_uint_and_mod //; smt(modz_cmp).
-  have hgu : to_uint (g `>>` W8.of_int 4) < 16.
-  + by rewrite W64.shr_div W8.of_uintK /= /#.
-  have hgl0 := W64.to_uint_cmp (g `&` W64.of_int 15).
-  have hgu0 := W64.to_uint_cmp (g `>>` W8.of_int 4).
-  have hp1 := to_uint_popcnt64_nibble _ hgl.
-  have hp2 := to_uint_popcnt64_nibble _ hgu.
-  move: (POPCNT_64 (g `&` W64.of_int 15)).`6 hp1 => p1 hp1.
-  move: (POPCNT_64 (g `>>` W8.of_int 4)).`6 hp2 => p2 hp2.
+  have hg0 := W64.to_uint_cmp g.
+  have hp := to_uint_popcnt64_byte _ hg.
+  move: (POPCNT_64 g).`6 hp => p hp.
   have hb0 := W64.to_uint_cmp bytes_filled{hr}.
   have hi0 := W64.to_uint_cmp input_offset{hr}.
   have hio744 : to_uint input_offset{hr} <= 744 by smt().
   have hio3 : to_uint input_offset{hr} + 32 <= 848 by smt().
-  have hbf1 : to_uint bytes_filled{hr} + 4 * to_uint p1 + 16 <= 1024 by smt().
-  have hs1 : to_uint (p1 `<<` W8.of_int 2) = 4 * to_uint p1.
+  have hbf : to_uint bytes_filled{hr} + 32 <= 1024 by smt().
+  have hs : to_uint (p `<<` W8.of_int 2) = 4 * to_uint p.
   + by rewrite /(`<<`) /= W64.to_uint_shl // /ptr_modulus /= modz_small /#.
-  have hs2 : to_uint (p2 `<<` W8.of_int 2) = 4 * to_uint p2.
-  + by rewrite /(`<<`) /= W64.to_uint_shl // /ptr_modulus /= modz_small /#.
-  have hb1 : to_uint (bytes_filled{hr} + (p1 `<<` W8.of_int 2))
-             = to_uint bytes_filled{hr} + 4 * to_uint p1.
-  + by rewrite W64.to_uintD_small hs1 /#.
-  have hb2 : to_uint (bytes_filled{hr} + (p1 `<<` W8.of_int 2) + (p2 `<<` W8.of_int 2))
-             = to_uint bytes_filled{hr} + 4 * to_uint p1 + 4 * to_uint p2.
-  + by rewrite W64.to_uintD_small hb1 hs2 /#.
-  have hsh1 : to_uint (g `&` W64.of_int 15 `<<` W8.of_int 4) = 16 * to_uint (g `&` W64.of_int 15).
-  + by rewrite /(`<<`) /= W64.to_uint_shl // /ptr_modulus /= modz_small /#.
-  have hsh2 : to_uint (g `>>` W8.of_int 4 `<<` W8.of_int 4) = 16 * to_uint (g `>>` W8.of_int 4).
-  + by rewrite /(`<<`) /= W64.to_uint_shl // /ptr_modulus /= modz_small /#.
+  have hb : to_uint (bytes_filled{hr} + (p `<<` W8.of_int 2))
+            = to_uint bytes_filled{hr} + 4 * to_uint p.
+  + by rewrite W64.to_uintD_small hs /#.
   have hin : to_uint (input_offset{hr} + W64.of_int 24) = to_uint input_offset{hr} + 24.
   + by rewrite W64.to_uintD_small W64.of_uintK /= /#.
-  (* the two half-blocks written *)
-  have hA : BArray1024.is_init (BArray1024.set128d b_polynomial{hr} (to_uint bytes_filled{hr})
-                                  (W128.of_int 340282366920938463463374607431768211455))
-              0 (to_uint bytes_filled{hr} + 16).
-  + by rewrite BI1024.is_init_set128d_in 1,2:/# /= hinit /=; smt(BI1024.is_init_le0).
-  have hB : BArray1024.is_init (BArray1024.set128d b_polynomial{hr} (to_uint bytes_filled{hr})
-                                  (W128.of_int 340282366920938463463374607431768211455))
-              0 (to_uint bytes_filled{hr} + 4 * to_uint p1).
-  + by apply (BI1024.is_init_sub _ 0 (to_uint bytes_filled{hr} + 16)) => // /#.
-  have hC : BArray1024.is_init
-      (BArray1024.set128d (BArray1024.set128d b_polynomial{hr} (to_uint bytes_filled{hr})
-                             (W128.of_int 340282366920938463463374607431768211455))
-         (to_uint bytes_filled{hr} + 4 * to_uint p1)
-         (W128.of_int 340282366920938463463374607431768211455))
-      0 (to_uint bytes_filled{hr} + 4 * to_uint p1 + 16).
-  + by rewrite BI1024.is_init_set128d_in 1,2:/# /= hB /=; smt(BI1024.is_init_le0).
-  have hD : BArray1024.is_init
-      (BArray1024.set128d (BArray1024.set128d b_polynomial{hr} (to_uint bytes_filled{hr})
-                             (W128.of_int 340282366920938463463374607431768211455))
-         (to_uint bytes_filled{hr} + 4 * to_uint p1)
-         (W128.of_int 340282366920938463463374607431768211455))
-      0 (to_uint bytes_filled{hr} + 4 * to_uint p1 + 4 * to_uint p2).
-  + by apply (BI1024.is_init_sub _ 0 (to_uint bytes_filled{hr} + 4 * to_uint p1 + 16)) => // /#.
-  rewrite ?W64.uleE ?W64.ultE hb1 hb2 hin hsh1 hsh2 /=.
+  have hg8 : to_uint (W64.of_int 8 * g) = 8 * to_uint g.
+  + by rewrite W64.to_uintM_small W64.of_uintK /= /#.
+  (* the 32 bytes written, of which the first 4 * p hold coefficients *)
+  have hA : BArray1024.is_init
+      (BArray1024.set256d b_polynomial{hr} (to_uint bytes_filled{hr})
+         (W256.of_int
+            115792089237316195423570985008687907853269984665640564039457584007913129639935))
+      0 (to_uint bytes_filled{hr} + 32).
+  + by rewrite BI1024.is_init_set256d_in 1,2:/# /= hinit /=; smt(BI1024.is_init_le0).
+  have hB : BArray1024.is_init
+      (BArray1024.set256d b_polynomial{hr} (to_uint bytes_filled{hr})
+         (W256.of_int
+            115792089237316195423570985008687907853269984665640564039457584007913129639935))
+      0 (to_uint bytes_filled{hr} + 4 * to_uint p).
+  + by apply (BI1024.is_init_sub _ 0 (to_uint bytes_filled{hr} + 32)) => // /#.
+  rewrite ?W64.uleE ?W64.ultE hb hin hg8 /=.
   smt().
 (* between the phases: the count of coefficients is the count of bytes over
    four, and the second loop runs when the polynomial and the input allow *)

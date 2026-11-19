@@ -1,4 +1,8 @@
-u8[2048] ERROR_VECTOR_SHUFFLE_TABLE = {
+// Row m (bytes 8m .. 8m+7): the positions of the set bits of the 8-bit mask m,
+// in increasing order, then zeros. As a VPSHUFB control it packs the bytes
+// selected by m to the front; widened to 32-bit lanes, as a VPERMD index
+// vector, the dwords.
+u8[2048] COMPACTION_INDEX_TABLE = {
     0,  0,  0,  0,  0,  0,  0,  0,
     0,  0,  0,  0,  0,  0,  0,  0,
     1,  0,  0,  0,  0,  0,  0,  0,

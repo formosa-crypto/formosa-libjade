@@ -44,7 +44,54 @@ abbrev [-printing] commitment__ENCODING_SHUFFLES_bits4 =
 (W256.of_int
 6809477063014005108496892811167092228318171255968858956394831878370493989120).
 
-abbrev  eRROR_VECTOR_SHUFFLE_TABLE =
+abbrev [-printing] t1__mask =
+(W256.of_int
+27580025446916579586740047030762717305835781530194468456916412547466239).
+
+abbrev  t1__DECODING_TABLE =
+(BArray64.of_list256
+[(W256.of_int
+ (-1704488708535735317993730919615273811755981492442837930308886608702668544)
+ );
+(W256.of_int
+161759680028012245712471816852122747571536270840244795705654356475904)]).
+
+abbrev [-printing] t1__SHUFFLE_TO_GROUP =
+(W128.of_int (-1152053784517354134044416)).
+
+abbrev  t1__ENCODING_SHIFTS_TABLE =
+(BArray96.of_list256
+[(W256.of_int 138096238178506976811873579382829307350851889511329270071318);
+(W256.of_int 8769009825346546976905862850151196547671258038272);
+(W256.of_int 75325220824640169170112861481543258555010121551634147311628)]).
+
+abbrev  t0__DECODING_TABLE =
+(BArray96.of_list256
+[(W256.of_int
+ (-1683702690027913741012871262190298745403129414409667671300841849902661376)
+ );
+(W256.of_int
+80879840039114529797782631482765660946599467588442375410801744805888);
+(W256.of_int
+220828923202046630884640982628521424684360592877637234731771588637630463)]).
+
+abbrev  t0__ENCODING_SHIFTS_TABLE =
+(BArray128.of_list256
+[(W256.of_int 119264932972346934519345364012443492712099359123420733243411);
+(W256.of_int 475368975159373001864691843072);
+(W256.of_int 37662610412320084585056430740771629277505060775817073655814);
+(W256.of_int 221360928884514619392)]).
+
+abbrev  matrix_A__DECODING_TABLE =
+(BArray64.of_list256
+[(W256.of_int
+ (-425713140823840248081236011254019577995129072381718798375629210144781238016)
+ );
+(W256.of_int
+226156397384342666605459106258636701594091082888230722833791023177481060351)]
+).
+
+abbrev  cOMPACTION_INDEX_TABLE =
 (BArray2048.of_list8
 [(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
 (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
@@ -456,118 +503,6 @@ abbrev  eRROR_VECTOR_SHUFFLE_TABLE =
 (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
 (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
 (W8.of_int 5); (W8.of_int 6); (W8.of_int 7)]).
-
-abbrev [-printing] t1__mask =
-(W256.of_int
-27580025446916579586740047030762717305835781530194468456916412547466239).
-
-abbrev  t1__DECODING_TABLE =
-(BArray64.of_list256
-[(W256.of_int
- (-1704488708535735317993730919615273811755981492442837930308886608702668544)
- );
-(W256.of_int
-161759680028012245712471816852122747571536270840244795705654356475904)]).
-
-abbrev [-printing] t1__SHUFFLE_TO_GROUP =
-(W128.of_int (-1152053784517354134044416)).
-
-abbrev  t1__ENCODING_SHIFTS_TABLE =
-(BArray96.of_list256
-[(W256.of_int 138096238178506976811873579382829307350851889511329270071318);
-(W256.of_int 8769009825346546976905862850151196547671258038272);
-(W256.of_int 75325220824640169170112861481543258555010121551634147311628)]).
-
-abbrev  t0__DECODING_TABLE =
-(BArray96.of_list256
-[(W256.of_int
- (-1683702690027913741012871262190298745403129414409667671300841849902661376)
- );
-(W256.of_int
-80879840039114529797782631482765660946599467588442375410801744805888);
-(W256.of_int
-220828923202046630884640982628521424684360592877637234731771588637630463)]).
-
-abbrev  t0__ENCODING_SHIFTS_TABLE =
-(BArray128.of_list256
-[(W256.of_int 119264932972346934519345364012443492712099359123420733243411);
-(W256.of_int 475368975159373001864691843072);
-(W256.of_int 37662610412320084585056430740771629277505060775817073655814);
-(W256.of_int 221360928884514619392)]).
-
-abbrev  matrix_A__DECODING_TABLE =
-(BArray96.of_list256
-[(W256.of_int 31385508682779410369523405889615886801803926611390921441280);
-(W256.of_int
-(-432808243909779573675567928807470101786712732301848327860692622735061155584)
-);
-(W256.of_int
-226156397384342666605459106258636701594091082888230722833791023177481060351)]
-).
-
-abbrev  matrix_A__SHUFFLE_TABLE =
-(BArray256.of_list8
-[(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 8); (W8.of_int 9);
-(W8.of_int 10); (W8.of_int 11); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 8); (W8.of_int 9); (W8.of_int 10);
-(W8.of_int 11); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 8); (W8.of_int 9); (W8.of_int 10); (W8.of_int 11);
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 8); (W8.of_int 9);
-(W8.of_int 10); (W8.of_int 11); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 12); (W8.of_int 13);
-(W8.of_int 14); (W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 12); (W8.of_int 13); (W8.of_int 14);
-(W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 12); (W8.of_int 13); (W8.of_int 14); (W8.of_int 15);
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 12); (W8.of_int 13);
-(W8.of_int 14); (W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 8); (W8.of_int 9);
-(W8.of_int 10); (W8.of_int 11); (W8.of_int 12); (W8.of_int 13);
-(W8.of_int 14); (W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 8); (W8.of_int 9); (W8.of_int 10);
-(W8.of_int 11); (W8.of_int 12); (W8.of_int 13); (W8.of_int 14);
-(W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 8); (W8.of_int 9); (W8.of_int 10); (W8.of_int 11); (W8.of_int 12);
-(W8.of_int 13); (W8.of_int 14); (W8.of_int 15); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 8); (W8.of_int 9); (W8.of_int 10);
-(W8.of_int 11); (W8.of_int 12); (W8.of_int 13); (W8.of_int 14);
-(W8.of_int 15)]).
 
 abbrev  rOL8 =
 (BArray32.of_list256
@@ -48411,18 +48346,16 @@ module M = {
     return (state, b_state, h0, b_h0, h1, b_h1, h2, b_h2, h3, b_h3,
            trace_shake256_squeezeblock4x);
   }
-  proc matrix_A____bytestream_to_potential_coefficients (bytestream:W256.t) : 
+  proc matrix_A____bytestream_to_potential_coefficients (bytestream:W256.t,
+                                                         byte_shuffle:W256.t,
+                                                         coefficient_mask:W256.t) : 
   W256.t * trace = {
     var coefficients:W256.t;
-    var constants:W256.t;
     var trace_matrix_A____bytestream_to_potential_coefficients:trace;
     trace_matrix_A____bytestream_to_potential_coefficients <- [];
-    constants <- (BArray96.get256 matrix_A__DECODING_TABLE 0);
-    coefficients <- (VPERMD constants bytestream);
-    constants <- (BArray96.get256 matrix_A__DECODING_TABLE 1);
-    coefficients <- (VPSHUFB_256 coefficients constants);
-    constants <- (BArray96.get256 matrix_A__DECODING_TABLE 2);
-    coefficients <- (VPAND_256 coefficients constants);
+    coefficients <- (VPERMQ bytestream (W8.of_int 148));
+    coefficients <- (VPSHUFB_256 coefficients byte_shuffle);
+    coefficients <- (VPAND_256 coefficients coefficient_mask);
     return (coefficients,
            trace_matrix_A____bytestream_to_potential_coefficients);
   }
@@ -48433,20 +48366,18 @@ module M = {
   BArray1024.t * BArray1024.t * W64.t * trace = {
     var filled:W64.t;
     var ms:W64.t;
-    var shuffle_table_pointer:BArray256.t;
+    var compaction_index_table:BArray2048.t;
     var bytes_filled:W64.t;
     var input_offset:W64.t;
     var modulus:W256.t;
+    var byte_shuffle:W256.t;
+    var coefficient_mask:W256.t;
     var condition_loop:bool;
     var potential_coefficients:W256.t;
     var compare_with_field_modulus:W256.t;
     var good:W64.t;
-    var lower_coefficients:W128.t;
-    var good_lower:W64.t;
-    var shuffle_table_idx:W64.t;
-    var shuffles:W128.t;
-    var upper_coefficients:W128.t;
-    var good_upper:W64.t;
+    var permd_indices:W128.t;
+    var permd_lanes:W256.t;
     var stop_sampling:W64.t;
     var condition:bool;
     var byte0:W32.t;
@@ -48454,30 +48385,29 @@ module M = {
     var byte2:W32.t;
     var coeff:W32.t;
     var param:W256.t;
-    var result:W256.t;
     var param_0:W256.t;
+    var param_1:W256.t;
+    var result:W256.t;
+    var param_2:W256.t;
     var result_0:W64.t;
     var  _0:bool;
     var  _1:bool;
     var  _2:bool;
     var  _3:bool;
     var  _4:bool;
-    var  _5:bool;
-    var  _6:bool;
-    var  _7:bool;
-    var  _8:bool;
-    var  _9:bool;
     var trace_matrix_A__rejection_sample_multiple_blocks:trace;
-    shuffle_table_pointer <- witness;
+    compaction_index_table <- witness;
     trace_matrix_A__rejection_sample_multiple_blocks <- [];
     trace_matrix_A__rejection_sample_multiple_blocks <-
     (trace_matrix_A__rejection_sample_multiple_blocks ++
     [(Assert, (BArray848.is_init b_randombytes 0 848))]);
     ms <- (init_msf);
-    shuffle_table_pointer <- matrix_A__SHUFFLE_TABLE;
+    compaction_index_table <- cOMPACTION_INDEX_TABLE;
     bytes_filled <- (W64.of_int 0);
     input_offset <- (W64.of_int 0);
     modulus <- mODULUS_VECTOR;
+    byte_shuffle <- (BArray64.get256 matrix_A__DECODING_TABLE 0);
+    coefficient_mask <- (BArray64.get256 matrix_A__DECODING_TABLE 1);
     condition_loop <- (input_offset \ult (W64.of_int 768));
     while (condition_loop) {
       ms <- (update_msf condition_loop ms);
@@ -48488,17 +48418,19 @@ module M = {
        (((W64.to_uint input_offset) + 32) <= 848)))]);
       potential_coefficients <-
       (BArray848.get256d randombytes (W64.to_uint input_offset));
-      param <- potential_coefficients;
+      param_1 <- potential_coefficients;
+      param_0 <- byte_shuffle;
+      param <- coefficient_mask;
       (result, tmp__trace) <@ matrix_A____bytestream_to_potential_coefficients (
-      param);
+      param_1, param_0, param);
       trace_matrix_A__rejection_sample_multiple_blocks <-
       (trace_matrix_A__rejection_sample_multiple_blocks ++ tmp__trace);
       potential_coefficients <- result;
       input_offset <- (input_offset + (W64.of_int 24));
       compare_with_field_modulus <-
       (VPCMPGT_8u32 modulus potential_coefficients);
-      param_0 <- compare_with_field_modulus;
-      (result_0, tmp__trace) <@ __lane_signs (param_0);
+      param_2 <- compare_with_field_modulus;
+      (result_0, tmp__trace) <@ __lane_signs (param_2);
       trace_matrix_A__rejection_sample_multiple_blocks <-
       (trace_matrix_A__rejection_sample_multiple_blocks ++ tmp__trace);
       trace_matrix_A__rejection_sample_multiple_blocks <-
@@ -48507,64 +48439,33 @@ module M = {
       good <- result_0;
       (* Erased call to declassify *)
       good <- (protect_64 good ms);
-      lower_coefficients <-
-      (VEXTRACTI128 potential_coefficients (W8.of_int 0));
-      good_lower <- good;
-      good_lower <- (good_lower `&` (W64.of_int 15));
-      shuffle_table_idx <- good_lower;
-      shuffle_table_idx <- (shuffle_table_idx `<<` (W8.of_int 4));
       trace_matrix_A__rejection_sample_multiple_blocks <-
       (trace_matrix_A__rejection_sample_multiple_blocks ++
       [(Assert,
-       ((0 <= (W64.to_uint shuffle_table_idx)) /\
-       (((W64.to_uint shuffle_table_idx) + 16) <= 256)))]);
-      shuffles <-
-      (BArray256.get128d shuffle_table_pointer
-      (W64.to_uint shuffle_table_idx));
-      lower_coefficients <- (VPSHUFB_128 lower_coefficients shuffles);
+       ((0 <= (W64.to_uint ((W64.of_int 8) * good))) /\
+       (((W64.to_uint ((W64.of_int 8) * good)) + 8) <= 2048)))]);
+      permd_indices <-
+      (zeroextu128
+      (BArray2048.get64d compaction_index_table
+      (W64.to_uint ((W64.of_int 8) * good))));
+      permd_lanes <- (VPMOVZX_8u8_8u32 (truncateu64 permd_indices));
+      potential_coefficients <- (VPERMD permd_lanes potential_coefficients);
       trace_matrix_A__rejection_sample_multiple_blocks <-
       (trace_matrix_A__rejection_sample_multiple_blocks ++
       [(Assert,
        ((0 <= (W64.to_uint bytes_filled)) /\
-       (((W64.to_uint bytes_filled) + 16) <= 1024)))]);
+       (((W64.to_uint bytes_filled) + 32) <= 1024)))]);
       b_polynomial <-
-      (BArray1024.set128d b_polynomial (W64.to_uint bytes_filled)
-      (W128.of_int 340282366920938463463374607431768211455));
+      (BArray1024.set256d b_polynomial (W64.to_uint bytes_filled)
+      (W256.of_int
+      115792089237316195423570985008687907853269984665640564039457584007913129639935
+      ));
       polynomial <-
-      (BArray1024.set128d polynomial (W64.to_uint bytes_filled)
-      lower_coefficients);
-      ( _0,  _1,  _2,  _3,  _4, good_lower) <- (POPCNT_64 good_lower);
-      good_lower <- (good_lower `<<` (W8.of_int 2));
-      bytes_filled <- (bytes_filled + good_lower);
-      upper_coefficients <-
-      (VEXTRACTI128 potential_coefficients (W8.of_int 1));
-      good_upper <- good;
-      good_upper <- (good_upper `>>` (W8.of_int 4));
-      shuffle_table_idx <- good_upper;
-      shuffle_table_idx <- (shuffle_table_idx `<<` (W8.of_int 4));
-      trace_matrix_A__rejection_sample_multiple_blocks <-
-      (trace_matrix_A__rejection_sample_multiple_blocks ++
-      [(Assert,
-       ((0 <= (W64.to_uint shuffle_table_idx)) /\
-       (((W64.to_uint shuffle_table_idx) + 16) <= 256)))]);
-      shuffles <-
-      (BArray256.get128d shuffle_table_pointer
-      (W64.to_uint shuffle_table_idx));
-      upper_coefficients <- (VPSHUFB_128 upper_coefficients shuffles);
-      trace_matrix_A__rejection_sample_multiple_blocks <-
-      (trace_matrix_A__rejection_sample_multiple_blocks ++
-      [(Assert,
-       ((0 <= (W64.to_uint bytes_filled)) /\
-       (((W64.to_uint bytes_filled) + 16) <= 1024)))]);
-      b_polynomial <-
-      (BArray1024.set128d b_polynomial (W64.to_uint bytes_filled)
-      (W128.of_int 340282366920938463463374607431768211455));
-      polynomial <-
-      (BArray1024.set128d polynomial (W64.to_uint bytes_filled)
-      upper_coefficients);
-      ( _5,  _6,  _7,  _8,  _9, good_upper) <- (POPCNT_64 good_upper);
-      good_upper <- (good_upper `<<` (W8.of_int 2));
-      bytes_filled <- (bytes_filled + good_upper);
+      (BArray1024.set256d polynomial (W64.to_uint bytes_filled)
+      potential_coefficients);
+      ( _0,  _1,  _2,  _3,  _4, good) <- (POPCNT_64 good);
+      good <- (good `<<` (W8.of_int 2));
+      bytes_filled <- (bytes_filled + good);
       condition_loop <- (input_offset \ult (W64.of_int 768));
     }
     ms <- (update_msf (! condition_loop) ms);
@@ -52734,7 +52635,7 @@ module M = {
     good <- good_overall;
     good <- (good `&` (W64.of_int 255));
     good_overall <- (good_overall `>>` (W8.of_int 8));
-    shuffle_table_pointer <- eRROR_VECTOR_SHUFFLE_TABLE;
+    shuffle_table_pointer <- cOMPACTION_INDEX_TABLE;
     shuffle_table_idx <- good;
     shuffle_table_idx <- (shuffle_table_idx `<<` (W8.of_int 3));
     trace_error_4x____write_out_8_coefficients <-
@@ -66805,9 +66706,11 @@ op shake256_squeezeblock4x_spec _state _b_state _h0 _b_h0 _h1 _b_h1 _h2 _b_h2 _h
     (BArray136.is_init res.`10 0 136)) /\
    (valid res.`11))].
 
-op matrix_A____bytestream_to_potential_coefficients_spec _bytestream =
+op matrix_A____bytestream_to_potential_coefficients_spec _bytestream _byte_shuffle _coefficient_mask =
    hoare [M.matrix_A____bytestream_to_potential_coefficients :
-   ((_bytestream = bytestream) /\ true) ==> (true /\ (valid res.`2))].
+   (((_coefficient_mask = coefficient_mask) /\
+    ((_byte_shuffle = byte_shuffle) /\ (_bytestream = bytestream))) /\
+   true) ==> (true /\ (valid res.`2))].
 
 op matrix_A__rejection_sample_multiple_blocks_spec _polynomial _b_polynomial _randombytes _b_randombytes =
    hoare [M.matrix_A__rejection_sample_multiple_blocks :
