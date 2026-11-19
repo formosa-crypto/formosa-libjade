@@ -9,10 +9,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* mldsa_native.h undefines its own namespace macro after the declarations. */
+#define MLDN(sym) MLD_API_CONCAT_UNDERSCORE(MLD_CONFIG_NAMESPACE_PREFIX, sym)
+
 void sig_keygen(uint8_t *vk, uint8_t *sk, const uint8_t *seed) {
   /* keypair_internal is warn_unused_result; a nonzero return is a real failure,
    * not something to discard. sig_keygen has no status channel, so abort. */
-  if (MLD_API_NAMESPACE(keypair_internal)(vk, sk, seed) != 0)
+  if (MLDN(keypair_internal)(vk, sk, seed) != 0)
     abort();
 }
 
@@ -27,16 +30,15 @@ static size_t make_pre(uint8_t pre[2 + 255], const uint8_t *ctx,
 int sig_sign(uint8_t *sig, const uint8_t *sk, const uint8_t *ctx, size_t ctx_len,
              const uint8_t *msg, size_t msg_len, const uint8_t *rnd) {
   uint8_t pre[2 + 255];
-  size_t prelen = make_pre(pre, ctx, ctx_len), siglen = 0;
-  return MLD_API_NAMESPACE(signature_internal)(
-      sig, &siglen, msg, msg_len, pre, prelen, rnd, sk, 0 /* externalmu */);
+  size_t prelen = make_pre(pre, ctx, ctx_len);
+  return MLDN(signature_internal)(
+      sig, msg, msg_len, pre, prelen, rnd, sk, 0 /* externalmu */);
 }
 
 int sig_verify(const uint8_t *vk, const uint8_t *ctx, size_t ctx_len,
                const uint8_t *msg, size_t msg_len, const uint8_t *sig) {
   uint8_t pre[2 + 255];
   size_t prelen = make_pre(pre, ctx, ctx_len);
-  return MLD_API_NAMESPACE(verify_internal)(
-      sig, MLDSA_BYTES(MLD_CONFIG_PARAMETER_SET), msg, msg_len, pre, prelen, vk,
-      0 /* externalmu */);
+  return MLDN(verify_internal)(sig, msg, msg_len, pre, prelen, vk,
+                               0 /* externalmu */);
 }
