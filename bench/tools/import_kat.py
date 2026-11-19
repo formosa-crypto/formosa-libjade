@@ -8,7 +8,10 @@ Two sources, both downloaded at a fixed version:
   checks (FIPS 203 7.2, 7.3) included (mlkem<n>.json); ML-DSA-keyGen /
   -sigGen / -sigVer (mldsa<n>-acvp.json), only the groups of the external,
   pure interface, the one the common ABI exposes (the importer lists the
-  others).
+  others); SHA3-{224,256,384,512} and SHAKE-{128,256}
+  (fips202-sha3<n>.json, fips202-shake<n>.json: the tests of the fips202
+  implementation, which covers every function), AFT only, byte-aligned
+  messages only.
 - the KAT files of post-quantum-cryptography/KAT (an archived repository,
   pinned to a commit), with the SHA3-256 hashes of the long outputs:
   ML-DSA hedged_pure (mldsa<n>.json), keygen then signing; ML-KEM
@@ -29,6 +32,8 @@ from pathlib import Path
 ACVP_BASE = "https://raw.githubusercontent.com/usnistgov/ACVP-Server/{v}/gen-val/json-files"
 ACVP_MLKEM = ["ML-KEM-keyGen-FIPS203", "ML-KEM-encapDecap-FIPS203"]
 ACVP_MLDSA = ["ML-DSA-keyGen-FIPS204", "ML-DSA-sigGen-FIPS204", "ML-DSA-sigVer-FIPS204"]
+ACVP_SHA3 = ["SHA3-224-2.0", "SHA3-256-2.0", "SHA3-384-2.0", "SHA3-512-2.0"]
+ACVP_SHAKE = ["SHAKE-128-FIPS202", "SHAKE-256-FIPS202"]
 PQC_COMMIT = "f238e347b1323344208eb316df9993c923334817"
 PQC_BASE = f"https://raw.githubusercontent.com/post-quantum-cryptography/KAT/{PQC_COMMIT}"
 PQC_TESTS = 100  # ML-KEM records kept per parameter set (the files have 1000)
@@ -38,8 +43,8 @@ def base_name(algo):
     return algo.replace("-", "").lower()  # "ML-KEM-512" -> "mlkem512"
 
 
-def write_scheme(out_dir, algo, tests, source, suffix=""):
-    path = out_dir / f"{base_name(algo)}{suffix}.json"
+def write_scheme(out_dir, algo, tests, source, suffix="", prefix=""):
+    path = out_dir / f"{prefix}{base_name(algo)}{suffix}.json"
     path.write_text(json.dumps(
         {"algorithm": algo, "source": source, "tests": tests}, indent=1))
     print(f"  {path.name}: {len(tests)} test(s)")
@@ -188,6 +193,35 @@ def import_mlkem(version, out_dir, cache):
         write_scheme(out_dir, algo, tests, f"NIST ACVP {version}")
 
 
+def import_fips202(version, out_dir, cache):
+    a = fetch_acvp(version, cache, ACVP_SHA3 + ACVP_SHAKE)
+    for d in ACVP_SHA3 + ACVP_SHAKE:
+        prompt, exp = a[d]
+        algo = prompt["algorithm"]
+        tests, skipped = [], 0
+        for g in prompt["testGroups"]:
+            if g["testType"] != "AFT":
+                print(f"  skipped {d} group {g['tgId']} ({g['testType']},"
+                      f" {len(g['tests'])} tests)")
+                continue
+            for t in g["tests"]:
+                in_bits = t["len"]
+                if in_bits % 8 != 0:
+                    skipped += 1
+                    continue
+                out_bits = t.get("outLen")
+                if out_bits is not None and out_bits % 8 != 0:
+                    skipped += 1
+                    continue
+                e = exp[t["tcId"]]
+                rec = {"message": t["msg"][:in_bits // 4], "digest": e["md"]}
+                if out_bits is not None:
+                    rec["output_length"] = out_bits // 8
+                tests.append({"count": t["tcId"], "hash": rec})
+        note = f" ({skipped} sub-byte test(s) excluded)" if skipped else ""
+        write_scheme(out_dir, algo, tests, f"NIST ACVP {version}{note}", prefix="fips202-")
+
+
 def import_mldsa_acvp(version, out_dir, cache):
     a = fetch_acvp(version, cache, ACVP_MLDSA)
     schemes = {}  # algo -> list of tests
@@ -247,22 +281,26 @@ def main(argv=None):
     here = Path(__file__).resolve().parent.parent
     ap.add_argument("--out", type=Path, default=here / "vectors")
     ap.add_argument("--acvp-version", default="v1.1.0.43")
-    ap.add_argument("--only", choices=("mldsa", "mlkem"))
+    ap.add_argument("--only", choices=("mldsa", "mlkem", "fips202"))
     args = ap.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)
 
     cache = args.out / ".cache"
     acvp = cache / "acvp" / args.acvp_version
-    if args.only != "mlkem":
+    only = args.only
+    if only in (None, "mldsa"):
         print("ML-DSA (post-quantum-cryptography/KAT):")
         import_mldsa_pqc(args.out, cache / "pqc")
         print("ML-DSA (NIST ACVP):")
         import_mldsa_acvp(args.acvp_version, args.out, acvp)
-    if args.only != "mldsa":
+    if only in (None, "mlkem"):
         print("ML-KEM (NIST ACVP):")
         import_mlkem(args.acvp_version, args.out, acvp)
         print("ML-KEM (post-quantum-cryptography/KAT):")
         import_mlkem_pqc(args.out, cache / "pqc")
+    if only in (None, "fips202"):
+        print("FIPS 202 (NIST ACVP):")
+        import_fips202(args.acvp_version, args.out, acvp)
     return 0
 
 

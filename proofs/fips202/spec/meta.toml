@@ -1,0 +1,6 @@
+primitive      = "SHA-3"
+standard       = "FIPS 202"
+spec           = "FIPS202_SHA3.ec"
+# the function of each parameter set: a hash function, or an XOF
+operations     = ["hash"]
+parameter_sets = ["SHA3-224", "SHA3-256", "SHA3-384", "SHA3-512", "SHAKE128", "SHAKE256"]

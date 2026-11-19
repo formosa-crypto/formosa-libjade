@@ -2163,15 +2163,21 @@ module M = {
   }
   proc __stavx2_unpack (st:W64.t Array25.t, state:W256.t Array7.t) : 
   W64.t Array25.t = {
-    var t128_0:W128.t;
     var t256_0:W256.t;
     var t256_1:W256.t;
     var t256_2:W256.t;
     var t256_3:W256.t;
-    var t128_1:W128.t;
     var t256_4:W256.t;
-    t128_0 <- (truncateu128 state.[0]);
-    st.[0] <- (VMOVLPD t128_0);
+    st <-
+    (Array25.init
+    (WArray200.get64
+    (WArray200.set128_direct (WArray200.init64 (fun i => st.[i])) (0 * 8)
+    (truncateu128 state.[0]))));
+    st <-
+    (Array25.init
+    (WArray200.get64
+    (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) (3 * 8)
+    state.[2])));
     st <-
     (Array25.init
     (WArray200.get64
@@ -2237,8 +2243,6 @@ module M = {
     ((2 ^ 1) *
     ((1 %% (2 ^ 1)) + ((2 ^ 1) * ((1 %% (2 ^ 1)) + ((2 ^ 1) * 1))))))))))))))
     ));
-    t128_1 <- (VEXTRACTI128 state.[2] (W8.of_int 1));
-    st.[5] <- (VMOVLPD t128_1);
     t256_4 <-
     (VPBLEND_8u32 t256_0 t256_3
     (W8.of_int
@@ -2259,8 +2263,16 @@ module M = {
     (WArray200.get64
     (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) (6 * 8)
     t256_4)));
-    t128_0 <- (truncateu128 state.[2]);
-    st.[10] <- (VMOVLPD t128_0);
+    st <-
+    (Array25.init
+    (WArray200.get64
+    (WArray200.set128_direct (WArray200.init64 (fun i => st.[i])) (10 * 8)
+    (truncateu128 state.[2]))));
+    st <-
+    (Array25.init
+    (WArray200.get64
+    (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) (12 * 8)
+    state.[2])));
     t256_4 <-
     (VPBLEND_8u32 t256_3 t256_1
     (W8.of_int
@@ -2281,7 +2293,11 @@ module M = {
     (WArray200.get64
     (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) (11 * 8)
     t256_4)));
-    st.[15] <- (VMOVHPD t128_1);
+    st <-
+    (Array25.init
+    (WArray200.get64
+    (WArray200.set128_direct (WArray200.init64 (fun i => st.[i])) (19 * 8)
+    (truncateu128 state.[2]))));
     t256_4 <-
     (VPBLEND_8u32 t256_2 t256_0
     (W8.of_int
@@ -2302,7 +2318,6 @@ module M = {
     (WArray200.get64
     (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) (16 * 8)
     t256_4)));
-    st.[20] <- (VMOVHPD t128_0);
     t256_4 <-
     (VPBLEND_8u32 t256_1 t256_2
     (W8.of_int
@@ -2604,14 +2619,13 @@ module M = {
         lEN <- (lEN - 16);
       } else {
         if ((8 <= lEN)) {
-          Glob.mem <- (storeW64 Glob.mem buf (MOVV_64 (truncateu64 w)));
+          Glob.mem <- (storeW64 Glob.mem buf (VPEXTR_64 w (W8.of_int 0)));
           buf <- (buf + 8);
           lEN <- (lEN - 8);
-          w <- (VPUNPCKH_2u64 w w);
+          t64 <- (VPEXTR_64 w (W8.of_int 1));
         } else {
-          
+          t64 <- (VPEXTR_64 w (W8.of_int 0));
         }
-        t64 <- (MOVV_64 (truncateu64 w));
         (buf, lEN) <@ __m_ilen_write_upto8 (buf, lEN, t64);
       }
     } else {
@@ -3963,9 +3977,8 @@ module M = {
     if ((0 < _LEN)) {
       t128_1 <- (VEXTRACTI128 st.[2] (W8.of_int 1));
       t128_0 <- (truncateu128 st.[2]);
-      t <- (MOVV_64 (truncateu64 t128_1));
+      t <- (VPEXTR_64 t128_1 (W8.of_int 0));
       (buf, _LEN) <@ __m_ilen_write_upto8 (buf, _LEN, t);
-      t128_1 <- (VPUNPCKH_2u64 t128_1 t128_1);
       if ((0 < _LEN)) {
         t256_0 <-
         (VPBLEND_8u32 st.[3] st.[4]
@@ -4044,9 +4057,8 @@ module M = {
         ));
         (buf, _LEN) <@ __m_ilen_write_upto32 (buf, _LEN, t256_4);
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 0));
           (buf, _LEN) <@ __m_ilen_write_upto8 (buf, _LEN, t);
-          t128_0 <- (VPUNPCKH_2u64 t128_0 t128_0);
         } else {
           
         }
@@ -4071,7 +4083,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_1));
+          t <- (VPEXTR_64 t128_1 (W8.of_int 1));
           (buf, _LEN) <@ __m_ilen_write_upto8 (buf, _LEN, t);
         } else {
           
@@ -4097,7 +4109,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 1));
           (buf, _LEN) <@ __m_ilen_write_upto8 (buf, _LEN, t);
         } else {
           
@@ -6151,7 +6163,10 @@ module M = {
     var rbit:W64.t;
     var r8:int;
     var at:int;
+    var  _0:W64.t;
     ststatus <- st.[(4 * 25)];
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
     (trailb, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     t8 <- (truncateu8 (W64.of_int at));
     at <- (at `|>>` 3);
@@ -6195,8 +6210,11 @@ module M = {
     var r8:int;
     var at:int;
     var  _0:W64.t;
+    var  _1:W64.t;
+     _0 <- (init_msf);
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     status.[0] <- (truncateu8 (W64.of_int r8));
     status.[1] <- (truncateu8 (W64.of_int at));
     status.[2] <-
@@ -6205,7 +6223,8 @@ module M = {
   }
   proc init_updstate_avx2x4 (st:W64.t Array101.t, r64:int, trailb:W8.t) : 
   W64.t Array101.t = {
-    
+    var  _0:W64.t;
+     _0 <- (init_msf);
     st <- st;
     r64 <- r64;
     trailb <- trailb;
@@ -6213,7 +6232,8 @@ module M = {
     return st;
   }
   proc finish_updstate_avx2x4 (st:W64.t Array101.t) : W64.t Array101.t = {
-    
+    var  _0:W64.t;
+     _0 <- (init_msf);
     st <- st;
     st <@ _finish_updstate_avx2x4 (st);
     return st;
@@ -6306,10 +6326,13 @@ module M = {
     var r8:int;
     var at:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
+    var  _2:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -6321,7 +6344,7 @@ module M = {
       at <- 0;
     }
     len <- len;
-    (stk, at,  _1) <@ _add_m_bcast_updstate_avx2x4 (stk, at, buf, len);
+    (stk, at,  _2) <@ _add_m_bcast_updstate_avx2x4 (stk, at, buf, len);
     st <-
     (Array101.init
     (WArray808.get64
@@ -6507,13 +6530,16 @@ module M = {
     var r8:int;
     var at:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
     var  _2:int;
     var  _3:int;
     var  _4:int;
+    var  _5:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -6529,7 +6555,7 @@ module M = {
       at <- 0;
     }
     len <- len;
-    (stk, at,  _1,  _2,  _3,  _4) <@ _add_m_updstate_avx2x4 (stk, at, 
+    (stk, at,  _2,  _3,  _4,  _5) <@ _add_m_updstate_avx2x4 (stk, at, 
     buf0, buf1, buf2, buf3, len);
     (* Erased call to unspill *)
     st <-
@@ -6652,13 +6678,16 @@ module M = {
     var r8:int;
     var at:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
     var  _2:int;
     var  _3:int;
     var  _4:int;
+    var  _5:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -6676,7 +6705,7 @@ module M = {
       at <- 0;
     }
     len <- len;
-    ( _1,  _2,  _3,  _4, at) <@ _dump_m_updstate_avx2x4 (buf0, buf1, 
+    ( _2,  _3,  _4,  _5, at) <@ _dump_m_updstate_avx2x4 (buf0, buf1, 
     buf2, buf3, stk, at, len);
     st <-
     (Array101.init
@@ -6697,7 +6726,8 @@ module M = {
   }
   proc absorb_m_bcast_updstate_avx2x4 (st:W64.t Array101.t, buf:int, len:int) : 
   W64.t Array101.t = {
-    
+    var  _0:W64.t;
+     _0 <- (init_msf);
     st <- st;
     buf <- buf;
     len <- len;
@@ -6706,7 +6736,8 @@ module M = {
   }
   proc absorb_m_updstate_avx2x4 (st:W64.t Array101.t, buf0:int, buf1:int,
                                  buf2:int, buf3:int, len:int) : W64.t Array101.t = {
-    
+    var  _0:W64.t;
+     _0 <- (init_msf);
     st <- st;
     buf0 <- buf0;
     buf1 <- buf1;
@@ -6718,7 +6749,8 @@ module M = {
   }
   proc squeeze_m_updstate_avx2x4 (st:W64.t Array101.t, buf0:int, buf1:int,
                                   buf2:int, buf3:int, len:int) : W64.t Array101.t = {
-    
+    var  _0:W64.t;
+     _0 <- (init_msf);
     st <- st;
     buf0 <- buf0;
     buf1 <- buf1;
@@ -6968,14 +7000,13 @@ module M = {
           (Array999.init
           (WArray999.get8
           (WArray999.set64_direct (WArray999.init8 (fun i => buf.[i]))
-          (offset + dELTA) (MOVV_64 (truncateu64 w)))));
+          (offset + dELTA) (VPEXTR_64 w (W8.of_int 0)))));
           dELTA <- (dELTA + 8);
           lEN <- (lEN - 8);
-          w <- (VPUNPCKH_2u64 w w);
+          t64 <- (VPEXTR_64 w (W8.of_int 1));
         } else {
-          
+          t64 <- (VPEXTR_64 w (W8.of_int 0));
         }
-        t64 <- (MOVV_64 (truncateu64 w));
         (buf, dELTA, lEN) <@ __a_ilen_write_upto8 (buf, offset, dELTA, 
         lEN, t64);
       }
@@ -7903,10 +7934,9 @@ module M = {
     if ((0 < _LEN)) {
       t128_1 <- (VEXTRACTI128 st.[2] (W8.of_int 1));
       t128_0 <- (truncateu128 st.[2]);
-      t <- (MOVV_64 (truncateu64 t128_1));
+      t <- (VPEXTR_64 t128_1 (W8.of_int 0));
       (buf, dELTA, _LEN) <@ __a_ilen_write_upto8 (buf, offset, dELTA, 
       _LEN, t);
-      t128_1 <- (VPUNPCKH_2u64 t128_1 t128_1);
       if ((0 < _LEN)) {
         t256_0 <-
         (VPBLEND_8u32 st.[3] st.[4]
@@ -7986,10 +8016,9 @@ module M = {
         (buf, dELTA, _LEN) <@ __a_ilen_write_upto32 (buf, offset, dELTA,
         _LEN, t256_4);
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 0));
           (buf, dELTA, _LEN) <@ __a_ilen_write_upto8 (buf, offset, dELTA,
           _LEN, t);
-          t128_0 <- (VPUNPCKH_2u64 t128_0 t128_0);
         } else {
           
         }
@@ -8015,7 +8044,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_1));
+          t <- (VPEXTR_64 t128_1 (W8.of_int 1));
           (buf, dELTA, _LEN) <@ __a_ilen_write_upto8 (buf, offset, dELTA,
           _LEN, t);
         } else {
@@ -8043,7 +8072,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 1));
           (buf, dELTA, _LEN) <@ __a_ilen_write_upto8 (buf, offset, dELTA,
           _LEN, t);
         } else {
@@ -8629,10 +8658,13 @@ module M = {
     var at:int;
     var off:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
+    var  _2:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -8645,7 +8677,7 @@ module M = {
       at <- 0;
     }
     len <- len;
-    (stk, at,  _1) <@ _add_bcast_updstate_avx2x4 (stk, at, buf, off, len);
+    (stk, at,  _2) <@ _add_bcast_updstate_avx2x4 (stk, at, buf, off, len);
     st <-
     (Array101.init
     (WArray808.get64
@@ -8833,10 +8865,13 @@ module M = {
     var at:int;
     var off:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
+    var  _2:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -8853,7 +8888,7 @@ module M = {
       at <- 0;
     }
     len <- len;
-    (stk, at,  _1) <@ _add_updstate_avx2x4 (stk, at, buf0, buf1, buf2, 
+    (stk, at,  _2) <@ _add_updstate_avx2x4 (stk, at, buf0, buf1, buf2, 
     buf3, off, len);
     (* Erased call to unspill *)
     st <-
@@ -9002,10 +9037,13 @@ module M = {
     var at:int;
     var off:int;
     var  _0:W64.t;
-    var  _1:int;
+    var  _1:W64.t;
+    var  _2:int;
     stk <- witness;
     ststatus <- st.[(4 * 25)];
-    ( _0, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
+    (* Erased call to declassify *)
+     _0 <- (init_msf);
+    ( _1, r8, at) <@ _ststatus_data_avx2x4 (ststatus);
     stk <-
     (Array25.init
     (fun i => (get256 (WArray808.init64 (fun i => st.[i])) (0 + i))));
@@ -9024,7 +9062,7 @@ module M = {
       at <- 0;
     }
     len <- len;
-    (buf0, buf1, buf2, buf3,  _1, at) <@ _dump_updstate_avx2x4 (buf0, 
+    (buf0, buf1, buf2, buf3,  _2, at) <@ _dump_updstate_avx2x4 (buf0, 
     buf1, buf2, buf3, off, stk, at, len);
     st <-
     (Array101.init

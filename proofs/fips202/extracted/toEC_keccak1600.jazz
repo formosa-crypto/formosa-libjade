@@ -11,3 +11,7 @@ from Keccak require "avx2/common/keccak1600_fixedsizes.jinc"
 //require "toEC_keccak1600_avx2x4.jazz"
 from Keccak require "avx2/common/keccak1600x4_fixedsizes.jinc"
 from Keccak require "avx2/common/keccak1600x4_updstate.jinc"
+
+// JKCP C-ABI entry points
+from Keccak require "ref/JKCP.jazz"
+from Keccak require "avx2/JKCP.jazz"

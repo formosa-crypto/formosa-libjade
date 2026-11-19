@@ -4063,15 +4063,21 @@ module M = {
   }
   proc __stavx2_unpack (st:W64.t Array25.t, state:W256.t Array7.t) : 
   W64.t Array25.t = {
-    var t128_0:W128.t;
     var t256_0:W256.t;
     var t256_1:W256.t;
     var t256_2:W256.t;
     var t256_3:W256.t;
-    var t128_1:W128.t;
     var t256_4:W256.t;
-    t128_0 <- (truncateu128 state.[0]);
-    st.[0] <- (VMOVLPD t128_0);
+    st <-
+    (Array25.init
+    (WArray200.get64
+    (WArray200.set128_direct (WArray200.init64 (fun i => st.[i])) (0 * 8)
+    (truncateu128 state.[0]))));
+    st <-
+    (Array25.init
+    (WArray200.get64
+    (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) (3 * 8)
+    state.[2])));
     st <-
     (Array25.init
     (WArray200.get64
@@ -4137,8 +4143,6 @@ module M = {
     ((2 ^ 1) *
     ((1 %% (2 ^ 1)) + ((2 ^ 1) * ((1 %% (2 ^ 1)) + ((2 ^ 1) * 1))))))))))))))
     ));
-    t128_1 <- (VEXTRACTI128 state.[2] (W8.of_int 1));
-    st.[5] <- (VMOVLPD t128_1);
     t256_4 <-
     (VPBLEND_8u32 t256_0 t256_3
     (W8.of_int
@@ -4159,8 +4163,16 @@ module M = {
     (WArray200.get64
     (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) (6 * 8)
     t256_4)));
-    t128_0 <- (truncateu128 state.[2]);
-    st.[10] <- (VMOVLPD t128_0);
+    st <-
+    (Array25.init
+    (WArray200.get64
+    (WArray200.set128_direct (WArray200.init64 (fun i => st.[i])) (10 * 8)
+    (truncateu128 state.[2]))));
+    st <-
+    (Array25.init
+    (WArray200.get64
+    (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) (12 * 8)
+    state.[2])));
     t256_4 <-
     (VPBLEND_8u32 t256_3 t256_1
     (W8.of_int
@@ -4181,7 +4193,11 @@ module M = {
     (WArray200.get64
     (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) (11 * 8)
     t256_4)));
-    st.[15] <- (VMOVHPD t128_1);
+    st <-
+    (Array25.init
+    (WArray200.get64
+    (WArray200.set128_direct (WArray200.init64 (fun i => st.[i])) (19 * 8)
+    (truncateu128 state.[2]))));
     t256_4 <-
     (VPBLEND_8u32 t256_2 t256_0
     (W8.of_int
@@ -4202,7 +4218,6 @@ module M = {
     (WArray200.get64
     (WArray200.set256_direct (WArray200.init64 (fun i => st.[i])) (16 * 8)
     t256_4)));
-    st.[20] <- (VMOVHPD t128_0);
     t256_4 <-
     (VPBLEND_8u32 t256_1 t256_2
     (W8.of_int
@@ -9148,14 +9163,13 @@ module M = {
           (Array64.init
           (WArray64.get8
           (WArray64.set64_direct (WArray64.init8 (fun i => buf.[i]))
-          (offset + dELTA) (MOVV_64 (truncateu64 w)))));
+          (offset + dELTA) (VPEXTR_64 w (W8.of_int 0)))));
           dELTA <- (dELTA + 8);
           lEN <- (lEN - 8);
-          w <- (VPUNPCKH_2u64 w w);
+          t64 <- (VPEXTR_64 w (W8.of_int 1));
         } else {
-          
+          t64 <- (VPEXTR_64 w (W8.of_int 0));
         }
-        t64 <- (MOVV_64 (truncateu64 w));
         (buf, dELTA, lEN) <@ a64____a_ilen_write_upto8 (buf, offset, 
         dELTA, lEN, t64);
       }
@@ -9392,10 +9406,9 @@ module M = {
     if ((0 < _LEN)) {
       t128_1 <- (VEXTRACTI128 st.[2] (W8.of_int 1));
       t128_0 <- (truncateu128 st.[2]);
-      t <- (MOVV_64 (truncateu64 t128_1));
+      t <- (VPEXTR_64 t128_1 (W8.of_int 0));
       (buf, dELTA, _LEN) <@ a64____a_ilen_write_upto8 (buf, offset, dELTA,
       _LEN, t);
-      t128_1 <- (VPUNPCKH_2u64 t128_1 t128_1);
       if ((0 < _LEN)) {
         t256_0 <-
         (VPBLEND_8u32 st.[3] st.[4]
@@ -9475,10 +9488,9 @@ module M = {
         (buf, dELTA, _LEN) <@ a64____a_ilen_write_upto32 (buf, offset, 
         dELTA, _LEN, t256_4);
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 0));
           (buf, dELTA, _LEN) <@ a64____a_ilen_write_upto8 (buf, offset,
           dELTA, _LEN, t);
-          t128_0 <- (VPUNPCKH_2u64 t128_0 t128_0);
         } else {
           
         }
@@ -9504,7 +9516,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_1));
+          t <- (VPEXTR_64 t128_1 (W8.of_int 1));
           (buf, dELTA, _LEN) <@ a64____a_ilen_write_upto8 (buf, offset,
           dELTA, _LEN, t);
         } else {
@@ -9532,7 +9544,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 1));
           (buf, dELTA, _LEN) <@ a64____a_ilen_write_upto8 (buf, offset,
           dELTA, _LEN, t);
         } else {
@@ -10510,14 +10522,13 @@ module M = {
           (Array128.init
           (WArray128.get8
           (WArray128.set64_direct (WArray128.init8 (fun i => buf.[i]))
-          (offset + dELTA) (MOVV_64 (truncateu64 w)))));
+          (offset + dELTA) (VPEXTR_64 w (W8.of_int 0)))));
           dELTA <- (dELTA + 8);
           lEN <- (lEN - 8);
-          w <- (VPUNPCKH_2u64 w w);
+          t64 <- (VPEXTR_64 w (W8.of_int 1));
         } else {
-          
+          t64 <- (VPEXTR_64 w (W8.of_int 0));
         }
-        t64 <- (MOVV_64 (truncateu64 w));
         (buf, dELTA, lEN) <@ a128____a_ilen_write_upto8 (buf, offset, 
         dELTA, lEN, t64);
       }
@@ -10693,10 +10704,9 @@ module M = {
     if ((0 < _LEN)) {
       t128_1 <- (VEXTRACTI128 st.[2] (W8.of_int 1));
       t128_0 <- (truncateu128 st.[2]);
-      t <- (MOVV_64 (truncateu64 t128_1));
+      t <- (VPEXTR_64 t128_1 (W8.of_int 0));
       (buf, dELTA, _LEN) <@ a128____a_ilen_write_upto8 (buf, offset, 
       dELTA, _LEN, t);
-      t128_1 <- (VPUNPCKH_2u64 t128_1 t128_1);
       if ((0 < _LEN)) {
         t256_0 <-
         (VPBLEND_8u32 st.[3] st.[4]
@@ -10776,10 +10786,9 @@ module M = {
         (buf, dELTA, _LEN) <@ a128____a_ilen_write_upto32 (buf, offset,
         dELTA, _LEN, t256_4);
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 0));
           (buf, dELTA, _LEN) <@ a128____a_ilen_write_upto8 (buf, offset,
           dELTA, _LEN, t);
-          t128_0 <- (VPUNPCKH_2u64 t128_0 t128_0);
         } else {
           
         }
@@ -10805,7 +10814,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_1));
+          t <- (VPEXTR_64 t128_1 (W8.of_int 1));
           (buf, dELTA, _LEN) <@ a128____a_ilen_write_upto8 (buf, offset,
           dELTA, _LEN, t);
         } else {
@@ -10833,7 +10842,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 1));
           (buf, dELTA, _LEN) <@ a128____a_ilen_write_upto8 (buf, offset,
           dELTA, _LEN, t);
         } else {
@@ -11191,14 +11200,13 @@ module M = {
           (Array136.init
           (WArray136.get8
           (WArray136.set64_direct (WArray136.init8 (fun i => buf.[i]))
-          (offset + dELTA) (MOVV_64 (truncateu64 w)))));
+          (offset + dELTA) (VPEXTR_64 w (W8.of_int 0)))));
           dELTA <- (dELTA + 8);
           lEN <- (lEN - 8);
-          w <- (VPUNPCKH_2u64 w w);
+          t64 <- (VPEXTR_64 w (W8.of_int 1));
         } else {
-          
+          t64 <- (VPEXTR_64 w (W8.of_int 0));
         }
-        t64 <- (MOVV_64 (truncateu64 w));
         (buf, dELTA, lEN) <@ a136____a_ilen_write_upto8 (buf, offset, 
         dELTA, lEN, t64);
       }
@@ -11268,10 +11276,9 @@ module M = {
     if ((0 < _LEN)) {
       t128_1 <- (VEXTRACTI128 st.[2] (W8.of_int 1));
       t128_0 <- (truncateu128 st.[2]);
-      t <- (MOVV_64 (truncateu64 t128_1));
+      t <- (VPEXTR_64 t128_1 (W8.of_int 0));
       (buf, dELTA, _LEN) <@ a136____a_ilen_write_upto8 (buf, offset, 
       dELTA, _LEN, t);
-      t128_1 <- (VPUNPCKH_2u64 t128_1 t128_1);
       if ((0 < _LEN)) {
         t256_0 <-
         (VPBLEND_8u32 st.[3] st.[4]
@@ -11351,10 +11358,9 @@ module M = {
         (buf, dELTA, _LEN) <@ a136____a_ilen_write_upto32 (buf, offset,
         dELTA, _LEN, t256_4);
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 0));
           (buf, dELTA, _LEN) <@ a136____a_ilen_write_upto8 (buf, offset,
           dELTA, _LEN, t);
-          t128_0 <- (VPUNPCKH_2u64 t128_0 t128_0);
         } else {
           
         }
@@ -11380,7 +11386,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_1));
+          t <- (VPEXTR_64 t128_1 (W8.of_int 1));
           (buf, dELTA, _LEN) <@ a136____a_ilen_write_upto8 (buf, offset,
           dELTA, _LEN, t);
         } else {
@@ -11408,7 +11414,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 1));
           (buf, dELTA, _LEN) <@ a136____a_ilen_write_upto8 (buf, offset,
           dELTA, _LEN, t);
         } else {
@@ -12071,14 +12077,13 @@ module M = {
           (Array32.init
           (WArray32.get8
           (WArray32.set64_direct (WArray32.init8 (fun i => buf.[i]))
-          (offset + dELTA) (MOVV_64 (truncateu64 w)))));
+          (offset + dELTA) (VPEXTR_64 w (W8.of_int 0)))));
           dELTA <- (dELTA + 8);
           lEN <- (lEN - 8);
-          w <- (VPUNPCKH_2u64 w w);
+          t64 <- (VPEXTR_64 w (W8.of_int 1));
         } else {
-          
+          t64 <- (VPEXTR_64 w (W8.of_int 0));
         }
-        t64 <- (MOVV_64 (truncateu64 w));
         (buf, dELTA, lEN) <@ a_COMMITMENT_HASH____a_ilen_write_upto8 (
         buf, offset, dELTA, lEN, t64);
       }
@@ -12258,10 +12263,9 @@ module M = {
     if ((0 < _LEN)) {
       t128_1 <- (VEXTRACTI128 st.[2] (W8.of_int 1));
       t128_0 <- (truncateu128 st.[2]);
-      t <- (MOVV_64 (truncateu64 t128_1));
+      t <- (VPEXTR_64 t128_1 (W8.of_int 0));
       (buf, dELTA, _LEN) <@ a_COMMITMENT_HASH____a_ilen_write_upto8 (
       buf, offset, dELTA, _LEN, t);
-      t128_1 <- (VPUNPCKH_2u64 t128_1 t128_1);
       if ((0 < _LEN)) {
         t256_0 <-
         (VPBLEND_8u32 st.[3] st.[4]
@@ -12341,10 +12345,9 @@ module M = {
         (buf, dELTA, _LEN) <@ a_COMMITMENT_HASH____a_ilen_write_upto32 (
         buf, offset, dELTA, _LEN, t256_4);
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 0));
           (buf, dELTA, _LEN) <@ a_COMMITMENT_HASH____a_ilen_write_upto8 (
           buf, offset, dELTA, _LEN, t);
-          t128_0 <- (VPUNPCKH_2u64 t128_0 t128_0);
         } else {
           
         }
@@ -12370,7 +12373,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_1));
+          t <- (VPEXTR_64 t128_1 (W8.of_int 1));
           (buf, dELTA, _LEN) <@ a_COMMITMENT_HASH____a_ilen_write_upto8 (
           buf, offset, dELTA, _LEN, t);
         } else {
@@ -12398,7 +12401,7 @@ module M = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 1));
           (buf, dELTA, _LEN) <@ a_COMMITMENT_HASH____a_ilen_write_upto8 (
           buf, offset, dELTA, _LEN, t);
         } else {

@@ -125,11 +125,11 @@ by rewrite /stavx2_to_st25 !get_of_list //=; circuit.
 qed.
 
 lemma dump_avx2_w2 (st: W256.t Array7.t):
- u64bytes (MOVV_64 (truncateu64 (VEXTRACTI128 st.[2] (W8.of_int 1))))
+ u64bytes (VPEXTR_64 (VEXTRACTI128 st.[2] (W8.of_int 1)) (W8.of_int 0))
  = sub (stbytes (stavx2_to_st25 st)) 40 8.
 proof.
 apply (dump_avx2_lane st 5) => //.
-by rewrite /stavx2_to_st25 !get_of_list //=; circuit.
+by rewrite vpextr64_0 /stavx2_to_st25 !get_of_list //=; circuit.
 qed.
 
 lemma dump_avx2_w3 (st: W256.t Array7.t):
@@ -142,11 +142,11 @@ by rewrite /stavx2_to_st25 !get_of_list //=; circuit.
 qed.
 
 lemma dump_avx2_w4 (st: W256.t Array7.t):
- u64bytes (MOVV_64 (truncateu64 (truncateu128 st.[2])))
+ u64bytes (VPEXTR_64 (truncateu128 st.[2]) (W8.of_int 0))
  = sub (stbytes (stavx2_to_st25 st)) 80 8.
 proof.
 apply (dump_avx2_lane st 10) => //.
-by rewrite /stavx2_to_st25 !get_of_list //=; circuit.
+by rewrite vpextr64_0 /stavx2_to_st25 !get_of_list //=; circuit.
 qed.
 
 lemma dump_avx2_w5 (st: W256.t Array7.t):
@@ -159,12 +159,11 @@ by rewrite /stavx2_to_st25 !get_of_list //=; circuit.
 qed.
 
 lemma dump_avx2_w6 (st: W256.t Array7.t):
- u64bytes (MOVV_64 (truncateu64 (VPUNPCKH_2u64 (VEXTRACTI128 st.[2] (W8.of_int 1))
-                                               (VEXTRACTI128 st.[2] (W8.of_int 1)))))
+ u64bytes (VPEXTR_64 (VEXTRACTI128 st.[2] (W8.of_int 1)) (W8.of_int 1))
  = sub (stbytes (stavx2_to_st25 st)) 120 8.
 proof.
 apply (dump_avx2_lane st 15) => //.
-by rewrite trunc_unpckh /stavx2_to_st25 !get_of_list //=; circuit.
+by rewrite vpextr64_1 trunc_unpckh /stavx2_to_st25 !get_of_list //=; circuit.
 qed.
 
 lemma dump_avx2_w7 (st: W256.t Array7.t):
@@ -177,11 +176,11 @@ by rewrite /stavx2_to_st25 !get_of_list //=; circuit.
 qed.
 
 lemma dump_avx2_w8 (st: W256.t Array7.t):
- u64bytes (MOVV_64 (truncateu64 (VPUNPCKH_2u64 (truncateu128 st.[2]) (truncateu128 st.[2]))))
+ u64bytes (VPEXTR_64 (truncateu128 st.[2]) (W8.of_int 1))
  = sub (stbytes (stavx2_to_st25 st)) 160 8.
 proof.
 apply (dump_avx2_lane st 20) => //.
-by rewrite trunc_unpckh /stavx2_to_st25 !get_of_list //=; circuit.
+by rewrite vpextr64_1 trunc_unpckh /stavx2_to_st25 !get_of_list //=; circuit.
 qed.
 
 lemma dump_avx2_w9 (st: W256.t Array7.t):
@@ -710,9 +709,9 @@ if; last first.
  auto => |> &m H Hl0 Hl1 C.
  exact (msubwrite_sub_skip _ _ _ _ _ 40 200 _ _ _ C H).
 (* lane 5 *)
-seq 5: (msubwrite _mem Glob.mem (sub (avx2bytes _st) 0 48) _buf _len buf _LEN
+seq 4: (msubwrite _mem Glob.mem (sub (avx2bytes _st) 0 48) _buf _len buf _LEN
         /\ st = _st /\ 0 <= _len <= 200
-        /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] (W8.of_int 1)) (VEXTRACTI128 _st.[2] (W8.of_int 1))
+        /\ t128_1 = VEXTRACTI128 _st.[2] (W8.of_int 1)
         /\ t128_0 = truncateu128 _st.[2]).
  wp; ecall (m_ilen_write_upto8_h Glob.mem buf _LEN t).
  auto => |> &m H Hl0 Hl1 C [b1 l1] m1 /= H1.
@@ -723,7 +722,7 @@ if; last first.
 (* lanes 6..9 *)
 seq 6: (msubwrite _mem Glob.mem (sub (avx2bytes _st) 0 80) _buf _len buf _LEN
         /\ st = _st /\ 0 <= _len <= 200
-        /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] (W8.of_int 1)) (VEXTRACTI128 _st.[2] (W8.of_int 1))
+        /\ t128_1 = VEXTRACTI128 _st.[2] (W8.of_int 1)
         /\ t128_0 = truncateu128 _st.[2]
         /\ t256_0 = VPBLEND_8u32 _st.[3] _st.[4] (W8.of_int 240)
         /\ t256_1 = VPBLEND_8u32 _st.[4] _st.[3] (W8.of_int 240)
@@ -732,11 +731,11 @@ seq 6: (msubwrite _mem Glob.mem (sub (avx2bytes _st) 0 80) _buf _len buf _LEN
  ecall (m_ilen_write_upto32_h Glob.mem buf _LEN t256_4).
  auto => |> &m H Hl0 Hl1 C [b1 l1] m1 /= H1.
  exact (msubwrite_sub_step _ _ _ _ _ _ 48 32 80 _ _ _ _ _ _ _ _ H (dump_avx2_w3 _st) H1).
-(* lane 10 (and t128_0 moves to lane 20) *)
+(* lane 10 *)
 seq 1: (msubwrite _mem Glob.mem (sub (avx2bytes _st) 0 88) _buf _len buf _LEN
         /\ st = _st /\ 0 <= _len <= 200
-        /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] (W8.of_int 1)) (VEXTRACTI128 _st.[2] (W8.of_int 1))
-        /\ (0 < _LEN => t128_0 = VPUNPCKH_2u64 (truncateu128 _st.[2]) (truncateu128 _st.[2]))
+        /\ t128_1 = VEXTRACTI128 _st.[2] (W8.of_int 1)
+        /\ t128_0 = truncateu128 _st.[2]
         /\ t256_0 = VPBLEND_8u32 _st.[3] _st.[4] (W8.of_int 240)
         /\ t256_1 = VPBLEND_8u32 _st.[4] _st.[3] (W8.of_int 240)
         /\ t256_2 = VPBLEND_8u32 _st.[5] _st.[6] (W8.of_int 240)
@@ -750,45 +749,42 @@ seq 1: (msubwrite _mem Glob.mem (sub (avx2bytes _st) 0 88) _buf _len buf _LEN
 (* lanes 11..14 *)
 seq 1: (msubwrite _mem Glob.mem (sub (avx2bytes _st) 0 120) _buf _len buf _LEN
         /\ st = _st /\ 0 <= _len <= 200
-        /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] (W8.of_int 1)) (VEXTRACTI128 _st.[2] (W8.of_int 1))
-        /\ (0 < _LEN => t128_0 = VPUNPCKH_2u64 (truncateu128 _st.[2]) (truncateu128 _st.[2]))
+        /\ t128_1 = VEXTRACTI128 _st.[2] (W8.of_int 1)
+        /\ t128_0 = truncateu128 _st.[2]
         /\ t256_0 = VPBLEND_8u32 _st.[3] _st.[4] (W8.of_int 240)
         /\ t256_1 = VPBLEND_8u32 _st.[4] _st.[3] (W8.of_int 240)
         /\ t256_2 = VPBLEND_8u32 _st.[5] _st.[6] (W8.of_int 240)
         /\ t256_3 = VPBLEND_8u32 _st.[6] _st.[5] (W8.of_int 240)).
  if.
   ecall (m_ilen_write_upto32_h Glob.mem buf _LEN t256_4).
-  auto => |> &m H Hl0 Hl1 Ht0 C [b1 l1] m1 /= H1.
-  split; first exact (msubwrite_sub_step _ _ _ _ _ _ 88 32 120 _ _ _ _ _ _ _ _ H (dump_avx2_w5 _st) H1).
-  smt().
- auto => |> &m H Hl0 Hl1 Ht0 C.
+  auto => |> &m H Hl0 Hl1 C [b1 l1] m1 /= H1.
+  exact (msubwrite_sub_step _ _ _ _ _ _ 88 32 120 _ _ _ _ _ _ _ _ H (dump_avx2_w5 _st) H1).
+ auto => |> &m H Hl0 Hl1 C.
  exact (msubwrite_sub_skip _ _ _ _ _ 88 120 _ _ _ C H).
 (* lane 15 *)
 seq 1: (msubwrite _mem Glob.mem (sub (avx2bytes _st) 0 128) _buf _len buf _LEN
         /\ st = _st /\ 0 <= _len <= 200
-        /\ (0 < _LEN => t128_0 = VPUNPCKH_2u64 (truncateu128 _st.[2]) (truncateu128 _st.[2]))
+        /\ t128_0 = truncateu128 _st.[2]
         /\ t256_0 = VPBLEND_8u32 _st.[3] _st.[4] (W8.of_int 240)
         /\ t256_1 = VPBLEND_8u32 _st.[4] _st.[3] (W8.of_int 240)
         /\ t256_2 = VPBLEND_8u32 _st.[5] _st.[6] (W8.of_int 240)).
  if.
   wp; ecall (m_ilen_write_upto8_h Glob.mem buf _LEN t).
-  auto => |> &m H Hl0 Hl1 Ht0 C [b1 l1] m1 /= H1.
-  split; first exact (msubwrite_sub_step _ _ _ _ _ _ 120 8 128 _ _ _ _ _ _ _ _ H (dump_avx2_w6 _st) H1).
-  smt().
- auto => |> &m H Hl0 Hl1 Ht0 C.
+  auto => |> &m H Hl0 Hl1 C [b1 l1] m1 /= H1.
+  exact (msubwrite_sub_step _ _ _ _ _ _ 120 8 128 _ _ _ _ _ _ _ _ H (dump_avx2_w6 _st) H1).
+ auto => |> &m H Hl0 Hl1 C.
  exact (msubwrite_sub_skip _ _ _ _ _ 120 128 _ _ _ C H).
 (* lanes 16..19 *)
 seq 1: (msubwrite _mem Glob.mem (sub (avx2bytes _st) 0 160) _buf _len buf _LEN
         /\ st = _st /\ 0 <= _len <= 200
-        /\ (0 < _LEN => t128_0 = VPUNPCKH_2u64 (truncateu128 _st.[2]) (truncateu128 _st.[2]))
+        /\ t128_0 = truncateu128 _st.[2]
         /\ t256_1 = VPBLEND_8u32 _st.[4] _st.[3] (W8.of_int 240)
         /\ t256_2 = VPBLEND_8u32 _st.[5] _st.[6] (W8.of_int 240)).
  if.
   ecall (m_ilen_write_upto32_h Glob.mem buf _LEN t256_4).
-  auto => |> &m H Hl0 Hl1 Ht0 C [b1 l1] m1 /= H1.
-  split; first exact (msubwrite_sub_step _ _ _ _ _ _ 128 32 160 _ _ _ _ _ _ _ _ H (dump_avx2_w7 _st) H1).
-  smt().
- auto => |> &m H Hl0 Hl1 Ht0 C.
+  auto => |> &m H Hl0 Hl1 C [b1 l1] m1 /= H1.
+  exact (msubwrite_sub_step _ _ _ _ _ _ 128 32 160 _ _ _ _ _ _ _ _ H (dump_avx2_w7 _st) H1).
+ auto => |> &m H Hl0 Hl1 C.
  exact (msubwrite_sub_skip _ _ _ _ _ 128 160 _ _ _ C H).
 (* lane 20 *)
 seq 1: (msubwrite _mem Glob.mem (sub (avx2bytes _st) 0 168) _buf _len buf _LEN
@@ -797,10 +793,9 @@ seq 1: (msubwrite _mem Glob.mem (sub (avx2bytes _st) 0 168) _buf _len buf _LEN
         /\ t256_2 = VPBLEND_8u32 _st.[5] _st.[6] (W8.of_int 240)).
  if.
   wp; ecall (m_ilen_write_upto8_h Glob.mem buf _LEN t).
-  auto => |> &m H Hl0 Hl1 Ht0 C [b1 l1] m1 /= H1.
-  rewrite Ht0 // in H1.
+  auto => |> &m H Hl0 Hl1 C [b1 l1] m1 /= H1.
   exact (msubwrite_sub_step _ _ _ _ _ _ 160 8 168 _ _ _ _ _ _ _ _ H (dump_avx2_w8 _st) H1).
- auto => |> &m H Hl0 Hl1 Ht0 C.
+ auto => |> &m H Hl0 Hl1 C.
  exact (msubwrite_sub_skip _ _ _ _ _ 160 168 _ _ _ C H).
 (* lanes 21..24 *)
 if.
@@ -1095,10 +1090,9 @@ module MM = {
     if ((0 < _LEN)) {
       t128_1 <- (VEXTRACTI128 st.[2] (W8.of_int 1));
       t128_0 <- (truncateu128 st.[2]);
-      t <- (MOVV_64 (truncateu64 t128_1));
+      t <- (VPEXTR_64 t128_1 (W8.of_int 0));
       (buf, dELTA, _LEN) <@ RW.MM.__a_ilen_write_upto8 (buf, offset, dELTA, 
       _LEN, t);
-      t128_1 <- (VPUNPCKH_2u64 t128_1 t128_1);
       if ((0 < _LEN)) {
         t256_0 <-
         (VPBLEND_8u32 st.[3] st.[4]
@@ -1178,10 +1172,9 @@ module MM = {
         (buf, dELTA, _LEN) <@ RW.MM.__a_ilen_write_upto32 (buf, offset, dELTA,
         _LEN, t256_4);
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 0));
           (buf, dELTA, _LEN) <@ RW.MM.__a_ilen_write_upto8 (buf, offset, dELTA,
           _LEN, t);
-          t128_0 <- (VPUNPCKH_2u64 t128_0 t128_0);
         } else {
 
         }
@@ -1207,7 +1200,7 @@ module MM = {
 
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_1));
+          t <- (VPEXTR_64 t128_1 (W8.of_int 1));
           (buf, dELTA, _LEN) <@ RW.MM.__a_ilen_write_upto8 (buf, offset, dELTA,
           _LEN, t);
         } else {
@@ -1235,7 +1228,7 @@ module MM = {
 
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 1));
           (buf, dELTA, _LEN) <@ RW.MM.__a_ilen_write_upto8 (buf, offset, dELTA,
           _LEN, t);
         } else {
@@ -1727,9 +1720,9 @@ if; last first.
  auto => |> &m H Hl0 Hl1 C.
  exact (asubwrite_sub_skip _ _ _ _ _ 40 200 _ _ _ C H).
 (* lane 5 *)
-seq 5: (asubwrite _buf buf _off (sub (avx2bytes _st) 0 48) 0 _len dELTA _LEN
+seq 4: (asubwrite _buf buf _off (sub (avx2bytes _st) 0 48) 0 _len dELTA _LEN
         /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
-        /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] (W8.of_int 1)) (VEXTRACTI128 _st.[2] (W8.of_int 1))
+        /\ t128_1 = VEXTRACTI128 _st.[2] (W8.of_int 1)
         /\ t128_0 = truncateu128 _st.[2]).
  wp; ecall (a_ilen_write_upto8_h buf offset dELTA _LEN t).
  auto => |> &m H Hl0 Hl1 C [b1 d1 l1] /= H1.
@@ -1740,7 +1733,7 @@ if; last first.
 (* lanes 6..9 *)
 seq 6: (asubwrite _buf buf _off (sub (avx2bytes _st) 0 80) 0 _len dELTA _LEN
         /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
-        /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] (W8.of_int 1)) (VEXTRACTI128 _st.[2] (W8.of_int 1))
+        /\ t128_1 = VEXTRACTI128 _st.[2] (W8.of_int 1)
         /\ t128_0 = truncateu128 _st.[2]
         /\ t256_0 = VPBLEND_8u32 _st.[3] _st.[4] (W8.of_int 240)
         /\ t256_1 = VPBLEND_8u32 _st.[4] _st.[3] (W8.of_int 240)
@@ -1749,11 +1742,11 @@ seq 6: (asubwrite _buf buf _off (sub (avx2bytes _st) 0 80) 0 _len dELTA _LEN
  ecall (a_ilen_write_upto32_h buf offset dELTA _LEN t256_4).
  auto => |> &m H Hl0 Hl1 C [b1 d1 l1] /= H1.
  exact (asubwrite_sub_step _ _ _ _ _ _ 48 32 80 _ _ _ _ _ _ _ _ H (dump_avx2_w3 _st) H1).
-(* lane 10 (and t128_0 moves to lane 20) *)
+(* lane 10 *)
 seq 1: (asubwrite _buf buf _off (sub (avx2bytes _st) 0 88) 0 _len dELTA _LEN
         /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
-        /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] (W8.of_int 1)) (VEXTRACTI128 _st.[2] (W8.of_int 1))
-        /\ (0 < _LEN => t128_0 = VPUNPCKH_2u64 (truncateu128 _st.[2]) (truncateu128 _st.[2]))
+        /\ t128_1 = VEXTRACTI128 _st.[2] (W8.of_int 1)
+        /\ t128_0 = truncateu128 _st.[2]
         /\ t256_0 = VPBLEND_8u32 _st.[3] _st.[4] (W8.of_int 240)
         /\ t256_1 = VPBLEND_8u32 _st.[4] _st.[3] (W8.of_int 240)
         /\ t256_2 = VPBLEND_8u32 _st.[5] _st.[6] (W8.of_int 240)
@@ -1767,45 +1760,42 @@ seq 1: (asubwrite _buf buf _off (sub (avx2bytes _st) 0 88) 0 _len dELTA _LEN
 (* lanes 11..14 *)
 seq 1: (asubwrite _buf buf _off (sub (avx2bytes _st) 0 120) 0 _len dELTA _LEN
         /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
-        /\ t128_1 = VPUNPCKH_2u64 (VEXTRACTI128 _st.[2] (W8.of_int 1)) (VEXTRACTI128 _st.[2] (W8.of_int 1))
-        /\ (0 < _LEN => t128_0 = VPUNPCKH_2u64 (truncateu128 _st.[2]) (truncateu128 _st.[2]))
+        /\ t128_1 = VEXTRACTI128 _st.[2] (W8.of_int 1)
+        /\ t128_0 = truncateu128 _st.[2]
         /\ t256_0 = VPBLEND_8u32 _st.[3] _st.[4] (W8.of_int 240)
         /\ t256_1 = VPBLEND_8u32 _st.[4] _st.[3] (W8.of_int 240)
         /\ t256_2 = VPBLEND_8u32 _st.[5] _st.[6] (W8.of_int 240)
         /\ t256_3 = VPBLEND_8u32 _st.[6] _st.[5] (W8.of_int 240)).
  if.
   ecall (a_ilen_write_upto32_h buf offset dELTA _LEN t256_4).
-  auto => |> &m H Hl0 Hl1 Ht0 C [b1 d1 l1] /= H1.
-  split; first exact (asubwrite_sub_step _ _ _ _ _ _ 88 32 120 _ _ _ _ _ _ _ _ H (dump_avx2_w5 _st) H1).
-  smt().
- auto => |> &m H Hl0 Hl1 Ht0 C.
+  auto => |> &m H Hl0 Hl1 C [b1 d1 l1] /= H1.
+  exact (asubwrite_sub_step _ _ _ _ _ _ 88 32 120 _ _ _ _ _ _ _ _ H (dump_avx2_w5 _st) H1).
+ auto => |> &m H Hl0 Hl1 C.
  exact (asubwrite_sub_skip _ _ _ _ _ 88 120 _ _ _ C H).
 (* lane 15 *)
 seq 1: (asubwrite _buf buf _off (sub (avx2bytes _st) 0 128) 0 _len dELTA _LEN
         /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
-        /\ (0 < _LEN => t128_0 = VPUNPCKH_2u64 (truncateu128 _st.[2]) (truncateu128 _st.[2]))
+        /\ t128_0 = truncateu128 _st.[2]
         /\ t256_0 = VPBLEND_8u32 _st.[3] _st.[4] (W8.of_int 240)
         /\ t256_1 = VPBLEND_8u32 _st.[4] _st.[3] (W8.of_int 240)
         /\ t256_2 = VPBLEND_8u32 _st.[5] _st.[6] (W8.of_int 240)).
  if.
   wp; ecall (a_ilen_write_upto8_h buf offset dELTA _LEN t).
-  auto => |> &m H Hl0 Hl1 Ht0 C [b1 d1 l1] /= H1.
-  split; first exact (asubwrite_sub_step _ _ _ _ _ _ 120 8 128 _ _ _ _ _ _ _ _ H (dump_avx2_w6 _st) H1).
-  smt().
- auto => |> &m H Hl0 Hl1 Ht0 C.
+  auto => |> &m H Hl0 Hl1 C [b1 d1 l1] /= H1.
+  exact (asubwrite_sub_step _ _ _ _ _ _ 120 8 128 _ _ _ _ _ _ _ _ H (dump_avx2_w6 _st) H1).
+ auto => |> &m H Hl0 Hl1 C.
  exact (asubwrite_sub_skip _ _ _ _ _ 120 128 _ _ _ C H).
 (* lanes 16..19 *)
 seq 1: (asubwrite _buf buf _off (sub (avx2bytes _st) 0 160) 0 _len dELTA _LEN
         /\ offset = _off /\ st = _st /\ 0 <= _len <= 200
-        /\ (0 < _LEN => t128_0 = VPUNPCKH_2u64 (truncateu128 _st.[2]) (truncateu128 _st.[2]))
+        /\ t128_0 = truncateu128 _st.[2]
         /\ t256_1 = VPBLEND_8u32 _st.[4] _st.[3] (W8.of_int 240)
         /\ t256_2 = VPBLEND_8u32 _st.[5] _st.[6] (W8.of_int 240)).
  if.
   ecall (a_ilen_write_upto32_h buf offset dELTA _LEN t256_4).
-  auto => |> &m H Hl0 Hl1 Ht0 C [b1 d1 l1] /= H1.
-  split; first exact (asubwrite_sub_step _ _ _ _ _ _ 128 32 160 _ _ _ _ _ _ _ _ H (dump_avx2_w7 _st) H1).
-  smt().
- auto => |> &m H Hl0 Hl1 Ht0 C.
+  auto => |> &m H Hl0 Hl1 C [b1 d1 l1] /= H1.
+  exact (asubwrite_sub_step _ _ _ _ _ _ 128 32 160 _ _ _ _ _ _ _ _ H (dump_avx2_w7 _st) H1).
+ auto => |> &m H Hl0 Hl1 C.
  exact (asubwrite_sub_skip _ _ _ _ _ 128 160 _ _ _ C H).
 (* lane 20 *)
 seq 1: (asubwrite _buf buf _off (sub (avx2bytes _st) 0 168) 0 _len dELTA _LEN
@@ -1814,10 +1804,9 @@ seq 1: (asubwrite _buf buf _off (sub (avx2bytes _st) 0 168) 0 _len dELTA _LEN
         /\ t256_2 = VPBLEND_8u32 _st.[5] _st.[6] (W8.of_int 240)).
  if.
   wp; ecall (a_ilen_write_upto8_h buf offset dELTA _LEN t).
-  auto => |> &m H Hl0 Hl1 Ht0 C [b1 d1 l1] /= H1.
-  rewrite Ht0 // in H1.
+  auto => |> &m H Hl0 Hl1 C [b1 d1 l1] /= H1.
   exact (asubwrite_sub_step _ _ _ _ _ _ 160 8 168 _ _ _ _ _ _ _ _ H (dump_avx2_w8 _st) H1).
- auto => |> &m H Hl0 Hl1 Ht0 C.
+ auto => |> &m H Hl0 Hl1 C.
  exact (asubwrite_sub_skip _ _ _ _ _ 160 168 _ _ _ C H).
 (* lanes 21..24 *)
 if.

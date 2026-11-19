@@ -51,9 +51,11 @@ for each set it covers:
   leakage ([MLDSA_Security.ec](proofs/mldsa/spec/properties/MLDSA_Security.ec)), for
   44, 65 and 87 (`Security<set>.ec` in the same directory).
 
-SHA-3 (FIPS 202) is available as building blocks under
-`src/fips202/<target>/common/`; the self-contained one-shot functions and incremental
-APIs are planned but not exported yet.
+- SHA-3 (FIPS 202), SHA3-224/256/384/512 and SHAKE128/256:
+  [FIPS202_SHA3.ec](proofs/fips202/spec/FIPS202_SHA3.ec), with no security theorem.
+  Its implementation, the Jasmin Keccak Code Package (JKCP), covers every function
+  at once (see [src/fips202/README.md](src/fips202/README.md)); its building blocks,
+  under `src/fips202/<target>/common/`, are also what ML-KEM and ML-DSA use.
 
 ## Assembly files
 
@@ -68,6 +70,15 @@ The assembly is compiled from
 `src/<algorithm>/<target>/<profile>/<parameter set>/` by `make -C src extract-asm`;
 CI fails if a committed file differs from the assembly it compiles.
 
+SHA-3 is one implementation of every function, in two assembly files, single lane
+and 4-way, with one header:
+
+```
+asm/fips202/avx2/fips202x1_avx2_sct.s   (from src/fips202/ref/JKCP.jazz)
+asm/fips202/avx2/fips202x4_avx2_sct.s   (from src/fips202/avx2/JKCP.jazz)
+src/include/JKCP.h
+```
+
 ## Implementations
 
 An implementation of an algorithm is fixed by two choices:
@@ -77,8 +88,9 @@ An implementation of an algorithm is fixed by two choices:
   `sct` is optimised for speed and protected against timing side channels, with
   [CT and SCT](docs/assurance.md#ct-and-sct) countermeasures.
 
-Every algorithm has one implementation, `avx2` / `sct`, with its sources in
-`src/<algorithm>/avx2/sct/`.
+Every algorithm has one implementation, `avx2` / `sct`. The sources of ML-KEM and
+ML-DSA are in `src/<algorithm>/avx2/sct/`, one directory per parameter set; those of
+SHA-3 are the two JKCP programs of `src/fips202/`.
 
 ### Claims
 
@@ -88,6 +100,17 @@ Each parameter set of an implementation states what it guarantees in
 ```toml
 claims  = ["kat", "memcheck", "ct", "sct", "safety", "correctness"]
 provsec = "functional"
+```
+
+An implementation of every parameter set at once, as JKCP, states it in
+`src/<algorithm>/meta.toml`, with its target, profile and programs; it claims checks
+only, for now:
+
+```toml
+target       = "avx2"
+profile      = "sct"
+entry_points = ["ref/JKCP.jazz", "avx2/JKCP.jazz"]
+claims       = ["kat", "memcheck", "ct", "sct"]
 ```
 
 - `kat`, `memcheck`, `ct` and `sct` are checks: the CI runs each of them on the
@@ -149,6 +172,15 @@ The exported functions of each algorithm, with `<p>` the parameter set:
   - `verify`: verification of a signature on a message with a context
     (Algorithm 3 in FIPS 204). Returns 0 when the signature verifies, -1 when the
     context is longer than 255 bytes, and a nonzero value otherwise.
+- SHA-3 (JKCP, `src/include/JKCP.h`), with `<f>` one of `sha3_224`, `sha3_256`,
+  `sha3_384`, `sha3_512`, `shake128`, `shake256`:
+  - one-shot, `<f>`: the hash of a message (`shake*` take the output length too);
+  - incremental, single lane: `<f>_init`, then `keccak_absorb` any number of
+    times, then `keccak_squeeze` any number of times (the first squeeze of a
+    positive length applies the padding); the caller owns the 208-byte state;
+  - incremental, 4-way: `<f>x4_init`, then `keccakx4_absorb_bcast` (the same
+    input in every lane) and `keccakx4_absorb` (four inputs of the same length),
+    then `keccakx4_squeeze` into four outputs; the state has 808 bytes.
 
 The header of each implementation describes informally the contract of each function:
 what it requires from the caller, what it ensures, and what the code declassifies.
@@ -169,9 +201,10 @@ CI runs these checks on every pull request and every commit on `main`
 ([checks.yml](.github/workflows/checks.yml)):
 
 - KAT: the known-answer tests of the parameter set (`bench/vectors/`), from NIST ACVP
-  and post-quantum-cryptography/KAT;
+  and post-quantum-cryptography/KAT; for SHA-3, every NIST ACVP test with a
+  byte-aligned message, through the one-shot, incremental and 4-way functions;
 - memcheck: Valgrind's memcheck on every operation;
-- CT and SCT: `jasmin-ct` on the entry point;
+- CT and SCT: `jasmin-ct` on the entry point (for SHA-3, on both JKCP programs);
 - extraction: the committed EasyCrypt models and assembly are the extraction of
   `src/`, and the claims are consistent (`scripts/claims.py`, see
   [Claims](#claims)).

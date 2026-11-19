@@ -3,7 +3,9 @@
 
 Loads _build/<backend>_<scheme>.so (built by `make libs`) and replays the KAT
 vectors through the common derand ABI (adapters/common_abi.h): kem_* for ML-KEM,
-sig_* for ML-DSA; selects the library by backend.
+sig_* for ML-DSA; selects the library by backend. The FIPS 202 functions (SHA-3,
+SHAKE) go through the C API of src/include/JKCP.h, in one library for all of
+them (<backend>_fips202.so).
 
 Usage:
     python3 kat.py --backend jasmin vectors/*.json
@@ -15,7 +17,7 @@ import ctypes
 import hashlib
 import json
 import sys
-from ctypes import c_int, c_size_t, c_void_p
+from ctypes import c_int, c_size_t, c_uint64, c_void_p
 from pathlib import Path
 
 
@@ -30,6 +32,12 @@ def _mlkem(base, pk, sk, ct):
             "shared_secret": 32}
 
 
+def _fips202(fn, digest=None):
+    # fn: the prefix of the function names of JKCP.h; digest: the output
+    # length of a hash function (None for an XOF, whose vectors give it)
+    return {"kind": "fips202", "base": "fips202", "fn": fn, "digest": digest}
+
+
 SCHEMES = {
     "ML-DSA-44": _mldsa("mldsa44", 1312, 2560, 2420),
     "ML-DSA-65": _mldsa("mldsa65", 1952, 4032, 3309),
@@ -37,6 +45,12 @@ SCHEMES = {
     "ML-KEM-512": _mlkem("mlkem512", 800, 1632, 768),
     "ML-KEM-768": _mlkem("mlkem768", 1184, 2400, 1088),
     "ML-KEM-1024": _mlkem("mlkem1024", 1568, 3168, 1568),
+    "SHA3-224": _fips202("sha3_224", 28),
+    "SHA3-256": _fips202("sha3_256", 32),
+    "SHA3-384": _fips202("sha3_384", 48),
+    "SHA3-512": _fips202("sha3_512", 64),
+    "SHAKE-128": _fips202("shake128"),
+    "SHAKE-256": _fips202("shake256"),
 }
 
 
@@ -254,6 +268,76 @@ class MLKEM(Scheme):
             ssb = out_buf(self.spec["shared_secret"])
             r = self.dec_fn(ssb, in_buf(bytes(self.spec["ciphertext"])), sk)
             rep.check(self.label("check_sk") + ".decaps", r == want, f"got {r}")
+
+
+JKCP_STATE, JKCP_X4_STATE = 208, 808  # jkcp_state, jkcp_x4_state (JKCP.h)
+
+
+@runner("fips202")
+class FIPS202(Scheme):
+    """Each test runs three times, and each output must be the digest: the
+    one-shot function; the incremental API, with the message absorbed in
+    three parts and the output squeezed in two, after and between
+    zero-length squeezes; the 4-way API, the same message in every lane
+    (broadcast absorb, then the four-buffer absorb, then broadcast again),
+    squeezed the same way."""
+    OPS = ("hash",)
+
+    def bind(self, lib):
+        fn = self.spec["fn"]
+
+        def f(name, argtypes):
+            g = getattr(lib, name)
+            g.restype, g.argtypes = None, argtypes
+            return g
+        p, n = c_void_p, c_uint64
+        self.oneshot = f(fn, [p, p, n] if self.spec["digest"] else [p, n, p, n])
+        self.init = f(fn + "_init", [p])
+        self.absorb = f("keccak_absorb", [p, p, n])
+        self.squeeze = f("keccak_squeeze", [p, p, n])
+        self.init4 = f(fn + "x4_init", [p])
+        self.absorb4_bcast = f("keccakx4_absorb_bcast", [p, p, n])
+        self.absorb4 = f("keccakx4_absorb", [p, p, p, p, p, n])
+        self.squeeze4 = f("keccakx4_squeeze", [p, p, p, p, p, n])
+
+    def hash(self, b, rep):
+        msg = h(b, "message")
+        n = self.spec["digest"] or b["output_length"]
+        label = self.label("hash")
+
+        out = out_buf(n)
+        if self.spec["digest"]:
+            self.oneshot(out, in_buf(msg), len(msg))
+        else:
+            self.oneshot(out, n, in_buf(msg), len(msg))
+        rep.check_output(label + ".oneshot", b, "digest", out.raw)
+
+        cuts = [0, len(msg) // 3, 2 * len(msg) // 3, len(msg)]
+        parts = [msg[a:c] for a, c in zip(cuts, cuts[1:])]
+        k = n // 2
+
+        st = out_buf(JKCP_STATE)
+        self.init(st)
+        for part in parts:
+            self.absorb(st, in_buf(part), len(part))
+        o1, o2 = out_buf(k), out_buf(n - k)
+        self.squeeze(st, out_buf(0), 0)
+        self.squeeze(st, o1, k)
+        self.squeeze(st, out_buf(0), 0)
+        self.squeeze(st, o2, n - k)
+        rep.check_output(label + ".incremental", b, "digest", o1.raw + o2.raw)
+
+        st4 = out_buf(JKCP_X4_STATE)
+        self.init4(st4)
+        self.absorb4_bcast(st4, in_buf(parts[0]), len(parts[0]))
+        self.absorb4(st4, *(in_buf(parts[1]) for _ in range(4)), len(parts[1]))
+        self.absorb4_bcast(st4, in_buf(parts[2]), len(parts[2]))
+        o1, o2 = [out_buf(k) for _ in range(4)], [out_buf(n - k) for _ in range(4)]
+        self.squeeze4(st4, *(out_buf(0) for _ in range(4)), 0)
+        self.squeeze4(st4, *o1, k)
+        self.squeeze4(st4, *o2, n - k)
+        for i in range(4):
+            rep.check_output(f"{label}.x4[{i}]", b, "digest", o1[i].raw + o2[i].raw)
 
 
 def load_backend(backend, scheme_base, lib_dir):

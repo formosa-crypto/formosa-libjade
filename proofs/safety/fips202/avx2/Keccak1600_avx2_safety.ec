@@ -529,7 +529,7 @@ seq 9 : (valid trace___dumpstate_m_avx2 /\ 0 <= __LEN <= 200 /\ 0 <= _buf /\
 + wp; ecall (__m_ilen_write_upto32_proof param_7 param_6 param_5).
   by auto => /> *; try (split; [smt() | move=> *]); (try split); smt().
 if.
-+ seq 13 : (valid trace___dumpstate_m_avx2 /\ 0 <= __LEN <= 200 /\ 0 <= _buf /\
++ seq 12 : (valid trace___dumpstate_m_avx2 /\ 0 <= __LEN <= 200 /\ 0 <= _buf /\
             is_valid ptr_modulus Glob.mem_v _buf __LEN /\
             _LEN = __LEN - (if __LEN < 48 then __LEN else 48) /\
             buf = _buf + (if __LEN < 48 then __LEN else 48)).
@@ -2024,7 +2024,7 @@ module MM = {
     if ((0 < _LEN)) {
       t128_1 <- (VEXTRACTI128 (BArray224.get256 st 2) (W8.of_int 1));
       t128_0 <- (truncateu128 (BArray224.get256 st 2));
-      t <- (MOVV_64 (truncateu64 t128_1));
+      t <- (VPEXTR_64 t128_1 (W8.of_int 0));
       b_param_6 <- b_buf;
       param_18 <- buf;
       param_17 <- offset;
@@ -2071,7 +2071,6 @@ module MM = {
       buf <- result_10;
       dELTA <- result_9;
       _LEN <- result_8;
-      t128_1 <- (VPUNPCKH_2u64 t128_1 t128_1);
       if ((0 < _LEN)) {
         t256_0 <-
         (VPBLEND_8u32 (BArray224.get256 st 3) (BArray224.get256 st 4)
@@ -2134,7 +2133,7 @@ module MM = {
         dELTA <- result_12;
         _LEN <- result_11;
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 0));
           b_param_4 <- b_buf;
           param_28 <- buf;
           param_27 <- offset;
@@ -2182,7 +2181,6 @@ module MM = {
           buf <- result_16;
           dELTA <- result_15;
           _LEN <- result_14;
-          t128_0 <- (VPUNPCKH_2u64 t128_0 t128_0);
         } else {
           
         }
@@ -2239,7 +2237,7 @@ module MM = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_1));
+          t <- (VPEXTR_64 t128_1 (W8.of_int 1));
           b_param_2 <- b_buf;
           param_38 <- buf;
           param_37 <- offset;
@@ -2343,7 +2341,7 @@ module MM = {
           
         }
         if ((0 < _LEN)) {
-          t <- (MOVV_64 (truncateu64 t128_0));
+          t <- (VPEXTR_64 t128_0 (W8.of_int 1));
           b_param_0 <- b_buf;
           param_48 <- buf;
           param_47 <- offset;
@@ -3018,7 +3016,7 @@ seq 13 : (valid trace___dumpstate_avx2 /\ 0 <= __LEN <= 200 /\ 0 <= _offset /\
   by auto => /> *; try (split; [smt(_ASIZE_ge0 _ASIZE_max) | move=> *]); (try split);
      smt(_ASIZE_ge0 _ASIZE_max).
 if.
-+ seq 17 : (valid trace___dumpstate_avx2 /\ 0 <= __LEN <= 200 /\ 0 <= _offset /\
++ seq 16 : (valid trace___dumpstate_avx2 /\ 0 <= __LEN <= 200 /\ 0 <= _offset /\
             _offset + __LEN <= _ASIZE /\ offset = _offset /\
             _LEN = __LEN - (if __LEN < 48 then __LEN else 48) /\
             dELTA = (if __LEN < 48 then __LEN else 48) /\

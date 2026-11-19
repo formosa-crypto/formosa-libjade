@@ -12112,22 +12112,22 @@ ml_dsa_65_keygen:
 	orq 	%r9, %r10
 	xorq	%r10, (%rax,%rdi,8)
 	movq	$0, %r10
-	movzwq	(%rcx,%r8), %r9
-	orq 	%r9, %r10
+	movzwq	(%rcx,%r8), %rcx
+	orq 	%rcx, %r10
 	movq	$31, %r9
 	shlq	$16, %r9
 	orq 	%r9, %r10
 	xorq	%r10, 8(%rax,%rdi,8)
 	movq	$0, %r10
-	movzwq	(%rdx,%r8), %r9
-	orq 	%r9, %r10
+	movzwq	(%rdx,%r8), %rcx
+	orq 	%rcx, %r10
 	movq	$31, %r9
 	shlq	$16, %r9
 	orq 	%r9, %r10
 	xorq	%r10, 16(%rax,%rdi,8)
 	movq	$0, %r10
-	movzwq	(%rsi,%r8), %r9
-	orq 	%r9, %r10
+	movzwq	(%rsi,%r8), %rcx
+	orq 	%rcx, %r10
 	movq	$31, %r9
 	shlq	$16, %r9
 	orq 	%r9, %r10
@@ -12197,22 +12197,22 @@ ml_dsa_65_keygen:
 	orq 	%r9, %r10
 	xorq	%r10, (%rax,%rdi,8)
 	movq	$0, %r10
-	movzwq	(%rcx,%r8), %r9
-	orq 	%r9, %r10
+	movzwq	(%rcx,%r8), %rcx
+	orq 	%rcx, %r10
 	movq	$31, %r9
 	shlq	$16, %r9
 	orq 	%r9, %r10
 	xorq	%r10, 8(%rax,%rdi,8)
 	movq	$0, %r10
-	movzwq	(%rdx,%r8), %r9
-	orq 	%r9, %r10
+	movzwq	(%rdx,%r8), %rcx
+	orq 	%rcx, %r10
 	movq	$31, %r9
 	shlq	$16, %r9
 	orq 	%r9, %r10
 	xorq	%r10, 16(%rax,%rdi,8)
 	movq	$0, %r10
-	movzwq	(%rsi,%r8), %r9
-	orq 	%r9, %r10
+	movzwq	(%rsi,%r8), %rcx
+	orq 	%rcx, %r10
 	movq	$31, %r9
 	shlq	$16, %r9
 	orq 	%r9, %r10
@@ -12501,8 +12501,8 @@ ml_dsa_65_keygen:
 	vpxor	32(%rax), %ymm0, %ymm0
 	vmovdqu	%ymm0, 32(%rax)
 	movq	$0, %r10
-	movzwq	64(%rcx,%rdx), %r9
-	orq 	%r9, %r10
+	movzwq	64(%rcx,%rdx), %rcx
+	orq 	%rcx, %r10
 	xorq	%r10, 64(%rax)
 	movq	$66, %r8
 	movq	%mm3, %rdx
@@ -12620,8 +12620,8 @@ ml_dsa_65_keygen:
 	leaq	32(%rsp), %rdx
 	movq	$0, %r8
 	movq	$0, %r10
-	movzwq	(%rax,%r8), %r9
-	orq 	%r9, %r10
+	movzwq	(%rax,%r8), %rcx
+	orq 	%rcx, %r10
 	movq	$31, %r9
 	shlq	$16, %r9
 	orq 	%r9, %r10
@@ -12739,8 +12739,8 @@ ml_dsa_65_keygen:
 	leaq	8(%rsp), %rcx
 	movq	$0, %r8
 	movq	$0, %r10
-	movzwq	(%rcx,%r8), %r9
-	orq 	%r9, %r10
+	movzwq	(%rcx,%r8), %rcx
+	orq 	%rcx, %r10
 	movq	$31, %r9
 	shlq	$16, %r9
 	orq 	%r9, %r10
