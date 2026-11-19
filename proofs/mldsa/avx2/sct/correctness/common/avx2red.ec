@@ -1163,6 +1163,49 @@ qed.
 hint simplify truncateu32_VMOV_64.
 
 (* ==================================================================== *)
+(* The twisted form of a zeta, zeta * q^-1 mod 2^32, lane by lane       *)
+op twist (w : W32.t) : W32.t = w * W32.of_int 58728449.
+
+op twistv (v : W256.t) : W256.t =
+  W8u32.pack8_t (W8u32.Pack.map twist (W8u32.unpack32 v)).
+
+lemma of_int_to_sint32 (w : W32.t) : W32.of_int (W32.to_sint w) = w.
+proof.
+rewrite W32.to_sintE /W32.smod.
+case: (2 ^ (32 - 1) <= to_uint w) => _; last by rewrite W32.to_uintK.
+rewrite -(W32.of_int_mod (to_uint w - W32.modulus)).
+rewrite (_ : (to_uint w - W32.modulus) %% W32.modulus = to_uint w).
+- by rewrite -modzDr /= pmod_small // W32.to_uint_cmp.
+by rewrite W32.to_uintK.
+qed.
+
+lemma shdup_twistvE (v : W256.t) : VMOVSHDUP_256 (twistv v) = twistv (VMOVSHDUP_256 v).
+proof. by rewrite /twistv !VMOVSHDUP_256E; apply W8u32.allP => /=. qed.
+
+lemma twistv_pack8E (z0 z1 z2 z3 z4 z5 z6 z7 : W32.t) :
+    twistv (W8u32.pack8 [z0; z1; z2; z3; z4; z5; z6; z7])
+  = W8u32.pack8 [twist z0; twist z1; twist z2; twist z3;
+                 twist z4; twist z5; twist z6; twist z7].
+proof. by rewrite /twistv; apply W8u32.allP => /=. qed.
+
+hint simplify twistv_pack8E.
+
+(* the low half of the signed product is the product of the words      *)
+lemma sx_lowE (a b : W32.t) : (a \sx b) \bits32 0 = a * b.
+proof.
+rewrite -truncateu32_64E /( \sx ) /truncateu32 /sigextu64.
+rewrite W64.of_intM W64.of_uintK.
+rewrite -(W32.of_int_mod (_ %% _)) modz_dvd 1:/# W32.of_int_mod.
+by rewrite -W32.of_intM !of_int_to_sint32.
+qed.
+
+(* hence the low half of the reduction from the twisted zeta            *)
+lemma sx_twistE (u w : W32.t) :
+    (u \sx twist w) \bits32 0
+  = ((u \sx w) \bits32 0 \sx W32.of_int 58728449) \bits32 0.
+proof. by rewrite !sx_lowE /twist mulrA. qed.
+
+(* ==================================================================== *)
 (* Montgomery multiplication of 8 lanes, in the model of any set        *)
 (* ==================================================================== *)
 abstract theory Avx2redT.
@@ -1214,5 +1257,44 @@ lemma mmrP_ll (u v : W256.t) : phoare[M.montgomery_multiply_and_reduce :
 proof. by conseq (mmr_ll u v) (mmrP u v). qed.
 
 (* -------------------------------------------------------------------- *)
+(* The Montgomery multiplication by zetas given with their twisted      *)
+(* form: the low half of the reduction is the product of u by           *)
+(* zeta * q^-1 mod 2^32, the same 32 bits as the low half of            *)
+(* (u * zeta) * q^-1, hence the lanes of mmrP.                          *)
+lemma mmrzP_lanes (u v : W256.t) :
+  hoare[M.montgomery_multiply_by_zeta_lanes :
+      lhs = u /\ zetas = v /\ zetas_high = VMOVSHDUP_256 v
+   /\ zetas_qinv = twistv v /\ zetas_qinv_high = VMOVSHDUP_256 (twistv v)
+    ==>
+      res = W8u32.pack8_t (W8u32.Pack.map2 mmr (W8u32.unpack32 u) (W8u32.unpack32 v))
+  ].
+proof.
+hint +listred.
+proc.
+auto=> &hr [#] 5!->>.
+pose uw (i : int) := u \bits32 i; pose vw (i : int) := v \bits32 i.
+rewrite /twistv -[u]pack8K /= -!/~(uw _) -[v]pack8K /= -!/~(vw _).
+rewrite MODULUS_VECTOR_E /MODULUS_VECTOR //=.
+pose qinv := W32.of_int INVERSE_OF_MODULUS_MOD_MONTGOMERY_R.
+pose q    := W32.of_int MODULUS.
+pose F    := fun k =>
+    (uw k \sx vw k)
+  - (uw k \sx twist (vw k) \bits32 0 \sx q) \bits32 1.
+apply: (pack8_eq F (fun i => mmr (uw i) (vw i))).
+move=> i rgi @/F @/mmr /=; rewrite sx_twistE; move: (uw i) (vw i) => w1 w2.
+by rewrite -shr_shrw 1:// => {F vw uw}; circuit.
+qed.
+
+(* the same for zetas whose odd lanes equal the even ones               *)
+lemma mmrzP (u v : W256.t) :
+  hoare[M.montgomery_multiply_by_zeta :
+      lhs = u /\ zetas = v /\ zetas_qinv = twistv v /\ VMOVSHDUP_256 v = v
+    ==>
+      res = W8u32.pack8_t (W8u32.Pack.map2 mmr (W8u32.unpack32 u) (W8u32.unpack32 v))
+  ].
+proof.
+proc; ecall (mmrzP_lanes u v); skip => &hr [#] -> -> -> hv.
+by rewrite shdup_twistvE hv.
+qed.
 
 end Avx2redT.

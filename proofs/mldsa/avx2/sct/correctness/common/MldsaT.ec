@@ -1442,6 +1442,35 @@ module M = {
     product_low <- (VPBLEND_8u32 product_low product_high (W8.of_int 170));
     return product_low;
   }
+  proc montgomery_multiply_by_zeta_lanes (lhs:W256.t, zetas:W256.t,
+                                          zetas_high:W256.t,
+                                          zetas_qinv:W256.t,
+                                          zetas_qinv_high:W256.t) : W256.t = {
+    var product_low:W256.t;
+    var lhs_high:W256.t;
+    var product_high:W256.t;
+    var t_low:W256.t;
+    var t_high:W256.t;
+    lhs_high <- (VMOVSHDUP_256 lhs);
+    product_low <- (VPMUL_256 lhs zetas);
+    product_high <- (VPMUL_256 lhs_high zetas_high);
+    t_low <- (VPMUL_256 lhs zetas_qinv);
+    t_high <- (VPMUL_256 lhs_high zetas_qinv_high);
+    t_low <- (VPMUL_256 t_low mODULUS_VECTOR);
+    t_high <- (VPMUL_256 t_high mODULUS_VECTOR);
+    product_low <- (VPSUB_4u64 product_low t_low);
+    product_high <- (VPSUB_4u64 product_high t_high);
+    product_low <- (VMOVSHDUP_256 product_low);
+    product_low <- (VPBLEND_8u32 product_low product_high (W8.of_int 170));
+    return product_low;
+  }
+  proc montgomery_multiply_by_zeta (lhs:W256.t, zetas:W256.t,
+                                    zetas_qinv:W256.t) : W256.t = {
+    var r:W256.t;
+    r <@ montgomery_multiply_by_zeta_lanes (lhs, zetas, zetas, zetas_qinv,
+    zetas_qinv);
+    return r;
+  }
   proc polynomial__pointwise_montgomery_multiply_and_reduce (product:W32.t Array256.t,
                                                              lhs:W32.t Array256.t,
                                                              rhs:W32.t Array256.t) : 
@@ -1530,30 +1559,34 @@ module M = {
     }
     return polynomial;
   }
-  proc polynomial____ct_butterfly (a:W256.t, b:W256.t, zetas:W256.t) : 
-  W256.t * W256.t = {
+  proc polynomial____ct_butterfly (a:W256.t, b:W256.t, zetas:W256.t,
+                                   zetas_qinv:W256.t) : W256.t * W256.t = {
     var t:W256.t;
-    t <@ montgomery_multiply_and_reduce (b, zetas);
+    t <@ montgomery_multiply_by_zeta (b, zetas, zetas_qinv);
     b <- (VPSUB_8u32 a t);
     a <- (VPADD_8u32 a t);
     return (a, b);
   }
-  proc polynomial____ct_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
-  W256.t * W256.t = {
+  proc polynomial____ct_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t = {
     var summands:W256.t;
     var zeta_products:W256.t;
     var add_terms:W256.t;
     var sub_terms:W256.t;
     summands <- (VPERM2I128 lhs rhs (W8.of_int 32));
     zeta_products <- (VPERM2I128 lhs rhs (W8.of_int 49));
-    zeta_products <@ montgomery_multiply_and_reduce (zeta_products, zetas);
+    zeta_products <@ montgomery_multiply_by_zeta (zeta_products, zetas,
+    zetas_qinv);
     add_terms <- (VPADD_8u32 summands zeta_products);
     sub_terms <- (VPSUB_8u32 summands zeta_products);
     lhs <- (VPERM2I128 add_terms sub_terms (W8.of_int 32));
     rhs <- (VPERM2I128 add_terms sub_terms (W8.of_int 49));
     return (lhs, rhs);
   }
-  proc polynomial____ct_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
+  proc polynomial____ct_butterfly_4_lanes (lhs:W256.t, rhs:W256.t,
+                                           zetas:W256.t, zetas_high:W256.t,
+                                           zetas_qinv:W256.t,
+                                           zetas_qinv_high:W256.t) : 
   W256.t * W256.t = {
     var summands:W256.t;
     var zeta_products:W256.t;
@@ -1561,19 +1594,31 @@ module M = {
     var sub_terms:W256.t;
     summands <- (VPUNPCKL_4u64 lhs rhs);
     zeta_products <- (VPUNPCKH_4u64 lhs rhs);
-    zeta_products <@ montgomery_multiply_and_reduce (zeta_products, zetas);
+    zeta_products <@ montgomery_multiply_by_zeta_lanes (zeta_products, 
+    zetas, zetas_high, zetas_qinv, zetas_qinv_high);
     add_terms <- (VPADD_8u32 summands zeta_products);
     sub_terms <- (VPSUB_8u32 summands zeta_products);
     lhs <- (VPUNPCKL_4u64 add_terms sub_terms);
     rhs <- (VPUNPCKH_4u64 add_terms sub_terms);
     return (lhs, rhs);
   }
-  proc polynomial____ct_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
-  W256.t * W256.t = {
+  proc polynomial____ct_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t = {
     
+    (lhs, rhs) <@ polynomial____ct_butterfly_4_lanes (lhs, rhs, zetas, 
+    zetas, zetas_qinv, zetas_qinv);
+    return (lhs, rhs);
+  }
+  proc polynomial____ct_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t = {
+    var zetas_high:W256.t;
+    var zetas_qinv_high:W256.t;
     lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
     rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
-    (lhs, rhs) <@ polynomial____ct_butterfly_4 (lhs, rhs, zetas);
+    zetas_high <- (VMOVSHDUP_256 zetas);
+    zetas_qinv_high <- (VMOVSHDUP_256 zetas_qinv);
+    (lhs, rhs) <@ polynomial____ct_butterfly_4_lanes (lhs, rhs, zetas,
+    zetas_high, zetas_qinv, zetas_qinv_high);
     lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
     rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
     return (lhs, rhs);
@@ -1588,8 +1633,8 @@ module M = {
     var r5:W256.t;
     var r6:W256.t;
     var r7:W256.t;
-    var zeta_0:W64.t;
     var zetas:W256.t;
+    var zetas_qinv:W256.t;
     r0 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * (j + 0)));
@@ -1614,31 +1659,32 @@ module M = {
     r7 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * (j + 28)));
-    zeta_0 <- (W64.of_int 25847);
-    zetas <- (zeroextu256 (VMOV_64 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    (r0, r4) <@ polynomial____ct_butterfly (r0, r4, zetas);
-    (r1, r5) <@ polynomial____ct_butterfly (r1, r5, zetas);
-    (r2, r6) <@ polynomial____ct_butterfly (r2, r6, zetas);
-    (r3, r7) <@ polynomial____ct_butterfly (r3, r7, zetas);
-    zeta_0 <- (W64.of_int (- 2608894));
-    zetas <- (zeroextu256 (VMOV_64 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    (r0, r2) <@ polynomial____ct_butterfly (r0, r2, zetas);
-    (r1, r3) <@ polynomial____ct_butterfly (r1, r3, zetas);
-    zeta_0 <- (W64.of_int (- 518909));
-    zetas <- (zeroextu256 (VMOV_64 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    (r4, r6) <@ polynomial____ct_butterfly (r4, r6, zetas);
-    (r5, r7) <@ polynomial____ct_butterfly (r5, r7, zetas);
+    zetas <- (VPBROADCAST_8u32 lAYERS_7_6_ZETAS.[0]);
+    zetas_qinv <- (VPBROADCAST_8u32 lAYERS_7_6_ZETAS.[1]);
+    (r0, r4) <@ polynomial____ct_butterfly (r0, r4, zetas, zetas_qinv);
+    (r1, r5) <@ polynomial____ct_butterfly (r1, r5, zetas, zetas_qinv);
+    (r2, r6) <@ polynomial____ct_butterfly (r2, r6, zetas, zetas_qinv);
+    (r3, r7) <@ polynomial____ct_butterfly (r3, r7, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 lAYERS_7_6_ZETAS.[2]);
+    zetas_qinv <- (VPBROADCAST_8u32 lAYERS_7_6_ZETAS.[3]);
+    (r0, r2) <@ polynomial____ct_butterfly (r0, r2, zetas, zetas_qinv);
+    (r1, r3) <@ polynomial____ct_butterfly (r1, r3, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 lAYERS_7_6_ZETAS.[4]);
+    zetas_qinv <- (VPBROADCAST_8u32 lAYERS_7_6_ZETAS.[5]);
+    (r4, r6) <@ polynomial____ct_butterfly (r4, r6, zetas, zetas_qinv);
+    (r5, r7) <@ polynomial____ct_butterfly (r5, r7, zetas, zetas_qinv);
     zetas <- lAYER_5_ZETAS.[0];
-    (r0, r1) <@ polynomial____ct_butterfly (r0, r1, zetas);
+    zetas_qinv <- lAYER_5_ZETAS_QINV.[0];
+    (r0, r1) <@ polynomial____ct_butterfly (r0, r1, zetas, zetas_qinv);
     zetas <- lAYER_5_ZETAS.[1];
-    (r2, r3) <@ polynomial____ct_butterfly (r2, r3, zetas);
+    zetas_qinv <- lAYER_5_ZETAS_QINV.[1];
+    (r2, r3) <@ polynomial____ct_butterfly (r2, r3, zetas, zetas_qinv);
     zetas <- lAYER_5_ZETAS.[2];
-    (r4, r5) <@ polynomial____ct_butterfly (r4, r5, zetas);
+    zetas_qinv <- lAYER_5_ZETAS_QINV.[2];
+    (r4, r5) <@ polynomial____ct_butterfly (r4, r5, zetas, zetas_qinv);
     zetas <- lAYER_5_ZETAS.[3];
-    (r6, r7) <@ polynomial____ct_butterfly (r6, r7, zetas);
+    zetas_qinv <- lAYER_5_ZETAS_QINV.[3];
+    (r6, r7) <@ polynomial____ct_butterfly (r6, r7, zetas, zetas_qinv);
     polynomial <-
     (Array256.init
     (WArray1024.get32
@@ -1692,6 +1738,7 @@ module M = {
     var r6:W256.t;
     var r7:W256.t;
     var zetas:W256.t;
+    var zetas_qinv:W256.t;
     r0 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * ((8 * g) + 0)));
@@ -1717,43 +1764,61 @@ module M = {
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * ((8 * g) + 7)));
     zetas <- lAYER_4_ZETAS.[(2 * g)];
-    (r0, r2) <@ polynomial____ct_butterfly (r0, r2, zetas);
-    (r1, r3) <@ polynomial____ct_butterfly (r1, r3, zetas);
+    zetas_qinv <- lAYER_4_ZETAS_QINV.[(2 * g)];
+    (r0, r2) <@ polynomial____ct_butterfly (r0, r2, zetas, zetas_qinv);
+    (r1, r3) <@ polynomial____ct_butterfly (r1, r3, zetas, zetas_qinv);
     zetas <- lAYER_4_ZETAS.[((2 * g) + 1)];
-    (r4, r6) <@ polynomial____ct_butterfly (r4, r6, zetas);
-    (r5, r7) <@ polynomial____ct_butterfly (r5, r7, zetas);
+    zetas_qinv <- lAYER_4_ZETAS_QINV.[((2 * g) + 1)];
+    (r4, r6) <@ polynomial____ct_butterfly (r4, r6, zetas, zetas_qinv);
+    (r5, r7) <@ polynomial____ct_butterfly (r5, r7, zetas, zetas_qinv);
     zetas <- lAYER_3_ZETAS.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____ct_butterfly (r0, r1, zetas);
+    zetas_qinv <- lAYER_3_ZETAS_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____ct_butterfly (r0, r1, zetas, zetas_qinv);
     zetas <- lAYER_3_ZETAS.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____ct_butterfly (r2, r3, zetas);
+    zetas_qinv <- lAYER_3_ZETAS_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____ct_butterfly (r2, r3, zetas, zetas_qinv);
     zetas <- lAYER_3_ZETAS.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____ct_butterfly (r4, r5, zetas);
+    zetas_qinv <- lAYER_3_ZETAS_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____ct_butterfly (r4, r5, zetas, zetas_qinv);
     zetas <- lAYER_3_ZETAS.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____ct_butterfly (r6, r7, zetas);
+    zetas_qinv <- lAYER_3_ZETAS_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____ct_butterfly (r6, r7, zetas, zetas_qinv);
     zetas <- lAYER_2_ZETAS.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____ct_butterfly_8 (r0, r1, zetas);
+    zetas_qinv <- lAYER_2_ZETAS_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____ct_butterfly_8 (r0, r1, zetas, zetas_qinv);
     zetas <- lAYER_2_ZETAS.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____ct_butterfly_8 (r2, r3, zetas);
+    zetas_qinv <- lAYER_2_ZETAS_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____ct_butterfly_8 (r2, r3, zetas, zetas_qinv);
     zetas <- lAYER_2_ZETAS.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____ct_butterfly_8 (r4, r5, zetas);
+    zetas_qinv <- lAYER_2_ZETAS_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____ct_butterfly_8 (r4, r5, zetas, zetas_qinv);
     zetas <- lAYER_2_ZETAS.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____ct_butterfly_8 (r6, r7, zetas);
+    zetas_qinv <- lAYER_2_ZETAS_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____ct_butterfly_8 (r6, r7, zetas, zetas_qinv);
     zetas <- lAYER_1_ZETAS.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____ct_butterfly_4 (r0, r1, zetas);
+    zetas_qinv <- lAYER_1_ZETAS_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____ct_butterfly_4 (r0, r1, zetas, zetas_qinv);
     zetas <- lAYER_1_ZETAS.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____ct_butterfly_4 (r2, r3, zetas);
+    zetas_qinv <- lAYER_1_ZETAS_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____ct_butterfly_4 (r2, r3, zetas, zetas_qinv);
     zetas <- lAYER_1_ZETAS.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____ct_butterfly_4 (r4, r5, zetas);
+    zetas_qinv <- lAYER_1_ZETAS_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____ct_butterfly_4 (r4, r5, zetas, zetas_qinv);
     zetas <- lAYER_1_ZETAS.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____ct_butterfly_4 (r6, r7, zetas);
+    zetas_qinv <- lAYER_1_ZETAS_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____ct_butterfly_4 (r6, r7, zetas, zetas_qinv);
     zetas <- lAYER_0_ZETAS.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____ct_butterfly_2 (r0, r1, zetas);
+    zetas_qinv <- lAYER_0_ZETAS_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____ct_butterfly_2 (r0, r1, zetas, zetas_qinv);
     zetas <- lAYER_0_ZETAS.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____ct_butterfly_2 (r2, r3, zetas);
+    zetas_qinv <- lAYER_0_ZETAS_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____ct_butterfly_2 (r2, r3, zetas, zetas_qinv);
     zetas <- lAYER_0_ZETAS.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____ct_butterfly_2 (r4, r5, zetas);
+    zetas_qinv <- lAYER_0_ZETAS_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____ct_butterfly_2 (r4, r5, zetas, zetas_qinv);
     zetas <- lAYER_0_ZETAS.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____ct_butterfly_2 (r6, r7, zetas);
+    zetas_qinv <- lAYER_0_ZETAS_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____ct_butterfly_2 (r6, r7, zetas, zetas_qinv);
     polynomial <-
     (Array256.init
     (WArray1024.get32
@@ -1810,15 +1875,18 @@ module M = {
     }
     return polynomial;
   }
-  proc polynomial____gs_butterfly (a:W256.t, b:W256.t, zetas:W256.t) : 
-  W256.t * W256.t = {
+  proc polynomial____gs_butterfly (a:W256.t, b:W256.t, zetas:W256.t,
+                                   zetas_qinv:W256.t) : W256.t * W256.t = {
     var b_minus_a:W256.t;
     b_minus_a <- (VPSUB_8u32 b a);
     a <- (VPADD_8u32 a b);
-    b <@ montgomery_multiply_and_reduce (b_minus_a, zetas);
+    b <@ montgomery_multiply_by_zeta (b_minus_a, zetas, zetas_qinv);
     return (a, b);
   }
-  proc polynomial____gs_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
+  proc polynomial____gs_butterfly_4_lanes (lhs:W256.t, rhs:W256.t,
+                                           zetas:W256.t, zetas_high:W256.t,
+                                           zetas_qinv:W256.t,
+                                           zetas_qinv_high:W256.t) : 
   W256.t * W256.t = {
     var low_values:W256.t;
     var high_values:W256.t;
@@ -1828,23 +1896,35 @@ module M = {
     high_values <- (VPUNPCKH_4u64 lhs rhs);
     differences <- (VPSUB_8u32 high_values low_values);
     sums <- (VPADD_8u32 high_values low_values);
-    differences <@ montgomery_multiply_and_reduce (differences, zetas);
+    differences <@ montgomery_multiply_by_zeta_lanes (differences, zetas,
+    zetas_high, zetas_qinv, zetas_qinv_high);
     lhs <- (VPUNPCKL_4u64 sums differences);
     rhs <- (VPUNPCKH_4u64 sums differences);
     return (lhs, rhs);
   }
-  proc polynomial____gs_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
-  W256.t * W256.t = {
+  proc polynomial____gs_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t = {
     
+    (lhs, rhs) <@ polynomial____gs_butterfly_4_lanes (lhs, rhs, zetas, 
+    zetas, zetas_qinv, zetas_qinv);
+    return (lhs, rhs);
+  }
+  proc polynomial____gs_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t = {
+    var zetas_high:W256.t;
+    var zetas_qinv_high:W256.t;
     lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
     rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
-    (lhs, rhs) <@ polynomial____gs_butterfly_4 (lhs, rhs, zetas);
+    zetas_high <- (VMOVSHDUP_256 zetas);
+    zetas_qinv_high <- (VMOVSHDUP_256 zetas_qinv);
+    (lhs, rhs) <@ polynomial____gs_butterfly_4_lanes (lhs, rhs, zetas,
+    zetas_high, zetas_qinv, zetas_qinv_high);
     lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
     rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
     return (lhs, rhs);
   }
-  proc polynomial____gs_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
-  W256.t * W256.t = {
+  proc polynomial____gs_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t = {
     var low_values:W256.t;
     var high_values:W256.t;
     var differences:W256.t;
@@ -1853,25 +1933,21 @@ module M = {
     high_values <- (VPERM2I128 lhs rhs (W8.of_int 49));
     differences <- (VPSUB_8u32 high_values low_values);
     sums <- (VPADD_8u32 high_values low_values);
-    differences <@ montgomery_multiply_and_reduce (differences, zetas);
+    differences <@ montgomery_multiply_by_zeta (differences, zetas,
+    zetas_qinv);
     lhs <- (VPERM2I128 sums differences (W8.of_int 32));
     rhs <- (VPERM2I128 sums differences (W8.of_int 49));
     return (lhs, rhs);
   }
   proc polynomial____gs_butterfly_scaled (a:W256.t, b:W256.t, zetas_f:W256.t,
-                                          f:W256.t) : W256.t * W256.t = {
+                                          zetas_f_qinv:W256.t, f:W256.t,
+                                          f_qinv:W256.t) : W256.t * W256.t = {
     var b_minus_a:W256.t;
     b_minus_a <- (VPSUB_8u32 b a);
     a <- (VPADD_8u32 a b);
-    b <@ montgomery_multiply_and_reduce (b_minus_a, zetas_f);
-    a <@ montgomery_multiply_and_reduce (a, f);
+    b <@ montgomery_multiply_by_zeta (b_minus_a, zetas_f, zetas_f_qinv);
+    a <@ montgomery_multiply_by_zeta (a, f, f_qinv);
     return (a, b);
-  }
-  proc polynomial____broadcast_zeta (zeta_0:W32.t) : W256.t = {
-    var zetas:W256.t;
-    zetas <- (zeroextu256 (VMOV_32 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    return zetas;
   }
   proc polynomial____invert_ntt_layers_0_to_4 (polynomial:W32.t Array256.t,
                                                g:int) : W32.t Array256.t = {
@@ -1884,7 +1960,7 @@ module M = {
     var r6:W256.t;
     var r7:W256.t;
     var zetas:W256.t;
-    var zeta_0:W32.t;
+    var zetas_qinv:W256.t;
     r0 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * ((8 * g) + 0)));
@@ -1910,49 +1986,66 @@ module M = {
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * ((8 * g) + 7)));
     zetas <- zETAS_TO_INVERT_LAYER_0.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____gs_butterfly_2 (r0, r1, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_0_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____gs_butterfly_2 (r0, r1, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_0.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____gs_butterfly_2 (r2, r3, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_0_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____gs_butterfly_2 (r2, r3, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_0.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____gs_butterfly_2 (r4, r5, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_0_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____gs_butterfly_2 (r4, r5, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_0.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____gs_butterfly_2 (r6, r7, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_0_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____gs_butterfly_2 (r6, r7, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_1.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____gs_butterfly_4 (r0, r1, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_1_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____gs_butterfly_4 (r0, r1, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_1.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____gs_butterfly_4 (r2, r3, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_1_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____gs_butterfly_4 (r2, r3, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_1.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____gs_butterfly_4 (r4, r5, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_1_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____gs_butterfly_4 (r4, r5, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_1.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____gs_butterfly_4 (r6, r7, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_1_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____gs_butterfly_4 (r6, r7, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_2.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____gs_butterfly_8 (r0, r1, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_2_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____gs_butterfly_8 (r0, r1, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_2.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____gs_butterfly_8 (r2, r3, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_2_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____gs_butterfly_8 (r2, r3, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_2.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____gs_butterfly_8 (r4, r5, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_2_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____gs_butterfly_8 (r4, r5, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_2.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____gs_butterfly_8 (r6, r7, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_3.[((4 * g) + 0)];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r0, r1) <@ polynomial____gs_butterfly (r0, r1, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_3.[((4 * g) + 1)];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r2, r3) <@ polynomial____gs_butterfly (r2, r3, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_3.[((4 * g) + 2)];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r4, r5) <@ polynomial____gs_butterfly (r4, r5, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_3.[((4 * g) + 3)];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r6, r7) <@ polynomial____gs_butterfly (r6, r7, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_4.[(2 * g)];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r0, r2) <@ polynomial____gs_butterfly (r0, r2, zetas);
-    (r1, r3) <@ polynomial____gs_butterfly (r1, r3, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_4.[((2 * g) + 1)];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r4, r6) <@ polynomial____gs_butterfly (r4, r6, zetas);
-    (r5, r7) <@ polynomial____gs_butterfly (r5, r7, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_2_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____gs_butterfly_8 (r6, r7, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3.[((4 * g) + 0)]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3_QINV.[((4 * g) + 0)]);
+    (r0, r1) <@ polynomial____gs_butterfly (r0, r1, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3.[((4 * g) + 1)]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3_QINV.[((4 * g) + 1)]);
+    (r2, r3) <@ polynomial____gs_butterfly (r2, r3, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3.[((4 * g) + 2)]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3_QINV.[((4 * g) + 2)]);
+    (r4, r5) <@ polynomial____gs_butterfly (r4, r5, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3.[((4 * g) + 3)]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3_QINV.[((4 * g) + 3)]);
+    (r6, r7) <@ polynomial____gs_butterfly (r6, r7, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_4.[(2 * g)]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_4_QINV.[(2 * g)]);
+    (r0, r2) <@ polynomial____gs_butterfly (r0, r2, zetas, zetas_qinv);
+    (r1, r3) <@ polynomial____gs_butterfly (r1, r3, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_4.[((2 * g) + 1)]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_4_QINV.[((2 * g) + 1)]);
+    (r4, r6) <@ polynomial____gs_butterfly (r4, r6, zetas, zetas_qinv);
+    (r5, r7) <@ polynomial____gs_butterfly (r5, r7, zetas, zetas_qinv);
     polynomial <-
     (Array256.init
     (WArray1024.get32
@@ -2005,9 +2098,10 @@ module M = {
     var r5:W256.t;
     var r6:W256.t;
     var r7:W256.t;
-    var zeta_0:W32.t;
     var zetas:W256.t;
+    var zetas_qinv:W256.t;
     var scaling:W256.t;
+    var scaling_qinv:W256.t;
     r0 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * (j + 0)));
@@ -2032,34 +2126,38 @@ module M = {
     r7 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * (j + 28)));
-    zeta_0 <- zETAS_TO_INVERT_LAYER_5.[0];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r0, r1) <@ polynomial____gs_butterfly (r0, r1, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_5.[1];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r2, r3) <@ polynomial____gs_butterfly (r2, r3, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_5.[2];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r4, r5) <@ polynomial____gs_butterfly (r4, r5, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_5.[3];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r6, r7) <@ polynomial____gs_butterfly (r6, r7, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_6.[0];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r0, r2) <@ polynomial____gs_butterfly (r0, r2, zetas);
-    (r1, r3) <@ polynomial____gs_butterfly (r1, r3, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_6.[1];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r4, r6) <@ polynomial____gs_butterfly (r4, r6, zetas);
-    (r5, r7) <@ polynomial____gs_butterfly (r5, r7, zetas);
-    zeta_0 <- (W32.of_int (- 3975713));
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    zeta_0 <- (W32.of_int 41978);
-    scaling <@ polynomial____broadcast_zeta (zeta_0);
-    (r0, r4) <@ polynomial____gs_butterfly_scaled (r0, r4, zetas, scaling);
-    (r1, r5) <@ polynomial____gs_butterfly_scaled (r1, r5, zetas, scaling);
-    (r2, r6) <@ polynomial____gs_butterfly_scaled (r2, r6, zetas, scaling);
-    (r3, r7) <@ polynomial____gs_butterfly_scaled (r3, r7, zetas, scaling);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5.[0]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5_QINV.[0]);
+    (r0, r1) <@ polynomial____gs_butterfly (r0, r1, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5.[1]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5_QINV.[1]);
+    (r2, r3) <@ polynomial____gs_butterfly (r2, r3, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5.[2]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5_QINV.[2]);
+    (r4, r5) <@ polynomial____gs_butterfly (r4, r5, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5.[3]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5_QINV.[3]);
+    (r6, r7) <@ polynomial____gs_butterfly (r6, r7, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_6.[0]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_6_QINV.[0]);
+    (r0, r2) <@ polynomial____gs_butterfly (r0, r2, zetas, zetas_qinv);
+    (r1, r3) <@ polynomial____gs_butterfly (r1, r3, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_6.[1]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_6_QINV.[1]);
+    (r4, r6) <@ polynomial____gs_butterfly (r4, r6, zetas, zetas_qinv);
+    (r5, r7) <@ polynomial____gs_butterfly (r5, r7, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 iNVERSE_NTT_LAYER_7_CONSTANTS.[0]);
+    zetas_qinv <- (VPBROADCAST_8u32 iNVERSE_NTT_LAYER_7_CONSTANTS.[1]);
+    scaling <- (VPBROADCAST_8u32 iNVERSE_NTT_LAYER_7_CONSTANTS.[2]);
+    scaling_qinv <- (VPBROADCAST_8u32 iNVERSE_NTT_LAYER_7_CONSTANTS.[3]);
+    (r0, r4) <@ polynomial____gs_butterfly_scaled (r0, r4, zetas, zetas_qinv,
+    scaling, scaling_qinv);
+    (r1, r5) <@ polynomial____gs_butterfly_scaled (r1, r5, zetas, zetas_qinv,
+    scaling, scaling_qinv);
+    (r2, r6) <@ polynomial____gs_butterfly_scaled (r2, r6, zetas, zetas_qinv,
+    scaling, scaling_qinv);
+    (r3, r7) <@ polynomial____gs_butterfly_scaled (r3, r7, zetas, zetas_qinv,
+    scaling, scaling_qinv);
     polynomial <-
     (Array256.init
     (WArray1024.get32

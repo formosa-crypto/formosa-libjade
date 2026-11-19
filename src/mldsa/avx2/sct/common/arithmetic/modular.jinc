@@ -52,6 +52,46 @@ inline fn montgomery_multiply_and_reduce(reg u256 lhs, reg u256 rhs) -> reg u256
     return product_low;
 }
 
+// Montgomery multiplication by a constant zeta, given with its twisted form
+// zeta * q^-1 mod 2^32: the low half of the reduction is a product of lhs,
+// computed alongside the product by zeta instead of after it. The result is
+// that of montgomery_multiply_and_reduce(lhs, zetas). The *_high arguments
+// hold the odd lanes of zetas and zetas_qinv in the even ones.
+inline fn montgomery_multiply_by_zeta_lanes(
+    reg u256 lhs zetas zetas_high zetas_qinv zetas_qinv_high
+) -> reg u256
+{
+    reg u256 lhs_high;
+    reg u256 product_low product_high;
+    reg u256 t_low t_high;
+
+    lhs_high = #VMOVSHDUP_256(lhs);
+
+    product_low = #VPMUL_256(lhs, zetas);
+    product_high = #VPMUL_256(lhs_high, zetas_high);
+    t_low = #VPMUL_256(lhs, zetas_qinv);
+    t_high = #VPMUL_256(lhs_high, zetas_qinv_high);
+
+    t_low = #VPMUL_256(t_low, MODULUS_VECTOR);
+    t_high = #VPMUL_256(t_high, MODULUS_VECTOR);
+
+    product_low = #VPSUB_4u64(product_low, t_low);
+    product_high = #VPSUB_4u64(product_high, t_high);
+
+    product_low = #VMOVSHDUP_256(product_low);
+    product_low = #VPBLEND_8u32(product_low, product_high, 0b1_0_1_0_1_0_1_0);
+
+    return product_low;
+}
+
+// The same for zetas whose odd lanes equal the even ones.
+inline fn montgomery_multiply_by_zeta(reg u256 lhs zetas zetas_qinv) -> reg u256
+{
+    reg u256 r;
+    r = montgomery_multiply_by_zeta_lanes(lhs, zetas, zetas, zetas_qinv, zetas_qinv);
+    return r;
+}
+
 namespace polynomial {
     #[safety =
        { requires = is_arr_init(lhs,0,4 * COEFFICIENTS_IN_POLYNOMIAL)

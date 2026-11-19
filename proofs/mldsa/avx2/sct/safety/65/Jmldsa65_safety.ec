@@ -13,20 +13,20 @@ Array128 Array136 Array160 Array168 Array192 Array200 Array224 Array256
 Array272 Array320 Array416 Array512 Array640 Array680 Array768 Array800
 Array848 Array1024 Array1280 Array1536 Array1920 Array1952 Array2048
 Array2496 Array3072 Array3200 Array3309 Array4032 Array5120 Array6144
-Array7680 Array12288 Array30720 WArray8 WArray16 WArray32 WArray64 WArray96
-WArray128 WArray160 WArray192 WArray256 WArray512 WArray2048 BArray2 BArray8
-BArray16 BArray32 BArray40 BArray48 BArray61 BArray64 BArray66 BArray96
-BArray128 BArray136 BArray160 BArray168 BArray192 BArray200 BArray224
-BArray256 BArray272 BArray320 BArray416 BArray512 BArray640 BArray680
-BArray768 BArray800 BArray848 BArray1024 BArray1920 BArray1952 BArray2048
-BArray2496 BArray3200 BArray3309 BArray4032 BArray5120 BArray6144 BArray12288
-BArray30720 SBArray128_32 SBArray1952_32 SBArray4032_32 SBArray3309_48
-SBArray3309_61 SBArray128_64 SBArray4032_64 SBArray640_128 SBArray768_128
-SBArray272_136 SBArray680_136 SBArray848_168 SBArray224_200 SBArray1920_320
-SBArray2496_416 SBArray680_640 SBArray3200_640 SBArray4032_640
-SBArray4032_768 SBArray5120_1024 SBArray6144_1024 SBArray30720_1024
-SBArray1952_1920 SBArray12288_2048 SBArray4032_2496 SBArray3309_3200
-SBArray30720_5120.
+Array7680 Array12288 Array30720 WArray8 WArray16 WArray24 WArray32 WArray64
+WArray96 WArray128 WArray160 WArray192 WArray256 WArray512 WArray2048 BArray2
+BArray8 BArray16 BArray24 BArray32 BArray40 BArray48 BArray61 BArray64
+BArray66 BArray96 BArray128 BArray136 BArray160 BArray168 BArray192 BArray200
+BArray224 BArray256 BArray272 BArray320 BArray416 BArray512 BArray640
+BArray680 BArray768 BArray800 BArray848 BArray1024 BArray1920 BArray1952
+BArray2048 BArray2496 BArray3200 BArray3309 BArray4032 BArray5120 BArray6144
+BArray12288 BArray30720 SBArray128_32 SBArray1952_32 SBArray4032_32
+SBArray3309_48 SBArray3309_61 SBArray128_64 SBArray4032_64 SBArray640_128
+SBArray768_128 SBArray272_136 SBArray680_136 SBArray848_168 SBArray224_200
+SBArray1920_320 SBArray2496_416 SBArray680_640 SBArray3200_640
+SBArray4032_640 SBArray4032_768 SBArray5120_1024 SBArray6144_1024
+SBArray30720_1024 SBArray1952_1920 SBArray12288_2048 SBArray4032_2496
+SBArray3309_3200 SBArray30720_5120.
 
 abbrev  commitment__ENCODING_CONSTANTS_TABLE_bits6 =
 (BArray128.of_list256
@@ -549,6 +549,432 @@ abbrev  kECCAK1600_RC =
 (W64.of_int (-9223372034707292150)); (W64.of_int (-9223372034707259263));
 (W64.of_int (-9223372036854742912)); (W64.of_int 2147483649);
 (W64.of_int (-9223372034707259384))]).
+
+abbrev  iNVERSE_NTT_LAYER_7_CONSTANTS =
+(BArray16.of_list32
+[(W32.of_int (-3975713)); (W32.of_int (-151046689)); (W32.of_int 41978);
+(W32.of_int (-8395782))]).
+
+abbrev  lAYERS_7_6_ZETAS =
+(BArray24.of_list32
+[(W32.of_int 25847); (W32.of_int 1830765815); (W32.of_int (-2608894));
+(W32.of_int (-1929875198)); (W32.of_int (-518909));
+(W32.of_int (-1927777021))]).
+
+abbrev  zETAS_TO_INVERT_LAYER_6_QINV =
+(BArray8.of_list32 [(W32.of_int (-1927777021)); (W32.of_int (-1929875198))]).
+
+abbrev  zETAS_TO_INVERT_LAYER_5_QINV =
+(BArray16.of_list32
+[(W32.of_int 1640734244); (W32.of_int 1612161320); (W32.of_int 1477910808);
+(W32.of_int 1640767044)]).
+
+abbrev  zETAS_TO_INVERT_LAYER_4_QINV =
+(BArray32.of_list32
+[(W32.of_int 625853735); (W32.of_int (-285697463)); (W32.of_int 515185417);
+(W32.of_int (-1929495947)); (W32.of_int (-1091570561));
+(W32.of_int (-1374673747)); (W32.of_int (-1815525077));
+(W32.of_int 308362795)]).
+
+abbrev  zETAS_TO_INVERT_LAYER_3_QINV =
+(BArray64.of_list32
+[(W32.of_int (-1170414139)); (W32.of_int (-1443016191));
+(W32.of_int 1837364258); (W32.of_int 329347125); (W32.of_int (-748618600));
+(W32.of_int (-1257667337)); (W32.of_int (-878576921));
+(W32.of_int 1654287830); (W32.of_int 684667771); (W32.of_int (-346752664));
+(W32.of_int 222489248); (W32.of_int 1806278032); (W32.of_int 858240904);
+(W32.of_int (-1364982364)); (W32.of_int 2082316400); (W32.of_int 1727305304)]
+).
+
+abbrev  zETAS_TO_INVERT_LAYER_2_QINV =
+(BArray512.of_list256
+[(W256.of_int
+ (-46231117865515701663188276477305069737239032811577578260659609631708380729555)
+ );
+(W256.of_int
+(-40308813007630279660800533413462476023785350571745809848720619359492527686608)
+);
+(W256.of_int
+(-7694070522706229301989874210595677606335887933700970434486053637379522717613)
+);
+(W256.of_int
+40032141758163935434887474281669587021823113703011892635341341287596361997210
+);
+(W256.of_int
+23723596059544975722777807283687995128496919235826647629994095617702911144844
+);
+(W256.of_int
+(-51907508028138545969467909703014425324839405453399629677470095520340178225641)
+);
+(W256.of_int
+11295882004830139526322800383483915498953326670369337600599805756481146507097
+);
+(W256.of_int
+(-47185954387656224337987428157052580683690441230793042324760942097210644780330)
+);
+(W256.of_int
+(-44794275860858407257481832412588729259925532078528860188595334316843494840995)
+);
+(W256.of_int
+(-28626428516259158855454904675138680106693733573439992772173914507878933919155)
+);
+(W256.of_int
+(-15136064007298948835278814028307374606217458242369158881244856756191927443903)
+);
+(W256.of_int
+(-5445936673258117338806948975153417607279815898353175578498992877001693393284)
+);
+(W256.of_int
+(-51189480829750957525635238513145969994086842705682668986149351508317597229393)
+);
+(W256.of_int
+42982123144482884937383571770905130459967901720610186867300062127654693679148
+);
+(W256.of_int
+(-37866039288938368815423130247323234275912068935950071492605711582741788721467)
+);
+(W256.of_int
+(-49771789149214465680432167981085667177811347099920728655539585845500629912032)
+)]).
+
+abbrev  zETAS_TO_INVERT_LAYER_1_QINV =
+(BArray512.of_list256
+[(W256.of_int
+ 52761908908540014504751632443020719561512049905216359154720584544792599705561
+ );
+(W256.of_int
+(-4819529861086092324585981415270609350650702302499781631276660532184282937342)
+);
+(W256.of_int
+47912672502293245640183129711909486119851340573162358786664506429485808531346
+);
+(W256.of_int
+(-18742020554263951902438285629488510204209062326384066584841357096139014111242)
+);
+(W256.of_int
+(-53906576939515236877641723015141521993915377413116784539933080944882851452920)
+);
+(W256.of_int
+18206336092483798440788595861005903595284327528650972929647718750311391062464
+);
+(W256.of_int
+(-48113585250169337653513867199466562800717122123930144040616877397505836865702)
+);
+(W256.of_int
+35637497933696450300991498286368625283831487087830974197198186376755708708232
+);
+(W256.of_int
+(-23990609258594871217389978161443799226256305301966544540886132356279073084318)
+);
+(W256.of_int
+57567428386298539943541134148725923067180607018601695831071321025282050812407
+);
+(W256.of_int
+7814927703971631469701528186129125337656985318469831940289371155284673385481);
+(W256.of_int
+(-21113263738042724161290298745543998703510811244044430810415027478043637756257)
+);
+(W256.of_int
+(-38843563307163194447182669822903180338777720248256856374404902393956614328374)
+);
+(W256.of_int
+(-34666536990969910574828186743975975682417923103670940118040220264557360218890)
+);
+(W256.of_int
+(-57801584797378915537023628044425028693215170335627209460846974271460982444101)
+);
+(W256.of_int
+(-42459716779958754719550077549828711654765343952693781629692706319611531577319)
+)]).
+
+abbrev  zETAS_TO_INVERT_LAYER_0_QINV =
+(BArray512.of_list256
+[(W256.of_int
+ 4186615309851504755332942127729647818026006622161825199072425226508611086798
+ );
+(W256.of_int
+30191271100413583978050196851679712458411167311374972300243016696897034192297
+);
+(W256.of_int
+(-42909445800777988099812779093536764462714048489339413859546778797351339237413)
+);
+(W256.of_int
+(-55194306081347488999026194845657370941562191263733111445115571701266634968050)
+);
+(W256.of_int
+(-54999873461561806471128960890054795047911487180239015458463565835864521298883)
+);
+(W256.of_int
+41917165260610674890153303375139919504516302768573312283183426801647143252903
+);
+(W256.of_int
+20407478420194398905727307411464211921978870104609324675324826800122495647263
+);
+(W256.of_int
+22429856577116842747078720252734599606715586813961730245694947316958642428111
+);
+(W256.of_int
+6338403331553085566809539389936911750764924826054757019987645358336386256238);
+(W256.of_int
+(-41426344522052273202116933361282037616609787375803872625531201807190840789338)
+);
+(W256.of_int
+(-51775693996357324784160055960959986919032977727099473837517693712032885302714)
+);
+(W256.of_int
+57288864163500310849483209297311795143736007720629732877968614598285401233700
+);
+(W256.of_int
+23283732376182742348555430102474356725916883664542405846824722812015904645570
+);
+(W256.of_int
+384277991645409746454064521460160179360463524960039924224108608074609559292);
+(W256.of_int
+(-16335032818224882313876243888543027395701913560802115969922428229769573497378)
+);
+(W256.of_int
+(-24221160338795132665385948408321411834756260109237612812647887790784256990)
+)]).
+
+abbrev  lAYER_5_ZETAS_QINV =
+(BArray128.of_list256
+[(W256.of_int
+ 44234992009757668820260223424326022228058474301785899076447686774770958605892
+ );
+(W256.of_int
+39844396571762505616456782984547926089680687191203502711917740426673673150744
+);
+(W256.of_int
+43463783216162876712066362383163736987842675713538547530988002719636104126760
+);
+(W256.of_int
+44234107723506780390337989725848398555401943105662545822718080852648224595492
+)]).
+
+abbrev  lAYER_4_ZETAS_QINV =
+(BArray256.of_list256
+[(W256.of_int
+ 8313444509269130609195606882539044467470568332023600378215133973127819771435
+ );
+(W256.of_int
+(-48946459233230847624512485315512274364265906653104309521038878412400779245269)
+);
+(W256.of_int
+(-37061130885521152111447773587482660641204595754594371517251343543994934090579)
+);
+(W256.of_int
+(-29428684087883656943091301771061580211781872251175007666098322891132697054081)
+);
+(W256.of_int
+(-52019107810755013208994404791501466597804675077470091377561186384359375095179)
+);
+(W256.of_int
+13889371369247633840281875659963931909345184399955166493714397392385558780681
+);
+(W256.of_int
+(-7702388340253648595945884936900825277126843178849497560684335690084124157367)
+);
+(W256.of_int
+16872983320965577290113406557456995625226257250553493020626415811957585986855
+)]).
+
+abbrev  lAYER_3_ZETAS_QINV =
+(BArray512.of_list256
+[(W256.of_int
+ 46568058884568893808127283778539484621527600772326629048966192451505949546072
+ );
+(W256.of_int
+56139139101204030406035212579597762223368195099844610808523694307678130905200
+);
+(W256.of_int
+(-36799851716649387945440853238300711202757300843633041450489470667178217568860)
+);
+(W256.of_int
+23138129004794417670685947582291603431140709302072926592632870925879147476872
+);
+(W256.of_int
+48697159420104007667749936897667179349127465862699524009428205713330815999376
+);
+(W256.of_int
+5998298261491039795685184589793773059444759573944532336988321629074807253664);
+(W256.of_int
+(-9348433303349060714128593154117512362575506047195646965107787702092406916760)
+);
+(W256.of_int
+18458606595174636723946636517094308981123861028661990141668396590606198977403
+);
+(W256.of_int
+44599511679300497199971152665316127914735602506294708408206940962397552799190
+);
+(W256.of_int
+(-23686386911704390997314705142661440294615737011330540662673288791204537697561)
+);
+(W256.of_int
+(-33906644311471929680437278468909146355964403333878475763583670912266704157449)
+);
+(W256.of_int
+(-20182717507776186393057021491069105895335129318870243571619214683665881564008)
+);
+(W256.of_int
+8879180927046740568647627186653457968587253537729862050037738844400715395125);
+(W256.of_int
+49535242415342130635668204449230149811046646921872789962899930897651217986594
+);
+(W256.of_int
+(-38903639531292873825111825206991230812037355062926287225586217773912928988671)
+);
+(W256.of_int
+(-31554302746305897609895159702433631728296645756812199190000012834599298341435)
+)]).
+
+abbrev  lAYER_2_ZETAS_QINV =
+(BArray512.of_list256
+[(W256.of_int
+ (-43977775003890976705780822596010459047367541268208591185812603494321957229977)
+ );
+(W256.of_int
+49553867721461414864332993254930295904984818972090182044300387244740683797709
+);
+(W256.of_int
+(-29035148748773605283129337767259250277664351418060556586467312378675679787773)
+);
+(W256.of_int
+(-16025974507462655885812109548855116240480339924005189791695650538903963449388)
+);
+(W256.of_int
+(-12832510240031018542921786423814997264538137236798711577542294050505807776379)
+);
+(W256.of_int
+48447597044056515198212613053313743573532636081367394373030872705998059555478
+);
+(W256.of_int
+55530307505228359609450222078965111317433932257469997706170484419364075734016
+);
+(W256.of_int
+(-29790108755548375818074413067380003044205234553429794450137750516050415888740)
+);
+(W256.of_int
+(-24308869676678151930824178363542406647345397850940699479871121503127382150595)
+);
+(W256.of_int
+49388340227113556847698423632058929748235431382014348816032729367113557949982
+);
+(W256.of_int
+26746904187224180933800981067660732769006855912733992509839185265562474079295
+);
+(W256.of_int
+54577819895401706000059745192313985739812571191668092027437211928847617037404
+);
+(W256.of_int
+(-44108704744752931554852515702914404034257600587753179498236721564261898165336)
+);
+(W256.of_int
+(-53476108792018003127298140966957482981855104563891889807274718899343198433418)
+);
+(W256.of_int
+(-25614008190003964111276974835186881424262624242805083606482010466680498420428)
+);
+(W256.of_int
+(-25677704487933164675968353991683606572373814630827466346854009469020182799020)
+)]).
+
+abbrev  lAYER_1_ZETAS_QINV =
+(BArray512.of_list256
+[(W256.of_int
+ (-53223230369489625717051912135200137469744725946962044237881971890205988182299)
+ );
+(W256.of_int
+3786682684290059300869545997520265064245495636665727322722981379160103286365);
+(W256.of_int
+52721812026891345590122427673664923767733648867294862062350660456695954370421
+);
+(W256.of_int
+(-57452236163827891783288068294917885767713010279915874276768667626194188938624)
+);
+(W256.of_int
+40929554887967497348452884366364972634856215758353740280115610742916388114674
+);
+(W256.of_int
+46071117214155789684075632258416469567620985928127618202183213019747779549091
+);
+(W256.of_int
+44176325089880396200969614428010478378983023746830016546264561950438545818242
+);
+(W256.of_int
+(-45022048857525128669488420205459791177085224115198666410582144594240430814243)
+);
+(W256.of_int
+31153527340476643606621709010671168889379544837369304924140557485575559060457
+);
+(W256.of_int
+32636587159155448615738805787120803244904238404513918520114219578444623162624
+);
+(W256.of_int
+(-8582613156055566650579449469731824964083122333534685073191720566261595214902)
+);
+(W256.of_int
+(-46621958908435050977775731840504021556073858918816135562071354055751052954260)
+);
+(W256.of_int
+38394469880506623137528644618306280069062672661456979103150083757329708246124
+);
+(W256.of_int
+6344247919765211151230023116414613880524396588278568735396193434804977245331);
+(W256.of_int
+32528151449800468199932287586449871143279149559167544186569724023037910072869
+);
+(W256.of_int
+(-24103825613533770532142673185826713680963910034204066683059041228834727383390)
+)]).
+
+abbrev  lAYER_0_ZETAS_QINV =
+(BArray512.of_list256
+[(W256.of_int
+ (-38308970390594172346780933300993306563586160368390102206232255843198464537965)
+ );
+(W256.of_int
+51356984136320819831555752696688926731225398877358194305726093766846471910133
+);
+(W256.of_int
+51944468498066308360851754217472685358728173402236032161224524424723954237022
+);
+(W256.of_int
+33925905191240738747088885057636509138219576595101555947055242299997500874785
+);
+(W256.of_int
+43944310286715963239939946131595973540055188583344720459239915722902285605145
+);
+(W256.of_int
+171565520809982250100928441156471833788848154303204066142312779936413777637);
+(W256.of_int
+30652523477176806320352999680566536501795759553327588198964028350622715184408
+);
+(W256.of_int
+30106724962988084369799469513738438616529678132928410124971686819994792061118
+);
+(W256.of_int
+37905666463871968531381078219560402987413265006277441399448087558944472881491
+);
+(W256.of_int
+25347616737674256314456976737426805521278272989303099308901782591948504054068
+);
+(W256.of_int
+55582273191487933046039251454461606619814232828109817794052999805663999444568
+);
+(W256.of_int
+46553191807393507542636849738570367899298411332841481447810117493410991910078
+);
+(W256.of_int
+10645171146978320071713975839801163342908221469015153062719929062699879178556
+);
+(W256.of_int
+20921014267148504153834232590264993933452107315580018080263209998527808806213
+);
+(W256.of_int
+5426026418443919239933395785275471729263236465199402658052664094533275854692);
+(W256.of_int
+10106212047683068291375379709759686040926239694735982216667643509512039664208
+)]).
 
 abbrev  zETAS_TO_INVERT_LAYER_6 =
 (BArray8.of_list32 [(W32.of_int (-518909)); (W32.of_int (-2608894))]).
@@ -2892,6 +3318,54 @@ module M = {
     product_low <- (VPBLEND_8u32 product_low product_high (W8.of_int 170));
     return (product_low, trace_montgomery_multiply_and_reduce);
   }
+  proc montgomery_multiply_by_zeta_lanes (lhs:W256.t, zetas:W256.t,
+                                          zetas_high:W256.t,
+                                          zetas_qinv:W256.t,
+                                          zetas_qinv_high:W256.t) : W256.t *
+                                                                    trace = {
+    var product_low:W256.t;
+    var lhs_high:W256.t;
+    var product_high:W256.t;
+    var t_low:W256.t;
+    var t_high:W256.t;
+    var trace_montgomery_multiply_by_zeta_lanes:trace;
+    trace_montgomery_multiply_by_zeta_lanes <- [];
+    lhs_high <- (VMOVSHDUP_256 lhs);
+    product_low <- (VPMUL_256 lhs zetas);
+    product_high <- (VPMUL_256 lhs_high zetas_high);
+    t_low <- (VPMUL_256 lhs zetas_qinv);
+    t_high <- (VPMUL_256 lhs_high zetas_qinv_high);
+    t_low <- (VPMUL_256 t_low mODULUS_VECTOR);
+    t_high <- (VPMUL_256 t_high mODULUS_VECTOR);
+    product_low <- (VPSUB_4u64 product_low t_low);
+    product_high <- (VPSUB_4u64 product_high t_high);
+    product_low <- (VMOVSHDUP_256 product_low);
+    product_low <- (VPBLEND_8u32 product_low product_high (W8.of_int 170));
+    return (product_low, trace_montgomery_multiply_by_zeta_lanes);
+  }
+  proc montgomery_multiply_by_zeta (lhs:W256.t, zetas:W256.t,
+                                    zetas_qinv:W256.t) : W256.t * trace = {
+    var r:W256.t;
+    var param:W256.t;
+    var param_0:W256.t;
+    var param_1:W256.t;
+    var param_2:W256.t;
+    var param_3:W256.t;
+    var result:W256.t;
+    var trace_montgomery_multiply_by_zeta:trace;
+    trace_montgomery_multiply_by_zeta <- [];
+    param_3 <- lhs;
+    param_2 <- zetas;
+    param_1 <- zetas;
+    param_0 <- zetas_qinv;
+    param <- zetas_qinv;
+    (result, tmp__trace) <@ montgomery_multiply_by_zeta_lanes (param_3,
+    param_2, param_1, param_0, param);
+    trace_montgomery_multiply_by_zeta <-
+    (trace_montgomery_multiply_by_zeta ++ tmp__trace);
+    r <- result;
+    return (r, trace_montgomery_multiply_by_zeta);
+  }
   proc polynomial__pointwise_montgomery_multiply_and_reduce (product:BArray1024.t,
                                                              b_product:BArray1024.t,
                                                              lhs:BArray1024.t,
@@ -3059,17 +3533,21 @@ module M = {
     b_polynomial <- (BArray1024.init_arr (W8.of_int 255));
     return (polynomial, b_polynomial, trace_polynomial__reduce32);
   }
-  proc polynomial____ct_butterfly (a:W256.t, b:W256.t, zetas:W256.t) : 
-  W256.t * W256.t * trace = {
+  proc polynomial____ct_butterfly (a:W256.t, b:W256.t, zetas:W256.t,
+                                   zetas_qinv:W256.t) : W256.t * W256.t *
+                                                        trace = {
     var t:W256.t;
     var param:W256.t;
     var param_0:W256.t;
+    var param_1:W256.t;
     var result:W256.t;
     var trace_polynomial____ct_butterfly:trace;
     trace_polynomial____ct_butterfly <- [];
-    param_0 <- b;
-    param <- zetas;
-    (result, tmp__trace) <@ montgomery_multiply_and_reduce (param_0, param);
+    param_1 <- b;
+    param_0 <- zetas;
+    param <- zetas_qinv;
+    (result, tmp__trace) <@ montgomery_multiply_by_zeta (param_1, param_0,
+    param);
     trace_polynomial____ct_butterfly <-
     (trace_polynomial____ct_butterfly ++ tmp__trace);
     t <- result;
@@ -3077,22 +3555,26 @@ module M = {
     a <- (VPADD_8u32 a t);
     return (a, b, trace_polynomial____ct_butterfly);
   }
-  proc polynomial____ct_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
-  W256.t * W256.t * trace = {
+  proc polynomial____ct_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t *
+                                                          trace = {
     var summands:W256.t;
     var zeta_products:W256.t;
     var add_terms:W256.t;
     var sub_terms:W256.t;
     var param:W256.t;
     var param_0:W256.t;
+    var param_1:W256.t;
     var result:W256.t;
     var trace_polynomial____ct_butterfly_8:trace;
     trace_polynomial____ct_butterfly_8 <- [];
     summands <- (VPERM2I128 lhs rhs (W8.of_int 32));
     zeta_products <- (VPERM2I128 lhs rhs (W8.of_int 49));
-    param_0 <- zeta_products;
-    param <- zetas;
-    (result, tmp__trace) <@ montgomery_multiply_and_reduce (param_0, param);
+    param_1 <- zeta_products;
+    param_0 <- zetas;
+    param <- zetas_qinv;
+    (result, tmp__trace) <@ montgomery_multiply_by_zeta (param_1, param_0,
+    param);
     trace_polynomial____ct_butterfly_8 <-
     (trace_polynomial____ct_butterfly_8 ++ tmp__trace);
     zeta_products <- result;
@@ -3102,7 +3584,10 @@ module M = {
     rhs <- (VPERM2I128 add_terms sub_terms (W8.of_int 49));
     return (lhs, rhs, trace_polynomial____ct_butterfly_8);
   }
-  proc polynomial____ct_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
+  proc polynomial____ct_butterfly_4_lanes (lhs:W256.t, rhs:W256.t,
+                                           zetas:W256.t, zetas_high:W256.t,
+                                           zetas_qinv:W256.t,
+                                           zetas_qinv_high:W256.t) : 
   W256.t * W256.t * trace = {
     var summands:W256.t;
     var zeta_products:W256.t;
@@ -3110,39 +3595,84 @@ module M = {
     var sub_terms:W256.t;
     var param:W256.t;
     var param_0:W256.t;
+    var param_1:W256.t;
+    var param_2:W256.t;
+    var param_3:W256.t;
     var result:W256.t;
-    var trace_polynomial____ct_butterfly_4:trace;
-    trace_polynomial____ct_butterfly_4 <- [];
+    var trace_polynomial____ct_butterfly_4_lanes:trace;
+    trace_polynomial____ct_butterfly_4_lanes <- [];
     summands <- (VPUNPCKL_4u64 lhs rhs);
     zeta_products <- (VPUNPCKH_4u64 lhs rhs);
-    param_0 <- zeta_products;
-    param <- zetas;
-    (result, tmp__trace) <@ montgomery_multiply_and_reduce (param_0, param);
-    trace_polynomial____ct_butterfly_4 <-
-    (trace_polynomial____ct_butterfly_4 ++ tmp__trace);
+    param_3 <- zeta_products;
+    param_2 <- zetas;
+    param_1 <- zetas_high;
+    param_0 <- zetas_qinv;
+    param <- zetas_qinv_high;
+    (result, tmp__trace) <@ montgomery_multiply_by_zeta_lanes (param_3,
+    param_2, param_1, param_0, param);
+    trace_polynomial____ct_butterfly_4_lanes <-
+    (trace_polynomial____ct_butterfly_4_lanes ++ tmp__trace);
     zeta_products <- result;
     add_terms <- (VPADD_8u32 summands zeta_products);
     sub_terms <- (VPSUB_8u32 summands zeta_products);
     lhs <- (VPUNPCKL_4u64 add_terms sub_terms);
     rhs <- (VPUNPCKH_4u64 add_terms sub_terms);
-    return (lhs, rhs, trace_polynomial____ct_butterfly_4);
+    return (lhs, rhs, trace_polynomial____ct_butterfly_4_lanes);
   }
-  proc polynomial____ct_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
-  W256.t * W256.t * trace = {
+  proc polynomial____ct_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t *
+                                                          trace = {
     var param:W256.t;
     var param_0:W256.t;
     var param_1:W256.t;
+    var param_2:W256.t;
+    var param_3:W256.t;
+    var param_4:W256.t;
+    var result:W256.t;
+    var result_0:W256.t;
+    var trace_polynomial____ct_butterfly_4:trace;
+    trace_polynomial____ct_butterfly_4 <- [];
+    param_4 <- lhs;
+    param_3 <- rhs;
+    param_2 <- zetas;
+    param_1 <- zetas;
+    param_0 <- zetas_qinv;
+    param <- zetas_qinv;
+    (result_0, result, tmp__trace) <@ polynomial____ct_butterfly_4_lanes (
+    param_4, param_3, param_2, param_1, param_0, param);
+    trace_polynomial____ct_butterfly_4 <-
+    (trace_polynomial____ct_butterfly_4 ++ tmp__trace);
+    lhs <- result_0;
+    rhs <- result;
+    return (lhs, rhs, trace_polynomial____ct_butterfly_4);
+  }
+  proc polynomial____ct_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t *
+                                                          trace = {
+    var zetas_high:W256.t;
+    var zetas_qinv_high:W256.t;
+    var param:W256.t;
+    var param_0:W256.t;
+    var param_1:W256.t;
+    var param_2:W256.t;
+    var param_3:W256.t;
+    var param_4:W256.t;
     var result:W256.t;
     var result_0:W256.t;
     var trace_polynomial____ct_butterfly_2:trace;
     trace_polynomial____ct_butterfly_2 <- [];
     lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
     rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
-    param_1 <- lhs;
-    param_0 <- rhs;
-    param <- zetas;
-    (result_0, result, tmp__trace) <@ polynomial____ct_butterfly_4 (param_1,
-    param_0, param);
+    zetas_high <- (VMOVSHDUP_256 zetas);
+    zetas_qinv_high <- (VMOVSHDUP_256 zetas_qinv);
+    param_4 <- lhs;
+    param_3 <- rhs;
+    param_2 <- zetas;
+    param_1 <- zetas_high;
+    param_0 <- zetas_qinv;
+    param <- zetas_qinv_high;
+    (result_0, result, tmp__trace) <@ polynomial____ct_butterfly_4_lanes (
+    param_4, param_3, param_2, param_1, param_0, param);
     trace_polynomial____ct_butterfly_2 <-
     (trace_polynomial____ct_butterfly_2 ++ tmp__trace);
     lhs <- result_0;
@@ -3162,66 +3692,78 @@ module M = {
     var r5:W256.t;
     var r6:W256.t;
     var r7:W256.t;
-    var zeta_0:W64.t;
     var zetas:W256.t;
+    var zetas_qinv:W256.t;
     var param:W256.t;
     var param_0:W256.t;
     var param_1:W256.t;
+    var param_2:W256.t;
     var result:W256.t;
     var result_0:W256.t;
-    var param_2:W256.t;
     var param_3:W256.t;
     var param_4:W256.t;
-    var result_1:W256.t;
-    var result_2:W256.t;
     var param_5:W256.t;
     var param_6:W256.t;
+    var result_1:W256.t;
+    var result_2:W256.t;
     var param_7:W256.t;
-    var result_3:W256.t;
-    var result_4:W256.t;
     var param_8:W256.t;
     var param_9:W256.t;
     var param_10:W256.t;
-    var result_5:W256.t;
-    var result_6:W256.t;
+    var result_3:W256.t;
+    var result_4:W256.t;
     var param_11:W256.t;
     var param_12:W256.t;
     var param_13:W256.t;
-    var result_7:W256.t;
-    var result_8:W256.t;
     var param_14:W256.t;
+    var result_5:W256.t;
+    var result_6:W256.t;
     var param_15:W256.t;
     var param_16:W256.t;
-    var result_9:W256.t;
-    var result_10:W256.t;
     var param_17:W256.t;
     var param_18:W256.t;
+    var result_7:W256.t;
+    var result_8:W256.t;
     var param_19:W256.t;
-    var result_11:W256.t;
-    var result_12:W256.t;
     var param_20:W256.t;
     var param_21:W256.t;
     var param_22:W256.t;
-    var result_13:W256.t;
-    var result_14:W256.t;
+    var result_9:W256.t;
+    var result_10:W256.t;
     var param_23:W256.t;
     var param_24:W256.t;
     var param_25:W256.t;
-    var result_15:W256.t;
-    var result_16:W256.t;
     var param_26:W256.t;
+    var result_11:W256.t;
+    var result_12:W256.t;
     var param_27:W256.t;
     var param_28:W256.t;
-    var result_17:W256.t;
-    var result_18:W256.t;
     var param_29:W256.t;
     var param_30:W256.t;
+    var result_13:W256.t;
+    var result_14:W256.t;
     var param_31:W256.t;
-    var result_19:W256.t;
-    var result_20:W256.t;
     var param_32:W256.t;
     var param_33:W256.t;
     var param_34:W256.t;
+    var result_15:W256.t;
+    var result_16:W256.t;
+    var param_35:W256.t;
+    var param_36:W256.t;
+    var param_37:W256.t;
+    var param_38:W256.t;
+    var result_17:W256.t;
+    var result_18:W256.t;
+    var param_39:W256.t;
+    var param_40:W256.t;
+    var param_41:W256.t;
+    var param_42:W256.t;
+    var result_19:W256.t;
+    var result_20:W256.t;
+    var param_43:W256.t;
+    var param_44:W256.t;
+    var param_45:W256.t;
+    var param_46:W256.t;
     var result_21:W256.t;
     var result_22:W256.t;
     var trace_polynomial____ntt_layers_7_6_5:trace;
@@ -3262,123 +3804,136 @@ module M = {
     (trace_polynomial____ntt_layers_7_6_5 ++
     [(Assert, ((0 <= (32 * (j + 28))) /\ (((32 * (j + 28)) + 32) <= 1024)))]);
     r7 <- (BArray1024.get256d polynomial (32 * (j + 28)));
-    zeta_0 <- (W64.of_int 25847);
-    zetas <- (zeroextu256 (VMOV_64 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    param_1 <- r0;
-    param_0 <- r4;
-    param <- zetas;
-    (result_0, result, tmp__trace) <@ polynomial____ct_butterfly (param_1,
-    param_0, param);
+    zetas <- (VPBROADCAST_8u32 (BArray24.get32 lAYERS_7_6_ZETAS 0));
+    zetas_qinv <- (VPBROADCAST_8u32 (BArray24.get32 lAYERS_7_6_ZETAS 1));
+    param_2 <- r0;
+    param_1 <- r4;
+    param_0 <- zetas;
+    param <- zetas_qinv;
+    (result_0, result, tmp__trace) <@ polynomial____ct_butterfly (param_2,
+    param_1, param_0, param);
     trace_polynomial____ntt_layers_7_6_5 <-
     (trace_polynomial____ntt_layers_7_6_5 ++ tmp__trace);
     r0 <- result_0;
     r4 <- result;
-    param_4 <- r1;
-    param_3 <- r5;
-    param_2 <- zetas;
-    (result_2, result_1, tmp__trace) <@ polynomial____ct_butterfly (param_4,
-    param_3, param_2);
+    param_6 <- r1;
+    param_5 <- r5;
+    param_4 <- zetas;
+    param_3 <- zetas_qinv;
+    (result_2, result_1, tmp__trace) <@ polynomial____ct_butterfly (param_6,
+    param_5, param_4, param_3);
     trace_polynomial____ntt_layers_7_6_5 <-
     (trace_polynomial____ntt_layers_7_6_5 ++ tmp__trace);
     r1 <- result_2;
     r5 <- result_1;
-    param_7 <- r2;
-    param_6 <- r6;
-    param_5 <- zetas;
-    (result_4, result_3, tmp__trace) <@ polynomial____ct_butterfly (param_7,
-    param_6, param_5);
+    param_10 <- r2;
+    param_9 <- r6;
+    param_8 <- zetas;
+    param_7 <- zetas_qinv;
+    (result_4, result_3, tmp__trace) <@ polynomial____ct_butterfly (param_10,
+    param_9, param_8, param_7);
     trace_polynomial____ntt_layers_7_6_5 <-
     (trace_polynomial____ntt_layers_7_6_5 ++ tmp__trace);
     r2 <- result_4;
     r6 <- result_3;
-    param_10 <- r3;
-    param_9 <- r7;
-    param_8 <- zetas;
-    (result_6, result_5, tmp__trace) <@ polynomial____ct_butterfly (param_10,
-    param_9, param_8);
+    param_14 <- r3;
+    param_13 <- r7;
+    param_12 <- zetas;
+    param_11 <- zetas_qinv;
+    (result_6, result_5, tmp__trace) <@ polynomial____ct_butterfly (param_14,
+    param_13, param_12, param_11);
     trace_polynomial____ntt_layers_7_6_5 <-
     (trace_polynomial____ntt_layers_7_6_5 ++ tmp__trace);
     r3 <- result_6;
     r7 <- result_5;
-    zeta_0 <- (W64.of_int 18446744073706942722);
-    zetas <- (zeroextu256 (VMOV_64 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    param_13 <- r0;
-    param_12 <- r2;
-    param_11 <- zetas;
-    (result_8, result_7, tmp__trace) <@ polynomial____ct_butterfly (param_13,
-    param_12, param_11);
+    zetas <- (VPBROADCAST_8u32 (BArray24.get32 lAYERS_7_6_ZETAS 2));
+    zetas_qinv <- (VPBROADCAST_8u32 (BArray24.get32 lAYERS_7_6_ZETAS 3));
+    param_18 <- r0;
+    param_17 <- r2;
+    param_16 <- zetas;
+    param_15 <- zetas_qinv;
+    (result_8, result_7, tmp__trace) <@ polynomial____ct_butterfly (param_18,
+    param_17, param_16, param_15);
     trace_polynomial____ntt_layers_7_6_5 <-
     (trace_polynomial____ntt_layers_7_6_5 ++ tmp__trace);
     r0 <- result_8;
     r2 <- result_7;
-    param_16 <- r1;
-    param_15 <- r3;
-    param_14 <- zetas;
+    param_22 <- r1;
+    param_21 <- r3;
+    param_20 <- zetas;
+    param_19 <- zetas_qinv;
     (result_10, result_9, tmp__trace) <@ polynomial____ct_butterfly (
-    param_16, param_15, param_14);
+    param_22, param_21, param_20, param_19);
     trace_polynomial____ntt_layers_7_6_5 <-
     (trace_polynomial____ntt_layers_7_6_5 ++ tmp__trace);
     r1 <- result_10;
     r3 <- result_9;
-    zeta_0 <- (W64.of_int 18446744073709032707);
-    zetas <- (zeroextu256 (VMOV_64 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    param_19 <- r4;
-    param_18 <- r6;
-    param_17 <- zetas;
+    zetas <- (VPBROADCAST_8u32 (BArray24.get32 lAYERS_7_6_ZETAS 4));
+    zetas_qinv <- (VPBROADCAST_8u32 (BArray24.get32 lAYERS_7_6_ZETAS 5));
+    param_26 <- r4;
+    param_25 <- r6;
+    param_24 <- zetas;
+    param_23 <- zetas_qinv;
     (result_12, result_11, tmp__trace) <@ polynomial____ct_butterfly (
-    param_19, param_18, param_17);
+    param_26, param_25, param_24, param_23);
     trace_polynomial____ntt_layers_7_6_5 <-
     (trace_polynomial____ntt_layers_7_6_5 ++ tmp__trace);
     r4 <- result_12;
     r6 <- result_11;
-    param_22 <- r5;
-    param_21 <- r7;
-    param_20 <- zetas;
+    param_30 <- r5;
+    param_29 <- r7;
+    param_28 <- zetas;
+    param_27 <- zetas_qinv;
     (result_14, result_13, tmp__trace) <@ polynomial____ct_butterfly (
-    param_22, param_21, param_20);
+    param_30, param_29, param_28, param_27);
     trace_polynomial____ntt_layers_7_6_5 <-
     (trace_polynomial____ntt_layers_7_6_5 ++ tmp__trace);
     r5 <- result_14;
     r7 <- result_13;
     zetas <- (BArray128.get256 lAYER_5_ZETAS 0);
-    param_25 <- r0;
-    param_24 <- r1;
-    param_23 <- zetas;
+    zetas_qinv <- (BArray128.get256 lAYER_5_ZETAS_QINV 0);
+    param_34 <- r0;
+    param_33 <- r1;
+    param_32 <- zetas;
+    param_31 <- zetas_qinv;
     (result_16, result_15, tmp__trace) <@ polynomial____ct_butterfly (
-    param_25, param_24, param_23);
+    param_34, param_33, param_32, param_31);
     trace_polynomial____ntt_layers_7_6_5 <-
     (trace_polynomial____ntt_layers_7_6_5 ++ tmp__trace);
     r0 <- result_16;
     r1 <- result_15;
     zetas <- (BArray128.get256 lAYER_5_ZETAS 1);
-    param_28 <- r2;
-    param_27 <- r3;
-    param_26 <- zetas;
+    zetas_qinv <- (BArray128.get256 lAYER_5_ZETAS_QINV 1);
+    param_38 <- r2;
+    param_37 <- r3;
+    param_36 <- zetas;
+    param_35 <- zetas_qinv;
     (result_18, result_17, tmp__trace) <@ polynomial____ct_butterfly (
-    param_28, param_27, param_26);
+    param_38, param_37, param_36, param_35);
     trace_polynomial____ntt_layers_7_6_5 <-
     (trace_polynomial____ntt_layers_7_6_5 ++ tmp__trace);
     r2 <- result_18;
     r3 <- result_17;
     zetas <- (BArray128.get256 lAYER_5_ZETAS 2);
-    param_31 <- r4;
-    param_30 <- r5;
-    param_29 <- zetas;
+    zetas_qinv <- (BArray128.get256 lAYER_5_ZETAS_QINV 2);
+    param_42 <- r4;
+    param_41 <- r5;
+    param_40 <- zetas;
+    param_39 <- zetas_qinv;
     (result_20, result_19, tmp__trace) <@ polynomial____ct_butterfly (
-    param_31, param_30, param_29);
+    param_42, param_41, param_40, param_39);
     trace_polynomial____ntt_layers_7_6_5 <-
     (trace_polynomial____ntt_layers_7_6_5 ++ tmp__trace);
     r4 <- result_20;
     r5 <- result_19;
     zetas <- (BArray128.get256 lAYER_5_ZETAS 3);
-    param_34 <- r6;
-    param_33 <- r7;
-    param_32 <- zetas;
+    zetas_qinv <- (BArray128.get256 lAYER_5_ZETAS_QINV 3);
+    param_46 <- r6;
+    param_45 <- r7;
+    param_44 <- zetas;
+    param_43 <- zetas_qinv;
     (result_22, result_21, tmp__trace) <@ polynomial____ct_butterfly (
-    param_34, param_33, param_32);
+    param_46, param_45, param_44, param_43);
     trace_polynomial____ntt_layers_7_6_5 <-
     (trace_polynomial____ntt_layers_7_6_5 ++ tmp__trace);
     r6 <- result_22;
@@ -3430,104 +3985,125 @@ module M = {
     var r6:W256.t;
     var r7:W256.t;
     var zetas:W256.t;
+    var zetas_qinv:W256.t;
     var param:W256.t;
     var param_0:W256.t;
     var param_1:W256.t;
+    var param_2:W256.t;
     var result:W256.t;
     var result_0:W256.t;
-    var param_2:W256.t;
     var param_3:W256.t;
     var param_4:W256.t;
-    var result_1:W256.t;
-    var result_2:W256.t;
     var param_5:W256.t;
     var param_6:W256.t;
+    var result_1:W256.t;
+    var result_2:W256.t;
     var param_7:W256.t;
-    var result_3:W256.t;
-    var result_4:W256.t;
     var param_8:W256.t;
     var param_9:W256.t;
     var param_10:W256.t;
-    var result_5:W256.t;
-    var result_6:W256.t;
+    var result_3:W256.t;
+    var result_4:W256.t;
     var param_11:W256.t;
     var param_12:W256.t;
     var param_13:W256.t;
-    var result_7:W256.t;
-    var result_8:W256.t;
     var param_14:W256.t;
+    var result_5:W256.t;
+    var result_6:W256.t;
     var param_15:W256.t;
     var param_16:W256.t;
-    var result_9:W256.t;
-    var result_10:W256.t;
     var param_17:W256.t;
     var param_18:W256.t;
+    var result_7:W256.t;
+    var result_8:W256.t;
     var param_19:W256.t;
-    var result_11:W256.t;
-    var result_12:W256.t;
     var param_20:W256.t;
     var param_21:W256.t;
     var param_22:W256.t;
-    var result_13:W256.t;
-    var result_14:W256.t;
+    var result_9:W256.t;
+    var result_10:W256.t;
     var param_23:W256.t;
     var param_24:W256.t;
     var param_25:W256.t;
-    var result_15:W256.t;
-    var result_16:W256.t;
     var param_26:W256.t;
+    var result_11:W256.t;
+    var result_12:W256.t;
     var param_27:W256.t;
     var param_28:W256.t;
-    var result_17:W256.t;
-    var result_18:W256.t;
     var param_29:W256.t;
     var param_30:W256.t;
+    var result_13:W256.t;
+    var result_14:W256.t;
     var param_31:W256.t;
-    var result_19:W256.t;
-    var result_20:W256.t;
     var param_32:W256.t;
     var param_33:W256.t;
     var param_34:W256.t;
-    var result_21:W256.t;
-    var result_22:W256.t;
+    var result_15:W256.t;
+    var result_16:W256.t;
     var param_35:W256.t;
     var param_36:W256.t;
     var param_37:W256.t;
-    var result_23:W256.t;
-    var result_24:W256.t;
     var param_38:W256.t;
+    var result_17:W256.t;
+    var result_18:W256.t;
     var param_39:W256.t;
     var param_40:W256.t;
-    var result_25:W256.t;
-    var result_26:W256.t;
     var param_41:W256.t;
     var param_42:W256.t;
+    var result_19:W256.t;
+    var result_20:W256.t;
     var param_43:W256.t;
-    var result_27:W256.t;
-    var result_28:W256.t;
     var param_44:W256.t;
     var param_45:W256.t;
     var param_46:W256.t;
-    var result_29:W256.t;
-    var result_30:W256.t;
+    var result_21:W256.t;
+    var result_22:W256.t;
     var param_47:W256.t;
     var param_48:W256.t;
     var param_49:W256.t;
-    var result_31:W256.t;
-    var result_32:W256.t;
     var param_50:W256.t;
+    var result_23:W256.t;
+    var result_24:W256.t;
     var param_51:W256.t;
     var param_52:W256.t;
-    var result_33:W256.t;
-    var result_34:W256.t;
     var param_53:W256.t;
     var param_54:W256.t;
+    var result_25:W256.t;
+    var result_26:W256.t;
     var param_55:W256.t;
-    var result_35:W256.t;
-    var result_36:W256.t;
     var param_56:W256.t;
     var param_57:W256.t;
     var param_58:W256.t;
+    var result_27:W256.t;
+    var result_28:W256.t;
+    var param_59:W256.t;
+    var param_60:W256.t;
+    var param_61:W256.t;
+    var param_62:W256.t;
+    var result_29:W256.t;
+    var result_30:W256.t;
+    var param_63:W256.t;
+    var param_64:W256.t;
+    var param_65:W256.t;
+    var param_66:W256.t;
+    var result_31:W256.t;
+    var result_32:W256.t;
+    var param_67:W256.t;
+    var param_68:W256.t;
+    var param_69:W256.t;
+    var param_70:W256.t;
+    var result_33:W256.t;
+    var result_34:W256.t;
+    var param_71:W256.t;
+    var param_72:W256.t;
+    var param_73:W256.t;
+    var param_74:W256.t;
+    var result_35:W256.t;
+    var result_36:W256.t;
+    var param_75:W256.t;
+    var param_76:W256.t;
+    var param_77:W256.t;
+    var param_78:W256.t;
     var result_37:W256.t;
     var result_38:W256.t;
     var trace_polynomial____ntt_layers_4_to_0:trace;
@@ -3579,20 +4155,26 @@ module M = {
     (trace_polynomial____ntt_layers_4_to_0 ++
     [(Assert, ((0 <= ((2 * g) * 32)) /\ ((((2 * g) * 32) + 32) <= 256)))]);
     zetas <- (BArray256.get256 lAYER_4_ZETAS (2 * g));
-    param_1 <- r0;
-    param_0 <- r2;
-    param <- zetas;
-    (result_0, result, tmp__trace) <@ polynomial____ct_butterfly (param_1,
-    param_0, param);
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert, ((0 <= ((2 * g) * 32)) /\ ((((2 * g) * 32) + 32) <= 256)))]);
+    zetas_qinv <- (BArray256.get256 lAYER_4_ZETAS_QINV (2 * g));
+    param_2 <- r0;
+    param_1 <- r2;
+    param_0 <- zetas;
+    param <- zetas_qinv;
+    (result_0, result, tmp__trace) <@ polynomial____ct_butterfly (param_2,
+    param_1, param_0, param);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r0 <- result_0;
     r2 <- result;
-    param_4 <- r1;
-    param_3 <- r3;
-    param_2 <- zetas;
-    (result_2, result_1, tmp__trace) <@ polynomial____ct_butterfly (param_4,
-    param_3, param_2);
+    param_6 <- r1;
+    param_5 <- r3;
+    param_4 <- zetas;
+    param_3 <- zetas_qinv;
+    (result_2, result_1, tmp__trace) <@ polynomial____ct_butterfly (param_6,
+    param_5, param_4, param_3);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r1 <- result_2;
@@ -3602,20 +4184,27 @@ module M = {
     [(Assert,
      ((0 <= (((2 * g) + 1) * 32)) /\ (((((2 * g) + 1) * 32) + 32) <= 256)))]);
     zetas <- (BArray256.get256 lAYER_4_ZETAS ((2 * g) + 1));
-    param_7 <- r4;
-    param_6 <- r6;
-    param_5 <- zetas;
-    (result_4, result_3, tmp__trace) <@ polynomial____ct_butterfly (param_7,
-    param_6, param_5);
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((2 * g) + 1) * 32)) /\ (((((2 * g) + 1) * 32) + 32) <= 256)))]);
+    zetas_qinv <- (BArray256.get256 lAYER_4_ZETAS_QINV ((2 * g) + 1));
+    param_10 <- r4;
+    param_9 <- r6;
+    param_8 <- zetas;
+    param_7 <- zetas_qinv;
+    (result_4, result_3, tmp__trace) <@ polynomial____ct_butterfly (param_10,
+    param_9, param_8, param_7);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r4 <- result_4;
     r6 <- result_3;
-    param_10 <- r5;
-    param_9 <- r7;
-    param_8 <- zetas;
-    (result_6, result_5, tmp__trace) <@ polynomial____ct_butterfly (param_10,
-    param_9, param_8);
+    param_14 <- r5;
+    param_13 <- r7;
+    param_12 <- zetas;
+    param_11 <- zetas_qinv;
+    (result_6, result_5, tmp__trace) <@ polynomial____ct_butterfly (param_14,
+    param_13, param_12, param_11);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r5 <- result_6;
@@ -3624,11 +4213,16 @@ module M = {
     (trace_polynomial____ntt_layers_4_to_0 ++
     [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_3_ZETAS (4 * g));
-    param_13 <- r0;
-    param_12 <- r1;
-    param_11 <- zetas;
-    (result_8, result_7, tmp__trace) <@ polynomial____ct_butterfly (param_13,
-    param_12, param_11);
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_3_ZETAS_QINV (4 * g));
+    param_18 <- r0;
+    param_17 <- r1;
+    param_16 <- zetas;
+    param_15 <- zetas_qinv;
+    (result_8, result_7, tmp__trace) <@ polynomial____ct_butterfly (param_18,
+    param_17, param_16, param_15);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r0 <- result_8;
@@ -3638,11 +4232,17 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_3_ZETAS ((4 * g) + 1));
-    param_16 <- r2;
-    param_15 <- r3;
-    param_14 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_3_ZETAS_QINV ((4 * g) + 1));
+    param_22 <- r2;
+    param_21 <- r3;
+    param_20 <- zetas;
+    param_19 <- zetas_qinv;
     (result_10, result_9, tmp__trace) <@ polynomial____ct_butterfly (
-    param_16, param_15, param_14);
+    param_22, param_21, param_20, param_19);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r2 <- result_10;
@@ -3652,11 +4252,17 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_3_ZETAS ((4 * g) + 2));
-    param_19 <- r4;
-    param_18 <- r5;
-    param_17 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_3_ZETAS_QINV ((4 * g) + 2));
+    param_26 <- r4;
+    param_25 <- r5;
+    param_24 <- zetas;
+    param_23 <- zetas_qinv;
     (result_12, result_11, tmp__trace) <@ polynomial____ct_butterfly (
-    param_19, param_18, param_17);
+    param_26, param_25, param_24, param_23);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r4 <- result_12;
@@ -3666,11 +4272,17 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_3_ZETAS ((4 * g) + 3));
-    param_22 <- r6;
-    param_21 <- r7;
-    param_20 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_3_ZETAS_QINV ((4 * g) + 3));
+    param_30 <- r6;
+    param_29 <- r7;
+    param_28 <- zetas;
+    param_27 <- zetas_qinv;
     (result_14, result_13, tmp__trace) <@ polynomial____ct_butterfly (
-    param_22, param_21, param_20);
+    param_30, param_29, param_28, param_27);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r6 <- result_14;
@@ -3679,11 +4291,16 @@ module M = {
     (trace_polynomial____ntt_layers_4_to_0 ++
     [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_2_ZETAS (4 * g));
-    param_25 <- r0;
-    param_24 <- r1;
-    param_23 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_2_ZETAS_QINV (4 * g));
+    param_34 <- r0;
+    param_33 <- r1;
+    param_32 <- zetas;
+    param_31 <- zetas_qinv;
     (result_16, result_15, tmp__trace) <@ polynomial____ct_butterfly_8 (
-    param_25, param_24, param_23);
+    param_34, param_33, param_32, param_31);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r0 <- result_16;
@@ -3693,11 +4310,17 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_2_ZETAS ((4 * g) + 1));
-    param_28 <- r2;
-    param_27 <- r3;
-    param_26 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_2_ZETAS_QINV ((4 * g) + 1));
+    param_38 <- r2;
+    param_37 <- r3;
+    param_36 <- zetas;
+    param_35 <- zetas_qinv;
     (result_18, result_17, tmp__trace) <@ polynomial____ct_butterfly_8 (
-    param_28, param_27, param_26);
+    param_38, param_37, param_36, param_35);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r2 <- result_18;
@@ -3707,11 +4330,17 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_2_ZETAS ((4 * g) + 2));
-    param_31 <- r4;
-    param_30 <- r5;
-    param_29 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_2_ZETAS_QINV ((4 * g) + 2));
+    param_42 <- r4;
+    param_41 <- r5;
+    param_40 <- zetas;
+    param_39 <- zetas_qinv;
     (result_20, result_19, tmp__trace) <@ polynomial____ct_butterfly_8 (
-    param_31, param_30, param_29);
+    param_42, param_41, param_40, param_39);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r4 <- result_20;
@@ -3721,11 +4350,17 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_2_ZETAS ((4 * g) + 3));
-    param_34 <- r6;
-    param_33 <- r7;
-    param_32 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_2_ZETAS_QINV ((4 * g) + 3));
+    param_46 <- r6;
+    param_45 <- r7;
+    param_44 <- zetas;
+    param_43 <- zetas_qinv;
     (result_22, result_21, tmp__trace) <@ polynomial____ct_butterfly_8 (
-    param_34, param_33, param_32);
+    param_46, param_45, param_44, param_43);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r6 <- result_22;
@@ -3734,11 +4369,16 @@ module M = {
     (trace_polynomial____ntt_layers_4_to_0 ++
     [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_1_ZETAS (4 * g));
-    param_37 <- r0;
-    param_36 <- r1;
-    param_35 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_1_ZETAS_QINV (4 * g));
+    param_50 <- r0;
+    param_49 <- r1;
+    param_48 <- zetas;
+    param_47 <- zetas_qinv;
     (result_24, result_23, tmp__trace) <@ polynomial____ct_butterfly_4 (
-    param_37, param_36, param_35);
+    param_50, param_49, param_48, param_47);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r0 <- result_24;
@@ -3748,11 +4388,17 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_1_ZETAS ((4 * g) + 1));
-    param_40 <- r2;
-    param_39 <- r3;
-    param_38 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_1_ZETAS_QINV ((4 * g) + 1));
+    param_54 <- r2;
+    param_53 <- r3;
+    param_52 <- zetas;
+    param_51 <- zetas_qinv;
     (result_26, result_25, tmp__trace) <@ polynomial____ct_butterfly_4 (
-    param_40, param_39, param_38);
+    param_54, param_53, param_52, param_51);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r2 <- result_26;
@@ -3762,11 +4408,17 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_1_ZETAS ((4 * g) + 2));
-    param_43 <- r4;
-    param_42 <- r5;
-    param_41 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_1_ZETAS_QINV ((4 * g) + 2));
+    param_58 <- r4;
+    param_57 <- r5;
+    param_56 <- zetas;
+    param_55 <- zetas_qinv;
     (result_28, result_27, tmp__trace) <@ polynomial____ct_butterfly_4 (
-    param_43, param_42, param_41);
+    param_58, param_57, param_56, param_55);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r4 <- result_28;
@@ -3776,11 +4428,17 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_1_ZETAS ((4 * g) + 3));
-    param_46 <- r6;
-    param_45 <- r7;
-    param_44 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_1_ZETAS_QINV ((4 * g) + 3));
+    param_62 <- r6;
+    param_61 <- r7;
+    param_60 <- zetas;
+    param_59 <- zetas_qinv;
     (result_30, result_29, tmp__trace) <@ polynomial____ct_butterfly_4 (
-    param_46, param_45, param_44);
+    param_62, param_61, param_60, param_59);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r6 <- result_30;
@@ -3789,11 +4447,16 @@ module M = {
     (trace_polynomial____ntt_layers_4_to_0 ++
     [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_0_ZETAS (4 * g));
-    param_49 <- r0;
-    param_48 <- r1;
-    param_47 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_0_ZETAS_QINV (4 * g));
+    param_66 <- r0;
+    param_65 <- r1;
+    param_64 <- zetas;
+    param_63 <- zetas_qinv;
     (result_32, result_31, tmp__trace) <@ polynomial____ct_butterfly_2 (
-    param_49, param_48, param_47);
+    param_66, param_65, param_64, param_63);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r0 <- result_32;
@@ -3803,11 +4466,17 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_0_ZETAS ((4 * g) + 1));
-    param_52 <- r2;
-    param_51 <- r3;
-    param_50 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_0_ZETAS_QINV ((4 * g) + 1));
+    param_70 <- r2;
+    param_69 <- r3;
+    param_68 <- zetas;
+    param_67 <- zetas_qinv;
     (result_34, result_33, tmp__trace) <@ polynomial____ct_butterfly_2 (
-    param_52, param_51, param_50);
+    param_70, param_69, param_68, param_67);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r2 <- result_34;
@@ -3817,11 +4486,17 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_0_ZETAS ((4 * g) + 2));
-    param_55 <- r4;
-    param_54 <- r5;
-    param_53 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_0_ZETAS_QINV ((4 * g) + 2));
+    param_74 <- r4;
+    param_73 <- r5;
+    param_72 <- zetas;
+    param_71 <- zetas_qinv;
     (result_36, result_35, tmp__trace) <@ polynomial____ct_butterfly_2 (
-    param_55, param_54, param_53);
+    param_74, param_73, param_72, param_71);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r4 <- result_36;
@@ -3831,11 +4506,17 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 lAYER_0_ZETAS ((4 * g) + 3));
-    param_58 <- r6;
-    param_57 <- r7;
-    param_56 <- zetas;
+    trace_polynomial____ntt_layers_4_to_0 <-
+    (trace_polynomial____ntt_layers_4_to_0 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 lAYER_0_ZETAS_QINV ((4 * g) + 3));
+    param_78 <- r6;
+    param_77 <- r7;
+    param_76 <- zetas;
+    param_75 <- zetas_qinv;
     (result_38, result_37, tmp__trace) <@ polynomial____ct_butterfly_2 (
-    param_58, param_57, param_56);
+    param_78, param_77, param_76, param_75);
     trace_polynomial____ntt_layers_4_to_0 <-
     (trace_polynomial____ntt_layers_4_to_0 ++ tmp__trace);
     r6 <- result_38;
@@ -3939,25 +4620,32 @@ module M = {
     b_polynomial <- (BArray1024.init_arr (W8.of_int 255));
     return (polynomial, b_polynomial, trace_polynomial__ntt);
   }
-  proc polynomial____gs_butterfly (a:W256.t, b:W256.t, zetas:W256.t) : 
-  W256.t * W256.t * trace = {
+  proc polynomial____gs_butterfly (a:W256.t, b:W256.t, zetas:W256.t,
+                                   zetas_qinv:W256.t) : W256.t * W256.t *
+                                                        trace = {
     var b_minus_a:W256.t;
     var param:W256.t;
     var param_0:W256.t;
+    var param_1:W256.t;
     var result:W256.t;
     var trace_polynomial____gs_butterfly:trace;
     trace_polynomial____gs_butterfly <- [];
     b_minus_a <- (VPSUB_8u32 b a);
     a <- (VPADD_8u32 a b);
-    param_0 <- b_minus_a;
-    param <- zetas;
-    (result, tmp__trace) <@ montgomery_multiply_and_reduce (param_0, param);
+    param_1 <- b_minus_a;
+    param_0 <- zetas;
+    param <- zetas_qinv;
+    (result, tmp__trace) <@ montgomery_multiply_by_zeta (param_1, param_0,
+    param);
     trace_polynomial____gs_butterfly <-
     (trace_polynomial____gs_butterfly ++ tmp__trace);
     b <- result;
     return (a, b, trace_polynomial____gs_butterfly);
   }
-  proc polynomial____gs_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
+  proc polynomial____gs_butterfly_4_lanes (lhs:W256.t, rhs:W256.t,
+                                           zetas:W256.t, zetas_high:W256.t,
+                                           zetas_qinv:W256.t,
+                                           zetas_qinv_high:W256.t) : 
   W256.t * W256.t * trace = {
     var low_values:W256.t;
     var high_values:W256.t;
@@ -3965,39 +4653,84 @@ module M = {
     var sums:W256.t;
     var param:W256.t;
     var param_0:W256.t;
+    var param_1:W256.t;
+    var param_2:W256.t;
+    var param_3:W256.t;
     var result:W256.t;
-    var trace_polynomial____gs_butterfly_4:trace;
-    trace_polynomial____gs_butterfly_4 <- [];
+    var trace_polynomial____gs_butterfly_4_lanes:trace;
+    trace_polynomial____gs_butterfly_4_lanes <- [];
     low_values <- (VPUNPCKL_4u64 lhs rhs);
     high_values <- (VPUNPCKH_4u64 lhs rhs);
     differences <- (VPSUB_8u32 high_values low_values);
     sums <- (VPADD_8u32 high_values low_values);
-    param_0 <- differences;
-    param <- zetas;
-    (result, tmp__trace) <@ montgomery_multiply_and_reduce (param_0, param);
-    trace_polynomial____gs_butterfly_4 <-
-    (trace_polynomial____gs_butterfly_4 ++ tmp__trace);
+    param_3 <- differences;
+    param_2 <- zetas;
+    param_1 <- zetas_high;
+    param_0 <- zetas_qinv;
+    param <- zetas_qinv_high;
+    (result, tmp__trace) <@ montgomery_multiply_by_zeta_lanes (param_3,
+    param_2, param_1, param_0, param);
+    trace_polynomial____gs_butterfly_4_lanes <-
+    (trace_polynomial____gs_butterfly_4_lanes ++ tmp__trace);
     differences <- result;
     lhs <- (VPUNPCKL_4u64 sums differences);
     rhs <- (VPUNPCKH_4u64 sums differences);
-    return (lhs, rhs, trace_polynomial____gs_butterfly_4);
+    return (lhs, rhs, trace_polynomial____gs_butterfly_4_lanes);
   }
-  proc polynomial____gs_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
-  W256.t * W256.t * trace = {
+  proc polynomial____gs_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t *
+                                                          trace = {
     var param:W256.t;
     var param_0:W256.t;
     var param_1:W256.t;
+    var param_2:W256.t;
+    var param_3:W256.t;
+    var param_4:W256.t;
+    var result:W256.t;
+    var result_0:W256.t;
+    var trace_polynomial____gs_butterfly_4:trace;
+    trace_polynomial____gs_butterfly_4 <- [];
+    param_4 <- lhs;
+    param_3 <- rhs;
+    param_2 <- zetas;
+    param_1 <- zetas;
+    param_0 <- zetas_qinv;
+    param <- zetas_qinv;
+    (result_0, result, tmp__trace) <@ polynomial____gs_butterfly_4_lanes (
+    param_4, param_3, param_2, param_1, param_0, param);
+    trace_polynomial____gs_butterfly_4 <-
+    (trace_polynomial____gs_butterfly_4 ++ tmp__trace);
+    lhs <- result_0;
+    rhs <- result;
+    return (lhs, rhs, trace_polynomial____gs_butterfly_4);
+  }
+  proc polynomial____gs_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t *
+                                                          trace = {
+    var zetas_high:W256.t;
+    var zetas_qinv_high:W256.t;
+    var param:W256.t;
+    var param_0:W256.t;
+    var param_1:W256.t;
+    var param_2:W256.t;
+    var param_3:W256.t;
+    var param_4:W256.t;
     var result:W256.t;
     var result_0:W256.t;
     var trace_polynomial____gs_butterfly_2:trace;
     trace_polynomial____gs_butterfly_2 <- [];
     lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
     rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
-    param_1 <- lhs;
-    param_0 <- rhs;
-    param <- zetas;
-    (result_0, result, tmp__trace) <@ polynomial____gs_butterfly_4 (param_1,
-    param_0, param);
+    zetas_high <- (VMOVSHDUP_256 zetas);
+    zetas_qinv_high <- (VMOVSHDUP_256 zetas_qinv);
+    param_4 <- lhs;
+    param_3 <- rhs;
+    param_2 <- zetas;
+    param_1 <- zetas_high;
+    param_0 <- zetas_qinv;
+    param <- zetas_qinv_high;
+    (result_0, result, tmp__trace) <@ polynomial____gs_butterfly_4_lanes (
+    param_4, param_3, param_2, param_1, param_0, param);
     trace_polynomial____gs_butterfly_2 <-
     (trace_polynomial____gs_butterfly_2 ++ tmp__trace);
     lhs <- result_0;
@@ -4006,14 +4739,16 @@ module M = {
     rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
     return (lhs, rhs, trace_polynomial____gs_butterfly_2);
   }
-  proc polynomial____gs_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
-  W256.t * W256.t * trace = {
+  proc polynomial____gs_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t *
+                                                          trace = {
     var low_values:W256.t;
     var high_values:W256.t;
     var differences:W256.t;
     var sums:W256.t;
     var param:W256.t;
     var param_0:W256.t;
+    var param_1:W256.t;
     var result:W256.t;
     var trace_polynomial____gs_butterfly_8:trace;
     trace_polynomial____gs_butterfly_8 <- [];
@@ -4021,9 +4756,11 @@ module M = {
     high_values <- (VPERM2I128 lhs rhs (W8.of_int 49));
     differences <- (VPSUB_8u32 high_values low_values);
     sums <- (VPADD_8u32 high_values low_values);
-    param_0 <- differences;
-    param <- zetas;
-    (result, tmp__trace) <@ montgomery_multiply_and_reduce (param_0, param);
+    param_1 <- differences;
+    param_0 <- zetas;
+    param <- zetas_qinv;
+    (result, tmp__trace) <@ montgomery_multiply_by_zeta (param_1, param_0,
+    param);
     trace_polynomial____gs_butterfly_8 <-
     (trace_polynomial____gs_butterfly_8 ++ tmp__trace);
     differences <- result;
@@ -4032,40 +4769,39 @@ module M = {
     return (lhs, rhs, trace_polynomial____gs_butterfly_8);
   }
   proc polynomial____gs_butterfly_scaled (a:W256.t, b:W256.t, zetas_f:W256.t,
-                                          f:W256.t) : W256.t * W256.t * trace = {
+                                          zetas_f_qinv:W256.t, f:W256.t,
+                                          f_qinv:W256.t) : W256.t * W256.t *
+                                                           trace = {
     var b_minus_a:W256.t;
     var param:W256.t;
     var param_0:W256.t;
-    var result:W256.t;
     var param_1:W256.t;
+    var result:W256.t;
     var param_2:W256.t;
+    var param_3:W256.t;
+    var param_4:W256.t;
     var result_0:W256.t;
     var trace_polynomial____gs_butterfly_scaled:trace;
     trace_polynomial____gs_butterfly_scaled <- [];
     b_minus_a <- (VPSUB_8u32 b a);
     a <- (VPADD_8u32 a b);
-    param_0 <- b_minus_a;
-    param <- zetas_f;
-    (result, tmp__trace) <@ montgomery_multiply_and_reduce (param_0, param);
+    param_1 <- b_minus_a;
+    param_0 <- zetas_f;
+    param <- zetas_f_qinv;
+    (result, tmp__trace) <@ montgomery_multiply_by_zeta (param_1, param_0,
+    param);
     trace_polynomial____gs_butterfly_scaled <-
     (trace_polynomial____gs_butterfly_scaled ++ tmp__trace);
     b <- result;
-    param_2 <- a;
-    param_1 <- f;
-    (result_0, tmp__trace) <@ montgomery_multiply_and_reduce (param_2,
-    param_1);
+    param_4 <- a;
+    param_3 <- f;
+    param_2 <- f_qinv;
+    (result_0, tmp__trace) <@ montgomery_multiply_by_zeta (param_4, param_3,
+    param_2);
     trace_polynomial____gs_butterfly_scaled <-
     (trace_polynomial____gs_butterfly_scaled ++ tmp__trace);
     a <- result_0;
     return (a, b, trace_polynomial____gs_butterfly_scaled);
-  }
-  proc polynomial____broadcast_zeta (zeta_0:W32.t) : W256.t * trace = {
-    var zetas:W256.t;
-    var trace_polynomial____broadcast_zeta:trace;
-    trace_polynomial____broadcast_zeta <- [];
-    zetas <- (zeroextu256 (VMOV_32 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    return (zetas, trace_polynomial____broadcast_zeta);
   }
   proc polynomial____invert_ntt_layers_0_to_4 (polynomial:BArray1024.t,
                                                b_polynomial:BArray1024.t,
@@ -4080,119 +4816,127 @@ module M = {
     var r6:W256.t;
     var r7:W256.t;
     var zetas:W256.t;
-    var zeta_0:W32.t;
+    var zetas_qinv:W256.t;
     var param:W256.t;
     var param_0:W256.t;
     var param_1:W256.t;
+    var param_2:W256.t;
     var result:W256.t;
     var result_0:W256.t;
-    var param_2:W256.t;
     var param_3:W256.t;
     var param_4:W256.t;
-    var result_1:W256.t;
-    var result_2:W256.t;
     var param_5:W256.t;
     var param_6:W256.t;
+    var result_1:W256.t;
+    var result_2:W256.t;
     var param_7:W256.t;
-    var result_3:W256.t;
-    var result_4:W256.t;
     var param_8:W256.t;
     var param_9:W256.t;
     var param_10:W256.t;
-    var result_5:W256.t;
-    var result_6:W256.t;
+    var result_3:W256.t;
+    var result_4:W256.t;
     var param_11:W256.t;
     var param_12:W256.t;
     var param_13:W256.t;
-    var result_7:W256.t;
-    var result_8:W256.t;
     var param_14:W256.t;
+    var result_5:W256.t;
+    var result_6:W256.t;
     var param_15:W256.t;
     var param_16:W256.t;
-    var result_9:W256.t;
-    var result_10:W256.t;
     var param_17:W256.t;
     var param_18:W256.t;
+    var result_7:W256.t;
+    var result_8:W256.t;
     var param_19:W256.t;
-    var result_11:W256.t;
-    var result_12:W256.t;
     var param_20:W256.t;
     var param_21:W256.t;
     var param_22:W256.t;
-    var result_13:W256.t;
-    var result_14:W256.t;
+    var result_9:W256.t;
+    var result_10:W256.t;
     var param_23:W256.t;
     var param_24:W256.t;
     var param_25:W256.t;
-    var result_15:W256.t;
-    var result_16:W256.t;
     var param_26:W256.t;
+    var result_11:W256.t;
+    var result_12:W256.t;
     var param_27:W256.t;
     var param_28:W256.t;
-    var result_17:W256.t;
-    var result_18:W256.t;
     var param_29:W256.t;
     var param_30:W256.t;
+    var result_13:W256.t;
+    var result_14:W256.t;
     var param_31:W256.t;
-    var result_19:W256.t;
-    var result_20:W256.t;
     var param_32:W256.t;
     var param_33:W256.t;
     var param_34:W256.t;
-    var result_21:W256.t;
-    var result_22:W256.t;
-    var param_35:W32.t;
-    var result_23:W256.t;
+    var result_15:W256.t;
+    var result_16:W256.t;
+    var param_35:W256.t;
     var param_36:W256.t;
     var param_37:W256.t;
     var param_38:W256.t;
-    var result_24:W256.t;
-    var result_25:W256.t;
-    var param_39:W32.t;
-    var result_26:W256.t;
+    var result_17:W256.t;
+    var result_18:W256.t;
+    var param_39:W256.t;
     var param_40:W256.t;
     var param_41:W256.t;
     var param_42:W256.t;
-    var result_27:W256.t;
-    var result_28:W256.t;
-    var param_43:W32.t;
-    var result_29:W256.t;
+    var result_19:W256.t;
+    var result_20:W256.t;
+    var param_43:W256.t;
     var param_44:W256.t;
     var param_45:W256.t;
     var param_46:W256.t;
-    var result_30:W256.t;
-    var result_31:W256.t;
-    var param_47:W32.t;
-    var result_32:W256.t;
+    var result_21:W256.t;
+    var result_22:W256.t;
+    var param_47:W256.t;
     var param_48:W256.t;
     var param_49:W256.t;
     var param_50:W256.t;
-    var result_33:W256.t;
-    var result_34:W256.t;
-    var param_51:W32.t;
-    var result_35:W256.t;
+    var result_23:W256.t;
+    var result_24:W256.t;
+    var param_51:W256.t;
     var param_52:W256.t;
     var param_53:W256.t;
     var param_54:W256.t;
-    var result_36:W256.t;
-    var result_37:W256.t;
+    var result_25:W256.t;
+    var result_26:W256.t;
     var param_55:W256.t;
     var param_56:W256.t;
     var param_57:W256.t;
-    var result_38:W256.t;
-    var result_39:W256.t;
-    var param_58:W32.t;
-    var result_40:W256.t;
+    var param_58:W256.t;
+    var result_27:W256.t;
+    var result_28:W256.t;
     var param_59:W256.t;
     var param_60:W256.t;
     var param_61:W256.t;
-    var result_41:W256.t;
-    var result_42:W256.t;
     var param_62:W256.t;
+    var result_29:W256.t;
+    var result_30:W256.t;
     var param_63:W256.t;
     var param_64:W256.t;
-    var result_43:W256.t;
-    var result_44:W256.t;
+    var param_65:W256.t;
+    var param_66:W256.t;
+    var result_31:W256.t;
+    var result_32:W256.t;
+    var param_67:W256.t;
+    var param_68:W256.t;
+    var param_69:W256.t;
+    var param_70:W256.t;
+    var result_33:W256.t;
+    var result_34:W256.t;
+    var param_71:W256.t;
+    var param_72:W256.t;
+    var param_73:W256.t;
+    var param_74:W256.t;
+    var result_35:W256.t;
+    var result_36:W256.t;
+    var param_75:W256.t;
+    var param_76:W256.t;
+    var param_77:W256.t;
+    var param_78:W256.t;
+    var result_37:W256.t;
+    var result_38:W256.t;
     var trace_polynomial____invert_ntt_layers_0_to_4:trace;
     trace_polynomial____invert_ntt_layers_0_to_4 <- [];
     trace_polynomial____invert_ntt_layers_0_to_4 <-
@@ -4242,11 +4986,16 @@ module M = {
     (trace_polynomial____invert_ntt_layers_0_to_4 ++
     [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 zETAS_TO_INVERT_LAYER_0 (4 * g));
-    param_1 <- r0;
-    param_0 <- r1;
-    param <- zetas;
-    (result_0, result, tmp__trace) <@ polynomial____gs_butterfly_2 (param_1,
-    param_0, param);
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 zETAS_TO_INVERT_LAYER_0_QINV (4 * g));
+    param_2 <- r0;
+    param_1 <- r1;
+    param_0 <- zetas;
+    param <- zetas_qinv;
+    (result_0, result, tmp__trace) <@ polynomial____gs_butterfly_2 (param_2,
+    param_1, param_0, param);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
     r0 <- result_0;
@@ -4256,11 +5005,18 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 zETAS_TO_INVERT_LAYER_0 ((4 * g) + 1));
-    param_4 <- r2;
-    param_3 <- r3;
-    param_2 <- zetas;
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
+    zetas_qinv <-
+    (BArray512.get256 zETAS_TO_INVERT_LAYER_0_QINV ((4 * g) + 1));
+    param_6 <- r2;
+    param_5 <- r3;
+    param_4 <- zetas;
+    param_3 <- zetas_qinv;
     (result_2, result_1, tmp__trace) <@ polynomial____gs_butterfly_2 (
-    param_4, param_3, param_2);
+    param_6, param_5, param_4, param_3);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
     r2 <- result_2;
@@ -4270,11 +5026,18 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 zETAS_TO_INVERT_LAYER_0 ((4 * g) + 2));
-    param_7 <- r4;
-    param_6 <- r5;
-    param_5 <- zetas;
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
+    zetas_qinv <-
+    (BArray512.get256 zETAS_TO_INVERT_LAYER_0_QINV ((4 * g) + 2));
+    param_10 <- r4;
+    param_9 <- r5;
+    param_8 <- zetas;
+    param_7 <- zetas_qinv;
     (result_4, result_3, tmp__trace) <@ polynomial____gs_butterfly_2 (
-    param_7, param_6, param_5);
+    param_10, param_9, param_8, param_7);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
     r4 <- result_4;
@@ -4284,11 +5047,18 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 zETAS_TO_INVERT_LAYER_0 ((4 * g) + 3));
-    param_10 <- r6;
-    param_9 <- r7;
-    param_8 <- zetas;
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
+    zetas_qinv <-
+    (BArray512.get256 zETAS_TO_INVERT_LAYER_0_QINV ((4 * g) + 3));
+    param_14 <- r6;
+    param_13 <- r7;
+    param_12 <- zetas;
+    param_11 <- zetas_qinv;
     (result_6, result_5, tmp__trace) <@ polynomial____gs_butterfly_2 (
-    param_10, param_9, param_8);
+    param_14, param_13, param_12, param_11);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
     r6 <- result_6;
@@ -4297,11 +5067,16 @@ module M = {
     (trace_polynomial____invert_ntt_layers_0_to_4 ++
     [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 zETAS_TO_INVERT_LAYER_1 (4 * g));
-    param_13 <- r0;
-    param_12 <- r1;
-    param_11 <- zetas;
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 zETAS_TO_INVERT_LAYER_1_QINV (4 * g));
+    param_18 <- r0;
+    param_17 <- r1;
+    param_16 <- zetas;
+    param_15 <- zetas_qinv;
     (result_8, result_7, tmp__trace) <@ polynomial____gs_butterfly_4 (
-    param_13, param_12, param_11);
+    param_18, param_17, param_16, param_15);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
     r0 <- result_8;
@@ -4311,11 +5086,18 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 zETAS_TO_INVERT_LAYER_1 ((4 * g) + 1));
-    param_16 <- r2;
-    param_15 <- r3;
-    param_14 <- zetas;
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
+    zetas_qinv <-
+    (BArray512.get256 zETAS_TO_INVERT_LAYER_1_QINV ((4 * g) + 1));
+    param_22 <- r2;
+    param_21 <- r3;
+    param_20 <- zetas;
+    param_19 <- zetas_qinv;
     (result_10, result_9, tmp__trace) <@ polynomial____gs_butterfly_4 (
-    param_16, param_15, param_14);
+    param_22, param_21, param_20, param_19);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
     r2 <- result_10;
@@ -4325,11 +5107,18 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 zETAS_TO_INVERT_LAYER_1 ((4 * g) + 2));
-    param_19 <- r4;
-    param_18 <- r5;
-    param_17 <- zetas;
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
+    zetas_qinv <-
+    (BArray512.get256 zETAS_TO_INVERT_LAYER_1_QINV ((4 * g) + 2));
+    param_26 <- r4;
+    param_25 <- r5;
+    param_24 <- zetas;
+    param_23 <- zetas_qinv;
     (result_12, result_11, tmp__trace) <@ polynomial____gs_butterfly_4 (
-    param_19, param_18, param_17);
+    param_26, param_25, param_24, param_23);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
     r4 <- result_12;
@@ -4339,11 +5128,18 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 zETAS_TO_INVERT_LAYER_1 ((4 * g) + 3));
-    param_22 <- r6;
-    param_21 <- r7;
-    param_20 <- zetas;
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
+    zetas_qinv <-
+    (BArray512.get256 zETAS_TO_INVERT_LAYER_1_QINV ((4 * g) + 3));
+    param_30 <- r6;
+    param_29 <- r7;
+    param_28 <- zetas;
+    param_27 <- zetas_qinv;
     (result_14, result_13, tmp__trace) <@ polynomial____gs_butterfly_4 (
-    param_22, param_21, param_20);
+    param_30, param_29, param_28, param_27);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
     r6 <- result_14;
@@ -4352,11 +5148,16 @@ module M = {
     (trace_polynomial____invert_ntt_layers_0_to_4 ++
     [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 zETAS_TO_INVERT_LAYER_2 (4 * g));
-    param_25 <- r0;
-    param_24 <- r1;
-    param_23 <- zetas;
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert, ((0 <= ((4 * g) * 32)) /\ ((((4 * g) * 32) + 32) <= 512)))]);
+    zetas_qinv <- (BArray512.get256 zETAS_TO_INVERT_LAYER_2_QINV (4 * g));
+    param_34 <- r0;
+    param_33 <- r1;
+    param_32 <- zetas;
+    param_31 <- zetas_qinv;
     (result_16, result_15, tmp__trace) <@ polynomial____gs_butterfly_8 (
-    param_25, param_24, param_23);
+    param_34, param_33, param_32, param_31);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
     r0 <- result_16;
@@ -4366,11 +5167,18 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 zETAS_TO_INVERT_LAYER_2 ((4 * g) + 1));
-    param_28 <- r2;
-    param_27 <- r3;
-    param_26 <- zetas;
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 1) * 32)) /\ (((((4 * g) + 1) * 32) + 32) <= 512)))]);
+    zetas_qinv <-
+    (BArray512.get256 zETAS_TO_INVERT_LAYER_2_QINV ((4 * g) + 1));
+    param_38 <- r2;
+    param_37 <- r3;
+    param_36 <- zetas;
+    param_35 <- zetas_qinv;
     (result_18, result_17, tmp__trace) <@ polynomial____gs_butterfly_8 (
-    param_28, param_27, param_26);
+    param_38, param_37, param_36, param_35);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
     r2 <- result_18;
@@ -4380,11 +5188,18 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 zETAS_TO_INVERT_LAYER_2 ((4 * g) + 2));
-    param_31 <- r4;
-    param_30 <- r5;
-    param_29 <- zetas;
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 2) * 32)) /\ (((((4 * g) + 2) * 32) + 32) <= 512)))]);
+    zetas_qinv <-
+    (BArray512.get256 zETAS_TO_INVERT_LAYER_2_QINV ((4 * g) + 2));
+    param_42 <- r4;
+    param_41 <- r5;
+    param_40 <- zetas;
+    param_39 <- zetas_qinv;
     (result_20, result_19, tmp__trace) <@ polynomial____gs_butterfly_8 (
-    param_31, param_30, param_29);
+    param_42, param_41, param_40, param_39);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
     r4 <- result_20;
@@ -4394,11 +5209,18 @@ module M = {
     [(Assert,
      ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
     zetas <- (BArray512.get256 zETAS_TO_INVERT_LAYER_2 ((4 * g) + 3));
-    param_34 <- r6;
-    param_33 <- r7;
-    param_32 <- zetas;
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 3) * 32)) /\ (((((4 * g) + 3) * 32) + 32) <= 512)))]);
+    zetas_qinv <-
+    (BArray512.get256 zETAS_TO_INVERT_LAYER_2_QINV ((4 * g) + 3));
+    param_46 <- r6;
+    param_45 <- r7;
+    param_44 <- zetas;
+    param_43 <- zetas_qinv;
     (result_22, result_21, tmp__trace) <@ polynomial____gs_butterfly_8 (
-    param_34, param_33, param_32);
+    param_46, param_45, param_44, param_43);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
     r6 <- result_22;
@@ -4406,133 +5228,155 @@ module M = {
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++
     [(Assert, ((0 <= ((4 * g) * 4)) /\ ((((4 * g) * 4) + 4) <= 64)))]);
-    zeta_0 <- (BArray64.get32 zETAS_TO_INVERT_LAYER_3 (4 * g));
-    param_35 <- zeta_0;
-    (result_23, tmp__trace) <@ polynomial____broadcast_zeta (param_35);
+    zetas <-
+    (VPBROADCAST_8u32 (BArray64.get32 zETAS_TO_INVERT_LAYER_3 (4 * g)));
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert, ((0 <= ((4 * g) * 4)) /\ ((((4 * g) * 4) + 4) <= 64)))]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32 (BArray64.get32 zETAS_TO_INVERT_LAYER_3_QINV (4 * g)));
+    param_50 <- r0;
+    param_49 <- r1;
+    param_48 <- zetas;
+    param_47 <- zetas_qinv;
+    (result_24, result_23, tmp__trace) <@ polynomial____gs_butterfly (
+    param_50, param_49, param_48, param_47);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    zetas <- result_23;
-    param_38 <- r0;
-    param_37 <- r1;
-    param_36 <- zetas;
-    (result_25, result_24, tmp__trace) <@ polynomial____gs_butterfly (
-    param_38, param_37, param_36);
-    trace_polynomial____invert_ntt_layers_0_to_4 <-
-    (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    r0 <- result_25;
-    r1 <- result_24;
+    r0 <- result_24;
+    r1 <- result_23;
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++
     [(Assert,
      ((0 <= (((4 * g) + 1) * 4)) /\ (((((4 * g) + 1) * 4) + 4) <= 64)))]);
-    zeta_0 <- (BArray64.get32 zETAS_TO_INVERT_LAYER_3 ((4 * g) + 1));
-    param_39 <- zeta_0;
-    (result_26, tmp__trace) <@ polynomial____broadcast_zeta (param_39);
+    zetas <-
+    (VPBROADCAST_8u32 (BArray64.get32 zETAS_TO_INVERT_LAYER_3 ((4 * g) + 1)));
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 1) * 4)) /\ (((((4 * g) + 1) * 4) + 4) <= 64)))]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32
+    (BArray64.get32 zETAS_TO_INVERT_LAYER_3_QINV ((4 * g) + 1)));
+    param_54 <- r2;
+    param_53 <- r3;
+    param_52 <- zetas;
+    param_51 <- zetas_qinv;
+    (result_26, result_25, tmp__trace) <@ polynomial____gs_butterfly (
+    param_54, param_53, param_52, param_51);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    zetas <- result_26;
-    param_42 <- r2;
-    param_41 <- r3;
-    param_40 <- zetas;
-    (result_28, result_27, tmp__trace) <@ polynomial____gs_butterfly (
-    param_42, param_41, param_40);
-    trace_polynomial____invert_ntt_layers_0_to_4 <-
-    (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    r2 <- result_28;
-    r3 <- result_27;
+    r2 <- result_26;
+    r3 <- result_25;
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++
     [(Assert,
      ((0 <= (((4 * g) + 2) * 4)) /\ (((((4 * g) + 2) * 4) + 4) <= 64)))]);
-    zeta_0 <- (BArray64.get32 zETAS_TO_INVERT_LAYER_3 ((4 * g) + 2));
-    param_43 <- zeta_0;
-    (result_29, tmp__trace) <@ polynomial____broadcast_zeta (param_43);
+    zetas <-
+    (VPBROADCAST_8u32 (BArray64.get32 zETAS_TO_INVERT_LAYER_3 ((4 * g) + 2)));
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 2) * 4)) /\ (((((4 * g) + 2) * 4) + 4) <= 64)))]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32
+    (BArray64.get32 zETAS_TO_INVERT_LAYER_3_QINV ((4 * g) + 2)));
+    param_58 <- r4;
+    param_57 <- r5;
+    param_56 <- zetas;
+    param_55 <- zetas_qinv;
+    (result_28, result_27, tmp__trace) <@ polynomial____gs_butterfly (
+    param_58, param_57, param_56, param_55);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    zetas <- result_29;
-    param_46 <- r4;
-    param_45 <- r5;
-    param_44 <- zetas;
-    (result_31, result_30, tmp__trace) <@ polynomial____gs_butterfly (
-    param_46, param_45, param_44);
-    trace_polynomial____invert_ntt_layers_0_to_4 <-
-    (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    r4 <- result_31;
-    r5 <- result_30;
+    r4 <- result_28;
+    r5 <- result_27;
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++
     [(Assert,
      ((0 <= (((4 * g) + 3) * 4)) /\ (((((4 * g) + 3) * 4) + 4) <= 64)))]);
-    zeta_0 <- (BArray64.get32 zETAS_TO_INVERT_LAYER_3 ((4 * g) + 3));
-    param_47 <- zeta_0;
-    (result_32, tmp__trace) <@ polynomial____broadcast_zeta (param_47);
+    zetas <-
+    (VPBROADCAST_8u32 (BArray64.get32 zETAS_TO_INVERT_LAYER_3 ((4 * g) + 3)));
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((4 * g) + 3) * 4)) /\ (((((4 * g) + 3) * 4) + 4) <= 64)))]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32
+    (BArray64.get32 zETAS_TO_INVERT_LAYER_3_QINV ((4 * g) + 3)));
+    param_62 <- r6;
+    param_61 <- r7;
+    param_60 <- zetas;
+    param_59 <- zetas_qinv;
+    (result_30, result_29, tmp__trace) <@ polynomial____gs_butterfly (
+    param_62, param_61, param_60, param_59);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    zetas <- result_32;
-    param_50 <- r6;
-    param_49 <- r7;
-    param_48 <- zetas;
-    (result_34, result_33, tmp__trace) <@ polynomial____gs_butterfly (
-    param_50, param_49, param_48);
-    trace_polynomial____invert_ntt_layers_0_to_4 <-
-    (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    r6 <- result_34;
-    r7 <- result_33;
+    r6 <- result_30;
+    r7 <- result_29;
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++
     [(Assert, ((0 <= ((2 * g) * 4)) /\ ((((2 * g) * 4) + 4) <= 32)))]);
-    zeta_0 <- (BArray32.get32 zETAS_TO_INVERT_LAYER_4 (2 * g));
-    param_51 <- zeta_0;
-    (result_35, tmp__trace) <@ polynomial____broadcast_zeta (param_51);
+    zetas <-
+    (VPBROADCAST_8u32 (BArray32.get32 zETAS_TO_INVERT_LAYER_4 (2 * g)));
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert, ((0 <= ((2 * g) * 4)) /\ ((((2 * g) * 4) + 4) <= 32)))]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32 (BArray32.get32 zETAS_TO_INVERT_LAYER_4_QINV (2 * g)));
+    param_66 <- r0;
+    param_65 <- r2;
+    param_64 <- zetas;
+    param_63 <- zetas_qinv;
+    (result_32, result_31, tmp__trace) <@ polynomial____gs_butterfly (
+    param_66, param_65, param_64, param_63);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    zetas <- result_35;
-    param_54 <- r0;
-    param_53 <- r2;
-    param_52 <- zetas;
-    (result_37, result_36, tmp__trace) <@ polynomial____gs_butterfly (
-    param_54, param_53, param_52);
+    r0 <- result_32;
+    r2 <- result_31;
+    param_70 <- r1;
+    param_69 <- r3;
+    param_68 <- zetas;
+    param_67 <- zetas_qinv;
+    (result_34, result_33, tmp__trace) <@ polynomial____gs_butterfly (
+    param_70, param_69, param_68, param_67);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    r0 <- result_37;
-    r2 <- result_36;
-    param_57 <- r1;
-    param_56 <- r3;
-    param_55 <- zetas;
-    (result_39, result_38, tmp__trace) <@ polynomial____gs_butterfly (
-    param_57, param_56, param_55);
-    trace_polynomial____invert_ntt_layers_0_to_4 <-
-    (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    r1 <- result_39;
-    r3 <- result_38;
+    r1 <- result_34;
+    r3 <- result_33;
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++
     [(Assert,
      ((0 <= (((2 * g) + 1) * 4)) /\ (((((2 * g) + 1) * 4) + 4) <= 32)))]);
-    zeta_0 <- (BArray32.get32 zETAS_TO_INVERT_LAYER_4 ((2 * g) + 1));
-    param_58 <- zeta_0;
-    (result_40, tmp__trace) <@ polynomial____broadcast_zeta (param_58);
+    zetas <-
+    (VPBROADCAST_8u32 (BArray32.get32 zETAS_TO_INVERT_LAYER_4 ((2 * g) + 1)));
+    trace_polynomial____invert_ntt_layers_0_to_4 <-
+    (trace_polynomial____invert_ntt_layers_0_to_4 ++
+    [(Assert,
+     ((0 <= (((2 * g) + 1) * 4)) /\ (((((2 * g) + 1) * 4) + 4) <= 32)))]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32
+    (BArray32.get32 zETAS_TO_INVERT_LAYER_4_QINV ((2 * g) + 1)));
+    param_74 <- r4;
+    param_73 <- r6;
+    param_72 <- zetas;
+    param_71 <- zetas_qinv;
+    (result_36, result_35, tmp__trace) <@ polynomial____gs_butterfly (
+    param_74, param_73, param_72, param_71);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    zetas <- result_40;
-    param_61 <- r4;
-    param_60 <- r6;
-    param_59 <- zetas;
-    (result_42, result_41, tmp__trace) <@ polynomial____gs_butterfly (
-    param_61, param_60, param_59);
+    r4 <- result_36;
+    r6 <- result_35;
+    param_78 <- r5;
+    param_77 <- r7;
+    param_76 <- zetas;
+    param_75 <- zetas_qinv;
+    (result_38, result_37, tmp__trace) <@ polynomial____gs_butterfly (
+    param_78, param_77, param_76, param_75);
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    r4 <- result_42;
-    r6 <- result_41;
-    param_64 <- r5;
-    param_63 <- r7;
-    param_62 <- zetas;
-    (result_44, result_43, tmp__trace) <@ polynomial____gs_butterfly (
-    param_64, param_63, param_62);
-    trace_polynomial____invert_ntt_layers_0_to_4 <-
-    (trace_polynomial____invert_ntt_layers_0_to_4 ++ tmp__trace);
-    r5 <- result_44;
-    r7 <- result_43;
+    r5 <- result_38;
+    r7 <- result_37;
     trace_polynomial____invert_ntt_layers_0_to_4 <-
     (trace_polynomial____invert_ntt_layers_0_to_4 ++
     [(Assert, ((0 <= (32 * (8 * g))) /\ (((32 * (8 * g)) + 32) <= 1024)))]);
@@ -4588,89 +5432,90 @@ module M = {
     var r5:W256.t;
     var r6:W256.t;
     var r7:W256.t;
-    var zeta_0:W32.t;
     var zetas:W256.t;
+    var zetas_qinv:W256.t;
     var scaling:W256.t;
-    var param:W32.t;
-    var result:W256.t;
+    var scaling_qinv:W256.t;
+    var param:W256.t;
     var param_0:W256.t;
     var param_1:W256.t;
     var param_2:W256.t;
+    var result:W256.t;
     var result_0:W256.t;
-    var result_1:W256.t;
-    var param_3:W32.t;
-    var result_2:W256.t;
+    var param_3:W256.t;
     var param_4:W256.t;
     var param_5:W256.t;
     var param_6:W256.t;
-    var result_3:W256.t;
-    var result_4:W256.t;
-    var param_7:W32.t;
-    var result_5:W256.t;
+    var result_1:W256.t;
+    var result_2:W256.t;
+    var param_7:W256.t;
     var param_8:W256.t;
     var param_9:W256.t;
     var param_10:W256.t;
-    var result_6:W256.t;
-    var result_7:W256.t;
-    var param_11:W32.t;
-    var result_8:W256.t;
+    var result_3:W256.t;
+    var result_4:W256.t;
+    var param_11:W256.t;
     var param_12:W256.t;
     var param_13:W256.t;
     var param_14:W256.t;
-    var result_9:W256.t;
-    var result_10:W256.t;
-    var param_15:W32.t;
-    var result_11:W256.t;
+    var result_5:W256.t;
+    var result_6:W256.t;
+    var param_15:W256.t;
     var param_16:W256.t;
     var param_17:W256.t;
     var param_18:W256.t;
-    var result_12:W256.t;
-    var result_13:W256.t;
+    var result_7:W256.t;
+    var result_8:W256.t;
     var param_19:W256.t;
     var param_20:W256.t;
     var param_21:W256.t;
-    var result_14:W256.t;
-    var result_15:W256.t;
-    var param_22:W32.t;
-    var result_16:W256.t;
+    var param_22:W256.t;
+    var result_9:W256.t;
+    var result_10:W256.t;
     var param_23:W256.t;
     var param_24:W256.t;
     var param_25:W256.t;
-    var result_17:W256.t;
-    var result_18:W256.t;
     var param_26:W256.t;
+    var result_11:W256.t;
+    var result_12:W256.t;
     var param_27:W256.t;
     var param_28:W256.t;
-    var result_19:W256.t;
-    var result_20:W256.t;
-    var param_29:W32.t;
-    var result_21:W256.t;
-    var param_30:W32.t;
-    var result_22:W256.t;
+    var param_29:W256.t;
+    var param_30:W256.t;
+    var result_13:W256.t;
+    var result_14:W256.t;
     var param_31:W256.t;
     var param_32:W256.t;
     var param_33:W256.t;
     var param_34:W256.t;
-    var result_23:W256.t;
-    var result_24:W256.t;
     var param_35:W256.t;
     var param_36:W256.t;
+    var result_15:W256.t;
+    var result_16:W256.t;
     var param_37:W256.t;
     var param_38:W256.t;
-    var result_25:W256.t;
-    var result_26:W256.t;
     var param_39:W256.t;
     var param_40:W256.t;
     var param_41:W256.t;
     var param_42:W256.t;
-    var result_27:W256.t;
-    var result_28:W256.t;
+    var result_17:W256.t;
+    var result_18:W256.t;
     var param_43:W256.t;
     var param_44:W256.t;
     var param_45:W256.t;
     var param_46:W256.t;
-    var result_29:W256.t;
-    var result_30:W256.t;
+    var param_47:W256.t;
+    var param_48:W256.t;
+    var result_19:W256.t;
+    var result_20:W256.t;
+    var param_49:W256.t;
+    var param_50:W256.t;
+    var param_51:W256.t;
+    var param_52:W256.t;
+    var param_53:W256.t;
+    var param_54:W256.t;
+    var result_21:W256.t;
+    var result_22:W256.t;
     var trace_polynomial____invert_ntt_layers_5_6_7:trace;
     trace_polynomial____invert_ntt_layers_5_6_7 <- [];
     trace_polynomial____invert_ntt_layers_5_6_7 <-
@@ -4709,166 +5554,160 @@ module M = {
     (trace_polynomial____invert_ntt_layers_5_6_7 ++
     [(Assert, ((0 <= (32 * (j + 28))) /\ (((32 * (j + 28)) + 32) <= 1024)))]);
     r7 <- (BArray1024.get256d polynomial (32 * (j + 28)));
-    zeta_0 <- (BArray16.get32 zETAS_TO_INVERT_LAYER_5 0);
-    param <- zeta_0;
-    (result, tmp__trace) <@ polynomial____broadcast_zeta (param);
-    trace_polynomial____invert_ntt_layers_5_6_7 <-
-    (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    zetas <- result;
+    zetas <- (VPBROADCAST_8u32 (BArray16.get32 zETAS_TO_INVERT_LAYER_5 0));
+    zetas_qinv <-
+    (VPBROADCAST_8u32 (BArray16.get32 zETAS_TO_INVERT_LAYER_5_QINV 0));
     param_2 <- r0;
     param_1 <- r1;
     param_0 <- zetas;
-    (result_1, result_0, tmp__trace) <@ polynomial____gs_butterfly (param_2,
-    param_1, param_0);
+    param <- zetas_qinv;
+    (result_0, result, tmp__trace) <@ polynomial____gs_butterfly (param_2,
+    param_1, param_0, param);
     trace_polynomial____invert_ntt_layers_5_6_7 <-
     (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    r0 <- result_1;
-    r1 <- result_0;
-    zeta_0 <- (BArray16.get32 zETAS_TO_INVERT_LAYER_5 1);
-    param_3 <- zeta_0;
-    (result_2, tmp__trace) <@ polynomial____broadcast_zeta (param_3);
-    trace_polynomial____invert_ntt_layers_5_6_7 <-
-    (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    zetas <- result_2;
+    r0 <- result_0;
+    r1 <- result;
+    zetas <- (VPBROADCAST_8u32 (BArray16.get32 zETAS_TO_INVERT_LAYER_5 1));
+    zetas_qinv <-
+    (VPBROADCAST_8u32 (BArray16.get32 zETAS_TO_INVERT_LAYER_5_QINV 1));
     param_6 <- r2;
     param_5 <- r3;
     param_4 <- zetas;
-    (result_4, result_3, tmp__trace) <@ polynomial____gs_butterfly (param_6,
-    param_5, param_4);
+    param_3 <- zetas_qinv;
+    (result_2, result_1, tmp__trace) <@ polynomial____gs_butterfly (param_6,
+    param_5, param_4, param_3);
     trace_polynomial____invert_ntt_layers_5_6_7 <-
     (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    r2 <- result_4;
-    r3 <- result_3;
-    zeta_0 <- (BArray16.get32 zETAS_TO_INVERT_LAYER_5 2);
-    param_7 <- zeta_0;
-    (result_5, tmp__trace) <@ polynomial____broadcast_zeta (param_7);
-    trace_polynomial____invert_ntt_layers_5_6_7 <-
-    (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    zetas <- result_5;
+    r2 <- result_2;
+    r3 <- result_1;
+    zetas <- (VPBROADCAST_8u32 (BArray16.get32 zETAS_TO_INVERT_LAYER_5 2));
+    zetas_qinv <-
+    (VPBROADCAST_8u32 (BArray16.get32 zETAS_TO_INVERT_LAYER_5_QINV 2));
     param_10 <- r4;
     param_9 <- r5;
     param_8 <- zetas;
-    (result_7, result_6, tmp__trace) <@ polynomial____gs_butterfly (param_10,
-    param_9, param_8);
+    param_7 <- zetas_qinv;
+    (result_4, result_3, tmp__trace) <@ polynomial____gs_butterfly (param_10,
+    param_9, param_8, param_7);
     trace_polynomial____invert_ntt_layers_5_6_7 <-
     (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    r4 <- result_7;
-    r5 <- result_6;
-    zeta_0 <- (BArray16.get32 zETAS_TO_INVERT_LAYER_5 3);
-    param_11 <- zeta_0;
-    (result_8, tmp__trace) <@ polynomial____broadcast_zeta (param_11);
-    trace_polynomial____invert_ntt_layers_5_6_7 <-
-    (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    zetas <- result_8;
+    r4 <- result_4;
+    r5 <- result_3;
+    zetas <- (VPBROADCAST_8u32 (BArray16.get32 zETAS_TO_INVERT_LAYER_5 3));
+    zetas_qinv <-
+    (VPBROADCAST_8u32 (BArray16.get32 zETAS_TO_INVERT_LAYER_5_QINV 3));
     param_14 <- r6;
     param_13 <- r7;
     param_12 <- zetas;
-    (result_10, result_9, tmp__trace) <@ polynomial____gs_butterfly (
-    param_14, param_13, param_12);
+    param_11 <- zetas_qinv;
+    (result_6, result_5, tmp__trace) <@ polynomial____gs_butterfly (param_14,
+    param_13, param_12, param_11);
     trace_polynomial____invert_ntt_layers_5_6_7 <-
     (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    r6 <- result_10;
-    r7 <- result_9;
-    zeta_0 <- (BArray8.get32 zETAS_TO_INVERT_LAYER_6 0);
-    param_15 <- zeta_0;
-    (result_11, tmp__trace) <@ polynomial____broadcast_zeta (param_15);
-    trace_polynomial____invert_ntt_layers_5_6_7 <-
-    (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    zetas <- result_11;
+    r6 <- result_6;
+    r7 <- result_5;
+    zetas <- (VPBROADCAST_8u32 (BArray8.get32 zETAS_TO_INVERT_LAYER_6 0));
+    zetas_qinv <-
+    (VPBROADCAST_8u32 (BArray8.get32 zETAS_TO_INVERT_LAYER_6_QINV 0));
     param_18 <- r0;
     param_17 <- r2;
     param_16 <- zetas;
-    (result_13, result_12, tmp__trace) <@ polynomial____gs_butterfly (
-    param_18, param_17, param_16);
+    param_15 <- zetas_qinv;
+    (result_8, result_7, tmp__trace) <@ polynomial____gs_butterfly (param_18,
+    param_17, param_16, param_15);
     trace_polynomial____invert_ntt_layers_5_6_7 <-
     (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    r0 <- result_13;
-    r2 <- result_12;
-    param_21 <- r1;
-    param_20 <- r3;
-    param_19 <- zetas;
-    (result_15, result_14, tmp__trace) <@ polynomial____gs_butterfly (
-    param_21, param_20, param_19);
+    r0 <- result_8;
+    r2 <- result_7;
+    param_22 <- r1;
+    param_21 <- r3;
+    param_20 <- zetas;
+    param_19 <- zetas_qinv;
+    (result_10, result_9, tmp__trace) <@ polynomial____gs_butterfly (
+    param_22, param_21, param_20, param_19);
     trace_polynomial____invert_ntt_layers_5_6_7 <-
     (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    r1 <- result_15;
-    r3 <- result_14;
-    zeta_0 <- (BArray8.get32 zETAS_TO_INVERT_LAYER_6 1);
-    param_22 <- zeta_0;
-    (result_16, tmp__trace) <@ polynomial____broadcast_zeta (param_22);
+    r1 <- result_10;
+    r3 <- result_9;
+    zetas <- (VPBROADCAST_8u32 (BArray8.get32 zETAS_TO_INVERT_LAYER_6 1));
+    zetas_qinv <-
+    (VPBROADCAST_8u32 (BArray8.get32 zETAS_TO_INVERT_LAYER_6_QINV 1));
+    param_26 <- r4;
+    param_25 <- r6;
+    param_24 <- zetas;
+    param_23 <- zetas_qinv;
+    (result_12, result_11, tmp__trace) <@ polynomial____gs_butterfly (
+    param_26, param_25, param_24, param_23);
     trace_polynomial____invert_ntt_layers_5_6_7 <-
     (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    zetas <- result_16;
-    param_25 <- r4;
-    param_24 <- r6;
-    param_23 <- zetas;
-    (result_18, result_17, tmp__trace) <@ polynomial____gs_butterfly (
-    param_25, param_24, param_23);
+    r4 <- result_12;
+    r6 <- result_11;
+    param_30 <- r5;
+    param_29 <- r7;
+    param_28 <- zetas;
+    param_27 <- zetas_qinv;
+    (result_14, result_13, tmp__trace) <@ polynomial____gs_butterfly (
+    param_30, param_29, param_28, param_27);
     trace_polynomial____invert_ntt_layers_5_6_7 <-
     (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    r4 <- result_18;
-    r6 <- result_17;
-    param_28 <- r5;
-    param_27 <- r7;
-    param_26 <- zetas;
-    (result_20, result_19, tmp__trace) <@ polynomial____gs_butterfly (
-    param_28, param_27, param_26);
+    r5 <- result_14;
+    r7 <- result_13;
+    zetas <-
+    (VPBROADCAST_8u32 (BArray16.get32 iNVERSE_NTT_LAYER_7_CONSTANTS 0));
+    zetas_qinv <-
+    (VPBROADCAST_8u32 (BArray16.get32 iNVERSE_NTT_LAYER_7_CONSTANTS 1));
+    scaling <-
+    (VPBROADCAST_8u32 (BArray16.get32 iNVERSE_NTT_LAYER_7_CONSTANTS 2));
+    scaling_qinv <-
+    (VPBROADCAST_8u32 (BArray16.get32 iNVERSE_NTT_LAYER_7_CONSTANTS 3));
+    param_36 <- r0;
+    param_35 <- r4;
+    param_34 <- zetas;
+    param_33 <- zetas_qinv;
+    param_32 <- scaling;
+    param_31 <- scaling_qinv;
+    (result_16, result_15, tmp__trace) <@ polynomial____gs_butterfly_scaled (
+    param_36, param_35, param_34, param_33, param_32, param_31);
     trace_polynomial____invert_ntt_layers_5_6_7 <-
     (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    r5 <- result_20;
-    r7 <- result_19;
-    zeta_0 <- (W32.of_int 4290991583);
-    param_29 <- zeta_0;
-    (result_21, tmp__trace) <@ polynomial____broadcast_zeta (param_29);
-    trace_polynomial____invert_ntt_layers_5_6_7 <-
-    (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    zetas <- result_21;
-    zeta_0 <- (W32.of_int 41978);
-    param_30 <- zeta_0;
-    (result_22, tmp__trace) <@ polynomial____broadcast_zeta (param_30);
-    trace_polynomial____invert_ntt_layers_5_6_7 <-
-    (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    scaling <- result_22;
-    param_34 <- r0;
-    param_33 <- r4;
-    param_32 <- zetas;
-    param_31 <- scaling;
-    (result_24, result_23, tmp__trace) <@ polynomial____gs_butterfly_scaled (
-    param_34, param_33, param_32, param_31);
-    trace_polynomial____invert_ntt_layers_5_6_7 <-
-    (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    r0 <- result_24;
-    r4 <- result_23;
-    param_38 <- r1;
-    param_37 <- r5;
-    param_36 <- zetas;
-    param_35 <- scaling;
-    (result_26, result_25, tmp__trace) <@ polynomial____gs_butterfly_scaled (
-    param_38, param_37, param_36, param_35);
-    trace_polynomial____invert_ntt_layers_5_6_7 <-
-    (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    r1 <- result_26;
-    r5 <- result_25;
-    param_42 <- r2;
-    param_41 <- r6;
+    r0 <- result_16;
+    r4 <- result_15;
+    param_42 <- r1;
+    param_41 <- r5;
     param_40 <- zetas;
-    param_39 <- scaling;
-    (result_28, result_27, tmp__trace) <@ polynomial____gs_butterfly_scaled (
-    param_42, param_41, param_40, param_39);
+    param_39 <- zetas_qinv;
+    param_38 <- scaling;
+    param_37 <- scaling_qinv;
+    (result_18, result_17, tmp__trace) <@ polynomial____gs_butterfly_scaled (
+    param_42, param_41, param_40, param_39, param_38, param_37);
     trace_polynomial____invert_ntt_layers_5_6_7 <-
     (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    r2 <- result_28;
-    r6 <- result_27;
-    param_46 <- r3;
-    param_45 <- r7;
-    param_44 <- zetas;
-    param_43 <- scaling;
-    (result_30, result_29, tmp__trace) <@ polynomial____gs_butterfly_scaled (
-    param_46, param_45, param_44, param_43);
+    r1 <- result_18;
+    r5 <- result_17;
+    param_48 <- r2;
+    param_47 <- r6;
+    param_46 <- zetas;
+    param_45 <- zetas_qinv;
+    param_44 <- scaling;
+    param_43 <- scaling_qinv;
+    (result_20, result_19, tmp__trace) <@ polynomial____gs_butterfly_scaled (
+    param_48, param_47, param_46, param_45, param_44, param_43);
     trace_polynomial____invert_ntt_layers_5_6_7 <-
     (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
-    r3 <- result_30;
-    r7 <- result_29;
+    r2 <- result_20;
+    r6 <- result_19;
+    param_54 <- r3;
+    param_53 <- r7;
+    param_52 <- zetas;
+    param_51 <- zetas_qinv;
+    param_50 <- scaling;
+    param_49 <- scaling_qinv;
+    (result_22, result_21, tmp__trace) <@ polynomial____gs_butterfly_scaled (
+    param_54, param_53, param_52, param_51, param_50, param_49);
+    trace_polynomial____invert_ntt_layers_5_6_7 <-
+    (trace_polynomial____invert_ntt_layers_5_6_7 ++ tmp__trace);
+    r3 <- result_22;
+    r7 <- result_21;
     trace_polynomial____invert_ntt_layers_5_6_7 <-
     (trace_polynomial____invert_ntt_layers_5_6_7 ++
     [(Assert, ((0 <= (32 * j)) /\ (((32 * j) + 32) <= 1024)))]);
@@ -58097,6 +58936,18 @@ op montgomery_multiply_and_reduce_spec _lhs _rhs =
    hoare [M.montgomery_multiply_and_reduce :
    (((_rhs = rhs) /\ (_lhs = lhs)) /\ true) ==> (true /\ (valid res.`2))].
 
+op montgomery_multiply_by_zeta_lanes_spec _lhs _zetas _zetas_high _zetas_qinv _zetas_qinv_high =
+   hoare [M.montgomery_multiply_by_zeta_lanes :
+   (((_zetas_qinv_high = zetas_qinv_high) /\
+    ((_zetas_qinv = zetas_qinv) /\
+    ((_zetas_high = zetas_high) /\ ((_zetas = zetas) /\ (_lhs = lhs))))) /\
+   true) ==> (true /\ (valid res.`2))].
+
+op montgomery_multiply_by_zeta_spec _lhs _zetas _zetas_qinv =
+   hoare [M.montgomery_multiply_by_zeta :
+   (((_zetas_qinv = zetas_qinv) /\ ((_zetas = zetas) /\ (_lhs = lhs))) /\
+   true) ==> (true /\ (valid res.`2))].
+
 op polynomial__pointwise_montgomery_multiply_and_reduce_spec _product _b_product _lhs _b_lhs _rhs _b_rhs =
    hoare [M.polynomial__pointwise_montgomery_multiply_and_reduce :
    (((_b_rhs = b_rhs) /\
@@ -58119,25 +58970,37 @@ op polynomial__reduce32_spec _polynomial _b_polynomial =
    (BArray1024.is_init _b_polynomial 0 1024)) ==>
    ((BArray1024.is_init res.`2 0 1024) /\ (valid res.`3))].
 
-op polynomial____ct_butterfly_spec _a _b _zetas =
+op polynomial____ct_butterfly_spec _a _b _zetas _zetas_qinv =
    hoare [M.polynomial____ct_butterfly :
-   (((_zetas = zetas) /\ ((_b = b) /\ (_a = a))) /\ true) ==>
-   (true /\ (valid res.`3))].
+   (((_zetas_qinv = zetas_qinv) /\
+    ((_zetas = zetas) /\ ((_b = b) /\ (_a = a)))) /\
+   true) ==> (true /\ (valid res.`3))].
 
-op polynomial____ct_butterfly_8_spec _lhs _rhs _zetas =
+op polynomial____ct_butterfly_8_spec _lhs _rhs _zetas _zetas_qinv =
    hoare [M.polynomial____ct_butterfly_8 :
-   (((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs))) /\ true) ==>
-   (true /\ (valid res.`3))].
+   (((_zetas_qinv = zetas_qinv) /\
+    ((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs)))) /\
+   true) ==> (true /\ (valid res.`3))].
 
-op polynomial____ct_butterfly_4_spec _lhs _rhs _zetas =
+op polynomial____ct_butterfly_4_lanes_spec _lhs _rhs _zetas _zetas_high _zetas_qinv _zetas_qinv_high =
+   hoare [M.polynomial____ct_butterfly_4_lanes :
+   (((_zetas_qinv_high = zetas_qinv_high) /\
+    ((_zetas_qinv = zetas_qinv) /\
+    ((_zetas_high = zetas_high) /\
+    ((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs)))))) /\
+   true) ==> (true /\ (valid res.`3))].
+
+op polynomial____ct_butterfly_4_spec _lhs _rhs _zetas _zetas_qinv =
    hoare [M.polynomial____ct_butterfly_4 :
-   (((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs))) /\ true) ==>
-   (true /\ (valid res.`3))].
+   (((_zetas_qinv = zetas_qinv) /\
+    ((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs)))) /\
+   true) ==> (true /\ (valid res.`3))].
 
-op polynomial____ct_butterfly_2_spec _lhs _rhs _zetas =
+op polynomial____ct_butterfly_2_spec _lhs _rhs _zetas _zetas_qinv =
    hoare [M.polynomial____ct_butterfly_2 :
-   (((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs))) /\ true) ==>
-   (true /\ (valid res.`3))].
+   (((_zetas_qinv = zetas_qinv) /\
+    ((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs)))) /\
+   true) ==> (true /\ (valid res.`3))].
 
 op polynomial____ntt_layers_7_6_5_spec _polynomial _b_polynomial _j =
    hoare [M.polynomial____ntt_layers_7_6_5 :
@@ -58165,34 +59028,45 @@ op polynomial__ntt_spec _polynomial _b_polynomial =
    (BArray1024.is_init _b_polynomial 0 1024)) ==>
    ((BArray1024.is_init res.`2 0 1024) /\ (valid res.`3))].
 
-op polynomial____gs_butterfly_spec _a _b _zetas =
+op polynomial____gs_butterfly_spec _a _b _zetas _zetas_qinv =
    hoare [M.polynomial____gs_butterfly :
-   (((_zetas = zetas) /\ ((_b = b) /\ (_a = a))) /\ true) ==>
-   (true /\ (valid res.`3))].
+   (((_zetas_qinv = zetas_qinv) /\
+    ((_zetas = zetas) /\ ((_b = b) /\ (_a = a)))) /\
+   true) ==> (true /\ (valid res.`3))].
 
-op polynomial____gs_butterfly_4_spec _lhs _rhs _zetas =
+op polynomial____gs_butterfly_4_lanes_spec _lhs _rhs _zetas _zetas_high _zetas_qinv _zetas_qinv_high =
+   hoare [M.polynomial____gs_butterfly_4_lanes :
+   (((_zetas_qinv_high = zetas_qinv_high) /\
+    ((_zetas_qinv = zetas_qinv) /\
+    ((_zetas_high = zetas_high) /\
+    ((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs)))))) /\
+   true) ==> (true /\ (valid res.`3))].
+
+op polynomial____gs_butterfly_4_spec _lhs _rhs _zetas _zetas_qinv =
    hoare [M.polynomial____gs_butterfly_4 :
-   (((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs))) /\ true) ==>
-   (true /\ (valid res.`3))].
+   (((_zetas_qinv = zetas_qinv) /\
+    ((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs)))) /\
+   true) ==> (true /\ (valid res.`3))].
 
-op polynomial____gs_butterfly_2_spec _lhs _rhs _zetas =
+op polynomial____gs_butterfly_2_spec _lhs _rhs _zetas _zetas_qinv =
    hoare [M.polynomial____gs_butterfly_2 :
-   (((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs))) /\ true) ==>
-   (true /\ (valid res.`3))].
+   (((_zetas_qinv = zetas_qinv) /\
+    ((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs)))) /\
+   true) ==> (true /\ (valid res.`3))].
 
-op polynomial____gs_butterfly_8_spec _lhs _rhs _zetas =
+op polynomial____gs_butterfly_8_spec _lhs _rhs _zetas _zetas_qinv =
    hoare [M.polynomial____gs_butterfly_8 :
-   (((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs))) /\ true) ==>
-   (true /\ (valid res.`3))].
+   (((_zetas_qinv = zetas_qinv) /\
+    ((_zetas = zetas) /\ ((_rhs = rhs) /\ (_lhs = lhs)))) /\
+   true) ==> (true /\ (valid res.`3))].
 
-op polynomial____gs_butterfly_scaled_spec _a _b _zetas_f _f =
+op polynomial____gs_butterfly_scaled_spec _a _b _zetas_f _zetas_f_qinv _f _f_qinv =
    hoare [M.polynomial____gs_butterfly_scaled :
-   (((_f = f) /\ ((_zetas_f = zetas_f) /\ ((_b = b) /\ (_a = a)))) /\ true) ==>
-   (true /\ (valid res.`3))].
-
-op polynomial____broadcast_zeta_spec _zeta =
-   hoare [M.polynomial____broadcast_zeta :
-   ((_zeta = zeta_0) /\ true) ==> (true /\ (valid res.`2))].
+   (((_f_qinv = f_qinv) /\
+    ((_f = f) /\
+    ((_zetas_f_qinv = zetas_f_qinv) /\
+    ((_zetas_f = zetas_f) /\ ((_b = b) /\ (_a = a)))))) /\
+   true) ==> (true /\ (valid res.`3))].
 
 op polynomial____invert_ntt_layers_0_to_4_spec _polynomial _b_polynomial _g =
    hoare [M.polynomial____invert_ntt_layers_0_to_4 :

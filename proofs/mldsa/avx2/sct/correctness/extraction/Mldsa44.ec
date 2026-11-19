@@ -10,11 +10,12 @@ Array25 Array28 Array32 Array40 Array64 Array66 Array84 Array96 Array128
 Array136 Array168 Array192 Array256 Array272 Array320 Array384 Array416
 Array512 Array576 Array680 Array768 Array848 Array1024 Array1280 Array1312
 Array1664 Array2048 Array2304 Array2420 Array2560 Array4096 WArray2 WArray8
-WArray16 WArray32 WArray40 WArray64 WArray66 WArray84 WArray96 WArray128
-WArray136 WArray160 WArray168 WArray192 WArray200 WArray224 WArray256
-WArray272 WArray320 WArray384 WArray416 WArray512 WArray576 WArray680
-WArray768 WArray800 WArray848 WArray1024 WArray1280 WArray1312 WArray1664
-WArray2048 WArray2304 WArray2420 WArray2560 WArray4096 WArray8192 WArray16384.
+WArray16 WArray24 WArray32 WArray40 WArray64 WArray66 WArray84 WArray96
+WArray128 WArray136 WArray160 WArray168 WArray192 WArray200 WArray224
+WArray256 WArray272 WArray320 WArray384 WArray416 WArray512 WArray576
+WArray680 WArray768 WArray800 WArray848 WArray1024 WArray1280 WArray1312
+WArray1664 WArray2048 WArray2304 WArray2420 WArray2560 WArray4096 WArray8192
+WArray16384.
 
 abbrev commitment__ENCODING_CONSTANTS_TABLE_bits6 =
 ((Array4.of_list witness<:W256.t>)
@@ -536,6 +537,433 @@ abbrev kECCAK1600_RC =
 (W64.of_int (-9223372034707292150)); (W64.of_int (-9223372034707259263));
 (W64.of_int (-9223372036854742912)); (W64.of_int 2147483649);
 (W64.of_int (-9223372034707259384))]).
+
+abbrev iNVERSE_NTT_LAYER_7_CONSTANTS =
+((Array4.of_list witness<:W32.t>)
+[(W32.of_int (-3975713)); (W32.of_int (-151046689)); (W32.of_int 41978);
+(W32.of_int (-8395782))]).
+
+abbrev lAYERS_7_6_ZETAS =
+((Array6.of_list witness<:W32.t>)
+[(W32.of_int 25847); (W32.of_int 1830765815); (W32.of_int (-2608894));
+(W32.of_int (-1929875198)); (W32.of_int (-518909));
+(W32.of_int (-1927777021))]).
+
+abbrev zETAS_TO_INVERT_LAYER_6_QINV =
+((Array2.of_list witness<:W32.t>)
+[(W32.of_int (-1927777021)); (W32.of_int (-1929875198))]).
+
+abbrev zETAS_TO_INVERT_LAYER_5_QINV =
+((Array4.of_list witness<:W32.t>)
+[(W32.of_int 1640734244); (W32.of_int 1612161320); (W32.of_int 1477910808);
+(W32.of_int 1640767044)]).
+
+abbrev zETAS_TO_INVERT_LAYER_4_QINV =
+((Array8.of_list witness<:W32.t>)
+[(W32.of_int 625853735); (W32.of_int (-285697463)); (W32.of_int 515185417);
+(W32.of_int (-1929495947)); (W32.of_int (-1091570561));
+(W32.of_int (-1374673747)); (W32.of_int (-1815525077));
+(W32.of_int 308362795)]).
+
+abbrev zETAS_TO_INVERT_LAYER_3_QINV =
+((Array16.of_list witness<:W32.t>)
+[(W32.of_int (-1170414139)); (W32.of_int (-1443016191));
+(W32.of_int 1837364258); (W32.of_int 329347125); (W32.of_int (-748618600));
+(W32.of_int (-1257667337)); (W32.of_int (-878576921));
+(W32.of_int 1654287830); (W32.of_int 684667771); (W32.of_int (-346752664));
+(W32.of_int 222489248); (W32.of_int 1806278032); (W32.of_int 858240904);
+(W32.of_int (-1364982364)); (W32.of_int 2082316400); (W32.of_int 1727305304)]
+).
+
+abbrev zETAS_TO_INVERT_LAYER_2_QINV =
+((Array16.of_list witness<:W256.t>)
+[(W256.of_int
+ (-46231117865515701663188276477305069737239032811577578260659609631708380729555)
+ );
+(W256.of_int
+(-40308813007630279660800533413462476023785350571745809848720619359492527686608)
+);
+(W256.of_int
+(-7694070522706229301989874210595677606335887933700970434486053637379522717613)
+);
+(W256.of_int
+40032141758163935434887474281669587021823113703011892635341341287596361997210
+);
+(W256.of_int
+23723596059544975722777807283687995128496919235826647629994095617702911144844
+);
+(W256.of_int
+(-51907508028138545969467909703014425324839405453399629677470095520340178225641)
+);
+(W256.of_int
+11295882004830139526322800383483915498953326670369337600599805756481146507097
+);
+(W256.of_int
+(-47185954387656224337987428157052580683690441230793042324760942097210644780330)
+);
+(W256.of_int
+(-44794275860858407257481832412588729259925532078528860188595334316843494840995)
+);
+(W256.of_int
+(-28626428516259158855454904675138680106693733573439992772173914507878933919155)
+);
+(W256.of_int
+(-15136064007298948835278814028307374606217458242369158881244856756191927443903)
+);
+(W256.of_int
+(-5445936673258117338806948975153417607279815898353175578498992877001693393284)
+);
+(W256.of_int
+(-51189480829750957525635238513145969994086842705682668986149351508317597229393)
+);
+(W256.of_int
+42982123144482884937383571770905130459967901720610186867300062127654693679148
+);
+(W256.of_int
+(-37866039288938368815423130247323234275912068935950071492605711582741788721467)
+);
+(W256.of_int
+(-49771789149214465680432167981085667177811347099920728655539585845500629912032)
+)]).
+
+abbrev zETAS_TO_INVERT_LAYER_1_QINV =
+((Array16.of_list witness<:W256.t>)
+[(W256.of_int
+ 52761908908540014504751632443020719561512049905216359154720584544792599705561
+ );
+(W256.of_int
+(-4819529861086092324585981415270609350650702302499781631276660532184282937342)
+);
+(W256.of_int
+47912672502293245640183129711909486119851340573162358786664506429485808531346
+);
+(W256.of_int
+(-18742020554263951902438285629488510204209062326384066584841357096139014111242)
+);
+(W256.of_int
+(-53906576939515236877641723015141521993915377413116784539933080944882851452920)
+);
+(W256.of_int
+18206336092483798440788595861005903595284327528650972929647718750311391062464
+);
+(W256.of_int
+(-48113585250169337653513867199466562800717122123930144040616877397505836865702)
+);
+(W256.of_int
+35637497933696450300991498286368625283831487087830974197198186376755708708232
+);
+(W256.of_int
+(-23990609258594871217389978161443799226256305301966544540886132356279073084318)
+);
+(W256.of_int
+57567428386298539943541134148725923067180607018601695831071321025282050812407
+);
+(W256.of_int
+7814927703971631469701528186129125337656985318469831940289371155284673385481);
+(W256.of_int
+(-21113263738042724161290298745543998703510811244044430810415027478043637756257)
+);
+(W256.of_int
+(-38843563307163194447182669822903180338777720248256856374404902393956614328374)
+);
+(W256.of_int
+(-34666536990969910574828186743975975682417923103670940118040220264557360218890)
+);
+(W256.of_int
+(-57801584797378915537023628044425028693215170335627209460846974271460982444101)
+);
+(W256.of_int
+(-42459716779958754719550077549828711654765343952693781629692706319611531577319)
+)]).
+
+abbrev zETAS_TO_INVERT_LAYER_0_QINV =
+((Array16.of_list witness<:W256.t>)
+[(W256.of_int
+ 4186615309851504755332942127729647818026006622161825199072425226508611086798
+ );
+(W256.of_int
+30191271100413583978050196851679712458411167311374972300243016696897034192297
+);
+(W256.of_int
+(-42909445800777988099812779093536764462714048489339413859546778797351339237413)
+);
+(W256.of_int
+(-55194306081347488999026194845657370941562191263733111445115571701266634968050)
+);
+(W256.of_int
+(-54999873461561806471128960890054795047911487180239015458463565835864521298883)
+);
+(W256.of_int
+41917165260610674890153303375139919504516302768573312283183426801647143252903
+);
+(W256.of_int
+20407478420194398905727307411464211921978870104609324675324826800122495647263
+);
+(W256.of_int
+22429856577116842747078720252734599606715586813961730245694947316958642428111
+);
+(W256.of_int
+6338403331553085566809539389936911750764924826054757019987645358336386256238);
+(W256.of_int
+(-41426344522052273202116933361282037616609787375803872625531201807190840789338)
+);
+(W256.of_int
+(-51775693996357324784160055960959986919032977727099473837517693712032885302714)
+);
+(W256.of_int
+57288864163500310849483209297311795143736007720629732877968614598285401233700
+);
+(W256.of_int
+23283732376182742348555430102474356725916883664542405846824722812015904645570
+);
+(W256.of_int
+384277991645409746454064521460160179360463524960039924224108608074609559292);
+(W256.of_int
+(-16335032818224882313876243888543027395701913560802115969922428229769573497378)
+);
+(W256.of_int
+(-24221160338795132665385948408321411834756260109237612812647887790784256990)
+)]).
+
+abbrev lAYER_5_ZETAS_QINV =
+((Array4.of_list witness<:W256.t>)
+[(W256.of_int
+ 44234992009757668820260223424326022228058474301785899076447686774770958605892
+ );
+(W256.of_int
+39844396571762505616456782984547926089680687191203502711917740426673673150744
+);
+(W256.of_int
+43463783216162876712066362383163736987842675713538547530988002719636104126760
+);
+(W256.of_int
+44234107723506780390337989725848398555401943105662545822718080852648224595492
+)]).
+
+abbrev lAYER_4_ZETAS_QINV =
+((Array8.of_list witness<:W256.t>)
+[(W256.of_int
+ 8313444509269130609195606882539044467470568332023600378215133973127819771435
+ );
+(W256.of_int
+(-48946459233230847624512485315512274364265906653104309521038878412400779245269)
+);
+(W256.of_int
+(-37061130885521152111447773587482660641204595754594371517251343543994934090579)
+);
+(W256.of_int
+(-29428684087883656943091301771061580211781872251175007666098322891132697054081)
+);
+(W256.of_int
+(-52019107810755013208994404791501466597804675077470091377561186384359375095179)
+);
+(W256.of_int
+13889371369247633840281875659963931909345184399955166493714397392385558780681
+);
+(W256.of_int
+(-7702388340253648595945884936900825277126843178849497560684335690084124157367)
+);
+(W256.of_int
+16872983320965577290113406557456995625226257250553493020626415811957585986855
+)]).
+
+abbrev lAYER_3_ZETAS_QINV =
+((Array16.of_list witness<:W256.t>)
+[(W256.of_int
+ 46568058884568893808127283778539484621527600772326629048966192451505949546072
+ );
+(W256.of_int
+56139139101204030406035212579597762223368195099844610808523694307678130905200
+);
+(W256.of_int
+(-36799851716649387945440853238300711202757300843633041450489470667178217568860)
+);
+(W256.of_int
+23138129004794417670685947582291603431140709302072926592632870925879147476872
+);
+(W256.of_int
+48697159420104007667749936897667179349127465862699524009428205713330815999376
+);
+(W256.of_int
+5998298261491039795685184589793773059444759573944532336988321629074807253664);
+(W256.of_int
+(-9348433303349060714128593154117512362575506047195646965107787702092406916760)
+);
+(W256.of_int
+18458606595174636723946636517094308981123861028661990141668396590606198977403
+);
+(W256.of_int
+44599511679300497199971152665316127914735602506294708408206940962397552799190
+);
+(W256.of_int
+(-23686386911704390997314705142661440294615737011330540662673288791204537697561)
+);
+(W256.of_int
+(-33906644311471929680437278468909146355964403333878475763583670912266704157449)
+);
+(W256.of_int
+(-20182717507776186393057021491069105895335129318870243571619214683665881564008)
+);
+(W256.of_int
+8879180927046740568647627186653457968587253537729862050037738844400715395125);
+(W256.of_int
+49535242415342130635668204449230149811046646921872789962899930897651217986594
+);
+(W256.of_int
+(-38903639531292873825111825206991230812037355062926287225586217773912928988671)
+);
+(W256.of_int
+(-31554302746305897609895159702433631728296645756812199190000012834599298341435)
+)]).
+
+abbrev lAYER_2_ZETAS_QINV =
+((Array16.of_list witness<:W256.t>)
+[(W256.of_int
+ (-43977775003890976705780822596010459047367541268208591185812603494321957229977)
+ );
+(W256.of_int
+49553867721461414864332993254930295904984818972090182044300387244740683797709
+);
+(W256.of_int
+(-29035148748773605283129337767259250277664351418060556586467312378675679787773)
+);
+(W256.of_int
+(-16025974507462655885812109548855116240480339924005189791695650538903963449388)
+);
+(W256.of_int
+(-12832510240031018542921786423814997264538137236798711577542294050505807776379)
+);
+(W256.of_int
+48447597044056515198212613053313743573532636081367394373030872705998059555478
+);
+(W256.of_int
+55530307505228359609450222078965111317433932257469997706170484419364075734016
+);
+(W256.of_int
+(-29790108755548375818074413067380003044205234553429794450137750516050415888740)
+);
+(W256.of_int
+(-24308869676678151930824178363542406647345397850940699479871121503127382150595)
+);
+(W256.of_int
+49388340227113556847698423632058929748235431382014348816032729367113557949982
+);
+(W256.of_int
+26746904187224180933800981067660732769006855912733992509839185265562474079295
+);
+(W256.of_int
+54577819895401706000059745192313985739812571191668092027437211928847617037404
+);
+(W256.of_int
+(-44108704744752931554852515702914404034257600587753179498236721564261898165336)
+);
+(W256.of_int
+(-53476108792018003127298140966957482981855104563891889807274718899343198433418)
+);
+(W256.of_int
+(-25614008190003964111276974835186881424262624242805083606482010466680498420428)
+);
+(W256.of_int
+(-25677704487933164675968353991683606572373814630827466346854009469020182799020)
+)]).
+
+abbrev lAYER_1_ZETAS_QINV =
+((Array16.of_list witness<:W256.t>)
+[(W256.of_int
+ (-53223230369489625717051912135200137469744725946962044237881971890205988182299)
+ );
+(W256.of_int
+3786682684290059300869545997520265064245495636665727322722981379160103286365);
+(W256.of_int
+52721812026891345590122427673664923767733648867294862062350660456695954370421
+);
+(W256.of_int
+(-57452236163827891783288068294917885767713010279915874276768667626194188938624)
+);
+(W256.of_int
+40929554887967497348452884366364972634856215758353740280115610742916388114674
+);
+(W256.of_int
+46071117214155789684075632258416469567620985928127618202183213019747779549091
+);
+(W256.of_int
+44176325089880396200969614428010478378983023746830016546264561950438545818242
+);
+(W256.of_int
+(-45022048857525128669488420205459791177085224115198666410582144594240430814243)
+);
+(W256.of_int
+31153527340476643606621709010671168889379544837369304924140557485575559060457
+);
+(W256.of_int
+32636587159155448615738805787120803244904238404513918520114219578444623162624
+);
+(W256.of_int
+(-8582613156055566650579449469731824964083122333534685073191720566261595214902)
+);
+(W256.of_int
+(-46621958908435050977775731840504021556073858918816135562071354055751052954260)
+);
+(W256.of_int
+38394469880506623137528644618306280069062672661456979103150083757329708246124
+);
+(W256.of_int
+6344247919765211151230023116414613880524396588278568735396193434804977245331);
+(W256.of_int
+32528151449800468199932287586449871143279149559167544186569724023037910072869
+);
+(W256.of_int
+(-24103825613533770532142673185826713680963910034204066683059041228834727383390)
+)]).
+
+abbrev lAYER_0_ZETAS_QINV =
+((Array16.of_list witness<:W256.t>)
+[(W256.of_int
+ (-38308970390594172346780933300993306563586160368390102206232255843198464537965)
+ );
+(W256.of_int
+51356984136320819831555752696688926731225398877358194305726093766846471910133
+);
+(W256.of_int
+51944468498066308360851754217472685358728173402236032161224524424723954237022
+);
+(W256.of_int
+33925905191240738747088885057636509138219576595101555947055242299997500874785
+);
+(W256.of_int
+43944310286715963239939946131595973540055188583344720459239915722902285605145
+);
+(W256.of_int
+171565520809982250100928441156471833788848154303204066142312779936413777637);
+(W256.of_int
+30652523477176806320352999680566536501795759553327588198964028350622715184408
+);
+(W256.of_int
+30106724962988084369799469513738438616529678132928410124971686819994792061118
+);
+(W256.of_int
+37905666463871968531381078219560402987413265006277441399448087558944472881491
+);
+(W256.of_int
+25347616737674256314456976737426805521278272989303099308901782591948504054068
+);
+(W256.of_int
+55582273191487933046039251454461606619814232828109817794052999805663999444568
+);
+(W256.of_int
+46553191807393507542636849738570367899298411332841481447810117493410991910078
+);
+(W256.of_int
+10645171146978320071713975839801163342908221469015153062719929062699879178556
+);
+(W256.of_int
+20921014267148504153834232590264993933452107315580018080263209998527808806213
+);
+(W256.of_int
+5426026418443919239933395785275471729263236465199402658052664094533275854692);
+(W256.of_int
+10106212047683068291375379709759686040926239694735982216667643509512039664208
+)]).
 
 abbrev zETAS_TO_INVERT_LAYER_6 =
 ((Array2.of_list witness<:W32.t>)
@@ -2394,6 +2822,35 @@ module M = {
     product_low <- (VPBLEND_8u32 product_low product_high (W8.of_int 170));
     return product_low;
   }
+  proc montgomery_multiply_by_zeta_lanes (lhs:W256.t, zetas:W256.t,
+                                          zetas_high:W256.t,
+                                          zetas_qinv:W256.t,
+                                          zetas_qinv_high:W256.t) : W256.t = {
+    var product_low:W256.t;
+    var lhs_high:W256.t;
+    var product_high:W256.t;
+    var t_low:W256.t;
+    var t_high:W256.t;
+    lhs_high <- (VMOVSHDUP_256 lhs);
+    product_low <- (VPMUL_256 lhs zetas);
+    product_high <- (VPMUL_256 lhs_high zetas_high);
+    t_low <- (VPMUL_256 lhs zetas_qinv);
+    t_high <- (VPMUL_256 lhs_high zetas_qinv_high);
+    t_low <- (VPMUL_256 t_low mODULUS_VECTOR);
+    t_high <- (VPMUL_256 t_high mODULUS_VECTOR);
+    product_low <- (VPSUB_4u64 product_low t_low);
+    product_high <- (VPSUB_4u64 product_high t_high);
+    product_low <- (VMOVSHDUP_256 product_low);
+    product_low <- (VPBLEND_8u32 product_low product_high (W8.of_int 170));
+    return product_low;
+  }
+  proc montgomery_multiply_by_zeta (lhs:W256.t, zetas:W256.t,
+                                    zetas_qinv:W256.t) : W256.t = {
+    var r:W256.t;
+    r <@ montgomery_multiply_by_zeta_lanes (lhs, zetas, zetas, zetas_qinv,
+    zetas_qinv);
+    return r;
+  }
   proc polynomial__pointwise_montgomery_multiply_and_reduce (product:W32.t Array256.t,
                                                              lhs:W32.t Array256.t,
                                                              rhs:W32.t Array256.t) : 
@@ -2482,30 +2939,34 @@ module M = {
     }
     return polynomial;
   }
-  proc polynomial____ct_butterfly (a:W256.t, b:W256.t, zetas:W256.t) : 
-  W256.t * W256.t = {
+  proc polynomial____ct_butterfly (a:W256.t, b:W256.t, zetas:W256.t,
+                                   zetas_qinv:W256.t) : W256.t * W256.t = {
     var t:W256.t;
-    t <@ montgomery_multiply_and_reduce (b, zetas);
+    t <@ montgomery_multiply_by_zeta (b, zetas, zetas_qinv);
     b <- (VPSUB_8u32 a t);
     a <- (VPADD_8u32 a t);
     return (a, b);
   }
-  proc polynomial____ct_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
-  W256.t * W256.t = {
+  proc polynomial____ct_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t = {
     var summands:W256.t;
     var zeta_products:W256.t;
     var add_terms:W256.t;
     var sub_terms:W256.t;
     summands <- (VPERM2I128 lhs rhs (W8.of_int 32));
     zeta_products <- (VPERM2I128 lhs rhs (W8.of_int 49));
-    zeta_products <@ montgomery_multiply_and_reduce (zeta_products, zetas);
+    zeta_products <@ montgomery_multiply_by_zeta (zeta_products, zetas,
+    zetas_qinv);
     add_terms <- (VPADD_8u32 summands zeta_products);
     sub_terms <- (VPSUB_8u32 summands zeta_products);
     lhs <- (VPERM2I128 add_terms sub_terms (W8.of_int 32));
     rhs <- (VPERM2I128 add_terms sub_terms (W8.of_int 49));
     return (lhs, rhs);
   }
-  proc polynomial____ct_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
+  proc polynomial____ct_butterfly_4_lanes (lhs:W256.t, rhs:W256.t,
+                                           zetas:W256.t, zetas_high:W256.t,
+                                           zetas_qinv:W256.t,
+                                           zetas_qinv_high:W256.t) : 
   W256.t * W256.t = {
     var summands:W256.t;
     var zeta_products:W256.t;
@@ -2513,19 +2974,31 @@ module M = {
     var sub_terms:W256.t;
     summands <- (VPUNPCKL_4u64 lhs rhs);
     zeta_products <- (VPUNPCKH_4u64 lhs rhs);
-    zeta_products <@ montgomery_multiply_and_reduce (zeta_products, zetas);
+    zeta_products <@ montgomery_multiply_by_zeta_lanes (zeta_products, 
+    zetas, zetas_high, zetas_qinv, zetas_qinv_high);
     add_terms <- (VPADD_8u32 summands zeta_products);
     sub_terms <- (VPSUB_8u32 summands zeta_products);
     lhs <- (VPUNPCKL_4u64 add_terms sub_terms);
     rhs <- (VPUNPCKH_4u64 add_terms sub_terms);
     return (lhs, rhs);
   }
-  proc polynomial____ct_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
-  W256.t * W256.t = {
+  proc polynomial____ct_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t = {
     
+    (lhs, rhs) <@ polynomial____ct_butterfly_4_lanes (lhs, rhs, zetas, 
+    zetas, zetas_qinv, zetas_qinv);
+    return (lhs, rhs);
+  }
+  proc polynomial____ct_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t = {
+    var zetas_high:W256.t;
+    var zetas_qinv_high:W256.t;
     lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
     rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
-    (lhs, rhs) <@ polynomial____ct_butterfly_4 (lhs, rhs, zetas);
+    zetas_high <- (VMOVSHDUP_256 zetas);
+    zetas_qinv_high <- (VMOVSHDUP_256 zetas_qinv);
+    (lhs, rhs) <@ polynomial____ct_butterfly_4_lanes (lhs, rhs, zetas,
+    zetas_high, zetas_qinv, zetas_qinv_high);
     lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
     rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
     return (lhs, rhs);
@@ -2540,8 +3013,8 @@ module M = {
     var r5:W256.t;
     var r6:W256.t;
     var r7:W256.t;
-    var zeta_0:W64.t;
     var zetas:W256.t;
+    var zetas_qinv:W256.t;
     r0 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * (j + 0)));
@@ -2566,31 +3039,32 @@ module M = {
     r7 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * (j + 28)));
-    zeta_0 <- (W64.of_int 25847);
-    zetas <- (zeroextu256 (VMOV_64 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    (r0, r4) <@ polynomial____ct_butterfly (r0, r4, zetas);
-    (r1, r5) <@ polynomial____ct_butterfly (r1, r5, zetas);
-    (r2, r6) <@ polynomial____ct_butterfly (r2, r6, zetas);
-    (r3, r7) <@ polynomial____ct_butterfly (r3, r7, zetas);
-    zeta_0 <- (W64.of_int (- 2608894));
-    zetas <- (zeroextu256 (VMOV_64 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    (r0, r2) <@ polynomial____ct_butterfly (r0, r2, zetas);
-    (r1, r3) <@ polynomial____ct_butterfly (r1, r3, zetas);
-    zeta_0 <- (W64.of_int (- 518909));
-    zetas <- (zeroextu256 (VMOV_64 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    (r4, r6) <@ polynomial____ct_butterfly (r4, r6, zetas);
-    (r5, r7) <@ polynomial____ct_butterfly (r5, r7, zetas);
+    zetas <- (VPBROADCAST_8u32 lAYERS_7_6_ZETAS.[0]);
+    zetas_qinv <- (VPBROADCAST_8u32 lAYERS_7_6_ZETAS.[1]);
+    (r0, r4) <@ polynomial____ct_butterfly (r0, r4, zetas, zetas_qinv);
+    (r1, r5) <@ polynomial____ct_butterfly (r1, r5, zetas, zetas_qinv);
+    (r2, r6) <@ polynomial____ct_butterfly (r2, r6, zetas, zetas_qinv);
+    (r3, r7) <@ polynomial____ct_butterfly (r3, r7, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 lAYERS_7_6_ZETAS.[2]);
+    zetas_qinv <- (VPBROADCAST_8u32 lAYERS_7_6_ZETAS.[3]);
+    (r0, r2) <@ polynomial____ct_butterfly (r0, r2, zetas, zetas_qinv);
+    (r1, r3) <@ polynomial____ct_butterfly (r1, r3, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 lAYERS_7_6_ZETAS.[4]);
+    zetas_qinv <- (VPBROADCAST_8u32 lAYERS_7_6_ZETAS.[5]);
+    (r4, r6) <@ polynomial____ct_butterfly (r4, r6, zetas, zetas_qinv);
+    (r5, r7) <@ polynomial____ct_butterfly (r5, r7, zetas, zetas_qinv);
     zetas <- lAYER_5_ZETAS.[0];
-    (r0, r1) <@ polynomial____ct_butterfly (r0, r1, zetas);
+    zetas_qinv <- lAYER_5_ZETAS_QINV.[0];
+    (r0, r1) <@ polynomial____ct_butterfly (r0, r1, zetas, zetas_qinv);
     zetas <- lAYER_5_ZETAS.[1];
-    (r2, r3) <@ polynomial____ct_butterfly (r2, r3, zetas);
+    zetas_qinv <- lAYER_5_ZETAS_QINV.[1];
+    (r2, r3) <@ polynomial____ct_butterfly (r2, r3, zetas, zetas_qinv);
     zetas <- lAYER_5_ZETAS.[2];
-    (r4, r5) <@ polynomial____ct_butterfly (r4, r5, zetas);
+    zetas_qinv <- lAYER_5_ZETAS_QINV.[2];
+    (r4, r5) <@ polynomial____ct_butterfly (r4, r5, zetas, zetas_qinv);
     zetas <- lAYER_5_ZETAS.[3];
-    (r6, r7) <@ polynomial____ct_butterfly (r6, r7, zetas);
+    zetas_qinv <- lAYER_5_ZETAS_QINV.[3];
+    (r6, r7) <@ polynomial____ct_butterfly (r6, r7, zetas, zetas_qinv);
     polynomial <-
     (Array256.init
     (WArray1024.get32
@@ -2644,6 +3118,7 @@ module M = {
     var r6:W256.t;
     var r7:W256.t;
     var zetas:W256.t;
+    var zetas_qinv:W256.t;
     r0 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * ((8 * g) + 0)));
@@ -2669,43 +3144,61 @@ module M = {
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * ((8 * g) + 7)));
     zetas <- lAYER_4_ZETAS.[(2 * g)];
-    (r0, r2) <@ polynomial____ct_butterfly (r0, r2, zetas);
-    (r1, r3) <@ polynomial____ct_butterfly (r1, r3, zetas);
+    zetas_qinv <- lAYER_4_ZETAS_QINV.[(2 * g)];
+    (r0, r2) <@ polynomial____ct_butterfly (r0, r2, zetas, zetas_qinv);
+    (r1, r3) <@ polynomial____ct_butterfly (r1, r3, zetas, zetas_qinv);
     zetas <- lAYER_4_ZETAS.[((2 * g) + 1)];
-    (r4, r6) <@ polynomial____ct_butterfly (r4, r6, zetas);
-    (r5, r7) <@ polynomial____ct_butterfly (r5, r7, zetas);
+    zetas_qinv <- lAYER_4_ZETAS_QINV.[((2 * g) + 1)];
+    (r4, r6) <@ polynomial____ct_butterfly (r4, r6, zetas, zetas_qinv);
+    (r5, r7) <@ polynomial____ct_butterfly (r5, r7, zetas, zetas_qinv);
     zetas <- lAYER_3_ZETAS.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____ct_butterfly (r0, r1, zetas);
+    zetas_qinv <- lAYER_3_ZETAS_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____ct_butterfly (r0, r1, zetas, zetas_qinv);
     zetas <- lAYER_3_ZETAS.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____ct_butterfly (r2, r3, zetas);
+    zetas_qinv <- lAYER_3_ZETAS_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____ct_butterfly (r2, r3, zetas, zetas_qinv);
     zetas <- lAYER_3_ZETAS.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____ct_butterfly (r4, r5, zetas);
+    zetas_qinv <- lAYER_3_ZETAS_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____ct_butterfly (r4, r5, zetas, zetas_qinv);
     zetas <- lAYER_3_ZETAS.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____ct_butterfly (r6, r7, zetas);
+    zetas_qinv <- lAYER_3_ZETAS_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____ct_butterfly (r6, r7, zetas, zetas_qinv);
     zetas <- lAYER_2_ZETAS.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____ct_butterfly_8 (r0, r1, zetas);
+    zetas_qinv <- lAYER_2_ZETAS_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____ct_butterfly_8 (r0, r1, zetas, zetas_qinv);
     zetas <- lAYER_2_ZETAS.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____ct_butterfly_8 (r2, r3, zetas);
+    zetas_qinv <- lAYER_2_ZETAS_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____ct_butterfly_8 (r2, r3, zetas, zetas_qinv);
     zetas <- lAYER_2_ZETAS.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____ct_butterfly_8 (r4, r5, zetas);
+    zetas_qinv <- lAYER_2_ZETAS_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____ct_butterfly_8 (r4, r5, zetas, zetas_qinv);
     zetas <- lAYER_2_ZETAS.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____ct_butterfly_8 (r6, r7, zetas);
+    zetas_qinv <- lAYER_2_ZETAS_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____ct_butterfly_8 (r6, r7, zetas, zetas_qinv);
     zetas <- lAYER_1_ZETAS.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____ct_butterfly_4 (r0, r1, zetas);
+    zetas_qinv <- lAYER_1_ZETAS_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____ct_butterfly_4 (r0, r1, zetas, zetas_qinv);
     zetas <- lAYER_1_ZETAS.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____ct_butterfly_4 (r2, r3, zetas);
+    zetas_qinv <- lAYER_1_ZETAS_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____ct_butterfly_4 (r2, r3, zetas, zetas_qinv);
     zetas <- lAYER_1_ZETAS.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____ct_butterfly_4 (r4, r5, zetas);
+    zetas_qinv <- lAYER_1_ZETAS_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____ct_butterfly_4 (r4, r5, zetas, zetas_qinv);
     zetas <- lAYER_1_ZETAS.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____ct_butterfly_4 (r6, r7, zetas);
+    zetas_qinv <- lAYER_1_ZETAS_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____ct_butterfly_4 (r6, r7, zetas, zetas_qinv);
     zetas <- lAYER_0_ZETAS.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____ct_butterfly_2 (r0, r1, zetas);
+    zetas_qinv <- lAYER_0_ZETAS_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____ct_butterfly_2 (r0, r1, zetas, zetas_qinv);
     zetas <- lAYER_0_ZETAS.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____ct_butterfly_2 (r2, r3, zetas);
+    zetas_qinv <- lAYER_0_ZETAS_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____ct_butterfly_2 (r2, r3, zetas, zetas_qinv);
     zetas <- lAYER_0_ZETAS.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____ct_butterfly_2 (r4, r5, zetas);
+    zetas_qinv <- lAYER_0_ZETAS_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____ct_butterfly_2 (r4, r5, zetas, zetas_qinv);
     zetas <- lAYER_0_ZETAS.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____ct_butterfly_2 (r6, r7, zetas);
+    zetas_qinv <- lAYER_0_ZETAS_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____ct_butterfly_2 (r6, r7, zetas, zetas_qinv);
     polynomial <-
     (Array256.init
     (WArray1024.get32
@@ -2762,15 +3255,18 @@ module M = {
     }
     return polynomial;
   }
-  proc polynomial____gs_butterfly (a:W256.t, b:W256.t, zetas:W256.t) : 
-  W256.t * W256.t = {
+  proc polynomial____gs_butterfly (a:W256.t, b:W256.t, zetas:W256.t,
+                                   zetas_qinv:W256.t) : W256.t * W256.t = {
     var b_minus_a:W256.t;
     b_minus_a <- (VPSUB_8u32 b a);
     a <- (VPADD_8u32 a b);
-    b <@ montgomery_multiply_and_reduce (b_minus_a, zetas);
+    b <@ montgomery_multiply_by_zeta (b_minus_a, zetas, zetas_qinv);
     return (a, b);
   }
-  proc polynomial____gs_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
+  proc polynomial____gs_butterfly_4_lanes (lhs:W256.t, rhs:W256.t,
+                                           zetas:W256.t, zetas_high:W256.t,
+                                           zetas_qinv:W256.t,
+                                           zetas_qinv_high:W256.t) : 
   W256.t * W256.t = {
     var low_values:W256.t;
     var high_values:W256.t;
@@ -2780,23 +3276,35 @@ module M = {
     high_values <- (VPUNPCKH_4u64 lhs rhs);
     differences <- (VPSUB_8u32 high_values low_values);
     sums <- (VPADD_8u32 high_values low_values);
-    differences <@ montgomery_multiply_and_reduce (differences, zetas);
+    differences <@ montgomery_multiply_by_zeta_lanes (differences, zetas,
+    zetas_high, zetas_qinv, zetas_qinv_high);
     lhs <- (VPUNPCKL_4u64 sums differences);
     rhs <- (VPUNPCKH_4u64 sums differences);
     return (lhs, rhs);
   }
-  proc polynomial____gs_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
-  W256.t * W256.t = {
+  proc polynomial____gs_butterfly_4 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t = {
     
+    (lhs, rhs) <@ polynomial____gs_butterfly_4_lanes (lhs, rhs, zetas, 
+    zetas, zetas_qinv, zetas_qinv);
+    return (lhs, rhs);
+  }
+  proc polynomial____gs_butterfly_2 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t = {
+    var zetas_high:W256.t;
+    var zetas_qinv_high:W256.t;
     lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
     rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
-    (lhs, rhs) <@ polynomial____gs_butterfly_4 (lhs, rhs, zetas);
+    zetas_high <- (VMOVSHDUP_256 zetas);
+    zetas_qinv_high <- (VMOVSHDUP_256 zetas_qinv);
+    (lhs, rhs) <@ polynomial____gs_butterfly_4_lanes (lhs, rhs, zetas,
+    zetas_high, zetas_qinv, zetas_qinv_high);
     lhs <- (VPSHUFD_256 lhs (W8.of_int 216));
     rhs <- (VPSHUFD_256 rhs (W8.of_int 216));
     return (lhs, rhs);
   }
-  proc polynomial____gs_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t) : 
-  W256.t * W256.t = {
+  proc polynomial____gs_butterfly_8 (lhs:W256.t, rhs:W256.t, zetas:W256.t,
+                                     zetas_qinv:W256.t) : W256.t * W256.t = {
     var low_values:W256.t;
     var high_values:W256.t;
     var differences:W256.t;
@@ -2805,25 +3313,21 @@ module M = {
     high_values <- (VPERM2I128 lhs rhs (W8.of_int 49));
     differences <- (VPSUB_8u32 high_values low_values);
     sums <- (VPADD_8u32 high_values low_values);
-    differences <@ montgomery_multiply_and_reduce (differences, zetas);
+    differences <@ montgomery_multiply_by_zeta (differences, zetas,
+    zetas_qinv);
     lhs <- (VPERM2I128 sums differences (W8.of_int 32));
     rhs <- (VPERM2I128 sums differences (W8.of_int 49));
     return (lhs, rhs);
   }
   proc polynomial____gs_butterfly_scaled (a:W256.t, b:W256.t, zetas_f:W256.t,
-                                          f:W256.t) : W256.t * W256.t = {
+                                          zetas_f_qinv:W256.t, f:W256.t,
+                                          f_qinv:W256.t) : W256.t * W256.t = {
     var b_minus_a:W256.t;
     b_minus_a <- (VPSUB_8u32 b a);
     a <- (VPADD_8u32 a b);
-    b <@ montgomery_multiply_and_reduce (b_minus_a, zetas_f);
-    a <@ montgomery_multiply_and_reduce (a, f);
+    b <@ montgomery_multiply_by_zeta (b_minus_a, zetas_f, zetas_f_qinv);
+    a <@ montgomery_multiply_by_zeta (a, f, f_qinv);
     return (a, b);
-  }
-  proc polynomial____broadcast_zeta (zeta_0:W32.t) : W256.t = {
-    var zetas:W256.t;
-    zetas <- (zeroextu256 (VMOV_32 zeta_0));
-    zetas <- (VPBROADCAST_8u32 (truncateu32 zetas));
-    return zetas;
   }
   proc polynomial____invert_ntt_layers_0_to_4 (polynomial:W32.t Array256.t,
                                                g:int) : W32.t Array256.t = {
@@ -2836,7 +3340,7 @@ module M = {
     var r6:W256.t;
     var r7:W256.t;
     var zetas:W256.t;
-    var zeta_0:W32.t;
+    var zetas_qinv:W256.t;
     r0 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * ((8 * g) + 0)));
@@ -2862,49 +3366,66 @@ module M = {
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * ((8 * g) + 7)));
     zetas <- zETAS_TO_INVERT_LAYER_0.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____gs_butterfly_2 (r0, r1, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_0_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____gs_butterfly_2 (r0, r1, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_0.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____gs_butterfly_2 (r2, r3, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_0_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____gs_butterfly_2 (r2, r3, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_0.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____gs_butterfly_2 (r4, r5, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_0_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____gs_butterfly_2 (r4, r5, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_0.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____gs_butterfly_2 (r6, r7, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_0_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____gs_butterfly_2 (r6, r7, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_1.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____gs_butterfly_4 (r0, r1, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_1_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____gs_butterfly_4 (r0, r1, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_1.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____gs_butterfly_4 (r2, r3, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_1_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____gs_butterfly_4 (r2, r3, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_1.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____gs_butterfly_4 (r4, r5, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_1_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____gs_butterfly_4 (r4, r5, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_1.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____gs_butterfly_4 (r6, r7, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_1_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____gs_butterfly_4 (r6, r7, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_2.[((4 * g) + 0)];
-    (r0, r1) <@ polynomial____gs_butterfly_8 (r0, r1, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_2_QINV.[((4 * g) + 0)];
+    (r0, r1) <@ polynomial____gs_butterfly_8 (r0, r1, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_2.[((4 * g) + 1)];
-    (r2, r3) <@ polynomial____gs_butterfly_8 (r2, r3, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_2_QINV.[((4 * g) + 1)];
+    (r2, r3) <@ polynomial____gs_butterfly_8 (r2, r3, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_2.[((4 * g) + 2)];
-    (r4, r5) <@ polynomial____gs_butterfly_8 (r4, r5, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_2_QINV.[((4 * g) + 2)];
+    (r4, r5) <@ polynomial____gs_butterfly_8 (r4, r5, zetas, zetas_qinv);
     zetas <- zETAS_TO_INVERT_LAYER_2.[((4 * g) + 3)];
-    (r6, r7) <@ polynomial____gs_butterfly_8 (r6, r7, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_3.[((4 * g) + 0)];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r0, r1) <@ polynomial____gs_butterfly (r0, r1, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_3.[((4 * g) + 1)];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r2, r3) <@ polynomial____gs_butterfly (r2, r3, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_3.[((4 * g) + 2)];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r4, r5) <@ polynomial____gs_butterfly (r4, r5, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_3.[((4 * g) + 3)];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r6, r7) <@ polynomial____gs_butterfly (r6, r7, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_4.[(2 * g)];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r0, r2) <@ polynomial____gs_butterfly (r0, r2, zetas);
-    (r1, r3) <@ polynomial____gs_butterfly (r1, r3, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_4.[((2 * g) + 1)];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r4, r6) <@ polynomial____gs_butterfly (r4, r6, zetas);
-    (r5, r7) <@ polynomial____gs_butterfly (r5, r7, zetas);
+    zetas_qinv <- zETAS_TO_INVERT_LAYER_2_QINV.[((4 * g) + 3)];
+    (r6, r7) <@ polynomial____gs_butterfly_8 (r6, r7, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3.[((4 * g) + 0)]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3_QINV.[((4 * g) + 0)]);
+    (r0, r1) <@ polynomial____gs_butterfly (r0, r1, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3.[((4 * g) + 1)]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3_QINV.[((4 * g) + 1)]);
+    (r2, r3) <@ polynomial____gs_butterfly (r2, r3, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3.[((4 * g) + 2)]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3_QINV.[((4 * g) + 2)]);
+    (r4, r5) <@ polynomial____gs_butterfly (r4, r5, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3.[((4 * g) + 3)]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_3_QINV.[((4 * g) + 3)]);
+    (r6, r7) <@ polynomial____gs_butterfly (r6, r7, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_4.[(2 * g)]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_4_QINV.[(2 * g)]);
+    (r0, r2) <@ polynomial____gs_butterfly (r0, r2, zetas, zetas_qinv);
+    (r1, r3) <@ polynomial____gs_butterfly (r1, r3, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_4.[((2 * g) + 1)]);
+    zetas_qinv <-
+    (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_4_QINV.[((2 * g) + 1)]);
+    (r4, r6) <@ polynomial____gs_butterfly (r4, r6, zetas, zetas_qinv);
+    (r5, r7) <@ polynomial____gs_butterfly (r5, r7, zetas, zetas_qinv);
     polynomial <-
     (Array256.init
     (WArray1024.get32
@@ -2957,9 +3478,10 @@ module M = {
     var r5:W256.t;
     var r6:W256.t;
     var r7:W256.t;
-    var zeta_0:W32.t;
     var zetas:W256.t;
+    var zetas_qinv:W256.t;
     var scaling:W256.t;
+    var scaling_qinv:W256.t;
     r0 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * (j + 0)));
@@ -2984,34 +3506,38 @@ module M = {
     r7 <-
     (get256_direct (WArray1024.init32 (fun i => polynomial.[i]))
     (32 * (j + 28)));
-    zeta_0 <- zETAS_TO_INVERT_LAYER_5.[0];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r0, r1) <@ polynomial____gs_butterfly (r0, r1, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_5.[1];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r2, r3) <@ polynomial____gs_butterfly (r2, r3, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_5.[2];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r4, r5) <@ polynomial____gs_butterfly (r4, r5, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_5.[3];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r6, r7) <@ polynomial____gs_butterfly (r6, r7, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_6.[0];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r0, r2) <@ polynomial____gs_butterfly (r0, r2, zetas);
-    (r1, r3) <@ polynomial____gs_butterfly (r1, r3, zetas);
-    zeta_0 <- zETAS_TO_INVERT_LAYER_6.[1];
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    (r4, r6) <@ polynomial____gs_butterfly (r4, r6, zetas);
-    (r5, r7) <@ polynomial____gs_butterfly (r5, r7, zetas);
-    zeta_0 <- (W32.of_int (- 3975713));
-    zetas <@ polynomial____broadcast_zeta (zeta_0);
-    zeta_0 <- (W32.of_int 41978);
-    scaling <@ polynomial____broadcast_zeta (zeta_0);
-    (r0, r4) <@ polynomial____gs_butterfly_scaled (r0, r4, zetas, scaling);
-    (r1, r5) <@ polynomial____gs_butterfly_scaled (r1, r5, zetas, scaling);
-    (r2, r6) <@ polynomial____gs_butterfly_scaled (r2, r6, zetas, scaling);
-    (r3, r7) <@ polynomial____gs_butterfly_scaled (r3, r7, zetas, scaling);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5.[0]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5_QINV.[0]);
+    (r0, r1) <@ polynomial____gs_butterfly (r0, r1, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5.[1]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5_QINV.[1]);
+    (r2, r3) <@ polynomial____gs_butterfly (r2, r3, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5.[2]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5_QINV.[2]);
+    (r4, r5) <@ polynomial____gs_butterfly (r4, r5, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5.[3]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_5_QINV.[3]);
+    (r6, r7) <@ polynomial____gs_butterfly (r6, r7, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_6.[0]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_6_QINV.[0]);
+    (r0, r2) <@ polynomial____gs_butterfly (r0, r2, zetas, zetas_qinv);
+    (r1, r3) <@ polynomial____gs_butterfly (r1, r3, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_6.[1]);
+    zetas_qinv <- (VPBROADCAST_8u32 zETAS_TO_INVERT_LAYER_6_QINV.[1]);
+    (r4, r6) <@ polynomial____gs_butterfly (r4, r6, zetas, zetas_qinv);
+    (r5, r7) <@ polynomial____gs_butterfly (r5, r7, zetas, zetas_qinv);
+    zetas <- (VPBROADCAST_8u32 iNVERSE_NTT_LAYER_7_CONSTANTS.[0]);
+    zetas_qinv <- (VPBROADCAST_8u32 iNVERSE_NTT_LAYER_7_CONSTANTS.[1]);
+    scaling <- (VPBROADCAST_8u32 iNVERSE_NTT_LAYER_7_CONSTANTS.[2]);
+    scaling_qinv <- (VPBROADCAST_8u32 iNVERSE_NTT_LAYER_7_CONSTANTS.[3]);
+    (r0, r4) <@ polynomial____gs_butterfly_scaled (r0, r4, zetas, zetas_qinv,
+    scaling, scaling_qinv);
+    (r1, r5) <@ polynomial____gs_butterfly_scaled (r1, r5, zetas, zetas_qinv,
+    scaling, scaling_qinv);
+    (r2, r6) <@ polynomial____gs_butterfly_scaled (r2, r6, zetas, zetas_qinv,
+    scaling, scaling_qinv);
+    (r3, r7) <@ polynomial____gs_butterfly_scaled (r3, r7, zetas, zetas_qinv,
+    scaling, scaling_qinv);
     polynomial <-
     (Array256.init
     (WArray1024.get32
