@@ -1,3 +1,8 @@
+// The roots of layers 7 and 6, each followed by its twisted form.
+u32[6] LAYERS_7_6_ZETAS = {
+    25_847, 1_830_765_815, -2_608_894, -1_929_875_198, -518_909, -1_927_777_021
+};
+
 namespace polynomial {
     // The forward NTT in two passes over the polynomial, the coefficients
     // staying in eight ymm registers through several layers.
@@ -15,11 +20,11 @@ namespace polynomial {
 
     // Cooley-Tukey butterfly on two registers: (a, b) -> (a + z b, a - z b)
     inline
-    fn __ct_butterfly(reg u256 a b zetas) -> reg u256, reg u256
+    fn __ct_butterfly(reg u256 a b zetas zetas_qinv) -> reg u256, reg u256
     {
         reg u256 t;
 
-        t = montgomery_multiply_and_reduce(b, zetas);
+        t = montgomery_multiply_by_zeta(b, zetas, zetas_qinv);
         b = #VPSUB_8u32(a, t);
         a = #VPADD_8u32(a, t);
 
@@ -28,14 +33,14 @@ namespace polynomial {
 
     // Layer 2: the butterflies pair the 128-bit halves of two registers.
     inline
-    fn __ct_butterfly_8(reg u256 lhs rhs zetas) -> reg u256, reg u256
+    fn __ct_butterfly_8(reg u256 lhs rhs zetas zetas_qinv) -> reg u256, reg u256
     {
         reg u256 summands zeta_products;
         reg u256 add_terms sub_terms;
 
         summands = #VPERM2I128(lhs, rhs, 0x20);
         zeta_products = #VPERM2I128(lhs, rhs, 0x31);
-        zeta_products = montgomery_multiply_and_reduce(zeta_products, zetas);
+        zeta_products = montgomery_multiply_by_zeta(zeta_products, zetas, zetas_qinv);
 
         add_terms = #VPADD_8u32(summands, zeta_products);
         sub_terms = #VPSUB_8u32(summands, zeta_products);
@@ -46,16 +51,20 @@ namespace polynomial {
         return lhs, rhs;
     }
 
-    // Layer 1: the butterflies pair the 64-bit quarters of two registers.
+    // Layer 1: the butterflies pair the 64-bit quarters of two registers; the
+    // *_high arguments hold the odd lanes of the zetas in the even ones.
     inline
-    fn __ct_butterfly_4(reg u256 lhs rhs zetas) -> reg u256, reg u256
+    fn __ct_butterfly_4_lanes(
+        reg u256 lhs rhs zetas zetas_high zetas_qinv zetas_qinv_high
+    ) -> reg u256, reg u256
     {
         reg u256 summands zeta_products;
         reg u256 add_terms sub_terms;
 
         summands = #VPUNPCKL_4u64(lhs, rhs);
         zeta_products = #VPUNPCKH_4u64(lhs, rhs);
-        zeta_products = montgomery_multiply_and_reduce(zeta_products, zetas);
+        zeta_products = montgomery_multiply_by_zeta_lanes(
+            zeta_products, zetas, zetas_high, zetas_qinv, zetas_qinv_high);
 
         add_terms = #VPADD_8u32(summands, zeta_products);
         sub_terms = #VPSUB_8u32(summands, zeta_products);
@@ -66,15 +75,27 @@ namespace polynomial {
         return lhs, rhs;
     }
 
+    inline
+    fn __ct_butterfly_4(reg u256 lhs rhs zetas zetas_qinv) -> reg u256, reg u256
+    {
+        lhs, rhs = __ct_butterfly_4_lanes(lhs, rhs, zetas, zetas, zetas_qinv, zetas_qinv);
+        return lhs, rhs;
+    }
+
     // Layer 0: the butterflies pair adjacent coefficients; a shuffle brings
     // them into the layout of layer 1 and back.
     inline
-    fn __ct_butterfly_2(reg u256 lhs rhs zetas) -> reg u256, reg u256
+    fn __ct_butterfly_2(reg u256 lhs rhs zetas zetas_qinv) -> reg u256, reg u256
     {
+        reg u256 zetas_high zetas_qinv_high;
+
         lhs = #VPSHUFD_256(lhs, 0b11_01_10_00);
         rhs = #VPSHUFD_256(rhs, 0b11_01_10_00);
 
-        lhs, rhs = __ct_butterfly_4(lhs, rhs, zetas);
+        zetas_high = #VMOVSHDUP_256(zetas);
+        zetas_qinv_high = #VMOVSHDUP_256(zetas_qinv);
+        lhs, rhs = __ct_butterfly_4_lanes(
+            lhs, rhs, zetas, zetas_high, zetas_qinv, zetas_qinv_high);
 
         lhs = #VPSHUFD_256(lhs, 0b11_01_10_00);
         rhs = #VPSHUFD_256(rhs, 0b11_01_10_00);
@@ -95,8 +116,7 @@ namespace polynomial {
     ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
     {
         reg u256 r0 r1 r2 r3 r4 r5 r6 r7;
-        reg u256 zetas;
-        reg u64 zeta;
+        reg u256 zetas zetas_qinv;
 
         r0 = polynomial.[:u256 32 * (j +  0)];
         r1 = polynomial.[:u256 32 * (j +  4)];
@@ -108,35 +128,36 @@ namespace polynomial {
         r7 = polynomial.[:u256 32 * (j + 28)];
 
         // layer 7: pairs (v, v + 16), one root
-        zeta = 25_847;
-        zetas = (256u)#VMOV(zeta);
-        zetas = #VPBROADCAST_8u32(zetas);
-        r0, r4 = __ct_butterfly(r0, r4, zetas);
-        r1, r5 = __ct_butterfly(r1, r5, zetas);
-        r2, r6 = __ct_butterfly(r2, r6, zetas);
-        r3, r7 = __ct_butterfly(r3, r7, zetas);
+        zetas = #VPBROADCAST_8u32(LAYERS_7_6_ZETAS[0]);
+        zetas_qinv = #VPBROADCAST_8u32(LAYERS_7_6_ZETAS[1]);
+        r0, r4 = __ct_butterfly(r0, r4, zetas, zetas_qinv);
+        r1, r5 = __ct_butterfly(r1, r5, zetas, zetas_qinv);
+        r2, r6 = __ct_butterfly(r2, r6, zetas, zetas_qinv);
+        r3, r7 = __ct_butterfly(r3, r7, zetas, zetas_qinv);
 
         // layer 6: pairs (v, v + 8), one root per half
-        zeta = -2_608_894;
-        zetas = (256u)#VMOV(zeta);
-        zetas = #VPBROADCAST_8u32(zetas);
-        r0, r2 = __ct_butterfly(r0, r2, zetas);
-        r1, r3 = __ct_butterfly(r1, r3, zetas);
-        zeta = -518_909;
-        zetas = (256u)#VMOV(zeta);
-        zetas = #VPBROADCAST_8u32(zetas);
-        r4, r6 = __ct_butterfly(r4, r6, zetas);
-        r5, r7 = __ct_butterfly(r5, r7, zetas);
+        zetas = #VPBROADCAST_8u32(LAYERS_7_6_ZETAS[2]);
+        zetas_qinv = #VPBROADCAST_8u32(LAYERS_7_6_ZETAS[3]);
+        r0, r2 = __ct_butterfly(r0, r2, zetas, zetas_qinv);
+        r1, r3 = __ct_butterfly(r1, r3, zetas, zetas_qinv);
+        zetas = #VPBROADCAST_8u32(LAYERS_7_6_ZETAS[4]);
+        zetas_qinv = #VPBROADCAST_8u32(LAYERS_7_6_ZETAS[5]);
+        r4, r6 = __ct_butterfly(r4, r6, zetas, zetas_qinv);
+        r5, r7 = __ct_butterfly(r5, r7, zetas, zetas_qinv);
 
         // layer 5: pairs (v, v + 4), one root per quarter
         zetas = LAYER_5_ZETAS[0];
-        r0, r1 = __ct_butterfly(r0, r1, zetas);
+        zetas_qinv = LAYER_5_ZETAS_QINV[0];
+        r0, r1 = __ct_butterfly(r0, r1, zetas, zetas_qinv);
         zetas = LAYER_5_ZETAS[1];
-        r2, r3 = __ct_butterfly(r2, r3, zetas);
+        zetas_qinv = LAYER_5_ZETAS_QINV[1];
+        r2, r3 = __ct_butterfly(r2, r3, zetas, zetas_qinv);
         zetas = LAYER_5_ZETAS[2];
-        r4, r5 = __ct_butterfly(r4, r5, zetas);
+        zetas_qinv = LAYER_5_ZETAS_QINV[2];
+        r4, r5 = __ct_butterfly(r4, r5, zetas, zetas_qinv);
         zetas = LAYER_5_ZETAS[3];
-        r6, r7 = __ct_butterfly(r6, r7, zetas);
+        zetas_qinv = LAYER_5_ZETAS_QINV[3];
+        r6, r7 = __ct_butterfly(r6, r7, zetas, zetas_qinv);
 
         polynomial.[:u256 32 * (j +  0)] = r0;
         polynomial.[:u256 32 * (j +  4)] = r1;
@@ -163,7 +184,7 @@ namespace polynomial {
     ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
     {
         reg u256 r0 r1 r2 r3 r4 r5 r6 r7;
-        reg u256 zetas;
+        reg u256 zetas zetas_qinv;
 
         r0 = polynomial.[:u256 32 * (8 * g + 0)];
         r1 = polynomial.[:u256 32 * (8 * g + 1)];
@@ -176,49 +197,67 @@ namespace polynomial {
 
         // layer 4: pairs (v, v + 2)
         zetas = LAYER_4_ZETAS[2 * g];
-        r0, r2 = __ct_butterfly(r0, r2, zetas);
-        r1, r3 = __ct_butterfly(r1, r3, zetas);
+        zetas_qinv = LAYER_4_ZETAS_QINV[2 * g];
+        r0, r2 = __ct_butterfly(r0, r2, zetas, zetas_qinv);
+        r1, r3 = __ct_butterfly(r1, r3, zetas, zetas_qinv);
         zetas = LAYER_4_ZETAS[2 * g + 1];
-        r4, r6 = __ct_butterfly(r4, r6, zetas);
-        r5, r7 = __ct_butterfly(r5, r7, zetas);
+        zetas_qinv = LAYER_4_ZETAS_QINV[2 * g + 1];
+        r4, r6 = __ct_butterfly(r4, r6, zetas, zetas_qinv);
+        r5, r7 = __ct_butterfly(r5, r7, zetas, zetas_qinv);
 
         // layer 3: pairs (v, v + 1)
         zetas = LAYER_3_ZETAS[4 * g + 0];
-        r0, r1 = __ct_butterfly(r0, r1, zetas);
+        zetas_qinv = LAYER_3_ZETAS_QINV[4 * g + 0];
+        r0, r1 = __ct_butterfly(r0, r1, zetas, zetas_qinv);
         zetas = LAYER_3_ZETAS[4 * g + 1];
-        r2, r3 = __ct_butterfly(r2, r3, zetas);
+        zetas_qinv = LAYER_3_ZETAS_QINV[4 * g + 1];
+        r2, r3 = __ct_butterfly(r2, r3, zetas, zetas_qinv);
         zetas = LAYER_3_ZETAS[4 * g + 2];
-        r4, r5 = __ct_butterfly(r4, r5, zetas);
+        zetas_qinv = LAYER_3_ZETAS_QINV[4 * g + 2];
+        r4, r5 = __ct_butterfly(r4, r5, zetas, zetas_qinv);
         zetas = LAYER_3_ZETAS[4 * g + 3];
-        r6, r7 = __ct_butterfly(r6, r7, zetas);
+        zetas_qinv = LAYER_3_ZETAS_QINV[4 * g + 3];
+        r6, r7 = __ct_butterfly(r6, r7, zetas, zetas_qinv);
 
         // layers 2, 1, 0: inside the register pairs (v, v + 1)
         zetas = LAYER_2_ZETAS[4 * g + 0];
-        r0, r1 = __ct_butterfly_8(r0, r1, zetas);
+        zetas_qinv = LAYER_2_ZETAS_QINV[4 * g + 0];
+        r0, r1 = __ct_butterfly_8(r0, r1, zetas, zetas_qinv);
         zetas = LAYER_2_ZETAS[4 * g + 1];
-        r2, r3 = __ct_butterfly_8(r2, r3, zetas);
+        zetas_qinv = LAYER_2_ZETAS_QINV[4 * g + 1];
+        r2, r3 = __ct_butterfly_8(r2, r3, zetas, zetas_qinv);
         zetas = LAYER_2_ZETAS[4 * g + 2];
-        r4, r5 = __ct_butterfly_8(r4, r5, zetas);
+        zetas_qinv = LAYER_2_ZETAS_QINV[4 * g + 2];
+        r4, r5 = __ct_butterfly_8(r4, r5, zetas, zetas_qinv);
         zetas = LAYER_2_ZETAS[4 * g + 3];
-        r6, r7 = __ct_butterfly_8(r6, r7, zetas);
+        zetas_qinv = LAYER_2_ZETAS_QINV[4 * g + 3];
+        r6, r7 = __ct_butterfly_8(r6, r7, zetas, zetas_qinv);
 
         zetas = LAYER_1_ZETAS[4 * g + 0];
-        r0, r1 = __ct_butterfly_4(r0, r1, zetas);
+        zetas_qinv = LAYER_1_ZETAS_QINV[4 * g + 0];
+        r0, r1 = __ct_butterfly_4(r0, r1, zetas, zetas_qinv);
         zetas = LAYER_1_ZETAS[4 * g + 1];
-        r2, r3 = __ct_butterfly_4(r2, r3, zetas);
+        zetas_qinv = LAYER_1_ZETAS_QINV[4 * g + 1];
+        r2, r3 = __ct_butterfly_4(r2, r3, zetas, zetas_qinv);
         zetas = LAYER_1_ZETAS[4 * g + 2];
-        r4, r5 = __ct_butterfly_4(r4, r5, zetas);
+        zetas_qinv = LAYER_1_ZETAS_QINV[4 * g + 2];
+        r4, r5 = __ct_butterfly_4(r4, r5, zetas, zetas_qinv);
         zetas = LAYER_1_ZETAS[4 * g + 3];
-        r6, r7 = __ct_butterfly_4(r6, r7, zetas);
+        zetas_qinv = LAYER_1_ZETAS_QINV[4 * g + 3];
+        r6, r7 = __ct_butterfly_4(r6, r7, zetas, zetas_qinv);
 
         zetas = LAYER_0_ZETAS[4 * g + 0];
-        r0, r1 = __ct_butterfly_2(r0, r1, zetas);
+        zetas_qinv = LAYER_0_ZETAS_QINV[4 * g + 0];
+        r0, r1 = __ct_butterfly_2(r0, r1, zetas, zetas_qinv);
         zetas = LAYER_0_ZETAS[4 * g + 1];
-        r2, r3 = __ct_butterfly_2(r2, r3, zetas);
+        zetas_qinv = LAYER_0_ZETAS_QINV[4 * g + 1];
+        r2, r3 = __ct_butterfly_2(r2, r3, zetas, zetas_qinv);
         zetas = LAYER_0_ZETAS[4 * g + 2];
-        r4, r5 = __ct_butterfly_2(r4, r5, zetas);
+        zetas_qinv = LAYER_0_ZETAS_QINV[4 * g + 2];
+        r4, r5 = __ct_butterfly_2(r4, r5, zetas, zetas_qinv);
         zetas = LAYER_0_ZETAS[4 * g + 3];
-        r6, r7 = __ct_butterfly_2(r6, r7, zetas);
+        zetas_qinv = LAYER_0_ZETAS_QINV[4 * g + 3];
+        r6, r7 = __ct_butterfly_2(r6, r7, zetas, zetas_qinv);
 
         polynomial.[:u256 32 * (8 * g + 0)] = r0;
         polynomial.[:u256 32 * (8 * g + 1)] = r1;

@@ -985,43 +985,75 @@ unroll for ^while.
 by auto => /> *.
 qed.
 
-lemma polynomial____ct_butterfly_proof _a _b _zetas :
-      (polynomial____ct_butterfly_spec _a _b _zetas).
+lemma montgomery_multiply_by_zeta_lanes_proof _lhs _zetas _zetas_high _zetas_qinv _zetas_qinv_high :
+      (montgomery_multiply_by_zeta_lanes_spec _lhs _zetas _zetas_high _zetas_qinv _zetas_qinv_high).
+proof.
+hint +safety.
+rewrite /montgomery_multiply_by_zeta_lanes_spec; proc.
+conseq (_ : _ ==> valid trace_montgomery_multiply_by_zeta_lanes).
+by auto => /> *.
+qed.
+
+lemma montgomery_multiply_by_zeta_proof _lhs _zetas _zetas_qinv :
+      (montgomery_multiply_by_zeta_spec _lhs _zetas _zetas_qinv).
+proof.
+hint +safety.
+rewrite /montgomery_multiply_by_zeta_spec; proc.
+conseq (_ : _ ==> valid trace_montgomery_multiply_by_zeta).
+auto; ecall (montgomery_multiply_by_zeta_lanes_proof param_3 param_2 param_1 param_0 param).
+by auto => /> *.
+qed.
+
+lemma polynomial____ct_butterfly_proof _a _b _zetas _zetas_qinv :
+      (polynomial____ct_butterfly_spec _a _b _zetas _zetas_qinv).
 proof.
 hint +safety.
 rewrite /polynomial____ct_butterfly_spec; proc.
 conseq (_ : _ ==> valid trace_polynomial____ct_butterfly).
-auto; ecall (montgomery_multiply_and_reduce_proof param_0 param).
+auto; ecall (montgomery_multiply_by_zeta_proof param_1 param_0 param).
 by auto => /> *.
 qed.
 
-lemma polynomial____ct_butterfly_8_proof _lhs _rhs _zetas :
-      (polynomial____ct_butterfly_8_spec _lhs _rhs _zetas).
+lemma polynomial____ct_butterfly_8_proof _lhs _rhs _zetas _zetas_qinv :
+      (polynomial____ct_butterfly_8_spec _lhs _rhs _zetas _zetas_qinv).
 proof.
 hint +safety.
 rewrite /polynomial____ct_butterfly_8_spec; proc.
 conseq (_ : _ ==> valid trace_polynomial____ct_butterfly_8).
-auto; ecall (montgomery_multiply_and_reduce_proof param_0 param).
+auto; ecall (montgomery_multiply_by_zeta_proof param_1 param_0 param).
 by auto => /> *.
 qed.
 
-lemma polynomial____ct_butterfly_4_proof _lhs _rhs _zetas :
-      (polynomial____ct_butterfly_4_spec _lhs _rhs _zetas).
+lemma polynomial____ct_butterfly_4_lanes_proof _lhs _rhs _zetas _zetas_high _zetas_qinv
+    _zetas_qinv_high :
+  polynomial____ct_butterfly_4_lanes_spec _lhs _rhs _zetas _zetas_high _zetas_qinv _zetas_qinv_high.
+proof.
+hint +safety.
+rewrite /polynomial____ct_butterfly_4_lanes_spec; proc.
+conseq (_ : _ ==> valid trace_polynomial____ct_butterfly_4_lanes).
+auto; ecall (montgomery_multiply_by_zeta_lanes_proof param_3 param_2 param_1 param_0 param).
+by auto => /> *.
+qed.
+
+lemma polynomial____ct_butterfly_4_proof _lhs _rhs _zetas _zetas_qinv :
+      (polynomial____ct_butterfly_4_spec _lhs _rhs _zetas _zetas_qinv).
 proof.
 hint +safety.
 rewrite /polynomial____ct_butterfly_4_spec; proc.
 conseq (_ : _ ==> valid trace_polynomial____ct_butterfly_4).
-auto; ecall (montgomery_multiply_and_reduce_proof param_0 param).
+auto; ecall (polynomial____ct_butterfly_4_lanes_proof param_4 param_3 param_2 param_1 param_0
+  param).
 by auto => /> *.
 qed.
 
-lemma polynomial____ct_butterfly_2_proof _lhs _rhs _zetas :
-      (polynomial____ct_butterfly_2_spec _lhs _rhs _zetas).
+lemma polynomial____ct_butterfly_2_proof _lhs _rhs _zetas _zetas_qinv :
+      (polynomial____ct_butterfly_2_spec _lhs _rhs _zetas _zetas_qinv).
 proof.
 hint +safety.
 rewrite /polynomial____ct_butterfly_2_spec; proc.
 conseq (_ : _ ==> valid trace_polynomial____ct_butterfly_2).
-auto; ecall (polynomial____ct_butterfly_4_proof param_1 param_0 param).
+auto; ecall (polynomial____ct_butterfly_4_lanes_proof param_4 param_3 param_2 param_1 param_0
+  param).
 by auto => /> *.
 qed.
 
@@ -1037,18 +1069,18 @@ conseq (_ :
   ==> BArray1024.is_init b_polynomial 0 (4 * 256)
    /\ valid trace_polynomial____ntt_layers_7_6_5).
 + by move=> &hr />; rewrite -!(BI1024.is_init_full _ 1024) //.
-auto; ecall (polynomial____ct_butterfly_proof param_34 param_33 param_32).
-auto; ecall (polynomial____ct_butterfly_proof param_31 param_30 param_29).
-auto; ecall (polynomial____ct_butterfly_proof param_28 param_27 param_26).
-auto; ecall (polynomial____ct_butterfly_proof param_25 param_24 param_23).
-auto; ecall (polynomial____ct_butterfly_proof param_22 param_21 param_20).
-auto; ecall (polynomial____ct_butterfly_proof param_19 param_18 param_17).
-auto; ecall (polynomial____ct_butterfly_proof param_16 param_15 param_14).
-auto; ecall (polynomial____ct_butterfly_proof param_13 param_12 param_11).
-auto; ecall (polynomial____ct_butterfly_proof param_10 param_9 param_8).
-auto; ecall (polynomial____ct_butterfly_proof param_7 param_6 param_5).
-auto; ecall (polynomial____ct_butterfly_proof param_4 param_3 param_2).
-auto; ecall (polynomial____ct_butterfly_proof param_1 param_0 param).
+auto; ecall (polynomial____ct_butterfly_proof param_46 param_45 param_44 param_43).
+auto; ecall (polynomial____ct_butterfly_proof param_42 param_41 param_40 param_39).
+auto; ecall (polynomial____ct_butterfly_proof param_38 param_37 param_36 param_35).
+auto; ecall (polynomial____ct_butterfly_proof param_34 param_33 param_32 param_31).
+auto; ecall (polynomial____ct_butterfly_proof param_30 param_29 param_28 param_27).
+auto; ecall (polynomial____ct_butterfly_proof param_26 param_25 param_24 param_23).
+auto; ecall (polynomial____ct_butterfly_proof param_22 param_21 param_20 param_19).
+auto; ecall (polynomial____ct_butterfly_proof param_18 param_17 param_16 param_15).
+auto; ecall (polynomial____ct_butterfly_proof param_14 param_13 param_12 param_11).
+auto; ecall (polynomial____ct_butterfly_proof param_10 param_9 param_8 param_7).
+auto; ecall (polynomial____ct_butterfly_proof param_6 param_5 param_4 param_3).
+auto; ecall (polynomial____ct_butterfly_proof param_2 param_1 param_0 param).
 case (j = 0); first by auto => /> *.
 case (j = 1); first by auto => /> *.
 case (j = 2); first by auto => /> *.
@@ -1069,26 +1101,26 @@ conseq (_ :
   ==> BArray1024.is_init b_polynomial 0 (4 * 256)
    /\ valid trace_polynomial____ntt_layers_4_to_0).
 + by move=> &hr />; rewrite -!(BI1024.is_init_full _ 1024) //.
-auto; ecall (polynomial____ct_butterfly_2_proof param_58 param_57 param_56).
-auto; ecall (polynomial____ct_butterfly_2_proof param_55 param_54 param_53).
-auto; ecall (polynomial____ct_butterfly_2_proof param_52 param_51 param_50).
-auto; ecall (polynomial____ct_butterfly_2_proof param_49 param_48 param_47).
-auto; ecall (polynomial____ct_butterfly_4_proof param_46 param_45 param_44).
-auto; ecall (polynomial____ct_butterfly_4_proof param_43 param_42 param_41).
-auto; ecall (polynomial____ct_butterfly_4_proof param_40 param_39 param_38).
-auto; ecall (polynomial____ct_butterfly_4_proof param_37 param_36 param_35).
-auto; ecall (polynomial____ct_butterfly_8_proof param_34 param_33 param_32).
-auto; ecall (polynomial____ct_butterfly_8_proof param_31 param_30 param_29).
-auto; ecall (polynomial____ct_butterfly_8_proof param_28 param_27 param_26).
-auto; ecall (polynomial____ct_butterfly_8_proof param_25 param_24 param_23).
-auto; ecall (polynomial____ct_butterfly_proof param_22 param_21 param_20).
-auto; ecall (polynomial____ct_butterfly_proof param_19 param_18 param_17).
-auto; ecall (polynomial____ct_butterfly_proof param_16 param_15 param_14).
-auto; ecall (polynomial____ct_butterfly_proof param_13 param_12 param_11).
-auto; ecall (polynomial____ct_butterfly_proof param_10 param_9 param_8).
-auto; ecall (polynomial____ct_butterfly_proof param_7 param_6 param_5).
-auto; ecall (polynomial____ct_butterfly_proof param_4 param_3 param_2).
-auto; ecall (polynomial____ct_butterfly_proof param_1 param_0 param).
+auto; ecall (polynomial____ct_butterfly_2_proof param_78 param_77 param_76 param_75).
+auto; ecall (polynomial____ct_butterfly_2_proof param_74 param_73 param_72 param_71).
+auto; ecall (polynomial____ct_butterfly_2_proof param_70 param_69 param_68 param_67).
+auto; ecall (polynomial____ct_butterfly_2_proof param_66 param_65 param_64 param_63).
+auto; ecall (polynomial____ct_butterfly_4_proof param_62 param_61 param_60 param_59).
+auto; ecall (polynomial____ct_butterfly_4_proof param_58 param_57 param_56 param_55).
+auto; ecall (polynomial____ct_butterfly_4_proof param_54 param_53 param_52 param_51).
+auto; ecall (polynomial____ct_butterfly_4_proof param_50 param_49 param_48 param_47).
+auto; ecall (polynomial____ct_butterfly_8_proof param_46 param_45 param_44 param_43).
+auto; ecall (polynomial____ct_butterfly_8_proof param_42 param_41 param_40 param_39).
+auto; ecall (polynomial____ct_butterfly_8_proof param_38 param_37 param_36 param_35).
+auto; ecall (polynomial____ct_butterfly_8_proof param_34 param_33 param_32 param_31).
+auto; ecall (polynomial____ct_butterfly_proof param_30 param_29 param_28 param_27).
+auto; ecall (polynomial____ct_butterfly_proof param_26 param_25 param_24 param_23).
+auto; ecall (polynomial____ct_butterfly_proof param_22 param_21 param_20 param_19).
+auto; ecall (polynomial____ct_butterfly_proof param_18 param_17 param_16 param_15).
+auto; ecall (polynomial____ct_butterfly_proof param_14 param_13 param_12 param_11).
+auto; ecall (polynomial____ct_butterfly_proof param_10 param_9 param_8 param_7).
+auto; ecall (polynomial____ct_butterfly_proof param_6 param_5 param_4 param_3).
+auto; ecall (polynomial____ct_butterfly_proof param_2 param_1 param_0 param).
 case (g = 0); first by auto => /> *.
 case (g = 1); first by auto => /> *.
 case (g = 2); first by auto => /> *.
@@ -1119,69 +1151,72 @@ auto; ecall (polynomial____ntt_layers_7_6_5_proof param_0 ((BArray1024.init_arr 
 by auto => /> *.
 qed.
 
-lemma polynomial____gs_butterfly_proof _a _b _zetas :
-      (polynomial____gs_butterfly_spec _a _b _zetas).
+lemma polynomial____gs_butterfly_proof _a _b _zetas _zetas_qinv :
+      (polynomial____gs_butterfly_spec _a _b _zetas _zetas_qinv).
 proof.
 hint +safety.
 rewrite /polynomial____gs_butterfly_spec; proc.
 conseq (_ : _ ==> valid trace_polynomial____gs_butterfly).
-auto; ecall (montgomery_multiply_and_reduce_proof param_0 param).
+auto; ecall (montgomery_multiply_by_zeta_proof param_1 param_0 param).
 by auto => /> *.
 qed.
 
-lemma polynomial____gs_butterfly_4_proof _lhs _rhs _zetas :
-      (polynomial____gs_butterfly_4_spec _lhs _rhs _zetas).
+lemma polynomial____gs_butterfly_4_lanes_proof _lhs _rhs _zetas _zetas_high _zetas_qinv
+    _zetas_qinv_high :
+  polynomial____gs_butterfly_4_lanes_spec _lhs _rhs _zetas _zetas_high _zetas_qinv _zetas_qinv_high.
+proof.
+hint +safety.
+rewrite /polynomial____gs_butterfly_4_lanes_spec; proc.
+conseq (_ : _ ==> valid trace_polynomial____gs_butterfly_4_lanes).
+auto; ecall (montgomery_multiply_by_zeta_lanes_proof param_3 param_2 param_1 param_0 param).
+by auto => /> *.
+qed.
+
+lemma polynomial____gs_butterfly_4_proof _lhs _rhs _zetas _zetas_qinv :
+      (polynomial____gs_butterfly_4_spec _lhs _rhs _zetas _zetas_qinv).
 proof.
 hint +safety.
 rewrite /polynomial____gs_butterfly_4_spec; proc.
 conseq (_ : _ ==> valid trace_polynomial____gs_butterfly_4).
-auto; ecall (montgomery_multiply_and_reduce_proof param_0 param).
+auto; ecall (polynomial____gs_butterfly_4_lanes_proof param_4 param_3 param_2 param_1 param_0
+  param).
 by auto => /> *.
 qed.
 
-lemma polynomial____gs_butterfly_2_proof _lhs _rhs _zetas :
-      (polynomial____gs_butterfly_2_spec _lhs _rhs _zetas).
+lemma polynomial____gs_butterfly_2_proof _lhs _rhs _zetas _zetas_qinv :
+      (polynomial____gs_butterfly_2_spec _lhs _rhs _zetas _zetas_qinv).
 proof.
 hint +safety.
 rewrite /polynomial____gs_butterfly_2_spec; proc.
 conseq (_ : _ ==> valid trace_polynomial____gs_butterfly_2).
-auto; ecall (polynomial____gs_butterfly_4_proof param_1 param_0 param).
+auto; ecall (polynomial____gs_butterfly_4_lanes_proof param_4 param_3 param_2 param_1 param_0
+  param).
 by auto => /> *.
 qed.
 
-lemma polynomial____gs_butterfly_8_proof _lhs _rhs _zetas :
-      (polynomial____gs_butterfly_8_spec _lhs _rhs _zetas).
+lemma polynomial____gs_butterfly_8_proof _lhs _rhs _zetas _zetas_qinv :
+      (polynomial____gs_butterfly_8_spec _lhs _rhs _zetas _zetas_qinv).
 proof.
 hint +safety.
 rewrite /polynomial____gs_butterfly_8_spec; proc.
 conseq (_ : _ ==> valid trace_polynomial____gs_butterfly_8).
-auto; ecall (montgomery_multiply_and_reduce_proof param_0 param).
+auto; ecall (montgomery_multiply_by_zeta_proof param_1 param_0 param).
 by auto => /> *.
 qed.
 
-lemma polynomial____gs_butterfly_scaled_proof _a _b _zetas_f _f :
-      (polynomial____gs_butterfly_scaled_spec _a _b _zetas_f _f).
+lemma polynomial____gs_butterfly_scaled_proof _a _b _zetas_f _zetas_f_qinv _f _f_qinv :
+      (polynomial____gs_butterfly_scaled_spec _a _b _zetas_f _zetas_f_qinv _f _f_qinv).
 proof.
 hint +safety.
 rewrite /polynomial____gs_butterfly_scaled_spec; proc.
 conseq (_ : _ ==> valid trace_polynomial____gs_butterfly_scaled).
-auto; ecall (montgomery_multiply_and_reduce_proof param_2 param_1).
-auto; ecall (montgomery_multiply_and_reduce_proof param_0 param).
-by auto => /> *.
-qed.
-
-lemma polynomial____broadcast_zeta_proof _zeta :
-      (polynomial____broadcast_zeta_spec _zeta).
-proof.
-hint +safety.
-rewrite /polynomial____broadcast_zeta_spec; proc.
-conseq (_ : _ ==> valid trace_polynomial____broadcast_zeta).
+auto; ecall (montgomery_multiply_by_zeta_proof param_4 param_3 param_2).
+auto; ecall (montgomery_multiply_by_zeta_proof param_1 param_0 param).
 by auto => /> *.
 qed.
 
 lemma polynomial____invert_ntt_layers_0_to_4_proof _polynomial _b_polynomial _g :
-      (polynomial____invert_ntt_layers_0_to_4_spec _polynomial _b_polynomial
-      _g).
+      (polynomial____invert_ntt_layers_0_to_4_spec _polynomial _b_polynomial _g).
 proof.
 hint +safety.
 rewrite /polynomial____invert_ntt_layers_0_to_4_spec; proc.
@@ -1192,32 +1227,26 @@ conseq (_ :
   ==> BArray1024.is_init b_polynomial 0 (4 * 256)
    /\ valid trace_polynomial____invert_ntt_layers_0_to_4).
 + by move=> &hr />; rewrite -!(BI1024.is_init_full _ 1024) //.
-auto; ecall (polynomial____gs_butterfly_proof param_64 param_63 param_62).
-auto; ecall (polynomial____gs_butterfly_proof param_61 param_60 param_59).
-auto; ecall (polynomial____broadcast_zeta_proof param_58).
-auto; ecall (polynomial____gs_butterfly_proof param_57 param_56 param_55).
-auto; ecall (polynomial____gs_butterfly_proof param_54 param_53 param_52).
-auto; ecall (polynomial____broadcast_zeta_proof param_51).
-auto; ecall (polynomial____gs_butterfly_proof param_50 param_49 param_48).
-auto; ecall (polynomial____broadcast_zeta_proof param_47).
-auto; ecall (polynomial____gs_butterfly_proof param_46 param_45 param_44).
-auto; ecall (polynomial____broadcast_zeta_proof param_43).
-auto; ecall (polynomial____gs_butterfly_proof param_42 param_41 param_40).
-auto; ecall (polynomial____broadcast_zeta_proof param_39).
-auto; ecall (polynomial____gs_butterfly_proof param_38 param_37 param_36).
-auto; ecall (polynomial____broadcast_zeta_proof param_35).
-auto; ecall (polynomial____gs_butterfly_8_proof param_34 param_33 param_32).
-auto; ecall (polynomial____gs_butterfly_8_proof param_31 param_30 param_29).
-auto; ecall (polynomial____gs_butterfly_8_proof param_28 param_27 param_26).
-auto; ecall (polynomial____gs_butterfly_8_proof param_25 param_24 param_23).
-auto; ecall (polynomial____gs_butterfly_4_proof param_22 param_21 param_20).
-auto; ecall (polynomial____gs_butterfly_4_proof param_19 param_18 param_17).
-auto; ecall (polynomial____gs_butterfly_4_proof param_16 param_15 param_14).
-auto; ecall (polynomial____gs_butterfly_4_proof param_13 param_12 param_11).
-auto; ecall (polynomial____gs_butterfly_2_proof param_10 param_9 param_8).
-auto; ecall (polynomial____gs_butterfly_2_proof param_7 param_6 param_5).
-auto; ecall (polynomial____gs_butterfly_2_proof param_4 param_3 param_2).
-auto; ecall (polynomial____gs_butterfly_2_proof param_1 param_0 param).
+auto; ecall (polynomial____gs_butterfly_proof param_78 param_77 param_76 param_75).
+auto; ecall (polynomial____gs_butterfly_proof param_74 param_73 param_72 param_71).
+auto; ecall (polynomial____gs_butterfly_proof param_70 param_69 param_68 param_67).
+auto; ecall (polynomial____gs_butterfly_proof param_66 param_65 param_64 param_63).
+auto; ecall (polynomial____gs_butterfly_proof param_62 param_61 param_60 param_59).
+auto; ecall (polynomial____gs_butterfly_proof param_58 param_57 param_56 param_55).
+auto; ecall (polynomial____gs_butterfly_proof param_54 param_53 param_52 param_51).
+auto; ecall (polynomial____gs_butterfly_proof param_50 param_49 param_48 param_47).
+auto; ecall (polynomial____gs_butterfly_8_proof param_46 param_45 param_44 param_43).
+auto; ecall (polynomial____gs_butterfly_8_proof param_42 param_41 param_40 param_39).
+auto; ecall (polynomial____gs_butterfly_8_proof param_38 param_37 param_36 param_35).
+auto; ecall (polynomial____gs_butterfly_8_proof param_34 param_33 param_32 param_31).
+auto; ecall (polynomial____gs_butterfly_4_proof param_30 param_29 param_28 param_27).
+auto; ecall (polynomial____gs_butterfly_4_proof param_26 param_25 param_24 param_23).
+auto; ecall (polynomial____gs_butterfly_4_proof param_22 param_21 param_20 param_19).
+auto; ecall (polynomial____gs_butterfly_4_proof param_18 param_17 param_16 param_15).
+auto; ecall (polynomial____gs_butterfly_2_proof param_14 param_13 param_12 param_11).
+auto; ecall (polynomial____gs_butterfly_2_proof param_10 param_9 param_8 param_7).
+auto; ecall (polynomial____gs_butterfly_2_proof param_6 param_5 param_4 param_3).
+auto; ecall (polynomial____gs_butterfly_2_proof param_2 param_1 param_0 param).
 case (g = 0); first by auto => /> *.
 case (g = 1); first by auto => /> *.
 case (g = 2); first by auto => /> *.
@@ -1227,8 +1256,7 @@ by auto => /> *.
 qed.
 
 lemma polynomial____invert_ntt_layers_5_6_7_proof _polynomial _b_polynomial _j :
-      (polynomial____invert_ntt_layers_5_6_7_spec _polynomial _b_polynomial
-      _j).
+      (polynomial____invert_ntt_layers_5_6_7_spec _polynomial _b_polynomial _j).
 proof.
 hint +safety.
 rewrite /polynomial____invert_ntt_layers_5_6_7_spec; proc.
@@ -1239,26 +1267,22 @@ conseq (_ :
   ==> BArray1024.is_init b_polynomial 0 (4 * 256)
    /\ valid trace_polynomial____invert_ntt_layers_5_6_7).
 + by move=> &hr />; rewrite -!(BI1024.is_init_full _ 1024) //.
-auto; ecall (polynomial____gs_butterfly_scaled_proof param_46 param_45 param_44 param_43).
-auto; ecall (polynomial____gs_butterfly_scaled_proof param_42 param_41 param_40 param_39).
-auto; ecall (polynomial____gs_butterfly_scaled_proof param_38 param_37 param_36 param_35).
-auto; ecall (polynomial____gs_butterfly_scaled_proof param_34 param_33 param_32 param_31).
-auto; ecall (polynomial____broadcast_zeta_proof param_30).
-auto; ecall (polynomial____broadcast_zeta_proof param_29).
-auto; ecall (polynomial____gs_butterfly_proof param_28 param_27 param_26).
-auto; ecall (polynomial____gs_butterfly_proof param_25 param_24 param_23).
-auto; ecall (polynomial____broadcast_zeta_proof param_22).
-auto; ecall (polynomial____gs_butterfly_proof param_21 param_20 param_19).
-auto; ecall (polynomial____gs_butterfly_proof param_18 param_17 param_16).
-auto; ecall (polynomial____broadcast_zeta_proof param_15).
-auto; ecall (polynomial____gs_butterfly_proof param_14 param_13 param_12).
-auto; ecall (polynomial____broadcast_zeta_proof param_11).
-auto; ecall (polynomial____gs_butterfly_proof param_10 param_9 param_8).
-auto; ecall (polynomial____broadcast_zeta_proof param_7).
-auto; ecall (polynomial____gs_butterfly_proof param_6 param_5 param_4).
-auto; ecall (polynomial____broadcast_zeta_proof param_3).
-auto; ecall (polynomial____gs_butterfly_proof param_2 param_1 param_0).
-auto; ecall (polynomial____broadcast_zeta_proof param).
+auto; ecall (polynomial____gs_butterfly_scaled_proof param_54 param_53 param_52 param_51 param_50
+  param_49).
+auto; ecall (polynomial____gs_butterfly_scaled_proof param_48 param_47 param_46 param_45 param_44
+  param_43).
+auto; ecall (polynomial____gs_butterfly_scaled_proof param_42 param_41 param_40 param_39 param_38
+  param_37).
+auto; ecall (polynomial____gs_butterfly_scaled_proof param_36 param_35 param_34 param_33 param_32
+  param_31).
+auto; ecall (polynomial____gs_butterfly_proof param_30 param_29 param_28 param_27).
+auto; ecall (polynomial____gs_butterfly_proof param_26 param_25 param_24 param_23).
+auto; ecall (polynomial____gs_butterfly_proof param_22 param_21 param_20 param_19).
+auto; ecall (polynomial____gs_butterfly_proof param_18 param_17 param_16 param_15).
+auto; ecall (polynomial____gs_butterfly_proof param_14 param_13 param_12 param_11).
+auto; ecall (polynomial____gs_butterfly_proof param_10 param_9 param_8 param_7).
+auto; ecall (polynomial____gs_butterfly_proof param_6 param_5 param_4 param_3).
+auto; ecall (polynomial____gs_butterfly_proof param_2 param_1 param_0 param).
 case (j = 0); first by auto => /> *.
 case (j = 1); first by auto => /> *.
 case (j = 2); first by auto => /> *.

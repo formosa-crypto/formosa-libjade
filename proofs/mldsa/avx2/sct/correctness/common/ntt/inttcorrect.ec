@@ -15,7 +15,7 @@ require Parameters MldsaT.
 require import WArray1024.
 require import Array2 Array4 Array8 Array16 Array256.
 require import XArray256.
-require import Nttzetas Nttspec Nttlogspec Nttvec.
+require import Nttzetas Nttspec Nttlogspec Nttvec Nttqinv.
 require import Avx2red Listred.
 
 abstract theory InttcorrectT.
@@ -36,10 +36,11 @@ lemma gs_butterflyP (p : wpoly) (k j r o o2 : int) :
   => o = j * 2^(k+1) + r => o2 = o + 2^k
   => hoare[M.polynomial____gs_butterfly :
           a = vec p o /\ b = vec p o2 /\ zetas = W8u32.pack8 (nseq 8 (izj k j))
+       /\ zetas_qinv = twistv zetas
        ==> res = (vec (ireduce_level p k) o, vec (ireduce_level p k) o2)].
 proof.
 hint +listred.
-move=> 5? o2E; proc; ecall (mmrP b_minus_a zetas); auto => &hr [#] -> -> -> /= ? ->.
+move=> 5? o2E; proc; ecall (mmrzP b_minus_a zetas); auto => &hr [#] -> -> -> -> /= ? ->.
 by rewrite o2E (ivec_lo p k j r o) // (ivec_hi p k j r o) // /vec /=.
 qed.
 
@@ -50,10 +51,11 @@ lemma gs_butterfly_8P (p : wpoly) (jb jb2 o o2 : int) :
        lhs = vec p o /\ rhs = vec p o2
     /\ zetas = W8u32.pack8 [
          izj 2 jb; izj 2 jb; izj 2 jb; izj 2 jb; izj 2 jb2; izj 2 jb2; izj 2 jb2; izj 2 jb2]
+    /\ zetas_qinv = twistv zetas
     ==> res = (vec (ireduce_level p 2) o, vec (ireduce_level p 2) o2)].
 proof.
 hint +listred.
-move=> 5?; proc; wp; ecall (mmrP differences zetas); auto => &hr [#] -> -> -> /= ? ->.
+move=> 5?; proc; wp; ecall (mmrzP differences zetas); auto => &hr [#] -> -> -> -> /= ? ->.
 by rewrite (ivec_small p 2 jb o) 1..4:/# (ivec_small p 2 jb2 o2) 1..4:/# /vec /=.
 qed.
 
@@ -65,10 +67,12 @@ lemma gs_butterfly_4P (p : wpoly) (jb jb2 o o2 : int) :
     /\ zetas = W8u32.pack8 [
          izj 1 jb; izj 1 jb; izj 1 jb2; izj 1 jb2;
          izj 1 (jb + 1); izj 1 (jb + 1); izj 1 (jb2 + 1); izj 1 (jb2 + 1)]
+    /\ zetas_qinv = twistv zetas
     ==> res = (vec (ireduce_level p 1) o, vec (ireduce_level p 1) o2)].
 proof.
 hint +listred.
-move=> 5?; proc; wp; ecall (mmrP differences zetas); auto => &hr [#] -> -> -> /= ? ->.
+move=> 5?; proc; inline M.polynomial____gs_butterfly_4_lanes; wp.
+ecall (mmrzP_lanes differences zetas0); auto => &hr [#] -> -> -> -> /= ? ->.
 by rewrite (ivec_small p 1 jb o) 1..4:/# (ivec_small p 1 jb2 o2) 1..4:/# /vec /=.
 qed.
 
@@ -80,11 +84,12 @@ lemma gs_butterfly_2P (p : wpoly) (jb jb2 o o2 : int) :
     /\ zetas = W8u32.pack8 [
          izj 0 jb; izj 0 (jb + 1); izj 0 jb2; izj 0 (jb2 + 1);
          izj 0 (jb + 2); izj 0 (jb + 3); izj 0 (jb2 + 2); izj 0 (jb2 + 3)]
+    /\ zetas_qinv = twistv zetas
     ==> res = (vec (ireduce_level p 0) o, vec (ireduce_level p 0) o2)].
 proof.
 hint +listred.
-move=> 5?; proc; inline M.polynomial____gs_butterfly_4; wp.
-ecall (mmrP differences zetas0); auto => &hr [#] -> -> -> /= ? ->.
+move=> 5?; proc; inline M.polynomial____gs_butterfly_4_lanes; wp.
+ecall (mmrzP_lanes differences zetas0); auto => &hr [#] -> -> -> -> /= ? ->.
 by rewrite (ivec_small p 0 jb o) 1..4:/# (ivec_small p 0 jb2 o2) 1..4:/# /vec /=.
 qed.
 
@@ -94,19 +99,16 @@ lemma gs_butterfly_scaledP (p : wpoly) (o o2 : int) :
   hoare[M.polynomial____gs_butterfly_scaled :
        a = vec p o /\ b = vec p o2
     /\ zetas_f = W8u32.pack8 (nseq 8 (W32.of_int (-3975713)))
+    /\ zetas_f_qinv = twistv zetas_f
     /\ f = W8u32.pack8 (nseq 8 (W32.of_int 41978))
+    /\ f_qinv = twistv f
     ==> res = (vec (ifinal p) o, vec (ifinal p) o2)].
 proof.
 hint +listred.
-move=> 2? o2E; proc; ecall (mmrP a f); ecall (mmrP b_minus_a zetas_f).
-auto => &hr [#] -> -> -> -> /= ? -> ? ->.
+move=> 2? o2E; proc; ecall (mmrzP a f); ecall (mmrzP b_minus_a zetas_f).
+auto => &hr [#] -> -> -> -> -> -> /= ? -> ? ->.
 by rewrite o2E vec_ifinal_lo // vec_ifinal_hi // /vec /=.
 qed.
-
-(* the broadcast of a scalar twiddle *)
-lemma broadcast_zetaP (z : W32.t) :
-  hoare[M.polynomial____broadcast_zeta : zeta_0 = z ==> res = W8u32.pack8 (nseq 8 z)].
-proof. by hint +listred; proc; auto. qed.
 
 (* ==================================================================== *)
 (* Levels 0 to 4, on the block g of 64 coefficients                     *)
@@ -120,7 +122,7 @@ seq 8 : (polynomial = p /\ g = g_ /\ blk p g_ r0 r1 r2 r3 r4 r5 r6 r7).
 - auto => />.
   by rewrite (get256_vecE p _ (64 * g_)) 1,2:/# !(get256_blkE p g_).
 pose p0 := ireduce_level p 0.
-seq 8 : (polynomial = p /\ g = g_ /\ blk p0 g_ r0 r1 r2 r3 r4 r5 r6 r7).
+seq 12 : (polynomial = p /\ g = g_ /\ blk p0 g_ r0 r1 r2 r3 r4 r5 r6 r7).
 - ecall (gs_butterfly_2P p (32 * g_ + 24) (32 * g_ + 28) (64 * g_ + 48) (64 * g_ + 56)
     _ _ _ _ _); 2..6: smt().
   wp; ecall (gs_butterfly_2P p (32 * g_ + 16) (32 * g_ + 20) (64 * g_ + 32) (64 * g_ + 40)
@@ -129,13 +131,13 @@ seq 8 : (polynomial = p /\ g = g_ /\ blk p0 g_ r0 r1 r2 r3 r4 r5 r6 r7).
         _ _ _ _ _); 2..6: smt().
   wp; ecall (gs_butterfly_2P p (32 * g_) (32 * g_ + 4) (64 * g_) (64 * g_ + 8)
         _ _ _ _ _); 2..6: smt().
-  auto => />.
+  wp; skip => &hr [#] -> -> hb; rewrite !iqinv0E 1..4:/#; move: hb => />.
   rewrite (izetas0E (4 * g_) (32 * g_) (32 * g_ + 4)) 1..3:/#.
   rewrite (izetas0E (4 * g_ + 1) (32 * g_ + 8) (32 * g_ + 12)) 1..3:/#.
   rewrite (izetas0E (4 * g_ + 2) (32 * g_ + 16) (32 * g_ + 20)) 1..3:/#.
   by rewrite (izetas0E (4 * g_ + 3) (32 * g_ + 24) (32 * g_ + 28)) 1..3:/#.
 pose p1 := ireduce_level p0 1.
-seq 8 : (polynomial = p /\ g = g_ /\ blk p1 g_ r0 r1 r2 r3 r4 r5 r6 r7).
+seq 12 : (polynomial = p /\ g = g_ /\ blk p1 g_ r0 r1 r2 r3 r4 r5 r6 r7).
 - ecall (gs_butterfly_4P p0 (16 * g_ + 12) (16 * g_ + 14) (64 * g_ + 48) (64 * g_ + 56)
     _ _ _ _ _); 2..6: smt().
   wp; ecall (gs_butterfly_4P p0 (16 * g_ + 8) (16 * g_ + 10) (64 * g_ + 32) (64 * g_ + 40)
@@ -144,13 +146,13 @@ seq 8 : (polynomial = p /\ g = g_ /\ blk p1 g_ r0 r1 r2 r3 r4 r5 r6 r7).
         _ _ _ _ _); 2..6: smt().
   wp; ecall (gs_butterfly_4P p0 (16 * g_) (16 * g_ + 2) (64 * g_) (64 * g_ + 8)
         _ _ _ _ _); 2..6: smt().
-  auto => />.
+  wp; skip => &hr [#] -> -> hb; rewrite !iqinv1E 1..4:/#; move: hb => />.
   rewrite (izetas1E (4 * g_) (16 * g_) (16 * g_ + 2)) 1..3:/#.
   rewrite (izetas1E (4 * g_ + 1) (16 * g_ + 4) (16 * g_ + 6)) 1..3:/#.
   rewrite (izetas1E (4 * g_ + 2) (16 * g_ + 8) (16 * g_ + 10)) 1..3:/#.
   by rewrite (izetas1E (4 * g_ + 3) (16 * g_ + 12) (16 * g_ + 14)) 1..3:/#.
 pose p2 := ireduce_level p1 2.
-seq 8 : (polynomial = p /\ g = g_ /\ blk p2 g_ r0 r1 r2 r3 r4 r5 r6 r7).
+seq 12 : (polynomial = p /\ g = g_ /\ blk p2 g_ r0 r1 r2 r3 r4 r5 r6 r7).
 - ecall (gs_butterfly_8P p1 (8 * g_ + 6) (8 * g_ + 7) (64 * g_ + 48) (64 * g_ + 56)
     _ _ _ _ _); 2..6: smt().
   wp; ecall (gs_butterfly_8P p1 (8 * g_ + 4) (8 * g_ + 5) (64 * g_ + 32) (64 * g_ + 40)
@@ -159,7 +161,7 @@ seq 8 : (polynomial = p /\ g = g_ /\ blk p2 g_ r0 r1 r2 r3 r4 r5 r6 r7).
         _ _ _ _ _); 2..6: smt().
   wp; ecall (gs_butterfly_8P p1 (8 * g_) (8 * g_ + 1) (64 * g_) (64 * g_ + 8)
         _ _ _ _ _); 2..6: smt().
-  auto => />.
+  wp; skip => &hr [#] -> -> hb; rewrite !iqinv2E 1..4:/#; move: hb => />.
   rewrite (izetas2E (4 * g_) (8 * g_) (8 * g_ + 1)) 1..3:/#.
   rewrite (izetas2E (4 * g_ + 1) (8 * g_ + 2) (8 * g_ + 3)) 1..3:/#.
   rewrite (izetas2E (4 * g_ + 2) (8 * g_ + 4) (8 * g_ + 5)) 1..3:/#.
@@ -167,23 +169,23 @@ seq 8 : (polynomial = p /\ g = g_ /\ blk p2 g_ r0 r1 r2 r3 r4 r5 r6 r7).
 pose p3 := ireduce_level p2 3.
 seq 12 : (polynomial = p /\ g = g_ /\ blk p3 g_ r0 r1 r2 r3 r4 r5 r6 r7).
 - ecall (gs_butterflyP p2 3 (4 * g_ + 3) 0 (64 * g_ + 48) (64 * g_ + 56) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0); wp.
+  wp.
   ecall (gs_butterflyP p2 3 (4 * g_ + 2) 0 (64 * g_ + 32) (64 * g_ + 40) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0); wp.
+  wp.
   ecall (gs_butterflyP p2 3 (4 * g_ + 1) 0 (64 * g_ + 16) (64 * g_ + 24) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0); wp.
+  wp.
   ecall (gs_butterflyP p2 3 (4 * g_) 0 (64 * g_) (64 * g_ + 8) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0).
-  by auto => />; rewrite !izetas3E 1..4:/#.
+  wp; skip => &hr [#] -> -> hb; rewrite !iqinv3E 1..4:/# !izetas3E 1..4:/#; move: hb => />.
+  by with hint +listred (done).
 pose p4 := ireduce_level p3 4.
 seq 8 : (polynomial = p /\ g = g_ /\ blk p4 g_ r0 r1 r2 r3 r4 r5 r6 r7).
 - ecall (gs_butterflyP p3 4 (2 * g_ + 1) 8 (64 * g_ + 40) (64 * g_ + 56) _ _ _ _ _ _); 2..7: smt().
   ecall (gs_butterflyP p3 4 (2 * g_ + 1) 0 (64 * g_ + 32) (64 * g_ + 48) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0); wp.
+  wp.
   ecall (gs_butterflyP p3 4 (2 * g_) 8 (64 * g_ + 8) (64 * g_ + 24) _ _ _ _ _ _); 2..7: smt().
   ecall (gs_butterflyP p3 4 (2 * g_) 0 (64 * g_) (64 * g_ + 16) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0).
-  by auto => />; rewrite !izetas4E 1..2:/#.
+  wp; skip => &hr [#] -> -> hb; rewrite !iqinv4E 1..2:/# !izetas4E 1..2:/#; move: hb => />.
+  by with hint +listred (done).
 by auto => />; rewrite store_blkE // ilevels0_5E.
 qed.
 
@@ -202,32 +204,31 @@ seq 8 : (polynomial = p /\ j = j_ /\ col p j_ r0 r1 r2 r3 r4 r5 r6 r7).
 pose p5 := ireduce_level p 5.
 seq 12 : (polynomial = p /\ j = j_ /\ col p5 j_ r0 r1 r2 r3 r4 r5 r6 r7).
 - ecall (gs_butterflyP p 5 3 (8 * j_) (8 * j_ + 192) (8 * j_ + 224) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0); wp.
+  wp.
   ecall (gs_butterflyP p 5 2 (8 * j_) (8 * j_ + 128) (8 * j_ + 160) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0); wp.
+  wp.
   ecall (gs_butterflyP p 5 1 (8 * j_) (8 * j_ + 64) (8 * j_ + 96) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0); wp.
+  wp.
   ecall (gs_butterflyP p 5 0 (8 * j_) (8 * j_) (8 * j_ + 32) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0); wp; skip.
+  wp; skip.
   (* the tables, before simplification evaluates their constant indices *)
-  by rewrite !izetas5E.
+  by rewrite !iqinv5E // !izetas5E.
 pose p6 := ireduce_level p5 6.
 seq 8 : (polynomial = p /\ j = j_ /\ col p6 j_ r0 r1 r2 r3 r4 r5 r6 r7).
 - ecall (gs_butterflyP p5 6 1 (8 * j_ + 32) (8 * j_ + 160) (8 * j_ + 224) _ _ _ _ _ _); 2..7: smt().
   ecall (gs_butterflyP p5 6 1 (8 * j_) (8 * j_ + 128) (8 * j_ + 192) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0); wp.
+  wp.
   ecall (gs_butterflyP p5 6 0 (8 * j_ + 32) (8 * j_ + 32) (8 * j_ + 96) _ _ _ _ _ _); 2..7: smt().
   ecall (gs_butterflyP p5 6 0 (8 * j_) (8 * j_) (8 * j_ + 64) _ _ _ _ _ _); 2..7: smt().
-  ecall (broadcast_zetaP zeta_0); wp; skip.
-  by rewrite !izetas6E.
+  wp; skip.
+  by rewrite !iqinv6E // !izetas6E.
 pose s7 := ifinal p6.
 seq 8 : (polynomial = p /\ j = j_ /\ col s7 j_ r0 r1 r2 r3 r4 r5 r6 r7).
 - ecall (gs_butterfly_scaledP p6 (8 * j_ + 96) (8 * j_ + 224) _ _ _); 2..4: smt().
   ecall (gs_butterfly_scaledP p6 (8 * j_ + 64) (8 * j_ + 192) _ _ _); 2..4: smt().
   ecall (gs_butterfly_scaledP p6 (8 * j_ + 32) (8 * j_ + 160) _ _ _); 2..4: smt().
   ecall (gs_butterfly_scaledP p6 (8 * j_) (8 * j_ + 128) _ _ _); 2..4: smt().
-  ecall (broadcast_zetaP zeta_0); wp.
-  by ecall (broadcast_zetaP zeta_0); auto.
+  wp; skip => &hr [#] -> -> hc; rewrite iqinv7zE iqinv7fE; move: hc => />.
 by auto => />; rewrite store_colE // ilevels5_7E.
 qed.
 

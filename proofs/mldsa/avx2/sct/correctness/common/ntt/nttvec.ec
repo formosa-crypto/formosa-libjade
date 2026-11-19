@@ -267,15 +267,6 @@ abbrev col (p : wpoly) (j : int) (r0 r1 r2 r3 r4 r5 r6 r7 : W256.t) =
   /\ r6 = vec p (8 * j + 192) /\ r7 = vec p (8 * j + 224).
 
 (* ==================================================================== *)
-(* The twiddles of levels 7 and 6, loaded as immediates                *)
-(* ==================================================================== *)
-lemma zj7E : zj 7 0 = W32.of_int 25847.
-proof. by rewrite zjE // zeta_L7E. qed.
-
-lemma zj6E : zj 6 0 = W32.of_int (-2608894) /\ zj 6 1 = W32.of_int (-518909).
-proof. by rewrite !zjE // zeta_L6E. qed.
-
-(* ==================================================================== *)
 (* Locality: a level only combines the coefficients t and t +/- 2^k of  *)
 (* a same block, so it preserves the agreement on a set closed by this  *)
 (* pairing                                                              *)
