@@ -113,7 +113,7 @@ MLKN_SRC := $(ADAPTERS)/mlkem-native/kem_shim.c \
 $(BUILD)/mlkem-native_mlkem%.so: $(MLKN_SRC) | $(BUILD)
 	$(CC) $(XARCH) -O3 -fomit-frame-pointer -fPIC -shared $(LINKFLAGS) \
 	    $(MLKN_FLAGS) -DMLK_CONFIG_PARAMETER_SET=$* \
-	    -DMLK_CONFIG_NAMESPACE_PREFIX=mlkn$*_ \
+	    -DMLK_CONFIG_NAMESPACE_PREFIX=mlkn$* \
 	    -I$(MLKN) -I$(ADAPTERS) -o $@ $(MLKN_SRC)
 
 # ---- mldsa-native backend: shim + monolithic source + asm, AVX2 backend --
@@ -127,7 +127,7 @@ MLDN_SRC := $(ADAPTERS)/mldsa-native/sig_shim.c \
 $(BUILD)/mldsa-native_mldsa%.so: $(MLDN_SRC) | $(BUILD)
 	$(CC) $(XARCH) -O3 -fomit-frame-pointer -fPIC -shared $(LINKFLAGS) \
 	    $(MLDN_FLAGS) -DMLD_CONFIG_PARAMETER_SET=$* \
-	    -DMLD_CONFIG_NAMESPACE_PREFIX=mldn$*_ \
+	    -DMLD_CONFIG_NAMESPACE_PREFIX=mldn$* \
 	    -I$(MLDN) -I$(ADAPTERS) -o $@ $(MLDN_SRC)
 
 # ---- pq-crystals backends -------------------------------------------------
