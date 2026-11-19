@@ -639,46 +639,9 @@ proof. by case: b => //; rewrite b2i0 /= eq_sym. qed.
 (* Leaf lemmas for the vectorized rejection-sampling loop body          *)
 (* ==================================================================== *)
 (* -------------------------------------------------------------------- *)
-lemma to_uint_and15 (g : W64.t) :
-  to_uint (g `&` W64.of_int 15) = to_uint g %% 16.
-proof.
-have := W64.to_uint_and_mod 4 g _ => //=.
-qed.
-
-lemma to_uint_shr4 (g : W64.t) :
-  to_uint (g `>>` W8.of_int 4) = to_uint g %/ 16.
-proof. by rewrite W64.shr_div of_uintK /=. qed.
-
 lemma popcnt6E (g : W64.t) :
   (POPCNT_64 g).`6 = W64.of_int (count idfun (W64.w2bits g)).
 proof. by rewrite /POPCNT_64 /flags_w. qed.
-
-lemma popcnt_count (g : W64.t) (bs : bool list) :
-  size bs = 4 => to_uint g = bs2int bs =>
-  count idfun (W64.w2bits g) = count idfun bs.
-proof.
-move=> szb hg.
-have e1 : bs2int (W64.w2bits g) = bs2int (bs ++ nseq 60 false).
-- by rewrite -W64.to_uintE hg bs2int_cat bs2int_nseq_false szb /=.
-have h1 := bs2intK (W64.w2bits g).
-have h2 := bs2intK (bs ++ nseq 60 false).
-move: h1 h2; rewrite W64.size_w2bits' size_cat szb size_nseq /= e1 => h1 h2.
-rewrite -h1 h2.
-by rewrite count_cat count_nseq /idfun /=.
-qed.
-
-(* -------------------------------------------------------------------- *)
-(* the shuffle table compacts the dwords selected by the 4-bit mask to  *)
-(* the front, in order                                                  *)
-lemma shuffle_compact (x : W128.t) (m : int) : 0 <= m < 16 =>
-    take (count idfun (int2bs 4 m))
-      (W4u32.Pack.to_list (W4u32.unpack32 (VPSHUFB_128 x
-        (W16u8.pack16 (Array256.sub matrix_A__SHUFFLE_TABLE (16 * m) 16)))))
-  = mask (int2bs 4 m) (W4u32.Pack.to_list (W4u32.unpack32 x)).
-proof.
-move: m; apply/allP_range.
-by rewrite /range /sub /int2bs /mkseq -iotaredE /=.
-qed.
 
 (* -------------------------------------------------------------------- *)
 lemma to_uint_shr2 (g : W64.t) :
@@ -743,36 +706,43 @@ qed.
 
 hint simplify pack4_3_and_maskE.
 
-(* DECODING_TABLE.[0]: the dword permutation [0 1 2 0 3 4 5 0]          *)
-lemma DECODING_PERM_E :
-  W256.of_int 31385508682779410369523405889615886801803926611390921441280
-  = W8u32.pack8
-    [W32.zero; W32.of_int 1; W32.of_int 2; W32.zero;
-     W32.of_int 3; W32.of_int 4; W32.of_int 5; W32.zero].
-proof.
-apply W8u32.allP => /=.
-by rewrite !W8u32.of_int_bits32_div //=.
-qed.
+(* VPERMQ 0b10_01_01_00: the qwords [0 1 1 2]                           *)
+lemma VPERMQ_148E (x00 x01 x02 x03 x04 x05 x06 x07 x08 x09 x10 x11 x12 x13 x14 x15
+                   x16 x17 x18 x19 x20 x21 x22 x23 x24 x25 x26 x27 x28 x29 x30 x31 : W8.t) :
+  VPERMQ
+    (W32u8.pack32
+      [x00; x01; x02; x03; x04; x05; x06; x07;
+       x08; x09; x10; x11; x12; x13; x14; x15;
+       x16; x17; x18; x19; x20; x21; x22; x23;
+       x24; x25; x26; x27; x28; x29; x30; x31])
+    (W8.of_int 148)
+  = W32u8.pack32
+      [x00; x01; x02; x03; x04; x05; x06; x07;
+       x08; x09; x10; x11; x12; x13; x14; x15;
+       x08; x09; x10; x11; x12; x13; x14; x15;
+       x16; x17; x18; x19; x20; x21; x22; x23].
+proof. by apply W256.all_eq_eq; cbv W256.all_eq VPERMQ W4u64.pack4 W32u8.pack32. qed.
 
-hint simplify DECODING_PERM_E.
+hint simplify VPERMQ_148E.
 
-(* DECODING_TABLE.[1]: the in-lane 3-of-4 byte spread                   *)
+(* DECODING_TABLE.[0]: the 3-of-4 byte spread, at offset 0 in the low   *)
+(* lane, 4 in the high one                                              *)
 lemma DECODING_SHUFFLE_E :
-  W256.of_int 115359280993406415849895417079880437751483271933338715711596891385178068484352
+  W256.of_int 115366376096492355175489748997433888275274855593258845241081954797768348401920
   = W32u8.pack32
     [W8.zero; W8.of_int   1; W8.of_int   2; W8.of_int 255;
      W8.of_int   3; W8.of_int   4; W8.of_int   5; W8.of_int 255;
      W8.of_int   6; W8.of_int   7; W8.of_int   8; W8.of_int 255;
      W8.of_int   9; W8.of_int  10; W8.of_int  11; W8.of_int 255;
-     W8.zero; W8.of_int   1; W8.of_int   2; W8.of_int 255;
-     W8.of_int   3; W8.of_int   4; W8.of_int   5; W8.of_int 255;
-     W8.of_int   6; W8.of_int   7; W8.of_int   8; W8.of_int 255;
-     W8.of_int   9; W8.of_int  10; W8.of_int  11; W8.of_int 255].
+     W8.of_int   4; W8.of_int   5; W8.of_int   6; W8.of_int 255;
+     W8.of_int   7; W8.of_int   8; W8.of_int   9; W8.of_int 255;
+     W8.of_int  10; W8.of_int  11; W8.of_int  12; W8.of_int 255;
+     W8.of_int  13; W8.of_int  14; W8.of_int  15; W8.of_int 255].
 proof. by apply W32u8.allP => /=. qed.
 
 hint simplify DECODING_SHUFFLE_E.
 
-(* DECODING_TABLE.[2]: the 8u32 23-bit mask, fused with the AND         *)
+(* DECODING_TABLE.[1]: the 8u32 23-bit mask, fused with the AND         *)
 lemma mask23_and_pack32E (x00 x01 x02 x03 x04 x05 x06 x07 x08 x09 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19 x20 x21 x22 x23 x24 x25 x26 x27 x28 x29 x30 x31 : W8.t) :
   W32u8.pack32
     [x00; x01; x02; x03; x04; x05; x06; x07;

@@ -5,7 +5,7 @@ require import AllCore IntDiv CoreMap List Distr.
 from Jasmin require import JModel_x86.
 
 require import Array1 Array2 Array3 Array4 Array5 Array6 Array8 Array16
- Array24 Array256 Array2048.
+ Array24 Array2048.
 
 abbrev commitment__ENCODING_CONSTANTS_TABLE_bits6 =
 ((Array4.of_list witness<:W256.t>)
@@ -23,7 +23,53 @@ abbrev commitment__ENCODING_SHUFFLES_bits4 =
 (W256.of_int
 6809477063014005108496892811167092228318171255968858956394831878370493989120).
 
-abbrev eRROR_VECTOR_SHUFFLE_TABLE =
+abbrev t1__mask =
+(W256.of_int
+27580025446916579586740047030762717305835781530194468456916412547466239).
+
+abbrev t1__DECODING_TABLE =
+((Array2.of_list witness<:W256.t>)
+[(W256.of_int
+ (-1704488708535735317993730919615273811755981492442837930308886608702668544)
+ );
+(W256.of_int
+161759680028012245712471816852122747571536270840244795705654356475904)]).
+
+abbrev t1__SHUFFLE_TO_GROUP = (W128.of_int (-1152053784517354134044416)).
+
+abbrev t1__ENCODING_SHIFTS_TABLE =
+((Array3.of_list witness<:W256.t>)
+[(W256.of_int 138096238178506976811873579382829307350851889511329270071318);
+(W256.of_int 8769009825346546976905862850151196547671258038272);
+(W256.of_int 75325220824640169170112861481543258555010121551634147311628)]).
+
+abbrev t0__DECODING_TABLE =
+((Array3.of_list witness<:W256.t>)
+[(W256.of_int
+ (-1683702690027913741012871262190298745403129414409667671300841849902661376)
+ );
+(W256.of_int
+80879840039114529797782631482765660946599467588442375410801744805888);
+(W256.of_int
+220828923202046630884640982628521424684360592877637234731771588637630463)]).
+
+abbrev t0__ENCODING_SHIFTS_TABLE =
+((Array4.of_list witness<:W256.t>)
+[(W256.of_int 119264932972346934519345364012443492712099359123420733243411);
+(W256.of_int 475368975159373001864691843072);
+(W256.of_int 37662610412320084585056430740771629277505060775817073655814);
+(W256.of_int 221360928884514619392)]).
+
+abbrev matrix_A__DECODING_TABLE =
+((Array2.of_list witness<:W256.t>)
+[(W256.of_int
+ (-425713140823840248081236011254019577995129072381718798375629210144781238016)
+ );
+(W256.of_int
+226156397384342666605459106258636701594091082888230722833791023177481060351)]
+).
+
+abbrev cOMPACTION_INDEX_TABLE =
 ((Array2048.of_list witness<:W8.t>)
 [(W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
 (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0); (W8.of_int 0);
@@ -435,117 +481,6 @@ abbrev eRROR_VECTOR_SHUFFLE_TABLE =
 (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 0);
 (W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
 (W8.of_int 5); (W8.of_int 6); (W8.of_int 7)]).
-
-abbrev t1__mask =
-(W256.of_int
-27580025446916579586740047030762717305835781530194468456916412547466239).
-
-abbrev t1__DECODING_TABLE =
-((Array2.of_list witness<:W256.t>)
-[(W256.of_int
- (-1704488708535735317993730919615273811755981492442837930308886608702668544)
- );
-(W256.of_int
-161759680028012245712471816852122747571536270840244795705654356475904)]).
-
-abbrev t1__SHUFFLE_TO_GROUP = (W128.of_int (-1152053784517354134044416)).
-
-abbrev t1__ENCODING_SHIFTS_TABLE =
-((Array3.of_list witness<:W256.t>)
-[(W256.of_int 138096238178506976811873579382829307350851889511329270071318);
-(W256.of_int 8769009825346546976905862850151196547671258038272);
-(W256.of_int 75325220824640169170112861481543258555010121551634147311628)]).
-
-abbrev t0__DECODING_TABLE =
-((Array3.of_list witness<:W256.t>)
-[(W256.of_int
- (-1683702690027913741012871262190298745403129414409667671300841849902661376)
- );
-(W256.of_int
-80879840039114529797782631482765660946599467588442375410801744805888);
-(W256.of_int
-220828923202046630884640982628521424684360592877637234731771588637630463)]).
-
-abbrev t0__ENCODING_SHIFTS_TABLE =
-((Array4.of_list witness<:W256.t>)
-[(W256.of_int 119264932972346934519345364012443492712099359123420733243411);
-(W256.of_int 475368975159373001864691843072);
-(W256.of_int 37662610412320084585056430740771629277505060775817073655814);
-(W256.of_int 221360928884514619392)]).
-
-abbrev matrix_A__DECODING_TABLE =
-((Array3.of_list witness<:W256.t>)
-[(W256.of_int 31385508682779410369523405889615886801803926611390921441280);
-(W256.of_int
-(-432808243909779573675567928807470101786712732301848327860692622735061155584)
-);
-(W256.of_int
-226156397384342666605459106258636701594091082888230722833791023177481060351)]
-).
-
-abbrev matrix_A__SHUFFLE_TABLE =
-((Array256.of_list witness<:W8.t>)
-[(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 8); (W8.of_int 9);
-(W8.of_int 10); (W8.of_int 11); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 8); (W8.of_int 9); (W8.of_int 10);
-(W8.of_int 11); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 8); (W8.of_int 9); (W8.of_int 10); (W8.of_int 11);
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 8); (W8.of_int 9);
-(W8.of_int 10); (W8.of_int 11); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 12); (W8.of_int 13);
-(W8.of_int 14); (W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 12); (W8.of_int 13); (W8.of_int 14);
-(W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 12); (W8.of_int 13); (W8.of_int 14); (W8.of_int 15);
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int 0); (W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4);
-(W8.of_int 5); (W8.of_int 6); (W8.of_int 7); (W8.of_int 12); (W8.of_int 13);
-(W8.of_int 14); (W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 8); (W8.of_int 9);
-(W8.of_int 10); (W8.of_int 11); (W8.of_int 12); (W8.of_int 13);
-(W8.of_int 14); (W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0); (W8.of_int 1);
-(W8.of_int 2); (W8.of_int 3); (W8.of_int 8); (W8.of_int 9); (W8.of_int 10);
-(W8.of_int 11); (W8.of_int 12); (W8.of_int 13); (W8.of_int 14);
-(W8.of_int 15); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int 4); (W8.of_int 5); (W8.of_int 6); (W8.of_int 7);
-(W8.of_int 8); (W8.of_int 9); (W8.of_int 10); (W8.of_int 11); (W8.of_int 12);
-(W8.of_int 13); (W8.of_int 14); (W8.of_int 15); (W8.of_int (-1));
-(W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int (-1)); (W8.of_int 0);
-(W8.of_int 1); (W8.of_int 2); (W8.of_int 3); (W8.of_int 4); (W8.of_int 5);
-(W8.of_int 6); (W8.of_int 7); (W8.of_int 8); (W8.of_int 9); (W8.of_int 10);
-(W8.of_int 11); (W8.of_int 12); (W8.of_int 13); (W8.of_int 14);
-(W8.of_int 15)]).
 
 abbrev rOL8 =
 ((Array1.of_list witness<:W256.t>)

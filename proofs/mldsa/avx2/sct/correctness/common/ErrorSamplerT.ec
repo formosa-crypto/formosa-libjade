@@ -3,7 +3,7 @@ import BS2Int.
 from Jasmin require import JWord JModel_x86.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 from CryptoSpecs require import Keccak1600_Spec.
-require import MldsaConstants Agree Avx2red Errshuffle Prefixarray Rejstream Warraypack.
+require import MldsaConstants Agree Avx2red Compaction Prefixarray Rejstream Warraypack.
 require import CircuitBindings Bindings JWordExtra.
 require import Array4 Array25 Array64 Array136 Array256 Array272 Array2048.
 require import WArray272 WArray1024 WArray2048.
@@ -291,7 +291,7 @@ qed.
 (* come first                                                           *)
 op shuffled (x : W128.t) (h : W64.t) : W64.t =
   truncateu64 (VPSHUFB_128 x
-    (VMOV_64 (W8u8.pack8 (Array2048.sub eRROR_VECTOR_SHUFFLE_TABLE
+    (VMOV_64 (W8u8.pack8 (Array2048.sub cOMPACTION_INDEX_TABLE
        (to_uint (h `<<` W8.of_int 3)) 8)))).
 
 lemma shuffledP (zs : W8.t list) (x : W128.t) (h : W64.t) :
@@ -1369,7 +1369,8 @@ proof.
 move=> hok hfuel [_ hinv].
 have hall : forall i, 0 <= i < 4 => 256 <= to_uint (nth witness [f0; f1; f2; f3] i).
 - move=> i rgi; have [_ hf] := hinv i rgi; rewrite /= in hf.
-  by rewrite hf Array4.initiE //=; smt(stream_fuelP).
+  rewrite hf Array4.initiE //=.
+  by have := stream_fuelP (nonce i) k (hok i rgi) (hfuel i rgi); smt().
 move: (hall 0 _) (hall 1 _) (hall 2 _) (hall 3 _) => //=.
 by rewrite /s_stop /= !W64.ultE /= => 4?; rewrite !ltzNge /#.
 qed.

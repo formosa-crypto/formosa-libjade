@@ -11,8 +11,8 @@ require import Array1 Array2 Array3 Array4 Array5 Array6 Array7 Array8 Array16
  Array24 Array25 Array28 Array32 Array64 Array66 Array128 Array136 Array168
  Array256 Array272 Array320 Array416 Array512 Array680 Array848 Array2048
  WArray2 WArray16 WArray32 WArray64 WArray66 WArray128 WArray136 WArray168
- WArray200 WArray224 WArray256 WArray272 WArray320 WArray416 WArray800
- WArray848 WArray1024 WArray2048.
+ WArray200 WArray224 WArray272 WArray320 WArray416 WArray800 WArray848
+ WArray1024 WArray2048.
 require import MldsaConstants.
 require LayoutT.
 
@@ -12963,16 +12963,14 @@ module M = {
     offset, 136, state);
     return (state, h0, h1, h2, h3);
   }
-  proc matrix_A____bytestream_to_potential_coefficients (bytestream:W256.t) : 
+  proc matrix_A____bytestream_to_potential_coefficients (bytestream:W256.t,
+                                                         byte_shuffle:W256.t,
+                                                         coefficient_mask:W256.t) : 
   W256.t = {
     var coefficients:W256.t;
-    var constants:W256.t;
-    constants <- matrix_A__DECODING_TABLE.[0];
-    coefficients <- (VPERMD constants bytestream);
-    constants <- matrix_A__DECODING_TABLE.[1];
-    coefficients <- (VPSHUFB_256 coefficients constants);
-    constants <- matrix_A__DECODING_TABLE.[2];
-    coefficients <- (VPAND_256 coefficients constants);
+    coefficients <- (VPERMQ bytestream (W8.of_int 148));
+    coefficients <- (VPSHUFB_256 coefficients byte_shuffle);
+    coefficients <- (VPAND_256 coefficients coefficient_mask);
     return coefficients;
   }
   proc matrix_A__rejection_sample_multiple_blocks (polynomial:W32.t Array256.t,
@@ -12980,20 +12978,18 @@ module M = {
   W32.t Array256.t * W64.t = {
     var filled:W64.t;
     var ms:W64.t;
-    var shuffle_table_pointer:W8.t Array256.t;
+    var compaction_index_table:W8.t Array2048.t;
     var bytes_filled:W64.t;
     var input_offset:W64.t;
     var modulus:W256.t;
+    var byte_shuffle:W256.t;
+    var coefficient_mask:W256.t;
     var condition_loop:bool;
     var potential_coefficients:W256.t;
     var compare_with_field_modulus:W256.t;
     var good:W64.t;
-    var lower_coefficients:W128.t;
-    var good_lower:W64.t;
-    var shuffle_table_idx:W64.t;
-    var shuffles:W128.t;
-    var upper_coefficients:W128.t;
-    var good_upper:W64.t;
+    var permd_indices:W128.t;
+    var permd_lanes:W256.t;
     var stop_sampling:W64.t;
     var condition:bool;
     var byte0:W32.t;
@@ -13005,17 +13001,14 @@ module M = {
     var  _2:bool;
     var  _3:bool;
     var  _4:bool;
-    var  _5:bool;
-    var  _6:bool;
-    var  _7:bool;
-    var  _8:bool;
-    var  _9:bool;
-    shuffle_table_pointer <- witness;
+    compaction_index_table <- witness;
     ms <- (init_msf);
-    shuffle_table_pointer <- matrix_A__SHUFFLE_TABLE;
+    compaction_index_table <- cOMPACTION_INDEX_TABLE;
     bytes_filled <- (W64.of_int 0);
     input_offset <- (W64.of_int 0);
     modulus <- mODULUS_VECTOR;
+    byte_shuffle <- matrix_A__DECODING_TABLE.[0];
+    coefficient_mask <- matrix_A__DECODING_TABLE.[1];
     condition_loop <- (input_offset \ult (W64.of_int ((256 %/ 8) * 24)));
     while (condition_loop) {
       ms <- (update_msf condition_loop ms);
@@ -13023,49 +13016,27 @@ module M = {
       (get256_direct (WArray848.init8 (fun i => randombytes.[i]))
       (W64.to_uint input_offset));
       potential_coefficients <@ matrix_A____bytestream_to_potential_coefficients (
-      potential_coefficients);
+      potential_coefficients, byte_shuffle, coefficient_mask);
       input_offset <- (input_offset + (W64.of_int 24));
       compare_with_field_modulus <-
       (VPCMPGT_8u32 modulus potential_coefficients);
       good <@ __lane_signs (compare_with_field_modulus);
       (* Erased call to declassify *)
       good <- (protect_64 good ms);
-      lower_coefficients <-
-      (VEXTRACTI128 potential_coefficients (W8.of_int 0));
-      good_lower <- good;
-      good_lower <- (good_lower `&` (W64.of_int 15));
-      shuffle_table_idx <- good_lower;
-      shuffle_table_idx <- (shuffle_table_idx `<<` (W8.of_int 4));
-      shuffles <-
-      (get128_direct (WArray256.init8 (fun i => shuffle_table_pointer.[i]))
-      (W64.to_uint shuffle_table_idx));
-      lower_coefficients <- (VPSHUFB_128 lower_coefficients shuffles);
+      permd_indices <-
+      (zeroextu128
+      (get64_direct (WArray2048.init8 (fun i => compaction_index_table.[i]))
+      (W64.to_uint ((W64.of_int 8) * good))));
+      permd_lanes <- (VPMOVZX_8u8_8u32 (truncateu64 permd_indices));
+      potential_coefficients <- (VPERMD permd_lanes potential_coefficients);
       polynomial <-
       (Array256.init
       (WArray1024.get32
-      (WArray1024.set128_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      (W64.to_uint bytes_filled) lower_coefficients)));
-      ( _0,  _1,  _2,  _3,  _4, good_lower) <- (POPCNT_64 good_lower);
-      good_lower <- (good_lower `<<` (W8.of_int 2));
-      bytes_filled <- (bytes_filled + good_lower);
-      upper_coefficients <-
-      (VEXTRACTI128 potential_coefficients (W8.of_int 1));
-      good_upper <- good;
-      good_upper <- (good_upper `>>` (W8.of_int 4));
-      shuffle_table_idx <- good_upper;
-      shuffle_table_idx <- (shuffle_table_idx `<<` (W8.of_int 4));
-      shuffles <-
-      (get128_direct (WArray256.init8 (fun i => shuffle_table_pointer.[i]))
-      (W64.to_uint shuffle_table_idx));
-      upper_coefficients <- (VPSHUFB_128 upper_coefficients shuffles);
-      polynomial <-
-      (Array256.init
-      (WArray1024.get32
-      (WArray1024.set128_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      (W64.to_uint bytes_filled) upper_coefficients)));
-      ( _5,  _6,  _7,  _8,  _9, good_upper) <- (POPCNT_64 good_upper);
-      good_upper <- (good_upper `<<` (W8.of_int 2));
-      bytes_filled <- (bytes_filled + good_upper);
+      (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
+      (W64.to_uint bytes_filled) potential_coefficients)));
+      ( _0,  _1,  _2,  _3,  _4, good) <- (POPCNT_64 good);
+      good <- (good `<<` (W8.of_int 2));
+      bytes_filled <- (bytes_filled + good);
       condition_loop <- (input_offset \ult (W64.of_int ((256 %/ 8) * 24)));
     }
     ms <- (update_msf (! condition_loop) ms);
@@ -14910,7 +14881,7 @@ module M = {
     good <- good_overall;
     good <- (good `&` (W64.of_int 255));
     good_overall <- (good_overall `>>` (W8.of_int 8));
-    shuffle_table_pointer <- eRROR_VECTOR_SHUFFLE_TABLE;
+    shuffle_table_pointer <- cOMPACTION_INDEX_TABLE;
     shuffle_table_idx <- good;
     shuffle_table_idx <- (shuffle_table_idx `<<` (W8.of_int 3));
     shuffles <-

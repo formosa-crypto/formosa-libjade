@@ -83,7 +83,7 @@ __write_out_8_coefficients(
 
     good_overall >>= 8;
 
-    shuffle_table_pointer = ERROR_VECTOR_SHUFFLE_TABLE;
+    shuffle_table_pointer = COMPACTION_INDEX_TABLE;
 
     shuffle_table_idx = good;
     shuffle_table_idx <<= 3;

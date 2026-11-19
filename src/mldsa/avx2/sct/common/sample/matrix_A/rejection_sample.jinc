@@ -1,11 +1,11 @@
-require "shuffle_table.jinc"
-
-u256[3] DECODING_TABLE = {
-    (8u32)[0, 5, 4, 3, 0, 2, 1, 0],
-    (32u8)[-1, 11, 10, 9, -1, 8, 7, 6,
-           -1, 5, 4, 3, -1, 2, 1, 0, -1,
-           11, 10, 9, -1, 8, 7, 6, -1,
-            5, 4, 3, -1, 2, 1, 0],
+// VPERMQ(_, 0b10_01_01_00) puts the bytes 0..15 of the input in the low
+// lane and its bytes 8..23 in the high one: each lane then holds the 12
+// bytes of 4 candidates, at offset 0 in the low lane, 4 in the high one.
+u256[2] DECODING_TABLE = {
+    (32u8)[-1, 15, 14, 13, -1, 12, 11, 10,
+           -1,  9,  8,  7, -1,  6,  5,  4,
+           -1, 11, 10,  9, -1,  8,  7,  6,
+           -1,  5,  4,  3, -1,  2,  1,  0],
     (8u32)[(1 << 23) - 1,
            (1 << 23) - 1,
            (1 << 23) - 1,
@@ -17,20 +17,19 @@ u256[3] DECODING_TABLE = {
 };
 
 // Read in 32 bytes to fill up the YMM register, but we only use the first 24,
-// since 24 bytes already give us 8 potential coefficients.
+// since 24 bytes already give us 8 potential coefficients. The constants are
+// DECODING_TABLE, loaded once by the caller.
 inline
-fn __bytestream_to_potential_coefficients(reg u256 bytestream) -> reg u256 {
-    reg u256 constants;
+fn __bytestream_to_potential_coefficients(
+    reg u256 bytestream,
+    reg u256 byte_shuffle,
+    reg u256 coefficient_mask
+) -> reg u256 {
     reg u256 coefficients;
 
-    constants = DECODING_TABLE[0];
-    coefficients = #VPERMD(constants, bytestream);
-
-    constants = DECODING_TABLE[1];
-    coefficients = #VPSHUFB_256(coefficients, constants);
-
-    constants = DECODING_TABLE[2];
-    coefficients = #VPAND_256(coefficients, constants);
+    coefficients = #VPERMQ(bytestream, 0b10_01_01_00);
+    coefficients = #VPSHUFB_256(coefficients, byte_shuffle);
+    coefficients = #VPAND_256(coefficients, coefficient_mask);
 
     return coefficients;
 }
@@ -47,14 +46,13 @@ fn rejection_sample_multiple_blocks(
      reg u64
 {
     reg u256 modulus potential_coefficients compare_with_field_modulus;
-    reg u128 shuffles lower_coefficients upper_coefficients;
+    reg u256 permd_lanes byte_shuffle coefficient_mask;
+    reg u128 permd_indices;
+    reg ptr u8[2048] compaction_index_table;
 
     reg u64 input_offset;
-    reg u64 good_lower good_upper good;
+    reg u64 good;
     reg u64 filled bytes_filled;
-
-    reg ptr u8[256] shuffle_table_pointer;
-    reg u64 shuffle_table_idx;
 
     reg u64 stop_sampling;
 
@@ -66,12 +64,14 @@ fn rejection_sample_multiple_blocks(
 
     ms = #init_msf();
 
-    shuffle_table_pointer = SHUFFLE_TABLE;
+    compaction_index_table = COMPACTION_INDEX_TABLE;
 
     bytes_filled = 0;
     input_offset = 0;
 
     modulus = MODULUS_VECTOR;
+    byte_shuffle = DECODING_TABLE[0];
+    coefficient_mask = DECODING_TABLE[1];
 
     // Each block of 24 bytes gives at most 8 coefficients, so the first
     // COEFFICIENTS_IN_POLYNOMIAL / 8 blocks never overflow the polynomial: the
@@ -82,7 +82,8 @@ fn rejection_sample_multiple_blocks(
     while { condition_loop = input_offset < VECTOR_SAMPLING_BYTES; } (condition_loop) {
         ms = #update_msf(condition_loop, ms);
         potential_coefficients = randombytes.[:u256 input_offset];
-        potential_coefficients = __bytestream_to_potential_coefficients(potential_coefficients);
+        potential_coefficients = __bytestream_to_potential_coefficients(
+            potential_coefficients, byte_shuffle, coefficient_mask);
         input_offset += 24;
 
         compare_with_field_modulus = #VPCMPGT_8u32(modulus, potential_coefficients);
@@ -92,39 +93,19 @@ fn rejection_sample_multiple_blocks(
         () = #declassify(good);
         good = #protect(good, ms);
 
-        // Do the lower 4 coefficients first.
-        lower_coefficients = #VEXTRACTI128(potential_coefficients, 0);
+        // Pack the accepted lanes to the front with one VPERMD, whose index
+        // vector is the row of the mask in COMPACTION_INDEX_TABLE widened to
+        // 32-bit lanes, and store all 8 lanes: the ones past the accepted
+        // candidates lie past the filled coefficients, the next block
+        // overwrites them.
+        permd_indices = (128u)compaction_index_table.[:u64 8 * good];
+        permd_lanes = #VPMOVZX_8u8_8u32(permd_indices);
+        potential_coefficients = #VPERMD(permd_lanes, potential_coefficients);
+        polynomial.[:u256 bytes_filled] = potential_coefficients;
 
-        good_lower = good;
-        good_lower &= 0xF;
-
-        shuffle_table_idx = good_lower;
-        shuffle_table_idx <<= 4;
-        shuffles = shuffle_table_pointer.[:u128 shuffle_table_idx];
-
-        lower_coefficients = #VPSHUFB_128(lower_coefficients, shuffles);
-        polynomial.[:u128 bytes_filled] = lower_coefficients;
-
-        _, _, _, _, _, good_lower = #POPCNT_64(good_lower);
-        good_lower <<= 2;
-        bytes_filled += good_lower;
-
-        // Then the upper 4 coefficients.
-        upper_coefficients = #VEXTRACTI128(potential_coefficients, 1);
-
-        good_upper = good;
-        good_upper >>= 4;
-
-        shuffle_table_idx = good_upper;
-        shuffle_table_idx <<= 4;
-        shuffles = shuffle_table_pointer.[:u128 shuffle_table_idx];
-
-        upper_coefficients = #VPSHUFB_128(upper_coefficients, shuffles);
-        polynomial.[:u128 bytes_filled] = upper_coefficients;
-
-        _, _, _, _, _, good_upper = #POPCNT_64(good_upper);
-        good_upper <<= 2;
-        bytes_filled += good_upper;
+        _, _, _, _, _, good = #POPCNT_64(good);
+        good <<= 2;
+        bytes_filled += good;
     }
     ms = #update_msf(!condition_loop, ms);
 
