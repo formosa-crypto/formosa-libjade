@@ -1,0 +1,45 @@
+/****************************************************************************
+
+   DEPENDENCIES:
+   =============
+
+param int KECCAK_FEATURES
+param int KECCAK_PERMUTATION
+
+(e.g.
+param int KECCAK_FEATURES
+ = KECCAK_FEATURE_AVX2 | KECCAK_FEATURE_BMI | KECCAK_FEATURE_BMI2;
+param int KECCAK_PERMUTATION = KECCAK_F1600_OPT + KECCAK_F1600x4_NAT;
+)
+
+*****************************************************************************/
+
+from Keccak require "common/keccakf1600_generic.jinc"
+
+from Keccak require "ref/common/keccakf1600.jinc"
+require "keccakf1600x4.jinc"
+require "keccakf1600x4_x1_nat_opt.jinc"
+
+/**
+ * A four-way and a one-way KeccakF[1600] permutation, for a one-way sponge
+ * that runs alongside a four-way one: the rounds of both are interleaved when
+ * the selected permutations have an interleaved implementation, and the two
+ * selected permutations run one after the other otherwise.
+ */
+inline fn _keccakf1600_x4_x1
+( reg ptr u256[25] a4
+, reg ptr u64[25] a1
+) -> reg ptr u256[25], reg ptr u64[25]
+{
+  inline int KECCAK_F4 KECCAK_F1;
+  KECCAK_F4 = __KECCAK_Fx4(KECCAK_PERMUTATION);
+  KECCAK_F1 = __KECCAK_F(KECCAK_PERMUTATION);
+
+  if (KECCAK_F4 == KECCAK_F1600x4_NAT && KECCAK_F1 == KECCAK_F1600_OPT) {
+    a4, a1 = _keccakf1600_x4_x1_nat_opt(a4, a1);
+  } else {
+    a4 = _keccakf1600_avx2x4(a4);
+    a1 = _keccakf1600(a1);
+  }
+  return a4, a1;
+}
