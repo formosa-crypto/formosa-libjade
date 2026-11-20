@@ -6,7 +6,7 @@ import BitChunking.
 (* -------------------------------------------------------------------- *)
 from Jasmin require import JWord JModel_x86.
 
-require import JModelExtra.
+require import JWordExtra JModelExtra.
 require import Agree.
 require import Avx2red.
 require import Prefixarray.
@@ -305,13 +305,36 @@ have -> : w2bits (W32.bits2w (map accept cs)) = map accept cs ++ nseq 24 false.
 by rewrite bs2int_cat bs2int_nseq_false.
 qed.
 
-(* the lane mask of lane_signs.jinc                                     *)
-lemma __lane_signs_ll : islossless M.__lane_signs.
-proof. by proc; auto. qed.
+(* the lane mask: PEXT keeps bit 4k+3 of the byte mask, the msb of the  *)
+(* dword lane k                                                         *)
+lemma lane_signs_bit (i : int) :
+  (W32.of_int 2290649224).[i] = (0 <= i < 32 /\ i %% 4 = 3).
+proof.
+rewrite W32.of_intwE /int_bit; case: (0 <= i < 32) => hi //=.
+have : i \in iota_ 0 32 by rewrite mem_iota /#.
+rewrite -iotaredE /=; do 31! (case=> [-> // |]).
+by move=> ->.
+qed.
 
-lemma __lane_signsP (c : W256.t) :
-  hoare [M.__lane_signs : lanes = c ==> res = zeroextu64 (MOVEMASK_8u32 c)].
-proof. by proc; auto => />; rewrite -lane_signs_movemask. qed.
+lemma pext_lane_signs (c : W256.t) :
+  zeroextu64 (PEXT_32 (MOVEMASK_32u8 c) (W32.of_int 2290649224))
+  = zeroextu64 (MOVEMASK_8u32 c).
+proof.
+have hf : filter (fun i => (W32.of_int 2290649224).[i]) (iota_ 0 32)
+          = mkseq (fun k => 4 * k + 3) 8.
+- rewrite (eq_filter _ (fun i => 0 <= i < 32 /\ i %% 4 = 3)) => [i /=|].
+  - by rewrite lane_signs_bit.
+  by rewrite -iotaredE /mkseq -iotaredE.
+apply W64.wordP => b hb.
+rewrite movemask_8u32_bit zeroextu64_bit /PEXT_32 /= hf.
+case: (0 <= b < 8) => hb8; last first.
+- case: (0 <= b < 32) => // hb32.
+  by rewrite W32.get_bits2w // nth_default // size_map size_mkseq /#.
+rewrite (_ : 0 <= b < 32) 1:/# /= W32.get_bits2w 1:/# (nth_map 0) ?size_mkseq 1:/#.
+have := movemask_32u8_bit c (4 * b + 3).
+rewrite nth_mkseq //= zeroextu64_bit (_ : 0 <= 4 * b + 3 < 32) 1:/# /= => ->.
+by rewrite WE8.msbE WE32.msbE /=; congr; ring.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (* writing eight dwords at the end of the agreed prefix extends the     *)
@@ -467,7 +490,8 @@ proof.
 proc=> /=.
 seq 3 : (#pre /\ rows_ok compaction_index_table).
 - by auto => />; exact compaction_rows_ok.
-sp 6; seq 0 : (#{/~{modulus}}pre /\ modulus = MODULUS8u32).
+(* the PEXT mask lane_signs is a constant: folded into the loop         *)
+cfold 1; wp; sp 6; seq 0 : (#{/~{modulus}}pre /\ modulus = MODULUS8u32).
 - by auto=> &hr |>; rewrite MODULUS8u32E.
 (* the vector loop: 32 windows of 24 bytes, which never overflow the     *)
 (* polynomial (8 candidates per window)                                 *)
@@ -523,7 +547,7 @@ seq 1: (
     /\ potential_coefficients = W8u32.pack8 (cands (Array848.sub buf (to_uint off0) 24))
     /\ to_uint good = bs2int (map accept (cands (Array848.sub buf (to_uint off0) 24)))
   ).
-  - wp; ecall (__lane_signsP compare_with_field_modulus); auto=> &hr |> hs hio hdvd hrows hne.
+  - auto=> &hr |> hs hio hdvd hrows hne.
     have hoff : to_uint input_offset{hr} < 768 by move: hne; rewrite ultE of_uintK.
     have hle : to_uint input_offset{hr} <= 744 by move: hdvd hoff => /dvdzP [q ->] /#.
     move: hs => @/vsampled [#] hio0 hdvd0 hble hsz hag.
@@ -531,7 +555,8 @@ seq 1: (
     - by smt(W64.to_uint_cmp).
     move=> hrs; split; 1: smt().
     rewrite hoff /=.
-    by rewrite /SLH64.protect_64 -(to_uint_good _ _ (cands_uint_lt _))
+    rewrite /SLH64.protect_32 pext_lane_signs.
+    by rewrite -(to_uint_good _ _ (cands_uint_lt _))
        1:size_cands 1:size_sub.
 
   (* b. compact-store the accepted candidates, which bytes_filled      *)
@@ -818,8 +843,7 @@ wp.
 while (   to_uint input_offset <= 768 /\ 24 %| to_uint input_offset
        /\ condition_loop = (to_uint input_offset < 768))
       (768 - to_uint input_offset).
-- move=> z; wp; call __lane_signs_ll; wp.
-  call matrix_A____bytestream_to_potential_coefficients_ll.
+- move=> z; wp; call matrix_A____bytestream_to_potential_coefficients_ll.
   auto=> &hr |> hle hdvd hc.
   have h744 : to_uint input_offset{hr} <= 744.
   - by move: hdvd hc => /dvdzP [q ->] /#.

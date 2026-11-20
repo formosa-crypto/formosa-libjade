@@ -58,6 +58,7 @@ fn rejection_sample_multiple_blocks(
 
     reg u32 byte0 byte1 byte2;
     reg u32 coeff;
+    reg u32 good_bytes good32 lane_signs;
 
     reg bool condition_loop condition;
     #[msf] reg u64 ms;
@@ -65,6 +66,7 @@ fn rejection_sample_multiple_blocks(
     ms = #init_msf();
 
     compaction_index_table = COMPACTION_INDEX_TABLE;
+    lane_signs = 0x88888888;
 
     bytes_filled = 0;
     input_offset = 0;
@@ -86,12 +88,17 @@ fn rejection_sample_multiple_blocks(
             potential_coefficients, byte_shuffle, coefficient_mask);
         input_offset += 24;
 
+        // The byte mask of the comparison (MOVEMASK_32u8 is DOIT,
+        // MOVEMASK_8u32 is not); PEXT keeps the sign of the top byte of each
+        // lane, which gives the mask of MOVEMASK_8u32.
         compare_with_field_modulus = #VPCMPGT_8u32(modulus, potential_coefficients);
-        good = __lane_signs(compare_with_field_modulus);
+        good_bytes = #MOVEMASK_32u8(compare_with_field_modulus);
         // Model item: the candidates of ExpandA (cands_leak); this mask, the
         // outcome of the rejection test of 8 candidates, is a function of them.
-        () = #declassify(good);
-        good = #protect(good, ms);
+        () = #declassify(good_bytes);
+        good_bytes = #protect_32(good_bytes, ms);
+        good32 = #PEXT_32(good_bytes, lane_signs);
+        good = (64u)good32;
 
         // Pack the accepted lanes to the front with one VPERMD, whose index
         // vector is the row of the mask in COMPACTION_INDEX_TABLE widened to

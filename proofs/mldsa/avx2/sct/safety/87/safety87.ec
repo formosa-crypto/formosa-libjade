@@ -1320,6 +1320,34 @@ proc; auto => />; rewrite -lane_signs_movemask /=.
 by rewrite -/(lane_signs _) lane_signs_ule.
 qed.
 
+(* the PEXT mask of the matrix A sampler: bit 4k+3 for each of the 8 lanes *)
+lemma lane_signs_bit (i : int) :
+  (W32.of_int 2290649224).[i] = (0 <= i < 32 /\ i %% 4 = 3).
+proof.
+rewrite W32.of_intwE /int_bit; case: (0 <= i < 32) => hi //=.
+have : i \in iota_ 0 32 by rewrite mem_iota /#.
+rewrite -iotaredE /=; do 31! (case=> [-> // |]).
+by move=> ->.
+qed.
+
+(* so PEXT with it gives a byte *)
+lemma pext_lane_signs_ule (x : W32.t) :
+  zeroextu64 (PEXT_32 x (W32.of_int 2290649224)) \ule W64.of_int 255.
+proof.
+have hf : filter (fun i => (W32.of_int 2290649224).[i]) (iota_ 0 32)
+          = mkseq (fun k => 4 * k + 3) 8.
++ rewrite (eq_filter _ (fun i => 0 <= i < 32 /\ i %% 4 = 3)) => [i /=|].
+  + by rewrite lane_signs_bit.
+  by rewrite -iotaredE /mkseq -iotaredE.
+pose w := zeroextu64 (PEXT_32 x (W32.of_int 2290649224)).
+rewrite (_ : w = lane_signs w) 2:lane_signs_ule //.
+apply W64.wordP => b hb.
+rewrite /lane_signs /w W64.andwE (_ : 255 = 2 ^ 8 - 1) // W64.of_int_powm1 // hb.
+rewrite zeroextu64_bit /PEXT_32 /= hf.
+case: (0 <= b < 32) => //= hb32; case: (b < 8) => //= hb8.
+by rewrite W32.get_bits2w // nth_default // size_map size_mkseq /#.
+qed.
+
 lemma matrix_A____bytestream_to_potential_coefficients_proof _bytestream _byte_shuffle
     _coefficient_mask :
   matrix_A____bytestream_to_potential_coefficients_spec _bytestream _byte_shuffle
@@ -1378,12 +1406,13 @@ while (b_randombytes = BArray848.init_arr (W8.of_int 255)
     /\ to_uint input_offset %% 24 = 0 /\ to_uint input_offset <= 768
     /\ 3 * to_uint bytes_filled <= 4 * to_uint input_offset
     /\ condition_loop = (to_uint input_offset < 768)
+    /\ lane_signs = W32.of_int 2290649224
     /\ valid trace_matrix_A__rejection_sample_multiple_blocks).
-+ auto; ecall (__lane_signs_proof param_2); auto.
-  ecall (matrix_A____bytestream_to_potential_coefficients_proof param_1 param_0 param).
-  auto => /> &hr hle hmod hinit himod hio h34 hvalid hlt r hv g hg hvg.
-  rewrite /SLH64.protect_64.
-  case: g hg hvg => g tg /= hg _.
++ auto; ecall (matrix_A____bytestream_to_potential_coefficients_proof param_1 param_0 param).
+  auto => /> &hr hle hmod hinit himod hio h34 hvalid hlt r hv.
+  rewrite /SLH64.protect_32.
+  have := pext_lane_signs_ule (MOVEMASK_32u8 (VPCMPGT_8u32 modulus{hr} r.`1)).
+  move: (zeroextu64 (PEXT_32 _ _)) => g hg.
   have {hg} hg : to_uint g < 256 by move: hg; rewrite W64.uleE /#.
   have hg0 := W64.to_uint_cmp g.
   have hp := to_uint_popcnt64_byte _ hg.
