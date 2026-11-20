@@ -6,7 +6,7 @@ require import XArray256 Array256 WArray1024.
 require BaseT.
 
 (* The polynomial routines of the implementation: infinity-norm check,
-   addition, subtraction, shift. They do
+   addition, subtraction to the inverse-NTT range, shift. They do
    not depend on the parameter set; the norm check holds for any threshold
    that fits in 31 bits. *)
 abstract theory PolynomialT.
@@ -225,13 +225,14 @@ lemma polynomial__add_ph
   by conseq polynomial__add_ll (polynomial__add_correct _sum _lhs _rhs A B).
 
 (* ================================================================== *)
-(* polynomial__subtract                                                 *)
-(* Pointwise subtraction without reduction.                            *)
+(* polynomial__subtract_to_intt_range                                   *)
+(* Pointwise subtraction, then d - q for d >= 0 and d + q for d < 0.   *)
 (* Spec: lifts_wpoly res = lifts_wpoly _lhs - lifts_wpoly _rhs        *)
-(* No range restriction: result may need reduce32 afterwards.          *)
+(* For lhs, rhs in (-q, q) the result is in [-q, q), the input range  *)
+(* of the inverse NTT.                                                 *)
 (* ================================================================== *)
 
-lemma polynomial__subtract_ll : islossless M.polynomial__subtract.
+lemma polynomial__subtract_to_intt_range_ll : islossless M.polynomial__subtract_to_intt_range.
 proof.
 proc.
 wp; while (0 <= offset <= (256 * 32) %/ 8 /\ offset %% 32 = 0)
@@ -239,58 +240,89 @@ wp; while (0 <= offset <= (256 * 32) %/ 8 /\ offset %% 32 = 0)
 by move => *; auto => /#.
 qed.
 
-lemma polynomial__subtract_correct
-      (_diff : W32.t Array256.t) (_lhs : W32.t Array256.t) (_rhs : W32.t Array256.t)
-      (A B : int) :
-    hoare [ M.polynomial__subtract :
+(* the subtraction on one coefficient: the sign mask of d selects 2q *)
+op sub_intt_w (a b : W32.t) : W32.t =
+  let d = a - b in
+  d - W32.of_int 8380417 + ((d `|>>>` 31) `&` W32.of_int 16760834).
+
+lemma sub_intt_w_cases (a b : W32.t) :
+  W32.of_int (-8380416) \sle a => a \sle W32.of_int 8380416 =>
+  W32.of_int (-8380416) \sle b => b \sle W32.of_int 8380416 =>
+  (W32.zero \sle a - b /\ sub_intt_w a b = a - b - W32.of_int 8380417) \/
+  (a - b \slt W32.zero /\ sub_intt_w a b = a - b + W32.of_int 8380417).
+proof. by rewrite /sub_intt_w; circuit. qed.
+
+lemma sub_intt_wE (a b : W32.t) :
+  -(q-1) <= to_sint a <= q-1 => -(q-1) <= to_sint b <= q-1 =>
+  incoeff (to_sint (sub_intt_w a b)) = incoeff (to_sint a) - incoeff (to_sint b) /\
+  -q <= to_sint (sub_intt_w a b) <= q - 1.
+proof.
+move=> ha hb.
+have hq : to_sint (W32.of_int 8380417) = q by rewrite W32.to_sintE W32.of_uintK /smod.
+have hz : to_sint W32.zero = 0 by rewrite W32.to_sintE W32.of_uintK /smod.
+have hd : to_sint (a - b) = to_sint a - to_sint b by rewrite W32.to_sintB_small /#.
+have hq0 : incoeff q = Zq.zero by rewrite incoeff_eq0P dvdzz.
+have := sub_intt_w_cases a b _ _ _ _; 1..4: by rewrite W32.sleE W32.to_sintK_small; smt().
+rewrite W32.sleE W32.sltE hz; case=> [[h0 ->] | [h0 ->]].
++ rewrite W32.to_sintB_small 1:/# hd hq !incoeffB hq0; split; [ring | smt()].
+rewrite W32.to_sintD_small 1:/# hd hq incoeffD incoeffB hq0; split; [ring | smt()].
+qed.
+
+lemma polynomial__subtract_to_intt_range_correct
+      (_diff : W32.t Array256.t) (_lhs : W32.t Array256.t) (_rhs : W32.t Array256.t) :
+    hoare [ M.polynomial__subtract_to_intt_range :
         difference_pointer = _diff /\ lhs_pointer = _lhs /\ rhs_pointer = _rhs /\
-        wpoly_srng A A _lhs /\ wpoly_srng B B _rhs /\ A + B < 2^31
+        wpoly_srng (q-1) (q-1) _lhs /\ wpoly_srng (q-1) (q-1) _rhs
         ==>
         lifts_wpoly res = lifts_wpoly _lhs &+ ((&-) (lifts_wpoly _rhs)) /\
-        wpoly_srng (A + B) (A + B) res
+        wpoly_intt_irng res
     ].
 proof.
 proc => /=.
-proc change ^while.1 : { lhs <- if (0 <= offset*8 <= 32*256-256) then BSWAS_256u32_256.sliceget lhs_pointer (offset*8) else get256_direct (WArray1024.init32 (fun (i_0:int) => lhs_pointer.[i_0])) offset; }.
-+ auto => /> &2.
-  case (0 <= offset{2} * 8 <= 7936); last by auto.
-  by move => Ha _ _ _; rewrite -BSWAS_256u32_256_slicegetE 1:/#.
-proc change ^while.2 : { rhs <- if (0 <= offset*8 <= 32*256-256) then BSWAS_256u32_256.sliceget rhs_pointer (offset*8) else get256_direct (WArray1024.init32 (fun (i_0:int) => rhs_pointer.[i_0])) offset; }.
-+ auto => /> &2.
-  case (0 <= offset{2} * 8 <= 7936); last by auto.
-  by move => Ha _ _ _; rewrite -BSWAS_256u32_256_slicegetE 1:/#.
-proc change ^while.4 : { difference_pointer <- if (0 <= offset*8 <= 32*256-256) then BSWAS_256u32_256.sliceset difference_pointer (offset*8) difference else Array256.init (get32 (set256_direct (WArray1024.init32 (fun (i_0:int) => difference_pointer.[i_0])) offset difference)); }.
-+ auto => /> &2.
-  case (0 <= offset{2} * 8 <= 7936); last by auto.
-  by move => Ha _ _ _; rewrite BSWAS_256u32_256_slicesetE 1:/#.
+proc change ^while.1 : { lhs <- if (0 <= offset*8 <= 32*256-256)
+  then BSWAS_256u32_256.sliceget lhs_pointer (offset*8)
+  else get256_direct (WArray1024.init32 (fun (i_0:int) => lhs_pointer.[i_0])) offset; }.
++ auto => /> &2; case (0 <= offset{2} * 8 <= 7936); last by auto.
+  by move => *; rewrite -BSWAS_256u32_256_slicegetE 1:/#.
+proc change ^while.2 : { rhs <- if (0 <= offset*8 <= 32*256-256)
+  then BSWAS_256u32_256.sliceget rhs_pointer (offset*8)
+  else get256_direct (WArray1024.init32 (fun (i_0:int) => rhs_pointer.[i_0])) offset; }.
++ auto => /> &2; case (0 <= offset{2} * 8 <= 7936); last by auto.
+  by move => *; rewrite -BSWAS_256u32_256_slicegetE 1:/#.
+proc change ^while.8 : { difference_pointer <- if (0 <= offset*8 <= 32*256-256)
+  then BSWAS_256u32_256.sliceset difference_pointer (offset*8) difference
+  else Array256.init (get32 (set256_direct
+         (WArray1024.init32 (fun (i_0:int) => difference_pointer.[i_0])) offset difference)); }.
++ auto => /> &2; case (0 <= offset{2} * 8 <= 7936); last by auto.
+  by move => *; rewrite BSWAS_256u32_256_slicesetE 1:/#.
 unroll for ^while.
-wp 128.
-conseq (: difference_pointer = _diff /\ lhs_pointer = _lhs /\ rhs_pointer = _rhs /\ wpoly_srng A A _lhs /\ wpoly_srng B B _rhs /\ A + B < 2^31 ==> difference_pointer = BSWA_256u32.init (fun (i:int) => _lhs.[i] - _rhs.[i])); last by circuit.
-move => &hr [# _ _ _ HsA HsB Hab] p0 ->.
-move: HsA HsB; rewrite /wpoly_srng !allP => HsA HsB.
+wp -1.
+conseq (: lhs_pointer = _lhs /\ rhs_pointer = _rhs ==>
+          difference_pointer = BSWA_256u32.init (fun (i:int) => sub_intt_w _lhs.[i] _rhs.[i]));
+  last by rewrite /sub_intt_w /=; circuit.
++ by move=> &hr />.
+move => &hr [# _ _ _ HsA HsB] p0 ->.
+move: HsA HsB; rewrite /wpoly_intt_irng /wpoly_srng !allP => HsA HsB.
 split.
 + apply Array256.tP => i Hi.
   rewrite /lifts_wpoly /BSWA_256u32.init mapiE 1:/# /= initiE 1:/# /= poly_addE 1:/#.
-  have /= HA := HsA i Hi. have /= HB := HsB i Hi.
-  rewrite poly_negE 1:/# !mapiE 1,2:/# /= to_sintB_small 1:/#.
-  by rewrite incoeffB.
-+ move => k kb.
-  have /= HA := HsA k kb. have /= HB := HsB k kb.
-  rewrite /BSWA_256u32.init initiE 1:/# /=.
-  by rewrite to_sintB_small 1:/#; smt().
+  rewrite poly_negE 1:/# !mapiE 1,2:/# /=.
+  by have [-> _] := sub_intt_wE _lhs.[i] _rhs.[i] (HsA i Hi) (HsB i Hi).
+move => k kb; rewrite /BSWA_256u32.init initiE 1:/# /=.
+by have [_ /#] := sub_intt_wE _lhs.[k] _rhs.[k] (HsA k kb) (HsB k kb).
 qed.
 
-lemma polynomial__subtract_ph
-      (_diff : W32.t Array256.t) (_lhs : W32.t Array256.t) (_rhs : W32.t Array256.t)
-      (A B : int) :
-    phoare [ M.polynomial__subtract :
+lemma polynomial__subtract_to_intt_range_ph
+      (_diff : W32.t Array256.t) (_lhs : W32.t Array256.t) (_rhs : W32.t Array256.t) :
+    phoare [ M.polynomial__subtract_to_intt_range :
         difference_pointer = _diff /\ lhs_pointer = _lhs /\ rhs_pointer = _rhs /\
-        wpoly_srng A A _lhs /\ wpoly_srng B B _rhs /\ A + B < 2^31
+        wpoly_srng (q-1) (q-1) _lhs /\ wpoly_srng (q-1) (q-1) _rhs
         ==>
         lifts_wpoly res = lifts_wpoly _lhs &+ ((&-) (lifts_wpoly _rhs)) /\
-        wpoly_srng (A + B) (A + B) res
+        wpoly_intt_irng res
     ] = 1%r
-  by conseq polynomial__subtract_ll (polynomial__subtract_correct _diff _lhs _rhs A B).
+  by conseq polynomial__subtract_to_intt_range_ll
+            (polynomial__subtract_to_intt_range_correct _diff _lhs _rhs).
 
 (* ================================================================== *)
 (* polynomial____shift_coefficients_left                                 *)

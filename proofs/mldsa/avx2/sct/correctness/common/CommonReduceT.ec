@@ -28,20 +28,9 @@ lemma montgomery_multiply_and_reduce_ll : islossless M.montgomery_multiply_and_r
 proof. by proc; islossless. qed.
 
 (* ================================================================== *)
-(* polynomial__reduce32                                                 *)
-(* reduce32(a)[i] = a[i] mod q, centered representative                *)
-(* Concretely: a[i] - round(a[i] / 2^23) * q                         *)
-(* Spec: lifts_wpoly res = lifts_wpoly _a (same GFq value)             *)
-(*       wpoly_srng ((q-1)%/2) ((q-1)%/2) res  (centered rep)         *)
+(* Reductions of one coefficient: reduce32, as in the fused            *)
+(* add/subtract-reduce32 routines, and the conditional addition of q   *)
 (* ================================================================== *)
-
-lemma polynomial__reduce32_ll : islossless M.polynomial__reduce32.
-proof.
-proc.
-wp; while (0 <= offset <= (256 * 32) %/ 8 /\ offset %% 32 = 0)
-         ((256 * 32) %/ 8 - offset); last by auto => /#.
-by move => *; auto => /#.
-qed.
 
 (* reduce32 on one coefficient: a - round(a / 2^23) * q. *)
 op reduce32_w (a : W32.t) : W32.t =
@@ -94,41 +83,6 @@ rewrite /caddq_w sltE Hz; case: (to_sint c < 0) => Hlt /=.
 have Hnn : 0 <= to_sint c by smt().
 by rewrite -(W32.to_sint_unsigned _ Hnn); smt().
 qed.
-
-lemma polynomial__reduce32_correct (_a : W32.t Array256.t) :
-    hoare [ M.polynomial__reduce32 :
-        polynomial = _a /\
-        wpoly_srng (2^31 - 2^22 - 1) (2^31 - 2^22 - 1) _a
-        ==>
-        lifts_wpoly res = lifts_wpoly _a /\
-        wpoly_srng 6283009 6283008 res
-    ].
-proof.
-proc => /=.
-proc change ^while.1 : { a <- if (0 <= offset*8 <= 32*256-256) then BSWAS_256u32_256.sliceget polynomial (offset*8) else WArray1024.WArray1024.get256_direct (WArray1024.WArray1024.init32 (fun (i_0:int) => polynomial.[i_0])) offset; }; first (auto => /> &2; case (0 <= offset{2} * 8 <= 7936); [by move => *; rewrite -BSWAS_256u32_256_slicegetE 1:/# | by auto]).
-proc change ^while.6 : { polynomial <- if (0 <= offset*8 <= 32*256-256) then BSWAS_256u32_256.sliceset polynomial (offset*8) a else Array256.init (WArray1024.WArray1024.get32 (WArray1024.WArray1024.set256_direct (WArray1024.WArray1024.init32 (fun (i_0:int) => polynomial.[i_0])) offset a)); }; first (auto => /> &2; case (0 <= offset{2} * 8 <= 7936); [by move => *; rewrite BSWAS_256u32_256_slicesetE 1:/# | by auto]).
-unroll for ^while.
-wp 194.
-conseq (: polynomial = _a /\ wpoly_srng 2143289343 2143289343 _a ==>
-          polynomial = BSWA_256u32.init (fun (i:int) => reduce32_w _a.[i])); last first.
-+ by rewrite /reduce32_w; circuit.
-move => &hr [# _ Hrng] p0 ->; move: Hrng; rewrite /wpoly_srng !allP => Hrng.
-split.
-+ apply Array256.tP => i Hi; rewrite /lifts_wpoly !mapiE 1,2:/# /= /BSWA_256u32.init initiE 1:/# /=.
-  by have [-> _] := reduce32_wE _a.[i] (Hrng i Hi).
-move => i Hi; rewrite /BSWA_256u32.init initiE 1:/# /=.
-by have [_ ->] := reduce32_wE _a.[i] (Hrng i Hi).
-qed.
-
-lemma polynomial__reduce32_ph (_a : W32.t Array256.t) :
-    phoare [ M.polynomial__reduce32 :
-        polynomial = _a /\
-        wpoly_srng (2^31 - 2^22 - 1) (2^31 - 2^22 - 1) _a
-        ==>
-        lifts_wpoly res = lifts_wpoly _a /\
-        wpoly_srng 6283009 6283008 res
-    ] = 1%r
-  by conseq polynomial__reduce32_ll (polynomial__reduce32_correct _a).
 
 (* ================================================================== *)
 (* polynomial__pointwise_montgomery_multiply_and_reduce                 *)

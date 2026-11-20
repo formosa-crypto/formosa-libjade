@@ -11,7 +11,7 @@ clone include VecMat.VecMatT.
 
 import Round ZModQ Zq PolyLVec PolyKVec PolyMat MLDSAParams.
 
-lemma invntt_obound_fits_for_caddq :
+lemma invntt_obound_add_eta_le :
   0 <= invntt_obound /\ invntt_obound + Eta <= q - 1.
 proof. by have := param_sets; rewrite /invntt_obound /=; smt(). qed.
 

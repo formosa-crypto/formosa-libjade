@@ -22,7 +22,9 @@ namespace row_vector {
     // reduction per coefficient instead of one per product, and no store or
     // addition pass per product. The sum of at most 7 products |a b| < q 2^31
     // stays below 2^63, and the reduction of a 64-bit T with |T| < 7 q 2^31
-    // returns a value in (-4q, 4q), which the reduce32 that follows centres.
+    // returns a value in (-4q, 4q). For a matrix row (entries in [0, q)) and
+    // NTT outputs (|b| < 9q), |T| < 63 q^2 and the result lies in (-q, q),
+    // the input range of the inverse NTT.
     #[safety =
        { requires = is_arr_init(lhs,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))
                  && is_arr_init(rhs,0,4 * (COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL))

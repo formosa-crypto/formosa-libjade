@@ -957,20 +957,6 @@ unroll for ^while.
 by auto => /> *.
 qed.
 
-lemma polynomial__reduce32_proof _polynomial _b_polynomial :
-      (polynomial__reduce32_spec _polynomial _b_polynomial).
-proof.
-hint +safety.
-rewrite /polynomial__reduce32_spec; proc.
-conseq (_ :
-     b_polynomial = BArray1024.init_arr (W8.of_int 255)
-  ==> BArray1024.is_init b_polynomial 0 1024
-   /\ valid trace_polynomial__reduce32).
-+ by move=> &hr />; rewrite -!(BI1024.is_init_full _ 1024) //.
-unroll for ^while.
-by auto => /> *.
-qed.
-
 lemma montgomery_multiply_by_zeta_lanes_proof _lhs _zetas _zetas_high _zetas_qinv _zetas_qinv_high :
       (montgomery_multiply_by_zeta_lanes_spec _lhs _zetas _zetas_high _zetas_qinv _zetas_qinv_high).
 proof.
@@ -2261,17 +2247,17 @@ unroll for ^while.
 by auto => /> *.
 qed.
 
-lemma polynomial__subtract_proof _difference_pointer _b_difference_pointer _lhs_pointer _b_lhs_pointer _rhs_pointer _b_rhs_pointer :
-      (polynomial__subtract_spec _difference_pointer _b_difference_pointer
+lemma polynomial__subtract_to_intt_range_proof _difference_pointer _b_difference_pointer _lhs_pointer _b_lhs_pointer _rhs_pointer _b_rhs_pointer :
+      (polynomial__subtract_to_intt_range_spec _difference_pointer _b_difference_pointer
       _lhs_pointer _b_lhs_pointer _rhs_pointer _b_rhs_pointer).
 proof.
 hint +safety.
-rewrite /polynomial__subtract_spec; proc.
+rewrite /polynomial__subtract_to_intt_range_spec; proc.
 conseq (_ :
      b_lhs_pointer = BArray1024.init_arr (W8.of_int 255)
   /\ b_rhs_pointer = BArray1024.init_arr (W8.of_int 255)
   ==> BArray1024.is_init b_difference_pointer 0 (4 * 256)
-   /\ valid trace_polynomial__subtract).
+   /\ valid trace_polynomial__subtract_to_intt_range).
 + by move=> &hr />; rewrite -!(BI1024.is_init_full _ 1024) //.
 unroll for ^while.
 by auto => /> *.
@@ -2439,28 +2425,6 @@ auto; ecall (polynomial____check_infinity_norm_proof param_0 b_param param).
 auto; ecall (polynomial____check_infinity_norm_proof param_0 b_param param).
 auto; ecall (polynomial____check_infinity_norm_proof param_0 b_param param).
 auto; ecall (polynomial____check_infinity_norm_proof param_0 b_param param).
-by auto => /> *.
-qed.
-
-lemma column_vector__reduce32_proof _vector _b_vector :
-      (column_vector__reduce32_spec _vector _b_vector).
-proof.
-hint +safety.
-rewrite /column_vector__reduce32_spec; proc.
-conseq (_ :
-     b_vector = BArray8192.init_arr (W8.of_int 255)
-  ==> BArray8192.is_init b_vector 0 8192
-   /\ valid trace_column_vector__reduce32).
-+ by move=> &hr />; rewrite -!(BI8192.is_init_full _ 8192) //.
-unroll for ^while.
-auto; ecall (polynomial__reduce32_proof param b_param).
-auto; ecall (polynomial__reduce32_proof param b_param).
-auto; ecall (polynomial__reduce32_proof param b_param).
-auto; ecall (polynomial__reduce32_proof param b_param).
-auto; ecall (polynomial__reduce32_proof param b_param).
-auto; ecall (polynomial__reduce32_proof param b_param).
-auto; ecall (polynomial__reduce32_proof param b_param).
-auto; ecall (polynomial__reduce32_proof param b_param).
 by auto => /> *.
 qed.
 
@@ -3561,11 +3525,10 @@ conseq (_ :
    /\ valid trace___compute_t0_t1).
 + by move=> &hr />; rewrite -!(BI7168.is_init_full _ 7168) // -!(BI8192.is_init_full _ 8192) // -!(BI57344.is_init_full _ 57344) //.
 + by move=> />.
-auto; ecall (column_vector____power2round_proof param_6 ((BArray8192.init_arr (W8.of_int 255)))).
-auto; ecall (column_vector____conditionally_add_modulus_proof param_5 ((BArray8192.init_arr (W8.of_int 255)))).
-auto; ecall (column_vector____add_proof param_4 ((BArray8192.init_arr (W8.of_int 255))) param_3 ((BArray8192.init_arr (W8.of_int 255)))).
-auto; ecall (column_vector__invert_ntt_montgomery_proof param_2 ((BArray8192.init_arr (W8.of_int 255)))).
-auto; ecall (column_vector__reduce32_proof param_1 ((BArray8192.init_arr (W8.of_int 255)))).
+auto; ecall (column_vector____power2round_proof param_5 ((BArray8192.init_arr (W8.of_int 255)))).
+auto; ecall (column_vector____conditionally_add_modulus_proof param_4 ((BArray8192.init_arr (W8.of_int 255)))).
+auto; ecall (column_vector____add_proof param_3 ((BArray8192.init_arr (W8.of_int 255))) param_2 ((BArray8192.init_arr (W8.of_int 255)))).
+auto; ecall (column_vector__invert_ntt_montgomery_proof param_1 ((BArray8192.init_arr (W8.of_int 255)))).
 auto; ecall (row_vector____multiply_with_matrix_A_proof param_0 ((BArray57344.init_arr (W8.of_int 255))) param ((BArray7168.init_arr (W8.of_int 255)))).
 by auto => /> *.
 qed.
@@ -4017,30 +3980,29 @@ seq < ^if : (exit_rejection_sampling_loop <> W64.zero
         by rewrite BI7168.is_init_set256d_in 1,2:/# /=; smt(BI7168.is_init_le0).
       auto; ecall (sample____mask_proof param_23 (BArray64.init_arr (W8.of_int 255)) param_22).
       by auto => /> *; smt().
-    auto; ecall (__make_hint_vector_proof param_55 b_param_5 param_54
-                  (BArray8192.init_arr (W8.of_int 255)) param_53 b_param_4 param_52).
-    auto; ecall (__apply_ct0_and_check_norm_proof param_51 b_param_8 param_50 b_param_7 param_49
-                  b_param_6 param_48 (BArray244.init_arr (W8.of_int 255)) param_47).
-    auto; ecall (__apply_cs2_and_check_norm_proof param_46 b_param_10 param_45
-                  (BArray8192.init_arr (W8.of_int 255)) param_44 b_param_9 param_43
-                  (BArray244.init_arr (W8.of_int 255)) param_42).
-    auto; ecall (__compute_z_and_check_norm_proof param_41 b_param_12 param_40
+    auto; ecall (__make_hint_vector_proof param_54 b_param_5 param_53
+                  (BArray8192.init_arr (W8.of_int 255)) param_52 b_param_4 param_51).
+    auto; ecall (__apply_ct0_and_check_norm_proof param_50 b_param_8 param_49 b_param_7 param_48
+                  b_param_6 param_47 (BArray244.init_arr (W8.of_int 255)) param_46).
+    auto; ecall (__apply_cs2_and_check_norm_proof param_45 b_param_10 param_44
+                  (BArray8192.init_arr (W8.of_int 255)) param_43 b_param_9 param_42
+                  (BArray244.init_arr (W8.of_int 255)) param_41).
+    auto; ecall (__compute_z_and_check_norm_proof param_40 b_param_12 param_39
                   (BArray244.init_arr (W8.of_int 255))
-                  param_39 (BArray7168.init_arr (W8.of_int 255))
-                  param_38 b_param_11 param_37).
+                  param_38 (BArray7168.init_arr (W8.of_int 255))
+                  param_37 b_param_11 param_36).
     (* the positions of the challenge, from its tau non-zero coefficients *)
-    auto; ecall (polynomial____challenge_positions_proof param_36
+    auto; ecall (polynomial____challenge_positions_proof param_35
                   (BArray1024.init_arr (W8.of_int 255))).
-    auto; ecall (sample____challenge_full param_35 b_param_13 param_34
+    auto; ecall (sample____challenge_full param_34 b_param_13 param_33
                   (BArray64.init_arr (W8.of_int 255))).
-    auto; ecall (__derive_commitment_hash_proof param_33 b_param_14 param_32
+    auto; ecall (__derive_commitment_hash_proof param_32 b_param_14 param_31
                   (BArray64.init_arr (W8.of_int 255))
-                  param_31 (BArray1024.init_arr (W8.of_int 255))).
-    auto; ecall (commitment____encode_proof param_30 (BArray8192.init_arr (W8.of_int 255))).
-    auto; ecall (column_vector____decompose_proof param_29 (BArray8192.init_arr (W8.of_int 255))).
-    auto; ecall (column_vector__invert_ntt_montgomery_proof param_28
+                  param_30 (BArray1024.init_arr (W8.of_int 255))).
+    auto; ecall (commitment____encode_proof param_29 (BArray8192.init_arr (W8.of_int 255))).
+    auto; ecall (column_vector____decompose_proof param_28 (BArray8192.init_arr (W8.of_int 255))).
+    auto; ecall (column_vector__invert_ntt_montgomery_proof param_27
                   (BArray8192.init_arr (W8.of_int 255))).
-    auto; ecall (column_vector__reduce32_proof param_27 (BArray8192.init_arr (W8.of_int 255))).
     auto; ecall (row_vector____multiply_with_matrix_A_proof param_26
                   (BArray57344.init_arr (W8.of_int 255))
                   param_25 (BArray7168.init_arr (W8.of_int 255))).
@@ -4068,10 +4030,10 @@ seq < ^if : (exit_rejection_sampling_loop <> W64.zero
 (* the signature is encoded only when the exiting attempt passed every norm
    check; otherwise every byte of it is set to zero *)
 wp; if.
-+ auto; ecall (signature____encode_proof param_59 b_param_2 param_58 b_param_1 param_57 b_param_0
-                param_56 b_param).
++ auto; ecall (signature____encode_proof param_58 b_param_2 param_57 b_param_1 param_56 b_param_0
+                param_55 b_param).
   by auto => /> /#.
-auto; ecall (signature____zero_proof param_60 b_param_3).
+auto; ecall (signature____zero_proof param_59 b_param_3).
 by auto => /> *.
 qed.
 
@@ -4109,75 +4071,59 @@ conseq (_ :
    /\ valid trace_reconstruct_signer_commitment).
 + by move=> &hr />; rewrite -!(BI1024.is_init_full _ 1024) // -!(BI2560.is_init_full _ 2560) // -!(BI8192.is_init_full _ 8192) //.
 unroll for ^while.
-auto; ecall (commitment____encode_proof param_14 b_param).
-auto; ecall (polynomial__use_hints_proof param_13 ((BArray1024.init_arr (W8.of_int 255))) param_12 b_param_0).
-auto; ecall (polynomial__conditionally_add_modulus_proof param_11 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__invert_ntt_montgomery_proof param_10 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__reduce32_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__subtract_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (commitment____encode_proof param_12 b_param).
+auto; ecall (polynomial__use_hints_proof param_11 ((BArray1024.init_arr (W8.of_int 255))) param_10 b_param_0).
+auto; ecall (polynomial__invert_ntt_montgomery_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__subtract_to_intt_range_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__pointwise_montgomery_multiply_and_reduce_proof param_5 b_param_3 param_4 ((BArray1024.init_arr (W8.of_int 255))) param_3 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__ntt_proof param_2 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial____shift_coefficients_left_proof param_1 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (t1__decode_polynomial_proof param_0 b_param_5 param b_param_4).
-auto; ecall (polynomial__use_hints_proof param_13 ((BArray1024.init_arr (W8.of_int 255))) param_12 b_param_0).
-auto; ecall (polynomial__conditionally_add_modulus_proof param_11 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__invert_ntt_montgomery_proof param_10 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__reduce32_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__subtract_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__use_hints_proof param_11 ((BArray1024.init_arr (W8.of_int 255))) param_10 b_param_0).
+auto; ecall (polynomial__invert_ntt_montgomery_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__subtract_to_intt_range_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__pointwise_montgomery_multiply_and_reduce_proof param_5 b_param_3 param_4 ((BArray1024.init_arr (W8.of_int 255))) param_3 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__ntt_proof param_2 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial____shift_coefficients_left_proof param_1 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (t1__decode_polynomial_proof param_0 b_param_5 param b_param_4).
-auto; ecall (polynomial__use_hints_proof param_13 ((BArray1024.init_arr (W8.of_int 255))) param_12 b_param_0).
-auto; ecall (polynomial__conditionally_add_modulus_proof param_11 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__invert_ntt_montgomery_proof param_10 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__reduce32_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__subtract_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__use_hints_proof param_11 ((BArray1024.init_arr (W8.of_int 255))) param_10 b_param_0).
+auto; ecall (polynomial__invert_ntt_montgomery_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__subtract_to_intt_range_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__pointwise_montgomery_multiply_and_reduce_proof param_5 b_param_3 param_4 ((BArray1024.init_arr (W8.of_int 255))) param_3 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__ntt_proof param_2 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial____shift_coefficients_left_proof param_1 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (t1__decode_polynomial_proof param_0 b_param_5 param b_param_4).
-auto; ecall (polynomial__use_hints_proof param_13 ((BArray1024.init_arr (W8.of_int 255))) param_12 b_param_0).
-auto; ecall (polynomial__conditionally_add_modulus_proof param_11 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__invert_ntt_montgomery_proof param_10 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__reduce32_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__subtract_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__use_hints_proof param_11 ((BArray1024.init_arr (W8.of_int 255))) param_10 b_param_0).
+auto; ecall (polynomial__invert_ntt_montgomery_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__subtract_to_intt_range_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__pointwise_montgomery_multiply_and_reduce_proof param_5 b_param_3 param_4 ((BArray1024.init_arr (W8.of_int 255))) param_3 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__ntt_proof param_2 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial____shift_coefficients_left_proof param_1 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (t1__decode_polynomial_proof param_0 b_param_5 param b_param_4).
-auto; ecall (polynomial__use_hints_proof param_13 ((BArray1024.init_arr (W8.of_int 255))) param_12 b_param_0).
-auto; ecall (polynomial__conditionally_add_modulus_proof param_11 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__invert_ntt_montgomery_proof param_10 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__reduce32_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__subtract_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__use_hints_proof param_11 ((BArray1024.init_arr (W8.of_int 255))) param_10 b_param_0).
+auto; ecall (polynomial__invert_ntt_montgomery_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__subtract_to_intt_range_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__pointwise_montgomery_multiply_and_reduce_proof param_5 b_param_3 param_4 ((BArray1024.init_arr (W8.of_int 255))) param_3 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__ntt_proof param_2 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial____shift_coefficients_left_proof param_1 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (t1__decode_polynomial_proof param_0 b_param_5 param b_param_4).
-auto; ecall (polynomial__use_hints_proof param_13 ((BArray1024.init_arr (W8.of_int 255))) param_12 b_param_0).
-auto; ecall (polynomial__conditionally_add_modulus_proof param_11 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__invert_ntt_montgomery_proof param_10 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__reduce32_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__subtract_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__use_hints_proof param_11 ((BArray1024.init_arr (W8.of_int 255))) param_10 b_param_0).
+auto; ecall (polynomial__invert_ntt_montgomery_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__subtract_to_intt_range_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__pointwise_montgomery_multiply_and_reduce_proof param_5 b_param_3 param_4 ((BArray1024.init_arr (W8.of_int 255))) param_3 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__ntt_proof param_2 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial____shift_coefficients_left_proof param_1 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (t1__decode_polynomial_proof param_0 b_param_5 param b_param_4).
-auto; ecall (polynomial__use_hints_proof param_13 ((BArray1024.init_arr (W8.of_int 255))) param_12 b_param_0).
-auto; ecall (polynomial__conditionally_add_modulus_proof param_11 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__invert_ntt_montgomery_proof param_10 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__reduce32_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__subtract_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__use_hints_proof param_11 ((BArray1024.init_arr (W8.of_int 255))) param_10 b_param_0).
+auto; ecall (polynomial__invert_ntt_montgomery_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__subtract_to_intt_range_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__pointwise_montgomery_multiply_and_reduce_proof param_5 b_param_3 param_4 ((BArray1024.init_arr (W8.of_int 255))) param_3 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__ntt_proof param_2 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial____shift_coefficients_left_proof param_1 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (t1__decode_polynomial_proof param_0 b_param_5 param b_param_4).
-auto; ecall (polynomial__use_hints_proof param_13 ((BArray1024.init_arr (W8.of_int 255))) param_12 b_param_0).
-auto; ecall (polynomial__conditionally_add_modulus_proof param_11 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__invert_ntt_montgomery_proof param_10 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__reduce32_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
-auto; ecall (polynomial__subtract_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__use_hints_proof param_11 ((BArray1024.init_arr (W8.of_int 255))) param_10 b_param_0).
+auto; ecall (polynomial__invert_ntt_montgomery_proof param_9 ((BArray1024.init_arr (W8.of_int 255)))).
+auto; ecall (polynomial__subtract_to_intt_range_proof param_8 b_param_2 param_7 b_param_1 param_6 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__pointwise_montgomery_multiply_and_reduce_proof param_5 b_param_3 param_4 ((BArray1024.init_arr (W8.of_int 255))) param_3 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial__ntt_proof param_2 ((BArray1024.init_arr (W8.of_int 255)))).
 auto; ecall (polynomial____shift_coefficients_left_proof param_1 ((BArray1024.init_arr (W8.of_int 255)))).

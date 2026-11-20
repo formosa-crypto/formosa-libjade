@@ -2,18 +2,6 @@ require "polynomial.jinc"
 
 // A column vector has dimensions ROWS_IN_MATRIX_A * 1
 namespace column_vector {
-    fn reduce32(reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] vector)
-        -> reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] {
-        inline int i;
-
-        for i = 0 to ROWS_IN_MATRIX_A {
-            vector[i * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL] =
-                polynomial::reduce32(vector[i * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL]);
-        }
-
-        return vector;
-    }
-
     fn ntt(reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] vector)
         -> reg ptr u32[ROWS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] {
         inline int i;

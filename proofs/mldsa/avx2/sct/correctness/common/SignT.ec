@@ -641,7 +641,7 @@ while (
    + by move => _ _ _ result_R _ Hdom; smt().
 
  sp 3 0.
- seq 0 7 : (#pre /\
+ seq 0 6 : (#pre /\
      lifts_wpolykvec (kvec_unflatten256 w0{2}) = w0{1} /\
      lifts_wpolykvec (kvec_unflatten256 w1{2}) = w1{1} /\
      wpolykvec_srng (kvec_unflatten256 w0{2}) gamma2 gamma2 /\
@@ -665,19 +665,15 @@ while (
      apply Array_lpolys.tP => k Hk; apply Hcopied; smt().
    wp; ecall{2} (column_vector____decompose_ph w{2}).
    wp; ecall{2} (column_vector__invert_ntt_montgomery_ph w{2}).
-   wp; ecall{2} (column_vector__reduce32_ph w{2}).
    wp; ecall{2} (row_vector____multiply_with_matrix_A_ph matrix_A{2} mask_as_ntt{2}).
    wp; ecall{2} (row_vector__ntt_ph mask_as_ntt{2}).
    auto => |> &1 &2 *.
-   have Hbound := invntt_obound_fits_for_caddq.
+   have Hbound := invntt_obound_add_eta_le.
    split; first by apply wpolylvec_srng_ntt_irng;
      apply (wpolylvec_srng_widen _ (gamma1-1) gamma1 (q-1) (q-1)); smt(gamma1_cases).
    move => _ result Hntt_eq Hntt_orng.
    move => _ result0 Hmul_eq Hmul_srng.
-   split; first by apply (wpolykvec_srng_widen _ (lvec * 8380416) (lvec * 8380416) 2143289343 2143289343); smt(param_sets).
-   move => _ result1 Hred_eq Hred_srng.
-   split; first by apply wpolykvec_bmul_orng_intt_irng;
-     apply (wpolykvec_srng_widen _ 6283009 6283008 (q-1) (q-1)); smt().
+   split; first by apply wpolykvec_bmul_orng_intt_irng.
    move => _ result2 Hinvntt_eq Hinvntt_srng.
    split;
      first by apply (wpolykvec_srng_widen _ invntt_obound invntt_obound (q-1) (q-1)); smt().
@@ -689,7 +685,7 @@ while (
    have Hreachable : lifts_wpolykvec (kvec_unflatten256 result2) =
                      invnttv (ntt_mulmxv (liftu_wpolymat (mat_unflatten256 matrix_A{2}))
                                          (nttv (lifts_wpolylvec (lvec_unflatten256 mask{2})))).
-   + by rewrite Hinvntt_eq (liftm_wpolykvec_lifts _ _ Hred_eq) Hmul_eq Hntt_eq.
+   + by rewrite Hinvntt_eq Hmul_eq Hntt_eq.
    have Hw1_lifts : lifts_wpolykvec (kvec_unflatten256 result4.`2) =
                     liftu_wpolykvec (kvec_unflatten256 result4.`2).
    + apply wpolykvec_urng_lifts_eq_liftu;

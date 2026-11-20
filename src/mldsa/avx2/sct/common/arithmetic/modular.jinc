@@ -153,34 +153,4 @@ namespace polynomial {
 
         return polynomial;
     }
-
-    fn reduce32(reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial)
-        -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
-    {
-        reg u256 two_pow_22 modulus;
-        reg u256 a t;
-
-        reg ui64 offset;
-
-        two_pow_22 = TWO_POW_22_VECTOR;
-        modulus = MODULUS_VECTOR;
-
-        offset = 0;
-        while(offset < BYTES_PER_UNCOMPRESSED_POLYNOMIAL) {
-            // t = (a + (1 << 22)) >> 23
-            a = polynomial.[:u256 offset];
-            t = #VPADD_8u32(a, two_pow_22);
-            t = #VPSRA_8u32(t, 23);
-
-            // t = a - t*Q
-            t = #VPMULL_8u32(t, modulus);
-            a = #VPSUB_8u32(a, t);
-
-            polynomial.[:u256 offset] = a;
-
-            offset += 32;
-        }
-
-        return polynomial;
-    }
 }
