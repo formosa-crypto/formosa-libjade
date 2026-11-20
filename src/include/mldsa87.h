@@ -12,7 +12,9 @@
  *   Ensures:
  *     - the function writes all of its output regions, and no memory outside
  *       the regions of the call;
- *     - the function keeps no state between calls.
+ *     - the function keeps no state between calls;
+ *     - before it returns, the function overwrites with zeros the stack
+ *       memory it used.
  *   Pointers need no alignment.
  *   Constant time: the signing key and the randomness are secret; the
  *     verification key, the message, the context and the signature are public.

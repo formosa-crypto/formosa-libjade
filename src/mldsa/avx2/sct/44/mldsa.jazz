@@ -19,6 +19,7 @@ from Common require "mldsa.jinc"
        {ptr: transient, val: secret} ->
        {ptr: transient, val: transient} *
        {ptr: secret, val: secret}"]
+#[stackzero=loopSCT, stackzerosize=u256]
 export fn ml_dsa_44_keygen(
     reg ptr u8[VERIFICATION_KEY_SIZE] verification_key,
     reg ptr u8[SIGNING_KEY_SIZE] signing_key,
@@ -49,6 +50,7 @@ export fn ml_dsa_44_keygen(
        transient *
        {ptr: transient, val: secret} ->
        {ptr: transient, val: transient} * public"]
+#[stackzero=loopSCT, stackzerosize=u256]
 export fn ml_dsa_44_sign(
     #[spill_to_mmx] reg ptr u8[SIGNATURE_SIZE] signature,
     reg ptr u8[SIGNING_KEY_SIZE] signing_key,
@@ -90,6 +92,7 @@ export fn ml_dsa_44_sign(
        transient *
        {ptr: transient, val: transient} ->
        public"]
+#[stackzero=loopSCT, stackzerosize=u256]
 export fn ml_dsa_44_verify(
     reg ptr u8[VERIFICATION_KEY_SIZE] verification_key,
     reg ptr u64[2] context,

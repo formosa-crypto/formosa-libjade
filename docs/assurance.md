@@ -124,6 +124,13 @@ annotations of the exported functions state which arguments are secret. Both che
 run with `--doit`: secret values (for SCT, transient ones too) only reach
 instructions of Intel's data operand independent timing (DOIT) list.
 
+### Stack zeroization
+
+Every entry point erases the stack it used before it returns, so that no
+intermediate value of the computation stays in memory after the call. The compiler
+inserts the erasure (attribute `stackzero` of the exported functions: a loop of
+256-bit stores, followed by a speculation barrier).
+
 ### ProvSec
 
 The connection between the Jasmin implementation and the security notion of the

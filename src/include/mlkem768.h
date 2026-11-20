@@ -10,7 +10,9 @@
  *   Ensures:
  *     - the function writes all of its output regions, and no memory outside
  *       the regions of the call;
- *     - the function keeps no state between calls.
+ *     - the function keeps no state between calls;
+ *     - before it returns, the function overwrites with zeros the stack
+ *       memory it used.
  *   Pointers need no alignment.
  *   Constant time: every input is secret. The code declassifies:
  *     - rho, which is part of the public key and seeds the expansion of the
