@@ -49206,6 +49206,7 @@ module M = {
     var filled:W64.t;
     var ms:W64.t;
     var compaction_index_table:BArray2048.t;
+    var lane_signs:W32.t;
     var bytes_filled:W64.t;
     var input_offset:W64.t;
     var modulus:W256.t;
@@ -49214,6 +49215,8 @@ module M = {
     var condition_loop:bool;
     var potential_coefficients:W256.t;
     var compare_with_field_modulus:W256.t;
+    var good_bytes:W32.t;
+    var good32:W32.t;
     var good:W64.t;
     var permd_indices:W128.t;
     var permd_lanes:W256.t;
@@ -49227,8 +49230,6 @@ module M = {
     var param_0:W256.t;
     var param_1:W256.t;
     var result:W256.t;
-    var param_2:W256.t;
-    var result_0:W64.t;
     var  _0:bool;
     var  _1:bool;
     var  _2:bool;
@@ -49242,6 +49243,7 @@ module M = {
     [(Assert, (BArray848.is_init b_randombytes 0 848))]);
     ms <- (init_msf);
     compaction_index_table <- cOMPACTION_INDEX_TABLE;
+    lane_signs <- (W32.of_int 2290649224);
     bytes_filled <- (W64.of_int 0);
     input_offset <- (W64.of_int 0);
     modulus <- mODULUS_VECTOR;
@@ -49268,16 +49270,11 @@ module M = {
       input_offset <- (input_offset + (W64.of_int 24));
       compare_with_field_modulus <-
       (VPCMPGT_8u32 modulus potential_coefficients);
-      param_2 <- compare_with_field_modulus;
-      (result_0, tmp__trace) <@ __lane_signs (param_2);
-      trace_matrix_A__rejection_sample_multiple_blocks <-
-      (trace_matrix_A__rejection_sample_multiple_blocks ++ tmp__trace);
-      trace_matrix_A__rejection_sample_multiple_blocks <-
-      (trace_matrix_A__rejection_sample_multiple_blocks ++
-      [(Assert, (result_0 \ule (W64.of_int 255)))]);
-      good <- result_0;
+      good_bytes <- (MOVEMASK_32u8 compare_with_field_modulus);
       (* Erased call to declassify *)
-      good <- (protect_64 good ms);
+      good_bytes <- (protect_32 good_bytes ms);
+      good32 <- (PEXT_32 good_bytes lane_signs);
+      good <- (zeroextu64 good32);
       trace_matrix_A__rejection_sample_multiple_blocks <-
       (trace_matrix_A__rejection_sample_multiple_blocks ++
       [(Assert,

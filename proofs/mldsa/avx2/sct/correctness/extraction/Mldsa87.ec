@@ -14460,6 +14460,7 @@ module M = {
     var filled:W64.t;
     var ms:W64.t;
     var compaction_index_table:W8.t Array2048.t;
+    var lane_signs:W32.t;
     var bytes_filled:W64.t;
     var input_offset:W64.t;
     var modulus:W256.t;
@@ -14468,6 +14469,8 @@ module M = {
     var condition_loop:bool;
     var potential_coefficients:W256.t;
     var compare_with_field_modulus:W256.t;
+    var good_bytes:W32.t;
+    var good32:W32.t;
     var good:W64.t;
     var permd_indices:W128.t;
     var permd_lanes:W256.t;
@@ -14485,6 +14488,7 @@ module M = {
     compaction_index_table <- witness;
     ms <- (init_msf);
     compaction_index_table <- cOMPACTION_INDEX_TABLE;
+    lane_signs <- (W32.of_int 2290649224);
     bytes_filled <- (W64.of_int 0);
     input_offset <- (W64.of_int 0);
     modulus <- mODULUS_VECTOR;
@@ -14501,9 +14505,11 @@ module M = {
       input_offset <- (input_offset + (W64.of_int 24));
       compare_with_field_modulus <-
       (VPCMPGT_8u32 modulus potential_coefficients);
-      good <@ __lane_signs (compare_with_field_modulus);
+      good_bytes <- (MOVEMASK_32u8 compare_with_field_modulus);
       (* Erased call to declassify *)
-      good <- (protect_64 good ms);
+      good_bytes <- (protect_32 good_bytes ms);
+      good32 <- (PEXT_32 good_bytes lane_signs);
+      good <- (zeroextu64 good32);
       permd_indices <-
       (zeroextu128
       (get64_direct (WArray2048.init8 (fun i => compaction_index_table.[i]))
