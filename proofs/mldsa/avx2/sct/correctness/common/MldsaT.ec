@@ -1501,31 +1501,6 @@ module M = {
     }
     return polynomial;
   }
-  proc polynomial__reduce32 (polynomial:W32.t Array256.t) : W32.t Array256.t = {
-    var two_pow_22:W256.t;
-    var modulus:W256.t;
-    var a:W256.t;
-    var t:W256.t;
-    var offset:int;
-    two_pow_22 <- tWO_POW_22_VECTOR;
-    modulus <- mODULUS_VECTOR;
-    offset <- 0;
-    while ((offset < ((256 * 32) %/ 8))) {
-      a <-
-      (get256_direct (WArray1024.init32 (fun i => polynomial.[i])) offset);
-      t <- (VPADD_8u32 a two_pow_22);
-      t <- (VPSRA_8u32 t (W128.of_int 23));
-      t <- (VPMULL_8u32 t modulus);
-      a <- (VPSUB_8u32 a t);
-      polynomial <-
-      (Array256.init
-      (WArray1024.get32
-      (WArray1024.set256_direct (WArray1024.init32 (fun i => polynomial.[i]))
-      offset a)));
-      offset <- (offset + 32);
-    }
-    return polynomial;
-  }
   proc polynomial____ct_butterfly (a:W256.t, b:W256.t, zetas:W256.t,
                                    zetas_qinv:W256.t) : W256.t * W256.t = {
     var t:W256.t;
@@ -13681,13 +13656,19 @@ module M = {
     }
     return sum_pointer;
   }
-  proc polynomial__subtract (difference_pointer:W32.t Array256.t,
-                             lhs_pointer:W32.t Array256.t,
-                             rhs_pointer:W32.t Array256.t) : W32.t Array256.t = {
+  proc polynomial__subtract_to_intt_range (difference_pointer:W32.t Array256.t,
+                                           lhs_pointer:W32.t Array256.t,
+                                           rhs_pointer:W32.t Array256.t) : 
+  W32.t Array256.t = {
+    var modulus:W256.t;
+    var two_modulus:W256.t;
     var lhs:W256.t;
     var rhs:W256.t;
     var difference:W256.t;
+    var signs:W256.t;
     var offset:int;
+    modulus <- mODULUS_VECTOR;
+    two_modulus <- (VPADD_8u32 modulus modulus);
     offset <- 0;
     while ((offset < ((256 * 32) %/ 8))) {
       lhs <-
@@ -13695,6 +13676,10 @@ module M = {
       rhs <-
       (get256_direct (WArray1024.init32 (fun i => rhs_pointer.[i])) offset);
       difference <- (VPSUB_8u32 lhs rhs);
+      signs <- (VPSRA_8u32 difference (W128.of_int 31));
+      signs <- (VPAND_256 signs two_modulus);
+      difference <- (VPSUB_8u32 difference modulus);
+      difference <- (VPADD_8u32 difference signs);
       difference_pointer <-
       (Array256.init
       (WArray1024.get32
@@ -14047,24 +14032,6 @@ module M = {
       i <- (i + 1);
     }
     return result;
-  }
-  proc column_vector__reduce32 (vector:W32.t Array_kpolys.t) : W32.t Array_kpolys.t = {
-    var aux:W32.t Array256.t;
-    var i:int;
-    i <- 0;
-    while ((i < P.kvec)) {
-      aux <@ polynomial__reduce32 ((Array256.init
-                                   (fun i_0 => vector.[((i * 256) + i_0)])));
-      vector <-
-      (Array_kpolys.init
-      (fun i_0 => (if ((i * 256) <= i_0 < ((i * 256) + 256)) then aux.[
-                                                                  (i_0 -
-                                                                  (i * 256))] else 
-                  vector.[i_0]))
-      );
-      i <- (i + 1);
-    }
-    return vector;
   }
   proc column_vector__invert_ntt_montgomery (vector:W32.t Array_kpolys.t) : 
   W32.t Array_kpolys.t = {
@@ -15798,7 +15765,6 @@ module M = {
     t0 <- witness;
     t1 <- witness;
     t <@ row_vector____multiply_with_matrix_A (matrix_A, s1);
-    t <@ column_vector__reduce32 (t);
     t <@ column_vector__invert_ntt_montgomery (t);
     t <@ column_vector____add (t, s2);
     t <@ column_vector____conditionally_add_modulus (t);
@@ -16652,7 +16618,6 @@ module M = {
       }
       mask_as_ntt <@ row_vector__ntt (mask_as_ntt);
       w <@ row_vector____multiply_with_matrix_A (matrix_A, mask_as_ntt);
-      w <@ column_vector__reduce32 (w);
       w <@ column_vector__invert_ntt_montgomery (w);
       (w0, w1) <@ column_vector____decompose (w);
       commitment_encoded <@ commitment____encode (w1);
@@ -16788,11 +16753,9 @@ module M = {
       c_times_t1, challenge_as_ntt, t1_element);
       commitment_element <-
       (Array256.init (fun i_0 => commitment.[((i * 256) + i_0)]));
-      commitment_element <@ polynomial__subtract (commitment_element,
+      commitment_element <@ polynomial__subtract_to_intt_range (commitment_element,
       az_element, c_times_t1);
-      commitment_element <@ polynomial__reduce32 (commitment_element);
       commitment_element <@ polynomial__invert_ntt_montgomery (commitment_element);
-      commitment_element <@ polynomial__conditionally_add_modulus (commitment_element);
       hints_element <-
       (Array256.init (fun i_0 => hints.[((i * 256) + i_0)]));
       commitment_element <@ polynomial__use_hints (commitment_element,

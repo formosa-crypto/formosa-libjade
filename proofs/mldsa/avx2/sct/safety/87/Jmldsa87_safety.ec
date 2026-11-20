@@ -3654,45 +3654,6 @@ module M = {
     return (polynomial, b_polynomial,
            trace_polynomial__conditionally_add_modulus);
   }
-  proc polynomial__reduce32 (polynomial:BArray1024.t,
-                             b_polynomial:BArray1024.t) : BArray1024.t *
-                                                          BArray1024.t *
-                                                          trace = {
-    var two_pow_22:W256.t;
-    var modulus:W256.t;
-    var a:W256.t;
-    var t:W256.t;
-    var offset:int;
-    var trace_polynomial__reduce32:trace;
-    trace_polynomial__reduce32 <- [];
-    trace_polynomial__reduce32 <-
-    (trace_polynomial__reduce32 ++
-    [(Assert, (BArray1024.is_init b_polynomial 0 1024))]);
-    two_pow_22 <- tWO_POW_22_VECTOR;
-    modulus <- mODULUS_VECTOR;
-    offset <- 0;
-    while ((offset < 1024)) {
-      trace_polynomial__reduce32 <-
-      (trace_polynomial__reduce32 ++
-      [(Assert, ((0 <= offset) /\ ((offset + 32) <= 1024)))]);
-      a <- (BArray1024.get256d polynomial offset);
-      t <- (VPADD_8u32 a two_pow_22);
-      t <- (VPSRA_8u32 t (W128.of_int 23));
-      t <- (VPMULL_8u32 t modulus);
-      a <- (VPSUB_8u32 a t);
-      trace_polynomial__reduce32 <-
-      (trace_polynomial__reduce32 ++
-      [(Assert, ((0 <= offset) /\ ((offset + 32) <= 1024)))]);
-      polynomial <- (BArray1024.set256d polynomial offset a);
-      trace_polynomial__reduce32 <-
-      (trace_polynomial__reduce32 ++
-      [(Assert,
-       ((0 <= (offset + 32)) /\ ((offset + 32) <= 18446744073709551615)))]);
-      offset <- (offset + 32);
-    }
-    b_polynomial <- (BArray1024.init_arr (W8.of_int 255));
-    return (polynomial, b_polynomial, trace_polynomial__reduce32);
-  }
   proc polynomial____ct_butterfly (a:W256.t, b:W256.t, zetas:W256.t,
                                    zetas_qinv:W256.t) : W256.t * W256.t *
                                                         trace = {
@@ -50816,38 +50777,46 @@ module M = {
     }
     return (sum_pointer, b_sum_pointer, trace_polynomial__add);
   }
-  proc polynomial__subtract (difference_pointer:BArray1024.t,
-                             b_difference_pointer:BArray1024.t,
-                             lhs_pointer:BArray1024.t,
-                             b_lhs_pointer:BArray1024.t,
-                             rhs_pointer:BArray1024.t,
-                             b_rhs_pointer:BArray1024.t) : BArray1024.t *
-                                                           BArray1024.t *
-                                                           trace = {
+  proc polynomial__subtract_to_intt_range (difference_pointer:BArray1024.t,
+                                           b_difference_pointer:BArray1024.t,
+                                           lhs_pointer:BArray1024.t,
+                                           b_lhs_pointer:BArray1024.t,
+                                           rhs_pointer:BArray1024.t,
+                                           b_rhs_pointer:BArray1024.t) : 
+  BArray1024.t * BArray1024.t * trace = {
+    var modulus:W256.t;
+    var two_modulus:W256.t;
     var lhs:W256.t;
     var rhs:W256.t;
     var difference:W256.t;
+    var signs:W256.t;
     var offset:int;
-    var trace_polynomial__subtract:trace;
-    trace_polynomial__subtract <- [];
-    trace_polynomial__subtract <-
-    (trace_polynomial__subtract ++
+    var trace_polynomial__subtract_to_intt_range:trace;
+    trace_polynomial__subtract_to_intt_range <- [];
+    trace_polynomial__subtract_to_intt_range <-
+    (trace_polynomial__subtract_to_intt_range ++
     [(Assert,
      ((BArray1024.is_init b_lhs_pointer 0 1024) /\
      (BArray1024.is_init b_rhs_pointer 0 1024)))]);
+    modulus <- mODULUS_VECTOR;
+    two_modulus <- (VPADD_8u32 modulus modulus);
     offset <- 0;
     while ((offset < 1024)) {
-      trace_polynomial__subtract <-
-      (trace_polynomial__subtract ++
+      trace_polynomial__subtract_to_intt_range <-
+      (trace_polynomial__subtract_to_intt_range ++
       [(Assert, ((0 <= offset) /\ ((offset + 32) <= 1024)))]);
       lhs <- (BArray1024.get256d lhs_pointer offset);
-      trace_polynomial__subtract <-
-      (trace_polynomial__subtract ++
+      trace_polynomial__subtract_to_intt_range <-
+      (trace_polynomial__subtract_to_intt_range ++
       [(Assert, ((0 <= offset) /\ ((offset + 32) <= 1024)))]);
       rhs <- (BArray1024.get256d rhs_pointer offset);
       difference <- (VPSUB_8u32 lhs rhs);
-      trace_polynomial__subtract <-
-      (trace_polynomial__subtract ++
+      signs <- (VPSRA_8u32 difference (W128.of_int 31));
+      signs <- (VPAND_256 signs two_modulus);
+      difference <- (VPSUB_8u32 difference modulus);
+      difference <- (VPADD_8u32 difference signs);
+      trace_polynomial__subtract_to_intt_range <-
+      (trace_polynomial__subtract_to_intt_range ++
       [(Assert, ((0 <= offset) /\ ((offset + 32) <= 1024)))]);
       b_difference_pointer <-
       (BArray1024.set256d b_difference_pointer offset
@@ -50856,14 +50825,14 @@ module M = {
       ));
       difference_pointer <-
       (BArray1024.set256d difference_pointer offset difference);
-      trace_polynomial__subtract <-
-      (trace_polynomial__subtract ++
+      trace_polynomial__subtract_to_intt_range <-
+      (trace_polynomial__subtract_to_intt_range ++
       [(Assert,
        ((0 <= (offset + 32)) /\ ((offset + 32) <= 18446744073709551615)))]);
       offset <- (offset + 32);
     }
     return (difference_pointer, b_difference_pointer,
-           trace_polynomial__subtract);
+           trace_polynomial__subtract_to_intt_range);
   }
   proc polynomial____check_infinity_norm (polynomial:BArray1024.t,
                                           b_polynomial:BArray1024.t,
@@ -51460,53 +51429,6 @@ module M = {
       i <- (i + 1);
     }
     return (result, trace_row_vector____check_infinity_norm);
-  }
-  proc column_vector__reduce32 (vector:BArray8192.t, b_vector:BArray8192.t) : 
-  BArray8192.t * BArray8192.t * trace = {
-    var aux:BArray1024.t;
-    var aux_0:BArray1024.t;
-    var i:int;
-    var param:BArray1024.t;
-    var result:BArray1024.t;
-    var b_result:BArray1024.t;
-    var b_param:BArray1024.t;
-    var trace_column_vector__reduce32:trace;
-    b_param <- witness;
-    b_result <- witness;
-    param <- witness;
-    result <- witness;
-    trace_column_vector__reduce32 <- [];
-    trace_column_vector__reduce32 <-
-    (trace_column_vector__reduce32 ++
-    [(Assert, (BArray8192.is_init b_vector 0 8192))]);
-    i <- 0;
-    while ((i < 8)) {
-      trace_column_vector__reduce32 <-
-      (trace_column_vector__reduce32 ++
-      [(Assert,
-       ((0 <= ((i * 256) * 4)) /\ ((((i * 256) * 4) + 1024) <= 8192)))]);
-      trace_column_vector__reduce32 <-
-      (trace_column_vector__reduce32 ++
-      [(Assert,
-       ((0 <= ((i * 256) * 4)) /\ ((((i * 256) * 4) + 1024) <= 8192)))]);
-      b_param <- (SBArray8192_1024.get_sub32 b_vector (i * 256));
-      param <- (SBArray8192_1024.get_sub32 vector (i * 256));
-      (aux, aux_0, tmp__trace) <@ polynomial__reduce32 (param, b_param);
-      result <- aux;
-      b_result <- aux_0;
-      trace_column_vector__reduce32 <-
-      (trace_column_vector__reduce32 ++ tmp__trace);
-      trace_column_vector__reduce32 <-
-      (trace_column_vector__reduce32 ++
-      [(Assert, (BArray1024.is_init b_result 0 1024))]);
-      b_vector <-
-      (SBArray8192_1024.set_sub32 b_vector (i * 256)
-      (BArray1024.init_arr (W8.of_int 255)));
-      vector <- (SBArray8192_1024.set_sub32 vector (i * 256) result);
-      i <- (i + 1);
-    }
-    b_vector <- (BArray8192.init_arr (W8.of_int 255));
-    return (vector, b_vector, trace_column_vector__reduce32);
   }
   proc column_vector__invert_ntt_montgomery (vector:BArray8192.t,
                                              b_vector:BArray8192.t) : 
@@ -55084,15 +55006,13 @@ module M = {
     var param_1:BArray8192.t;
     var result_0:BArray8192.t;
     var param_2:BArray8192.t;
-    var result_1:BArray8192.t;
     var param_3:BArray8192.t;
+    var result_1:BArray8192.t;
     var param_4:BArray8192.t;
     var result_2:BArray8192.t;
     var param_5:BArray8192.t;
     var result_3:BArray8192.t;
-    var param_6:BArray8192.t;
     var result_4:BArray8192.t;
-    var result_5:BArray8192.t;
     var b_t0:BArray8192.t;
     var b_t1:BArray8192.t;
     var b_result:BArray8192.t;
@@ -55101,7 +55021,6 @@ module M = {
     var b_result_2:BArray8192.t;
     var b_result_3:BArray8192.t;
     var b_result_4:BArray8192.t;
-    var b_result_5:BArray8192.t;
     var trace___compute_t0_t1:trace;
     b_result <- witness;
     b_result_0 <- witness;
@@ -55109,7 +55028,6 @@ module M = {
     b_result_2 <- witness;
     b_result_3 <- witness;
     b_result_4 <- witness;
-    b_result_5 <- witness;
     b_t0 <- witness;
     b_t1 <- witness;
     param <- witness;
@@ -55119,14 +55037,12 @@ module M = {
     param_3 <- witness;
     param_4 <- witness;
     param_5 <- witness;
-    param_6 <- witness;
     result <- witness;
     result_0 <- witness;
     result_1 <- witness;
     result_2 <- witness;
     result_3 <- witness;
     result_4 <- witness;
-    result_5 <- witness;
     t <- witness;
     t0 <- witness;
     t1 <- witness;
@@ -55144,60 +55060,50 @@ module M = {
     param_0, (BArray57344.init_arr (W8.of_int 255)), param,
     (BArray7168.init_arr (W8.of_int 255)));
     result <- aux;
-    b_result_5 <- aux_0;
-    trace___compute_t0_t1 <- (trace___compute_t0_t1 ++ tmp__trace);
-    trace___compute_t0_t1 <-
-    (trace___compute_t0_t1 ++
-    [(Assert, (BArray8192.is_init b_result_5 0 8192))]);
-    t <- result;
-    param_1 <- t;
-    (aux, aux_0, tmp__trace) <@ column_vector__reduce32 (param_1,
-    (BArray8192.init_arr (W8.of_int 255)));
-    result_0 <- aux;
     b_result_4 <- aux_0;
     trace___compute_t0_t1 <- (trace___compute_t0_t1 ++ tmp__trace);
     trace___compute_t0_t1 <-
     (trace___compute_t0_t1 ++
     [(Assert, (BArray8192.is_init b_result_4 0 8192))]);
-    t <- result_0;
-    param_2 <- t;
+    t <- result;
+    param_1 <- t;
     (aux, aux_0, tmp__trace) <@ column_vector__invert_ntt_montgomery (
-    param_2, (BArray8192.init_arr (W8.of_int 255)));
-    result_1 <- aux;
+    param_1, (BArray8192.init_arr (W8.of_int 255)));
+    result_0 <- aux;
     b_result_3 <- aux_0;
     trace___compute_t0_t1 <- (trace___compute_t0_t1 ++ tmp__trace);
     trace___compute_t0_t1 <-
     (trace___compute_t0_t1 ++
     [(Assert, (BArray8192.is_init b_result_3 0 8192))]);
-    t <- result_1;
-    param_4 <- t;
-    param_3 <- s2;
-    (aux, aux_0, tmp__trace) <@ column_vector____add (param_4,
-    (BArray8192.init_arr (W8.of_int 255)), param_3,
+    t <- result_0;
+    param_3 <- t;
+    param_2 <- s2;
+    (aux, aux_0, tmp__trace) <@ column_vector____add (param_3,
+    (BArray8192.init_arr (W8.of_int 255)), param_2,
     (BArray8192.init_arr (W8.of_int 255)));
-    result_2 <- aux;
+    result_1 <- aux;
     b_result_2 <- aux_0;
     trace___compute_t0_t1 <- (trace___compute_t0_t1 ++ tmp__trace);
     trace___compute_t0_t1 <-
     (trace___compute_t0_t1 ++
     [(Assert, (BArray8192.is_init b_result_2 0 8192))]);
-    t <- result_2;
-    param_5 <- t;
+    t <- result_1;
+    param_4 <- t;
     (aux, aux_0, tmp__trace) <@ column_vector____conditionally_add_modulus (
-    param_5, (BArray8192.init_arr (W8.of_int 255)));
-    result_3 <- aux;
+    param_4, (BArray8192.init_arr (W8.of_int 255)));
+    result_2 <- aux;
     b_result_1 <- aux_0;
     trace___compute_t0_t1 <- (trace___compute_t0_t1 ++ tmp__trace);
     trace___compute_t0_t1 <-
     (trace___compute_t0_t1 ++
     [(Assert, (BArray8192.is_init b_result_1 0 8192))]);
-    t <- result_3;
-    param_6 <- t;
+    t <- result_2;
+    param_5 <- t;
     (aux, aux_0, aux_1, aux_2, tmp__trace) <@ column_vector____power2round (
-    param_6, (BArray8192.init_arr (W8.of_int 255)));
-    result_5 <- aux;
+    param_5, (BArray8192.init_arr (W8.of_int 255)));
+    result_4 <- aux;
     b_result_0 <- aux_0;
-    result_4 <- aux_1;
+    result_3 <- aux_1;
     b_result <- aux_2;
     trace___compute_t0_t1 <- (trace___compute_t0_t1 ++ tmp__trace);
     trace___compute_t0_t1 <-
@@ -55206,8 +55112,8 @@ module M = {
     trace___compute_t0_t1 <-
     (trace___compute_t0_t1 ++
     [(Assert, (BArray8192.is_init b_result 0 8192))]);
-    t1 <- result_5;
-    t0 <- result_4;
+    t1 <- result_4;
+    t0 <- result_3;
     b_t0 <- (BArray8192.init_arr (W8.of_int 255));
     b_t1 <- (BArray8192.init_arr (W8.of_int 255));
     return (t1, b_t1, t0, b_t0, trace___compute_t0_t1);
@@ -56786,54 +56692,52 @@ module M = {
     var result_13:BArray8192.t;
     var param_28:BArray8192.t;
     var result_14:BArray8192.t;
-    var param_29:BArray8192.t;
     var result_15:BArray8192.t;
-    var result_16:BArray8192.t;
-    var param_30:BArray8192.t;
-    var result_17:BArray1024.t;
-    var param_31:BArray1024.t;
+    var param_29:BArray8192.t;
+    var result_16:BArray1024.t;
+    var param_30:BArray1024.t;
+    var param_31:BArray64.t;
     var param_32:BArray64.t;
+    var result_17:BArray64.t;
     var param_33:BArray64.t;
-    var result_18:BArray64.t;
-    var param_34:BArray64.t;
+    var param_34:BArray1024.t;
+    var result_18:BArray1024.t;
     var param_35:BArray1024.t;
-    var result_19:BArray1024.t;
-    var param_36:BArray1024.t;
-    var result_20:BArray244.t;
-    var param_37:W64.t;
+    var result_19:BArray244.t;
+    var param_36:W64.t;
+    var param_37:BArray7168.t;
     var param_38:BArray7168.t;
-    var param_39:BArray7168.t;
-    var param_40:BArray244.t;
-    var param_41:BArray7168.t;
-    var result_21:W64.t;
-    var result_22:BArray7168.t;
-    var param_42:W64.t;
-    var param_43:BArray244.t;
+    var param_39:BArray244.t;
+    var param_40:BArray7168.t;
+    var result_20:W64.t;
+    var result_21:BArray7168.t;
+    var param_41:W64.t;
+    var param_42:BArray244.t;
+    var param_43:BArray8192.t;
     var param_44:BArray8192.t;
     var param_45:BArray8192.t;
-    var param_46:BArray8192.t;
-    var result_23:W64.t;
-    var result_24:BArray8192.t;
-    var param_47:W64.t;
-    var param_48:BArray244.t;
-    var param_49:BArray16384.t;
+    var result_22:W64.t;
+    var result_23:BArray8192.t;
+    var param_46:W64.t;
+    var param_47:BArray244.t;
+    var param_48:BArray16384.t;
+    var param_49:BArray8192.t;
     var param_50:BArray8192.t;
-    var param_51:BArray8192.t;
-    var result_25:W64.t;
-    var result_26:BArray8192.t;
-    var param_52:W64.t;
+    var result_24:W64.t;
+    var result_25:BArray8192.t;
+    var param_51:W64.t;
+    var param_52:BArray8192.t;
     var param_53:BArray8192.t;
     var param_54:BArray8192.t;
+    var result_26:W64.t;
+    var result_27:BArray8192.t;
     var param_55:BArray8192.t;
-    var result_27:W64.t;
-    var result_28:BArray8192.t;
-    var param_56:BArray8192.t;
-    var param_57:BArray7168.t;
-    var param_58:BArray64.t;
+    var param_56:BArray7168.t;
+    var param_57:BArray64.t;
+    var param_58:BArray4627.t;
+    var result_28:BArray4627.t;
     var param_59:BArray4627.t;
     var result_29:BArray4627.t;
-    var param_60:BArray4627.t;
-    var result_30:BArray4627.t;
     var b_result:BArray4627.t;
     var b_param:BArray8192.t;
     var b_param_0:BArray7168.t;
@@ -56874,40 +56778,39 @@ module M = {
     var b_result_10:BArray8192.t;
     var b_result_11:BArray8192.t;
     var b_result_12:BArray8192.t;
-    var b_result_13:BArray8192.t;
     var b_mask_as_ntt:BArray7168.t;
-    var b_result_14:BArray7168.t;
+    var b_result_13:BArray7168.t;
     var b_param_15:BArray7168.t;
-    var b_result_15:BArray7168.t;
+    var b_result_14:BArray7168.t;
     var b_seed_for_mask:BArray64.t;
-    var b_result_16:BArray2048.t;
+    var b_result_15:BArray2048.t;
     var b_param_16:BArray1024.t;
     var b_param_17:BArray2048.t;
     var b_t0:BArray8192.t;
-    var b_result_17:BArray1024.t;
+    var b_result_16:BArray1024.t;
     var b_param_18:BArray1024.t;
     var b_param_19:BArray1024.t;
     var b_s2:BArray8192.t;
-    var b_result_18:BArray1024.t;
+    var b_result_17:BArray1024.t;
     var b_param_20:BArray1024.t;
     var b_param_21:BArray1024.t;
     var b_s1:BArray7168.t;
-    var b_result_19:BArray8192.t;
+    var b_result_18:BArray8192.t;
     var b_param_22:BArray3328.t;
     var b_param_23:BArray8192.t;
-    var b_result_20:BArray8192.t;
+    var b_result_19:BArray8192.t;
     var b_param_24:BArray768.t;
     var b_param_25:BArray8192.t;
-    var b_result_21:BArray7168.t;
+    var b_result_20:BArray7168.t;
     var b_param_26:BArray672.t;
     var b_param_27:BArray7168.t;
-    var b_result_22:BArray64.t;
+    var b_result_21:BArray64.t;
     var b_param_28:BArray64.t;
     var b_param_29:BArray32.t;
-    var b_result_23:BArray64.t;
+    var b_result_22:BArray64.t;
     var b_param_30:BArray64.t;
     var b_param_31:BArray64.t;
-    var b_result_24:BArray57344.t;
+    var b_result_23:BArray57344.t;
     var b_param_32:BArray32.t;
     var b_seed_for_matrix_A:BArray32.t;
     var  _0:W64.t;
@@ -56980,7 +56883,6 @@ module M = {
     b_result_21 <- witness;
     b_result_22 <- witness;
     b_result_23 <- witness;
-    b_result_24 <- witness;
     b_s1 <- witness;
     b_s1_doubled <- witness;
     b_s2 <- witness;
@@ -57033,19 +56935,19 @@ module M = {
     param_33 <- witness;
     param_34 <- witness;
     param_35 <- witness;
-    param_36 <- witness;
+    param_37 <- witness;
     param_38 <- witness;
     param_39 <- witness;
     param_40 <- witness;
-    param_41 <- witness;
+    param_42 <- witness;
     param_43 <- witness;
     param_44 <- witness;
     param_45 <- witness;
-    param_46 <- witness;
+    param_47 <- witness;
     param_48 <- witness;
     param_49 <- witness;
     param_50 <- witness;
-    param_51 <- witness;
+    param_52 <- witness;
     param_53 <- witness;
     param_54 <- witness;
     param_55 <- witness;
@@ -57053,7 +56955,6 @@ module M = {
     param_57 <- witness;
     param_58 <- witness;
     param_59 <- witness;
-    param_60 <- witness;
     result_0 <- witness;
     result_1 <- witness;
     result_2 <- witness;
@@ -57073,13 +56974,12 @@ module M = {
     result_17 <- witness;
     result_18 <- witness;
     result_19 <- witness;
-    result_20 <- witness;
-    result_22 <- witness;
-    result_24 <- witness;
-    result_26 <- witness;
+    result_21 <- witness;
+    result_23 <- witness;
+    result_25 <- witness;
+    result_27 <- witness;
     result_28 <- witness;
     result_29 <- witness;
-    result_30 <- witness;
     s1 <- witness;
     s1_doubled <- witness;
     s2 <- witness;
@@ -57146,11 +57046,11 @@ module M = {
     param <- seed_for_matrix_A;
     (aux, aux_0, tmp__trace) <@ sample____matrix_A (param, b_param_32);
     result_0 <- aux;
-    b_result_24 <- aux_0;
+    b_result_23 <- aux_0;
     trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
     trace___sign_internal <-
     (trace___sign_internal ++
-    [(Assert, (BArray57344.is_init b_result_24 0 57344))]);
+    [(Assert, (BArray57344.is_init b_result_23 0 57344))]);
     matrix_A <- result_0;
     (* Erased call to unspill *)
     ms <- (init_msf);
@@ -57165,13 +57065,13 @@ module M = {
     param_2 <- context_size;
     param_1 <- message_pointer;
     param_0 <- message_size;
-    (result_1, b_result_23, tmp__trace) <@ __derive_message_representative (
+    (result_1, b_result_22, tmp__trace) <@ __derive_message_representative (
     param_5, b_param_31, param_4, b_param_30, param_3, param_2, param_1,
     param_0);
     trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
     trace___sign_internal <-
     (trace___sign_internal ++
-    [(Assert, (BArray64.is_init b_result_23 0 64))]);
+    [(Assert, (BArray64.is_init b_result_22 0 64))]);
     message_representative <- result_1;
     (* Erased call to unspill *)
     (* Erased call to unspill *)
@@ -57186,13 +57086,13 @@ module M = {
     param_7 <- message_representative;
     b_param_28 <- b_seed_for_mask;
     param_6 <- seed_for_mask;
-    (result_2, b_result_22, tmp__trace) <@ derive_seed_for_mask (param_9,
+    (result_2, b_result_21, tmp__trace) <@ derive_seed_for_mask (param_9,
     b_param_29, param_8, (BArray32.init_arr (W8.of_int 255)), param_7,
     (BArray64.init_arr (W8.of_int 255)), param_6, b_param_28);
     trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
     trace___sign_internal <-
     (trace___sign_internal ++
-    [(Assert, (BArray64.is_init b_result_22 0 64))]);
+    [(Assert, (BArray64.is_init b_result_21 0 64))]);
     seed_for_mask <- result_2;
     (* Erased call to unspill *)
     ms <- (init_msf);
@@ -57205,11 +57105,11 @@ module M = {
     (aux_1, aux_2, tmp__trace) <@ s1____decode (param_11, b_param_27,
     param_10, b_param_26);
     result_3 <- aux_1;
-    b_result_21 <- aux_2;
+    b_result_20 <- aux_2;
     trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
     trace___sign_internal <-
     (trace___sign_internal ++
-    [(Assert, (BArray7168.is_init b_result_21 0 7168))]);
+    [(Assert, (BArray7168.is_init b_result_20 0 7168))]);
     b_s1 <- (BArray7168.init_arr (W8.of_int 255));
     s1 <- result_3;
     b_param_25 <- b_s2;
@@ -57219,11 +57119,11 @@ module M = {
     (aux_3, aux_4, tmp__trace) <@ s2____decode (param_13, b_param_25,
     param_12, b_param_24);
     result_4 <- aux_3;
-    b_result_20 <- aux_4;
+    b_result_19 <- aux_4;
     trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
     trace___sign_internal <-
     (trace___sign_internal ++
-    [(Assert, (BArray8192.is_init b_result_20 0 8192))]);
+    [(Assert, (BArray8192.is_init b_result_19 0 8192))]);
     b_s2 <- (BArray8192.init_arr (W8.of_int 255));
     s2 <- result_4;
     b_param_23 <- b_t0;
@@ -57233,11 +57133,11 @@ module M = {
     (aux_3, aux_4, tmp__trace) <@ t0__decode (param_15, b_param_23, param_14,
     b_param_22);
     result_5 <- aux_3;
-    b_result_19 <- aux_4;
+    b_result_18 <- aux_4;
     trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
     trace___sign_internal <-
     (trace___sign_internal ++
-    [(Assert, (BArray8192.is_init b_result_19 0 8192))]);
+    [(Assert, (BArray8192.is_init b_result_18 0 8192))]);
     b_t0 <- (BArray8192.init_arr (W8.of_int 255));
     t0 <- result_5;
     (* Erased call to declassify *)
@@ -57263,11 +57163,11 @@ module M = {
       (aux_5, aux_6, tmp__trace) <@ polynomial____double_16 (param_17,
       b_param_21, param_16, b_param_20);
       result_6 <- aux_5;
-      b_result_18 <- aux_6;
+      b_result_17 <- aux_6;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
-      [(Assert, (BArray1024.is_init b_result_18 0 1024))]);
+      [(Assert, (BArray1024.is_init b_result_17 0 1024))]);
       b_s1_doubled <-
       (SBArray7168_1024.set_sub32 b_s1_doubled (i * 256)
       (BArray1024.init_arr (W8.of_int 255)));
@@ -57296,11 +57196,11 @@ module M = {
       (aux_5, aux_6, tmp__trace) <@ polynomial____double_16 (param_19,
       b_param_19, param_18, b_param_18);
       result_7 <- aux_5;
-      b_result_17 <- aux_6;
+      b_result_16 <- aux_6;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
-      [(Assert, (BArray1024.is_init b_result_17 0 1024))]);
+      [(Assert, (BArray1024.is_init b_result_16 0 1024))]);
       b_s2_doubled <-
       (SBArray8192_1024.set_sub32 b_s2_doubled (i * 256)
       (BArray1024.init_arr (W8.of_int 255)));
@@ -57328,11 +57228,11 @@ module M = {
       (aux_7, aux_8, tmp__trace) <@ polynomial____double_32 (param_21,
       b_param_17, param_20, b_param_16);
       result_8 <- aux_7;
-      b_result_16 <- aux_8;
+      b_result_15 <- aux_8;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
-      [(Assert, (BArray2048.is_init b_result_16 0 2048))]);
+      [(Assert, (BArray2048.is_init b_result_15 0 2048))]);
       b_t0_doubled <-
       (SBArray16384_2048.set_sub32 b_t0_doubled ((i * 2) * 256)
       (BArray2048.init_arr (W8.of_int 255)));
@@ -57351,12 +57251,12 @@ module M = {
       (aux_1, aux_2, aux_9, tmp__trace) <@ sample____mask (param_23,
       (BArray64.init_arr (W8.of_int 255)), param_22);
       result_10 <- aux_1;
-      b_result_15 <- aux_2;
+      b_result_14 <- aux_2;
       result_9 <- aux_9;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
-      [(Assert, (BArray7168.is_init b_result_15 0 7168))]);
+      [(Assert, (BArray7168.is_init b_result_14 0 7168))]);
       mask <- result_10;
       domain_separator_for_mask <- result_9;
       j <- 0;
@@ -57383,11 +57283,11 @@ module M = {
       param_24 <- mask_as_ntt;
       (aux_1, aux_2, tmp__trace) <@ row_vector__ntt (param_24, b_param_15);
       result_11 <- aux_1;
-      b_result_14 <- aux_2;
+      b_result_13 <- aux_2;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
-      [(Assert, (BArray7168.is_init b_result_14 0 7168))]);
+      [(Assert, (BArray7168.is_init b_result_13 0 7168))]);
       b_mask_as_ntt <- (BArray7168.init_arr (W8.of_int 255));
       mask_as_ntt <- result_11;
       param_26 <- matrix_A;
@@ -57396,38 +57296,28 @@ module M = {
       param_26, (BArray57344.init_arr (W8.of_int 255)), param_25,
       (BArray7168.init_arr (W8.of_int 255)));
       result_12 <- aux_3;
-      b_result_13 <- aux_4;
-      trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
-      trace___sign_internal <-
-      (trace___sign_internal ++
-      [(Assert, (BArray8192.is_init b_result_13 0 8192))]);
-      w <- result_12;
-      param_27 <- w;
-      (aux_3, aux_4, tmp__trace) <@ column_vector__reduce32 (param_27,
-      (BArray8192.init_arr (W8.of_int 255)));
-      result_13 <- aux_3;
       b_result_12 <- aux_4;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert, (BArray8192.is_init b_result_12 0 8192))]);
-      w <- result_13;
-      param_28 <- w;
+      w <- result_12;
+      param_27 <- w;
       (aux_3, aux_4, tmp__trace) <@ column_vector__invert_ntt_montgomery (
-      param_28, (BArray8192.init_arr (W8.of_int 255)));
-      result_14 <- aux_3;
+      param_27, (BArray8192.init_arr (W8.of_int 255)));
+      result_13 <- aux_3;
       b_result_11 <- aux_4;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert, (BArray8192.is_init b_result_11 0 8192))]);
-      w <- result_14;
-      param_29 <- w;
+      w <- result_13;
+      param_28 <- w;
       (aux_3, aux_4, aux_10, aux_11, tmp__trace) <@ column_vector____decompose (
-      param_29, (BArray8192.init_arr (W8.of_int 255)));
-      result_16 <- aux_3;
+      param_28, (BArray8192.init_arr (W8.of_int 255)));
+      result_15 <- aux_3;
       b_result_10 <- aux_4;
-      result_15 <- aux_10;
+      result_14 <- aux_10;
       b_result_9 <- aux_11;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
@@ -57436,153 +57326,153 @@ module M = {
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert, (BArray8192.is_init b_result_9 0 8192))]);
-      w0 <- result_16;
-      w1 <- result_15;
-      param_30 <- w1;
-      (result_17, b_result_8, tmp__trace) <@ commitment____encode (param_30,
+      w0 <- result_15;
+      w1 <- result_14;
+      param_29 <- w1;
+      (result_16, b_result_8, tmp__trace) <@ commitment____encode (param_29,
       (BArray8192.init_arr (W8.of_int 255)));
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert, (BArray1024.is_init b_result_8 0 1024))]);
-      commitment_encoded <- result_17;
+      commitment_encoded <- result_16;
       (* Erased call to spill *)
       b_param_14 <- b_commitment_hash;
-      param_33 <- commitment_hash;
-      param_32 <- message_representative;
-      param_31 <- commitment_encoded;
-      (result_18, b_result_7, tmp__trace) <@ __derive_commitment_hash (
-      param_33, b_param_14, param_32, (BArray64.init_arr (W8.of_int 255)),
-      param_31, (BArray1024.init_arr (W8.of_int 255)));
+      param_32 <- commitment_hash;
+      param_31 <- message_representative;
+      param_30 <- commitment_encoded;
+      (result_17, b_result_7, tmp__trace) <@ __derive_commitment_hash (
+      param_32, b_param_14, param_31, (BArray64.init_arr (W8.of_int 255)),
+      param_30, (BArray1024.init_arr (W8.of_int 255)));
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert, (BArray64.is_init b_result_7 0 64))]);
       b_commitment_hash <- (BArray64.init_arr (W8.of_int 255));
-      commitment_hash <- result_18;
+      commitment_hash <- result_17;
       (* Erased call to declassify *)
       b_param_13 <- b_verifier_challenge;
-      param_35 <- verifier_challenge;
-      param_34 <- commitment_hash;
-      (aux_5, aux_6, tmp__trace) <@ sample____challenge (param_35,
-      b_param_13, param_34, (BArray64.init_arr (W8.of_int 255)));
-      result_19 <- aux_5;
+      param_34 <- verifier_challenge;
+      param_33 <- commitment_hash;
+      (aux_5, aux_6, tmp__trace) <@ sample____challenge (param_34,
+      b_param_13, param_33, (BArray64.init_arr (W8.of_int 255)));
+      result_18 <- aux_5;
       b_result_6 <- aux_6;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert, (BArray1024.is_init b_result_6 0 1024))]);
       b_verifier_challenge <- (BArray1024.init_arr (W8.of_int 255));
-      verifier_challenge <- result_19;
+      verifier_challenge <- result_18;
       (* Erased call to unspill *)
       (* Erased call to declassify *)
-      param_36 <- verifier_challenge;
+      param_35 <- verifier_challenge;
       (aux_12, aux_13, tmp__trace) <@ polynomial____challenge_positions (
-      param_36, (BArray1024.init_arr (W8.of_int 255)));
-      result_20 <- aux_12;
+      param_35, (BArray1024.init_arr (W8.of_int 255)));
+      result_19 <- aux_12;
       b_result_5 <- aux_13;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert, (BArray244.is_init b_result_5 0 244))]);
-      challenge_positions <- result_20;
+      challenge_positions <- result_19;
       infinity_norm_check_result <- (W64.of_int 0);
       b_param_12 <- b_s1_doubled;
-      param_41 <- s1_doubled;
-      param_40 <- challenge_positions;
-      param_39 <- mask;
+      param_40 <- s1_doubled;
+      param_39 <- challenge_positions;
+      param_38 <- mask;
       b_param_11 <- b_signer_response;
-      param_38 <- signer_response;
-      param_37 <- infinity_norm_check_result;
+      param_37 <- signer_response;
+      param_36 <- infinity_norm_check_result;
       (aux_1, aux_2, aux_14, tmp__trace) <@ __compute_z_and_check_norm (
-      param_41, b_param_12, param_40, (BArray244.init_arr (W8.of_int 255)),
-      param_39, (BArray7168.init_arr (W8.of_int 255)), param_38, b_param_11,
-      param_37);
-      result_22 <- aux_1;
+      param_40, b_param_12, param_39, (BArray244.init_arr (W8.of_int 255)),
+      param_38, (BArray7168.init_arr (W8.of_int 255)), param_37, b_param_11,
+      param_36);
+      result_21 <- aux_1;
       b_result_4 <- aux_2;
-      result_21 <- aux_14;
+      result_20 <- aux_14;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert,
        ((BArray7168.is_init b_result_4 0
-        ((result_21 = (W64.of_int 0)) ? 7168 : 0)) /\
-       ((param_37 = (W64.of_int 0)) \/ (result_21 <> (W64.of_int 0)))))]);
+        ((result_20 = (W64.of_int 0)) ? 7168 : 0)) /\
+       ((param_36 = (W64.of_int 0)) \/ (result_20 <> (W64.of_int 0)))))]);
       b_signer_response <- b_result_4;
-      signer_response <- result_22;
-      infinity_norm_check_result <- result_21;
+      signer_response <- result_21;
+      infinity_norm_check_result <- result_20;
       b_param_10 <- b_w0_minus_cs2;
-      param_46 <- w0_minus_cs2;
-      param_45 <- w0;
+      param_45 <- w0_minus_cs2;
+      param_44 <- w0;
       b_param_9 <- b_s2_doubled;
-      param_44 <- s2_doubled;
-      param_43 <- challenge_positions;
-      param_42 <- infinity_norm_check_result;
+      param_43 <- s2_doubled;
+      param_42 <- challenge_positions;
+      param_41 <- infinity_norm_check_result;
       (aux_3, aux_4, aux_14, tmp__trace) <@ __apply_cs2_and_check_norm (
-      param_46, b_param_10, param_45, (BArray8192.init_arr (W8.of_int 255)),
-      param_44, b_param_9, param_43, (BArray244.init_arr (W8.of_int 255)),
-      param_42);
-      result_24 <- aux_3;
+      param_45, b_param_10, param_44, (BArray8192.init_arr (W8.of_int 255)),
+      param_43, b_param_9, param_42, (BArray244.init_arr (W8.of_int 255)),
+      param_41);
+      result_23 <- aux_3;
       b_result_3 <- aux_4;
-      result_23 <- aux_14;
+      result_22 <- aux_14;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert,
        ((BArray8192.is_init b_result_3 0
-        ((result_23 = (W64.of_int 0)) ? 8192 : 0)) /\
-       ((param_42 = (W64.of_int 0)) \/ (result_23 <> (W64.of_int 0)))))]);
+        ((result_22 = (W64.of_int 0)) ? 8192 : 0)) /\
+       ((param_41 = (W64.of_int 0)) \/ (result_22 <> (W64.of_int 0)))))]);
       b_w0_minus_cs2 <- b_result_3;
-      w0_minus_cs2 <- result_24;
-      infinity_norm_check_result <- result_23;
+      w0_minus_cs2 <- result_23;
+      infinity_norm_check_result <- result_22;
       b_param_8 <- b_w0_minus_cs2_plus_ct0;
-      param_51 <- w0_minus_cs2_plus_ct0;
+      param_50 <- w0_minus_cs2_plus_ct0;
       b_param_7 <- b_w0_minus_cs2;
-      param_50 <- w0_minus_cs2;
+      param_49 <- w0_minus_cs2;
       b_param_6 <- b_t0_doubled;
-      param_49 <- t0_doubled;
-      param_48 <- challenge_positions;
-      param_47 <- infinity_norm_check_result;
+      param_48 <- t0_doubled;
+      param_47 <- challenge_positions;
+      param_46 <- infinity_norm_check_result;
       (aux_3, aux_4, aux_14, tmp__trace) <@ __apply_ct0_and_check_norm (
-      param_51, b_param_8, param_50, b_param_7, param_49, b_param_6,
-      param_48, (BArray244.init_arr (W8.of_int 255)), param_47);
-      result_26 <- aux_3;
+      param_50, b_param_8, param_49, b_param_7, param_48, b_param_6,
+      param_47, (BArray244.init_arr (W8.of_int 255)), param_46);
+      result_25 <- aux_3;
       b_result_2 <- aux_4;
-      result_25 <- aux_14;
+      result_24 <- aux_14;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert,
        (BArray8192.is_init b_result_2 0
-       ((param_47 = (W64.of_int 0)) ? 8192 : 0)))]);
+       ((param_46 = (W64.of_int 0)) ? 8192 : 0)))]);
       b_w0_minus_cs2_plus_ct0 <- b_result_2;
-      w0_minus_cs2_plus_ct0 <- result_26;
-      ct0_norm_check_result <- result_25;
+      w0_minus_cs2_plus_ct0 <- result_25;
+      ct0_norm_check_result <- result_24;
       (* Erased call to spill *)
       b_w0_minus_cs2_plus_ct0 <- b_w0_minus_cs2_plus_ct0;
       w0_minus_cs2_plus_ct0 <- w0_minus_cs2_plus_ct0;
       b_param_5 <- b_w0_minus_cs2_plus_ct0;
-      param_55 <- w0_minus_cs2_plus_ct0;
-      param_54 <- w1;
+      param_54 <- w0_minus_cs2_plus_ct0;
+      param_53 <- w1;
       b_param_4 <- b_hint;
-      param_53 <- hint_0;
-      param_52 <- infinity_norm_check_result;
-      (aux_3, aux_4, aux_14, tmp__trace) <@ __make_hint_vector (param_55,
-      b_param_5, param_54, (BArray8192.init_arr (W8.of_int 255)), param_53,
-      b_param_4, param_52);
-      result_28 <- aux_3;
+      param_52 <- hint_0;
+      param_51 <- infinity_norm_check_result;
+      (aux_3, aux_4, aux_14, tmp__trace) <@ __make_hint_vector (param_54,
+      b_param_5, param_53, (BArray8192.init_arr (W8.of_int 255)), param_52,
+      b_param_4, param_51);
+      result_27 <- aux_3;
       b_result_1 <- aux_4;
-      result_27 <- aux_14;
+      result_26 <- aux_14;
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert,
        ((BArray8192.is_init b_result_1 0
-        ((result_27 = (W64.of_int 0)) ? 8192 : 0)) /\
-       ((param_52 = (W64.of_int 0)) \/ (result_27 <> (W64.of_int 0)))))]);
+        ((result_26 = (W64.of_int 0)) ? 8192 : 0)) /\
+       ((param_51 = (W64.of_int 0)) \/ (result_26 <> (W64.of_int 0)))))]);
       b_hint <- b_result_1;
-      hint_0 <- result_28;
-      infinity_norm_check_result <- result_27;
+      hint_0 <- result_27;
+      infinity_norm_check_result <- result_26;
       (* Erased call to declassify *)
       (* Erased call to unspill *)
       (* Erased call to unspill *)
@@ -57609,31 +57499,31 @@ module M = {
       (* Erased call to declassify *)
       (* Erased call to declassify *)
       b_param_2 <- b_signature;
-      param_59 <- signature;
+      param_58 <- signature;
       b_param_1 <- b_commitment_hash;
-      param_58 <- commitment_hash;
+      param_57 <- commitment_hash;
       b_param_0 <- b_signer_response;
-      param_57 <- signer_response;
+      param_56 <- signer_response;
       b_param <- b_hint;
-      param_56 <- hint_0;
-      (result_29, b_result, tmp__trace) <@ signature____encode (param_59,
-      b_param_2, param_58, b_param_1, param_57, b_param_0, param_56,
+      param_55 <- hint_0;
+      (result_28, b_result, tmp__trace) <@ signature____encode (param_58,
+      b_param_2, param_57, b_param_1, param_56, b_param_0, param_55,
       b_param);
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert, (BArray4627.is_init b_result 0 4627))]);
-      signature <- result_29;
+      signature <- result_28;
     } else {
       b_param_3 <- b_signature;
-      param_60 <- signature;
-      (result_30, b_result_0, tmp__trace) <@ signature____zero (param_60,
+      param_59 <- signature;
+      (result_29, b_result_0, tmp__trace) <@ signature____zero (param_59,
       b_param_3);
       trace___sign_internal <- (trace___sign_internal ++ tmp__trace);
       trace___sign_internal <-
       (trace___sign_internal ++
       [(Assert, (BArray4627.is_init b_result_0 0 4627))]);
-      signature <- result_30;
+      signature <- result_29;
     }
      _5 <- (init_msf);
     result <- last_norm_check_result;
@@ -57740,14 +57630,10 @@ module M = {
     var param_9:BArray1024.t;
     var result_4:BArray1024.t;
     var param_10:BArray1024.t;
-    var result_5:BArray1024.t;
     var param_11:BArray1024.t;
+    var result_5:BArray1024.t;
+    var param_12:BArray8192.t;
     var result_6:BArray1024.t;
-    var param_12:BArray1024.t;
-    var param_13:BArray1024.t;
-    var result_7:BArray1024.t;
-    var param_14:BArray8192.t;
-    var result_8:BArray1024.t;
     var b_commitment_encoded:BArray1024.t;
     var b_result:BArray1024.t;
     var b_param:BArray8192.t;
@@ -57758,18 +57644,16 @@ module M = {
     var b_hints_element:BArray1024.t;
     var b_result_1:BArray1024.t;
     var b_result_2:BArray1024.t;
-    var b_result_3:BArray1024.t;
-    var b_result_4:BArray1024.t;
     var b_param_1:BArray1024.t;
     var b_param_2:BArray1024.t;
     var b_c_times_t1:BArray1024.t;
     var b_Az_element:BArray1024.t;
-    var b_result_5:BArray1024.t;
+    var b_result_3:BArray1024.t;
     var b_param_3:BArray1024.t;
     var b_t1_element:BArray1024.t;
+    var b_result_4:BArray1024.t;
+    var b_result_5:BArray1024.t;
     var b_result_6:BArray1024.t;
-    var b_result_7:BArray1024.t;
-    var b_result_8:BArray1024.t;
     var b_param_4:BArray320.t;
     var b_param_5:BArray1024.t;
     var trace_reconstruct_signer_commitment:trace;
@@ -57795,8 +57679,6 @@ module M = {
     b_result_4 <- witness;
     b_result_5 <- witness;
     b_result_6 <- witness;
-    b_result_7 <- witness;
-    b_result_8 <- witness;
     b_t1_element <- witness;
     c_times_t1 <- witness;
     commitment <- witness;
@@ -57817,8 +57699,6 @@ module M = {
     param_10 <- witness;
     param_11 <- witness;
     param_12 <- witness;
-    param_13 <- witness;
-    param_14 <- witness;
     result <- witness;
     result_0 <- witness;
     result_1 <- witness;
@@ -57827,8 +57707,6 @@ module M = {
     result_4 <- witness;
     result_5 <- witness;
     result_6 <- witness;
-    result_7 <- witness;
-    result_8 <- witness;
     t1_element <- witness;
     trace_reconstruct_signer_commitment <- [];
     trace_reconstruct_signer_commitment <-
@@ -57867,34 +57745,34 @@ module M = {
       (aux, aux_0, tmp__trace) <@ t1__decode_polynomial (param_0, b_param_5,
       param, b_param_4);
       result <- aux;
-      b_result_8 <- aux_0;
-      trace_reconstruct_signer_commitment <-
-      (trace_reconstruct_signer_commitment ++ tmp__trace);
-      trace_reconstruct_signer_commitment <-
-      (trace_reconstruct_signer_commitment ++
-      [(Assert, (BArray1024.is_init b_result_8 0 1024))]);
-      t1_element <- result;
-      param_1 <- t1_element;
-      (aux, aux_0, tmp__trace) <@ polynomial____shift_coefficients_left (
-      param_1, (BArray1024.init_arr (W8.of_int 255)));
-      result_0 <- aux;
-      b_result_7 <- aux_0;
-      trace_reconstruct_signer_commitment <-
-      (trace_reconstruct_signer_commitment ++ tmp__trace);
-      trace_reconstruct_signer_commitment <-
-      (trace_reconstruct_signer_commitment ++
-      [(Assert, (BArray1024.is_init b_result_7 0 1024))]);
-      t1_element <- result_0;
-      param_2 <- t1_element;
-      (aux, aux_0, tmp__trace) <@ polynomial__ntt (param_2,
-      (BArray1024.init_arr (W8.of_int 255)));
-      result_1 <- aux;
       b_result_6 <- aux_0;
       trace_reconstruct_signer_commitment <-
       (trace_reconstruct_signer_commitment ++ tmp__trace);
       trace_reconstruct_signer_commitment <-
       (trace_reconstruct_signer_commitment ++
       [(Assert, (BArray1024.is_init b_result_6 0 1024))]);
+      t1_element <- result;
+      param_1 <- t1_element;
+      (aux, aux_0, tmp__trace) <@ polynomial____shift_coefficients_left (
+      param_1, (BArray1024.init_arr (W8.of_int 255)));
+      result_0 <- aux;
+      b_result_5 <- aux_0;
+      trace_reconstruct_signer_commitment <-
+      (trace_reconstruct_signer_commitment ++ tmp__trace);
+      trace_reconstruct_signer_commitment <-
+      (trace_reconstruct_signer_commitment ++
+      [(Assert, (BArray1024.is_init b_result_5 0 1024))]);
+      t1_element <- result_0;
+      param_2 <- t1_element;
+      (aux, aux_0, tmp__trace) <@ polynomial__ntt (param_2,
+      (BArray1024.init_arr (W8.of_int 255)));
+      result_1 <- aux;
+      b_result_4 <- aux_0;
+      trace_reconstruct_signer_commitment <-
+      (trace_reconstruct_signer_commitment ++ tmp__trace);
+      trace_reconstruct_signer_commitment <-
+      (trace_reconstruct_signer_commitment ++
+      [(Assert, (BArray1024.is_init b_result_4 0 1024))]);
       b_t1_element <- (BArray1024.init_arr (W8.of_int 255));
       t1_element <- result_1;
       (* Erased call to unspill *)
@@ -57906,12 +57784,12 @@ module M = {
       param_5, b_param_3, param_4, (BArray1024.init_arr (W8.of_int 255)),
       param_3, (BArray1024.init_arr (W8.of_int 255)));
       result_2 <- aux;
-      b_result_5 <- aux_0;
+      b_result_3 <- aux_0;
       trace_reconstruct_signer_commitment <-
       (trace_reconstruct_signer_commitment ++ tmp__trace);
       trace_reconstruct_signer_commitment <-
       (trace_reconstruct_signer_commitment ++
-      [(Assert, (BArray1024.is_init b_result_5 0 1024))]);
+      [(Assert, (BArray1024.is_init b_result_3 0 1024))]);
       b_c_times_t1 <- (BArray1024.init_arr (W8.of_int 255));
       c_times_t1 <- result_2;
       trace_reconstruct_signer_commitment <-
@@ -57927,68 +57805,47 @@ module M = {
       b_param_1 <- b_Az_element;
       param_7 <- az_element;
       param_6 <- c_times_t1;
-      (aux, aux_0, tmp__trace) <@ polynomial__subtract (param_8, b_param_2,
-      param_7, b_param_1, param_6, (BArray1024.init_arr (W8.of_int 255)));
-      result_3 <- aux;
-      b_result_4 <- aux_0;
-      trace_reconstruct_signer_commitment <-
-      (trace_reconstruct_signer_commitment ++ tmp__trace);
-      trace_reconstruct_signer_commitment <-
-      (trace_reconstruct_signer_commitment ++
-      [(Assert, (BArray1024.is_init b_result_4 0 1024))]);
-      commitment_element <- result_3;
-      param_9 <- commitment_element;
-      (aux, aux_0, tmp__trace) <@ polynomial__reduce32 (param_9,
+      (aux, aux_0, tmp__trace) <@ polynomial__subtract_to_intt_range (
+      param_8, b_param_2, param_7, b_param_1, param_6,
       (BArray1024.init_arr (W8.of_int 255)));
-      result_4 <- aux;
-      b_result_3 <- aux_0;
-      trace_reconstruct_signer_commitment <-
-      (trace_reconstruct_signer_commitment ++ tmp__trace);
-      trace_reconstruct_signer_commitment <-
-      (trace_reconstruct_signer_commitment ++
-      [(Assert, (BArray1024.is_init b_result_3 0 1024))]);
-      commitment_element <- result_4;
-      param_10 <- commitment_element;
-      (aux, aux_0, tmp__trace) <@ polynomial__invert_ntt_montgomery (
-      param_10, (BArray1024.init_arr (W8.of_int 255)));
-      result_5 <- aux;
+      result_3 <- aux;
       b_result_2 <- aux_0;
       trace_reconstruct_signer_commitment <-
       (trace_reconstruct_signer_commitment ++ tmp__trace);
       trace_reconstruct_signer_commitment <-
       (trace_reconstruct_signer_commitment ++
       [(Assert, (BArray1024.is_init b_result_2 0 1024))]);
-      commitment_element <- result_5;
-      param_11 <- commitment_element;
-      (aux, aux_0, tmp__trace) <@ polynomial__conditionally_add_modulus (
-      param_11, (BArray1024.init_arr (W8.of_int 255)));
-      result_6 <- aux;
+      commitment_element <- result_3;
+      param_9 <- commitment_element;
+      (aux, aux_0, tmp__trace) <@ polynomial__invert_ntt_montgomery (
+      param_9, (BArray1024.init_arr (W8.of_int 255)));
+      result_4 <- aux;
       b_result_1 <- aux_0;
       trace_reconstruct_signer_commitment <-
       (trace_reconstruct_signer_commitment ++ tmp__trace);
       trace_reconstruct_signer_commitment <-
       (trace_reconstruct_signer_commitment ++
       [(Assert, (BArray1024.is_init b_result_1 0 1024))]);
-      commitment_element <- result_6;
+      commitment_element <- result_4;
       trace_reconstruct_signer_commitment <-
       (trace_reconstruct_signer_commitment ++
       [(Assert,
        ((0 <= ((i * 256) * 4)) /\ ((((i * 256) * 4) + 1024) <= 8192)))]);
       b_hints_element <- (SBArray8192_1024.get_sub32 b_hints (i * 256));
       hints_element <- (SBArray8192_1024.get_sub32 hints (i * 256));
-      param_13 <- commitment_element;
+      param_11 <- commitment_element;
       b_param_0 <- b_hints_element;
-      param_12 <- hints_element;
-      (aux, aux_0, tmp__trace) <@ polynomial__use_hints (param_13,
-      (BArray1024.init_arr (W8.of_int 255)), param_12, b_param_0);
-      result_7 <- aux;
+      param_10 <- hints_element;
+      (aux, aux_0, tmp__trace) <@ polynomial__use_hints (param_11,
+      (BArray1024.init_arr (W8.of_int 255)), param_10, b_param_0);
+      result_5 <- aux;
       b_result_0 <- aux_0;
       trace_reconstruct_signer_commitment <-
       (trace_reconstruct_signer_commitment ++ tmp__trace);
       trace_reconstruct_signer_commitment <-
       (trace_reconstruct_signer_commitment ++
       [(Assert, (BArray1024.is_init b_result_0 0 1024))]);
-      commitment_element <- result_7;
+      commitment_element <- result_5;
       trace_reconstruct_signer_commitment <-
       (trace_reconstruct_signer_commitment ++
       [(Assert,
@@ -58001,15 +57858,15 @@ module M = {
       i <- (i + 1);
     }
     b_param <- b_commitment;
-    param_14 <- commitment;
-    (result_8, b_result, tmp__trace) <@ commitment____encode (param_14,
+    param_12 <- commitment;
+    (result_6, b_result, tmp__trace) <@ commitment____encode (param_12,
     b_param);
     trace_reconstruct_signer_commitment <-
     (trace_reconstruct_signer_commitment ++ tmp__trace);
     trace_reconstruct_signer_commitment <-
     (trace_reconstruct_signer_commitment ++
     [(Assert, (BArray1024.is_init b_result 0 1024))]);
-    commitment_encoded <- result_8;
+    commitment_encoded <- result_6;
     b_commitment_encoded <- (BArray1024.init_arr (W8.of_int 255));
     return (commitment_encoded, b_commitment_encoded,
            trace_reconstruct_signer_commitment);
@@ -58835,12 +58692,6 @@ op polynomial__pointwise_montgomery_multiply_and_reduce_spec _product _b_product
 
 op polynomial__conditionally_add_modulus_spec _polynomial _b_polynomial =
    hoare [M.polynomial__conditionally_add_modulus :
-   (((_b_polynomial = b_polynomial) /\ (_polynomial = polynomial)) /\
-   (BArray1024.is_init _b_polynomial 0 1024)) ==>
-   ((BArray1024.is_init res.`2 0 1024) /\ (valid res.`3))].
-
-op polynomial__reduce32_spec _polynomial _b_polynomial =
-   hoare [M.polynomial__reduce32 :
    (((_b_polynomial = b_polynomial) /\ (_polynomial = polynomial)) /\
    (BArray1024.is_init _b_polynomial 0 1024)) ==>
    ((BArray1024.is_init res.`2 0 1024) /\ (valid res.`3))].
@@ -67548,8 +67399,8 @@ op polynomial__add_spec _sum_pointer _b_sum_pointer _lhs_pointer _b_lhs_pointer 
    (BArray1024.is_init _b_rhs_pointer 0 (4 * 256)))) ==>
    ((BArray1024.is_init res.`2 0 (4 * 256)) /\ (valid res.`3))].
 
-op polynomial__subtract_spec _difference_pointer _b_difference_pointer _lhs_pointer _b_lhs_pointer _rhs_pointer _b_rhs_pointer =
-   hoare [M.polynomial__subtract :
+op polynomial__subtract_to_intt_range_spec _difference_pointer _b_difference_pointer _lhs_pointer _b_lhs_pointer _rhs_pointer _b_rhs_pointer =
+   hoare [M.polynomial__subtract_to_intt_range :
    (((_b_rhs_pointer = b_rhs_pointer) /\
     ((_rhs_pointer = rhs_pointer) /\
     ((_b_lhs_pointer = b_lhs_pointer) /\
@@ -67640,12 +67491,6 @@ op row_vector____check_infinity_norm_spec _vector _b_vector _threshold =
    (((_threshold = threshold) /\
     ((_b_vector = b_vector) /\ (_vector = vector))) /\
    (BArray7168.is_init _b_vector 0 7168)) ==> (true /\ (valid res.`2))].
-
-op column_vector__reduce32_spec _vector _b_vector =
-   hoare [M.column_vector__reduce32 :
-   (((_b_vector = b_vector) /\ (_vector = vector)) /\
-   (BArray8192.is_init _b_vector 0 8192)) ==>
-   ((BArray8192.is_init res.`2 0 8192) /\ (valid res.`3))].
 
 op column_vector__invert_ntt_montgomery_spec _vector _b_vector =
    hoare [M.column_vector__invert_ntt_montgomery :

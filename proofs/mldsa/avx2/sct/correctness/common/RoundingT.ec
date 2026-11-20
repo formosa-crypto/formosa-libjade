@@ -99,12 +99,6 @@ by smt(divz_eq modz_cmp).
 qed.
 
 (* Input range, pointwise and as the List.all form circuit attaches to lanes. *)
-lemma urng_at (a : W32.t Array256.t) (i : int) :
-    wpoly_urng q a => 0 <= i < 256 => 0 <= W32.to_uint a.[i] < q.
-proof.
-rewrite /wpoly_urng allP /= => H Hi; by apply (H i _); smt().
-qed.
-
 lemma srng_at (a : W32.t Array256.t) (i : int) :
     wpoly_srng (q-1) (q-1) a => 0 <= i < 256 =>
     0 <= W32.to_uint (caddq_w a.[i]) < q /\
@@ -121,15 +115,6 @@ proof.
 move => Hrng; rewrite iotaredE allP => x; rewrite mem_iota /= => Hx.
 have [Hb _] := srng_at a x Hrng _; first smt().
 by rewrite W32.ultE /q W32.of_uintK /=; smt().
-qed.
-
-(* The input range of use_hints, [0, q-1], is within that of decompose. *)
-lemma urng_srng (a : W32.t Array256.t) :
-    wpoly_urng q a => wpoly_srng (q-1) (q-1) a /\ lifts_wpoly a = liftu_wpoly a.
-proof.
-move=> Hu; split; last exact wpoly_urng_lifts_eq_liftu.
-move: Hu; rewrite /wpoly_urng /wpoly_srng !allP => H i Hi /=.
-have /= Hi' := H i Hi; rewrite W32.to_sintE /smod; smt().
 qed.
 
 (* The lane functions as integer operations. *)
@@ -647,9 +632,10 @@ lemma polynomial__decompose_ph
 (* Applies hints to adjust HighBits of commitment coefficients.        *)
 (* Internally calls polynomial__decompose, then uses VPSIGN-based     *)
 (* conditional adjustment of high bits based on sign of low bits.      *)
+(* Input: commitment in (-q, q), brought to [0, q-1] by decompose.    *)
 (* Spec connection (via poly_UseHint from Rq.ec):                      *)
 (*   liftu_wpoly res = poly_UseHint (liftu_wpoly _hints)               *)
-(*                                   (liftu_wpoly _commitment)         *)
+(*                                   (lifts_wpoly _commitment)         *)
 (* ================================================================== *)
 
 (* Per-lane specification. The VPCMPEQ/VPOR pair maps low = 0 to all-ones so
@@ -774,10 +760,10 @@ lemma polynomial__use_hints_gamma2_32_correct
     gamma2 = 261888 =>
     hoare [ M.polynomial__use_hints_gamma2_32 :
         commitment = _commitment /\ hint_polynomial = _hints /\
-        wpoly_urng q _commitment /\   (* standard range [0, q-1] *)
-        wpoly_urng 2 _hints           (* hints are 0 or 1 *)
+        wpoly_srng (q-1) (q-1) _commitment /\   (* decompose adds q itself *)
+        wpoly_urng 2 _hints                     (* hints are 0 or 1 *)
         ==>
-        liftu_wpoly res = poly_UseHint (liftu_wpoly _hints) (liftu_wpoly _commitment) /\
+        liftu_wpoly res = poly_UseHint (liftu_wpoly _hints) (lifts_wpoly _commitment) /\
         wpoly_urng ((q - 1) %/ (2 * gamma2)) res
     ].
 proof.
@@ -810,21 +796,16 @@ proc change ^while.9 : {
 (* decompose gives the low/high characterisation; the loop is then a per-lane
    map, so one conseq + circuit does the program part. *)
 seq 5 : (commitment = _commitment /\ hint_polynomial = _hints /\
-         wpoly_urng q _commitment /\ wpoly_urng 2 _hints /\
+         wpoly_srng (q-1) (q-1) _commitment /\ wpoly_urng 2 _hints /\
          zeros = W256.zero /\
          mask = polynomial__CONSTANTS_TABLE_gamma2_32.[0] /\
          (forall i, 0 <= i < 256 =>
-            to_sint lows.[i] = LowBits ((liftu_wpoly _commitment).[i])) /\
+            to_sint lows.[i] = LowBits ((lifts_wpoly _commitment).[i])) /\
          (forall i, 0 <= i < 256 =>
-            to_uint highs.[i] = HighBits ((liftu_wpoly _commitment).[i])) /\
+            to_uint highs.[i] = HighBits ((lifts_wpoly _commitment).[i])) /\
          wpoly_urng 16 highs).
 + call (polynomial__decompose_gamma2_32_correct witness witness _commitment Hg).
-  auto => /> Hc _; have [Hs Hl] := urng_srng _ Hc.
-  split; 1: exact Hs.
-  move=> _ r Hlo _ Hhi Hhr; rewrite -Hl; do split.
-  + by move=> i h0 h1; apply Hlo.
-  + by move=> i h0 h1; apply Hhi.
-  by move: Hhr; rewrite Hg.
+  by auto => /> _ _ r _ _ _; rewrite Hg.
 unroll for ^while; wp -1.
 conseq (: hint_polynomial = _hints /\ zeros = W256.zero /\
           mask = polynomial__CONSTANTS_TABLE_gamma2_32.[0] /\
@@ -838,7 +819,7 @@ conseq (: hint_polynomial = _hints /\ zeros = W256.zero /\
   have Hkey : forall i, 0 <= i < 256 =>
       to_uint c0.[i]
       = asint (UseHint (!(liftu_wpoly _hints).[i] = Zq.zero)
-                       ((liftu_wpoly _commitment).[i])).
+                       ((lifts_wpoly _commitment).[i])).
   + move => i Hi; rewrite Hc0 /BSWA_256u32.init initiE 1:/# /=.
     have Hhi2 : to_uint _hints.[i] < 2
       by move: Hhq; rewrite /wpoly_urng allP /= => H; have := H i _; first smt().
@@ -846,9 +827,8 @@ conseq (: hint_polynomial = _hints /\ zeros = W256.zero /\
       by move: Hhr; rewrite /wpoly_urng allP /= => H; have := H i _; first smt().
     rewrite (uh_lane32_val _ _ _ Hhi2 Hhg16) Hhv 1:/# Hlv 1:/#.
     (* the hint is 0/1, so "coeff nonzero" and "word = one" coincide *)
-    have Hhb := hint_bitE _hints i Hhq Hi.
-    rewrite Hhb /liftu_wpoly mapiE 1:/# /=.
-    by apply uh32_spec => //; exact (urng_at _commitment i).
+    have [Hci <-] := srng_at _commitment i Hcq Hi.
+    by rewrite (hint_bitE _hints i Hhq Hi); apply uh32_spec.
   split; last first.
   + rewrite Hm16 /wpoly_urng allP => x Hx.
     rewrite Hc0 /BSWA_256u32.init initiE 1:/# /= /uh_lane32 /=.
@@ -956,9 +936,9 @@ lemma D88_use_hints_correct (_commitment : W32.t Array256.t) (_hints : W32.t Arr
     gamma2 = 95232 =>
     hoare [ D88.use_hints :
         commitment = _commitment /\ hint_polynomial = _hints /\
-        wpoly_urng q _commitment /\ wpoly_urng 2 _hints
+        wpoly_srng (q-1) (q-1) _commitment /\ wpoly_urng 2 _hints
         ==>
-        liftu_wpoly res = poly_UseHint (liftu_wpoly _hints) (liftu_wpoly _commitment) /\
+        liftu_wpoly res = poly_UseHint (liftu_wpoly _hints) (lifts_wpoly _commitment) /\
         wpoly_urng ((q - 1) %/ (2 * gamma2)) res
     ].
 proof.
@@ -989,20 +969,15 @@ proc change ^while.12 : {
 + auto => /> &2; case (0 <= offset{2} * 8 <= 7936); last by auto.
   by move => *; rewrite BSWAS_256u32_256_slicesetE 1:/#.
 seq 5 : (commitment = _commitment /\ hint_polynomial = _hints /\
-         wpoly_urng q _commitment /\ wpoly_urng 2 _hints /\
+         wpoly_srng (q-1) (q-1) _commitment /\ wpoly_urng 2 _hints /\
          zeros = W256.zero /\ max = polynomial__CONSTANTS_TABLE_gamma2_88.[4] /\
          (forall i, 0 <= i < 256 =>
-            to_sint lows.[i] = LowBits ((liftu_wpoly _commitment).[i])) /\
+            to_sint lows.[i] = LowBits ((lifts_wpoly _commitment).[i])) /\
          (forall i, 0 <= i < 256 =>
-            to_uint highs.[i] = HighBits ((liftu_wpoly _commitment).[i])) /\
+            to_uint highs.[i] = HighBits ((lifts_wpoly _commitment).[i])) /\
          wpoly_urng 44 highs).
 + call (polynomial__decompose_gamma2_88_correct witness witness _commitment Hg).
-  auto => /> Hc _; have [Hs Hl] := urng_srng _ Hc.
-  split; 1: exact Hs.
-  move=> _ r Hlo _ Hhi Hhr; rewrite -Hl; do split.
-  + by move=> i h0 h1; apply Hlo.
-  + by move=> i h0 h1; apply Hhi.
-  by move: Hhr; rewrite Hg.
+  by auto => /> _ _ r _ _ _; rewrite Hg.
 unroll for ^while; wp -1.
 conseq (: hint_polynomial = _hints /\ zeros = W256.zero /\
           max = polynomial__CONSTANTS_TABLE_gamma2_88.[4] /\
@@ -1018,7 +993,7 @@ conseq (: hint_polynomial = _hints /\ zeros = W256.zero /\
   have Hkey : forall i, 0 <= i < 256 =>
       to_uint c0.[i]
       = asint (UseHint (!(liftu_wpoly _hints).[i] = Zq.zero)
-                       ((liftu_wpoly _commitment).[i])).
+                       ((lifts_wpoly _commitment).[i])).
   + move => i Hi; rewrite Hc0 /BSWA_256u32.init initiE 1:/# /=.
     have Hhi2 : to_uint _hints.[i] < 2
       by move: Hhq; rewrite /wpoly_urng allP /= => H; have := H i _; first smt().
@@ -1040,9 +1015,9 @@ lemma polynomial__use_hints_gamma2_88_correct
     gamma2 = 95232 =>
     hoare [ M.polynomial__use_hints_gamma2_88 :
         commitment = _commitment /\ hint_polynomial = _hints /\
-        wpoly_urng q _commitment /\ wpoly_urng 2 _hints
+        wpoly_srng (q-1) (q-1) _commitment /\ wpoly_urng 2 _hints
         ==>
-        liftu_wpoly res = poly_UseHint (liftu_wpoly _hints) (liftu_wpoly _commitment) /\
+        liftu_wpoly res = poly_UseHint (liftu_wpoly _hints) (lifts_wpoly _commitment) /\
         wpoly_urng ((q - 1) %/ (2 * gamma2)) res
     ].
 proof.
@@ -1065,10 +1040,10 @@ lemma polynomial__use_hints_correct
       (_commitment : W32.t Array256.t) (_hints : W32.t Array256.t) :
     hoare [ M.polynomial__use_hints :
         commitment = _commitment /\ hint_polynomial = _hints /\
-        wpoly_urng q _commitment /\   (* standard range [0, q-1] *)
-        wpoly_urng 2 _hints           (* hints are 0 or 1 *)
+        wpoly_srng (q-1) (q-1) _commitment /\   (* decompose adds q itself *)
+        wpoly_urng 2 _hints                     (* hints are 0 or 1 *)
         ==>
-        liftu_wpoly res = poly_UseHint (liftu_wpoly _hints) (liftu_wpoly _commitment) /\
+        liftu_wpoly res = poly_UseHint (liftu_wpoly _hints) (lifts_wpoly _commitment) /\
         wpoly_urng ((q - 1) %/ (2 * gamma2)) res
     ].
 proof.
@@ -1083,10 +1058,10 @@ lemma polynomial__use_hints_ph
       (_commitment : W32.t Array256.t) (_hints : W32.t Array256.t) :
     phoare [ M.polynomial__use_hints :
         commitment = _commitment /\ hint_polynomial = _hints /\
-        wpoly_urng q _commitment /\
+        wpoly_srng (q-1) (q-1) _commitment /\
         wpoly_urng 2 _hints
         ==>
-        liftu_wpoly res = poly_UseHint (liftu_wpoly _hints) (liftu_wpoly _commitment) /\
+        liftu_wpoly res = poly_UseHint (liftu_wpoly _hints) (lifts_wpoly _commitment) /\
         wpoly_urng ((q - 1) %/ (2 * gamma2)) res
     ] = 1%r
   by conseq polynomial__use_hints_ll (polynomial__use_hints_correct _commitment _hints).

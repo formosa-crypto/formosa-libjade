@@ -274,33 +274,32 @@ rewrite !addzA /=; case: (i = 0) => [->|_] /=.
 done.
 qed.
 
-(* the coefficients of an L-vector in the base-multiplication range *)
-lemma dot_coeff_bnd (v : W32.t Array_lpolys.t) (i c : int) :
-  wpolylvec_bmul_irng (lvec_unflatten256 v) => 0 <= i < lvec => 0 <= c < 256 =>
-  `|to_sint v.[256 * i + c]| <= 9 * q - 1.
+(* the coefficients of an L-vector in a signed range *)
+lemma dot_coeff_bnd (v : W32.t Array_lpolys.t) (b i c : int) :
+  wpolylvec_srng (lvec_unflatten256 v) b b => 0 <= i < lvec => 0 <= c < 256 =>
+  `|to_sint v.[256 * i + c]| <= b.
 proof.
-rewrite /wpolylvec_bmul_irng LArray.allP => H hi hc.
+rewrite /wpolylvec_srng LArray.allP => H hi hc.
 have := H i hi; have -> : (lvec_unflatten256 v).[i] = Array256.init (fun j => v.[256 * i + j]).
 + by have := lvec_slice_eq v (256 * i) _ _; [smt() | smt() | rewrite (_ : 256 * i %/ 256 = i) 1:/#].
-rewrite /wpoly_bmul_irng /wpoly_srng Array256.allP => Hs.
+rewrite /wpoly_srng Array256.allP => Hs.
 by have /= := Hs c hc; rewrite Array256.initiE //=; smt().
 qed.
 
-lemma dot_lane_bnd (lhs rhs : W32.t Array_lpolys.t) (m c : int) :
-  wpolylvec_bmul_irng (lvec_unflatten256 lhs) =>
-  wpolylvec_bmul_irng (lvec_unflatten256 rhs) =>
+lemma dot_lane_bnd (lhs rhs : W32.t Array_lpolys.t) (a b m c : int) :
+  wpolylvec_srng (lvec_unflatten256 lhs) a a =>
+  wpolylvec_srng (lvec_unflatten256 rhs) b b =>
   0 <= m <= lvec => 0 <= c < 256 =>
-  `|dot_lane lhs rhs m c| <= m * ((9 * q - 1) * (9 * q - 1)).
+  `|dot_lane lhs rhs m c| <= m * (a * b).
 proof.
 move=> hl hr; elim/natind: m => [m hm0 hm1 hc|m hm0 ih hm1 hc].
 + have -> : m = 0 by smt().
   by rewrite dot_lane0.
 rewrite dot_laneS //.
-have hx := dot_coeff_bnd lhs m c hl _ hc; 1: smt().
-have hy := dot_coeff_bnd rhs m c hr _ hc; 1: smt().
+have hx := dot_coeff_bnd lhs a m c hl _ hc; 1: smt().
+have hy := dot_coeff_bnd rhs b m c hr _ hc; 1: smt().
 have hd := ih _ hc; 1: smt().
-have hxy : `|to_sint lhs.[256 * m + c] * to_sint rhs.[256 * m + c]|
-           <= (9 * q - 1) * (9 * q - 1).
+have hxy : `|to_sint lhs.[256 * m + c] * to_sint rhs.[256 * m + c]| <= a * b.
 + by rewrite StdOrder.IntOrder.normrM; apply StdOrder.IntOrder.ler_pmul; smt().
 smt().
 qed.
@@ -325,22 +324,25 @@ have Hs : forall (v : W32.t Array_lpolys.t),
 by rewrite !Hs incoeffM; ring.
 qed.
 
-(* the stored coefficients mred (sum) are the abstract dot product, in
-   the base-multiplication output range *)
+(* the stored coefficients mred (sum) are the abstract dot product; for
+   a lhs in (-q, q) and a rhs in the base-multiplication range, the sum
+   of lvec <= 7 products is below 63 q^2 < 2^31 q and its Montgomery
+   reduction lies in (-q, q) *)
 lemma dot_spec (lhs rhs : W32.t Array_lpolys.t) (out : W32.t Array256.t) :
-  wpolylvec_bmul_irng (lvec_unflatten256 lhs) =>
+  wpolylvec_srng (lvec_unflatten256 lhs) (q - 1) (q - 1) =>
   wpolylvec_bmul_irng (lvec_unflatten256 rhs) =>
   (forall c, 0 <= c < 256 => out.[c] = mred (W64.of_int (dot_lane lhs rhs lvec c))) =>
   liftm_wpoly out = ntt_dotp (lifts_wpolylvec (lvec_unflatten256 lhs))
                              (lifts_wpolylvec (lvec_unflatten256 rhs)) /\
-  wpoly_srng (lvec * (q - 1)) (lvec * (q - 1)) out.
+  wpoly_srng (q - 1) (q - 1) out.
 proof.
 move=> hl hr Hout.
 have hlv : lvec = 4 \/ lvec = 5 \/ lvec = 7 by smt(param_sets).
 have HS : forall c, 0 <= c < 256 =>
-  `|dot_lane lhs rhs lvec c| <= lvec * ((9 * q - 1) * (9 * q - 1)) /\
+  `|dot_lane lhs rhs lvec c| <= lvec * ((q - 1) * (9 * q - 1)) /\
   to_sint (W64.of_int (dot_lane lhs rhs lvec c)) = dot_lane lhs rhs lvec c.
-+ move=> c hc; have Hb := dot_lane_bnd lhs rhs lvec c hl hr _ hc; 1: smt(gt0_l).
++ move=> c hc; have Hb := dot_lane_bnd lhs rhs (q - 1) (9 * q - 1) lvec c hl hr _ hc.
+  + smt(gt0_l).
   split; 1: exact Hb.
   by apply W64.to_sintK_small; move: Hb; rewrite /q; smt().
 split.
@@ -354,7 +356,7 @@ split.
   by rewrite /mont -incoeffM; apply incoeffP; rewrite incoeffK hm.
 rewrite /wpoly_srng Array256.allP => c hc /=; rewrite Hout //.
 have [Hb hS] := HS c hc.
-have := mred_bnd (W64.of_int (dot_lane lhs rhs lvec c)) (lvec * ((9 * q - 1) * (9 * q - 1))) _ _.
+have := mred_bnd (W64.of_int (dot_lane lhs rhs lvec c)) (lvec * ((q - 1) * (9 * q - 1))) _ _.
 + by rewrite hS.
 + by move: hlv; rewrite /q; smt().
 by move: hlv; rewrite /q; smt().
@@ -372,12 +374,12 @@ lemma row_vector____dot_product_correct
       (_lhs : W32.t Array_lpolys.t) (_rhs : W32.t Array_lpolys.t) :
     hoare [ M.row_vector____dot_product :
         output = _out /\ lhs = _lhs /\ rhs = _rhs /\
-        wpolylvec_bmul_irng (lvec_unflatten256 _lhs) /\
+        wpolylvec_srng (lvec_unflatten256 _lhs) (q-1) (q-1) /\
         wpolylvec_bmul_irng (lvec_unflatten256 _rhs)
         ==>
         liftm_wpoly res = ntt_dotp (lifts_wpolylvec (lvec_unflatten256 _lhs))
                                     (lifts_wpolylvec (lvec_unflatten256 _rhs)) /\
-        wpoly_srng (lvec * (q-1)) (lvec * (q-1)) res
+        wpoly_srng (q-1) (q-1) res
     ].
 proof.
 proc.
@@ -441,12 +443,12 @@ lemma row_vector____dot_product_ph
       (_lhs : W32.t Array_lpolys.t) (_rhs : W32.t Array_lpolys.t) :
     phoare [ M.row_vector____dot_product :
         output = _out /\ lhs = _lhs /\ rhs = _rhs /\
-        wpolylvec_bmul_irng (lvec_unflatten256 _lhs) /\
+        wpolylvec_srng (lvec_unflatten256 _lhs) (q-1) (q-1) /\
         wpolylvec_bmul_irng (lvec_unflatten256 _rhs)
         ==>
         liftm_wpoly res = ntt_dotp (lifts_wpolylvec (lvec_unflatten256 _lhs))
                                     (lifts_wpolylvec (lvec_unflatten256 _rhs)) /\
-        wpoly_srng (lvec * (q-1)) (lvec * (q-1)) res
+        wpoly_srng (q-1) (q-1) res
     ] = 1%r
   by conseq row_vector____dot_product_ll
             (row_vector____dot_product_correct _out _lhs _rhs).
@@ -457,6 +459,13 @@ lemma row_vector____dot_product_ph
 (* Calls row_vector____dot_product in a loop over the rows.             *)
 (* Spec: ntt_mulmxv from VecMat.ec                                     *)
 (* ================================================================== *)
+
+(* the entries of the matrix, in [0, q), are in (-q, q) *)
+lemma wpoly_urng_srng (p : wpoly) : wpoly_urng q p => wpoly_srng (q-1) (q-1) p.
+proof.
+rewrite /wpoly_urng /wpoly_srng !allP => H x /H /= rgx.
+by rewrite W32.to_sintE /smod; smt().
+qed.
 
 lemma row_vector____multiply_with_matrix_A_ll :
     islossless M.row_vector____multiply_with_matrix_A.
@@ -478,7 +487,7 @@ lemma row_vector____multiply_with_matrix_A_correct
         liftm_wpolykvec (kvec_unflatten256 res) =
           ntt_mulmxv (liftu_wpolymat (mat_unflatten256 _mat))
                      (lifts_wpolylvec (lvec_unflatten256 _vec)) /\
-        wpolykvec_srng (kvec_unflatten256 res) (lvec * (q-1)) (lvec * (q-1))
+        wpolykvec_srng (kvec_unflatten256 res) (q-1) (q-1)
     ].
 proof.
 have lvec_val := gt0_l.
@@ -491,7 +500,7 @@ while (0 <= i <= kvec /\ matrix_A = _mat /\ vector = _vec /\
           (liftm_wpolykvec (kvec_unflatten256 out)).[k] =
           ntt_dotp (row (lifts_wpolymat (mat_unflatten256 _mat)) k)
                    (lifts_wpolylvec (lvec_unflatten256 _vec)) /\
-          wpoly_srng (lvec * (q-1)) (lvec * (q-1)) (kvec_unflatten256 out).[k])
+          wpoly_srng (q-1) (q-1) (kvec_unflatten256 out).[k])
       ); last first.
 + (* Exit + pre-loop *)
   auto => /> Hmurng Hvbmul; split; 1: smt().
@@ -520,10 +529,10 @@ wp; ecall (row_vector____dot_product_correct
             vector).
 auto => /> &hr Hi1 Hi2 Hmurng Hvbmul Hinv Hguard.
 split.
-+ (* wpolylvec_bmul_irng on row slice: each element is urng q and hence bmul_irng *)
-  rewrite /wpolylvec_bmul_irng LArray.allP => l lb.
++ (* the row slice: each element is urng q and hence in (-q, q) *)
+  rewrite /wpolylvec_srng LArray.allP => l lb.
   have /= -> := mat_row_slice_unflatten _mat i{hr} l _ _; 1,2: smt().
-  apply wpoly_urng_bmul_irng.
+  apply wpoly_urng_srng.
   move: Hmurng; rewrite /wpolymat_urng KLMatrix.allP => Hj.
   by apply (Hj (i{hr}*lvec + l)); smt(mat_idx).
 + (* Post-call: establish invariant at i+1 *)
@@ -573,7 +582,7 @@ lemma row_vector____multiply_with_matrix_A_ph
         liftm_wpolykvec (kvec_unflatten256 res) =
           ntt_mulmxv (liftu_wpolymat (mat_unflatten256 _mat))
                      (lifts_wpolylvec (lvec_unflatten256 _vec)) /\
-        wpolykvec_srng (kvec_unflatten256 res) (lvec * (q-1)) (lvec * (q-1))
+        wpolykvec_srng (kvec_unflatten256 res) (q-1) (q-1)
     ] = 1%r
   by conseq row_vector____multiply_with_matrix_A_ll
             (row_vector____multiply_with_matrix_A_correct _mat _vec).

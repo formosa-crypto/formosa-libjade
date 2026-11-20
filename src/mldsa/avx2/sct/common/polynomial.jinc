@@ -29,20 +29,26 @@ namespace polynomial {
         return sum_pointer;
     }
 
+    // difference = lhs - rhs - q when it is not negative, lhs - rhs + q
+    // otherwise: for lhs, rhs in (-q, q), a representative in [-q, q), the
+    // input range of the inverse NTT.
     #[safety =
        { requires = is_arr_init(lhs_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
                  && is_arr_init(rhs_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
        , ensures = is_arr_init(difference_pointer,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
        }
      ]
-    fn subtract(
+    fn subtract_to_intt_range(
         reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] difference_pointer lhs_pointer rhs_pointer
     )
     -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
     {
-        reg u256 lhs rhs difference;
+        reg u256 lhs rhs difference signs modulus two_modulus;
 
         reg ui64 offset;
+
+        modulus = MODULUS_VECTOR;
+        two_modulus = #VPADD_8u32(modulus, modulus);
 
         offset = 0;
         while (offset < BYTES_PER_UNCOMPRESSED_POLYNOMIAL) {
@@ -50,6 +56,10 @@ namespace polynomial {
             rhs = rhs_pointer.[:u256 offset];
 
             difference = #VPSUB_8u32(lhs, rhs);
+            signs = #VPSRA_8u32(difference, 31);
+            signs = #VPAND_256(signs, two_modulus);
+            difference = #VPSUB_8u32(difference, modulus);
+            difference = #VPADD_8u32(difference, signs);
             difference_pointer.[:u256 offset] = difference;
 
             offset += 32;

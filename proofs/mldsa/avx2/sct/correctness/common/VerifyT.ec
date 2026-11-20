@@ -169,8 +169,8 @@ proof. by conseq compare_commitment_hashes_ll (compare_commitment_hashes_h _lhs 
 (* Reconstructs w1' = UseHint(h, A*z - c*t1*2^d) for each of the kvec rows. *)
 (* Per-component loop body:                                            *)
 (*   t1_decode → shift_left → NTT → pmmar(c,t1) →                    *)
-(*   subtract(az, ct1) → reduce32 → invNTT → cond_add_mod →          *)
-(*   use_hints → write back                                            *)
+(*   subtract_to_intt_range(az, ct1) → invNTT → use_hints →          *)
+(*   write back                                                        *)
 (* Then commitment_encode on the result.                               *)
 (* Spec: w1Encode(UseHint(h, Az - c*NTT^{-1}(NTT(t1*2^d)*chat)))    *)
 (* ================================================================== *)
@@ -183,10 +183,8 @@ wp; call commitment____encode_ll.
 while (0 <= i <= kvec) (kvec - i); last by auto => />; smt(gt0_k).
 move => *; wp.
 call polynomial__use_hints_ll; wp.
-call polynomial__conditionally_add_modulus_ll.
 call polynomial__invert_ntt_montgomery_ll.
-call polynomial__reduce32_ll.
-call polynomial__subtract_ll; wp.
+call polynomial__subtract_to_intt_range_ll; wp.
 call polynomial__pointwise_montgomery_multiply_and_reduce_ll.
 call polynomial__ntt_ll.
 call polynomial____shift_coefficients_left_ll.
@@ -222,9 +220,8 @@ lemma reconstruct_signer_commitment_correct
         a_times_signer_response = _az /\ hints = _hints /\
         wpoly_ntt_orng _ch /\
         wpolykvec_urng (kvec_unflatten256 _hints) 2 /\
-        (* _az is the output of row_vector____multiply_with_matrix_A: sum of lvec *)
-        (* basemul results, each wpoly_srng (q-1) (q-1). Bound: lvec*(q-1).        *)
-        wpolykvec_srng (kvec_unflatten256 _az) (lvec * (q-1)) (lvec * (q-1))
+        (* _az is the output of row_vector____multiply_with_matrix_A, in (-q, q) *)
+        wpolykvec_srng (kvec_unflatten256 _az) (q-1) (q-1)
         ==>
         BytesW1.of_list (to_list res) =
           w1Encode (UseHint (liftu_wpolykvec (kvec_unflatten256 _hints))
@@ -242,7 +239,7 @@ while (0 <= i <= kvec /\ t1_encoded = _t1enc /\ challenge_as_ntt = _ch /\
        a_times_signer_response = _az /\ hints = _hints /\
        wpoly_ntt_orng _ch /\
        wpolykvec_urng (kvec_unflatten256 _hints) 2 /\
-       wpolykvec_srng (kvec_unflatten256 _az) (lvec * (q-1)) (lvec * (q-1)) /\
+       wpolykvec_srng (kvec_unflatten256 _az) (q-1) (q-1) /\
        (forall k, 0 <= k < i =>
           liftu_wpoly (kvec_unflatten256 commitment).[k] =
             poly_UseHint
@@ -280,17 +277,14 @@ while (0 <= i <= kvec /\ t1_encoded = _t1enc /\ challenge_as_ntt = _ch /\
   + by rewrite allP => s /mapP [wi [_ ->]] /=; rewrite Hsz.
   rewrite (nth_map witness); 1: by rewrite size_mkseq; smt(gt0_k).
   by rewrite nth_mkseq.
-(* Loop body: 9-call chain (t1_decode → shift → ntt → pmmar → subtract → reduce32 →    *)
-(*   invert_ntt → caddq → use_hints) + writeback. The ecall chain is structurally      *)
-(* threaded below.                              *)
+(* Loop body: 7-call chain (t1_decode → shift → ntt → pmmar → subtract_to_intt_range → *)
+(*   invert_ntt → use_hints) + writeback. The ecall chain is structurally threaded     *)
+(* below.                                                                              *)
 wp.
 ecall (polynomial__use_hints_correct commitment_element hints_element).
 wp.
-ecall (polynomial__conditionally_add_modulus_correct commitment_element).
 ecall (polynomial__invert_ntt_montgomery_correct commitment_element).
-ecall (polynomial__reduce32_correct commitment_element).
-ecall (polynomial__subtract_correct commitment_element az_element c_times_t1
-         (lvec * (q-1)) (q-1)).
+ecall (polynomial__subtract_to_intt_range_correct commitment_element az_element c_times_t1).
 wp.
 ecall (polynomial__pointwise_montgomery_multiply_and_reduce_correct
          c_times_t1 challenge_as_ntt t1_element).
@@ -304,34 +298,25 @@ move => result Hliftu_t1 Hurng_t1 Hurng_t1_1024 result0 Hto_sint_shift Hsrng_shi
 (* ntt's and pmmar's pres are the ranges at hand (ntt_irng = srng (q-1); *)
 (* ntt_orng = bmul_irng): discharged by auto                              *)
 move => _ result1 Hlifts_ntt Horng_ntt _ _ result2 Hlifts_pmmar Hsrng_pmmar.
-(* subtract's pre: wpoly_srng on az slice + arithmetic bound *)
+(* subtract's pre: wpoly_srng on az slice *)
 split.
-+ split; 2: smt(param_sets).
-  have /= Hslice := kvec_slice_eq _az (i{hr} * n) _ _; 1,2: smt().
++ have /= Hslice := kvec_slice_eq _az (i{hr} * n) _ _; 1,2: smt().
   have Hdiv : i{hr} * n %/ n = i{hr} by smt().
   move: Hslice; rewrite Hdiv => Hslice.
   rewrite -Hslice.
   by move: Haz_rng; rewrite /wpolykvec_srng KArray.allP => H; apply H; smt(gt0_k).
-move => _ _ result3 Hlifts_sub Hsrng_sub.
-split; first by apply (wpoly_srng_widen result3 (lvec * 8380416 + 8380416) (lvec * 8380416 + 8380416) 2143289343 2143289343); [ smt(param_sets) | smt(param_sets) | exact Hsrng_sub ].
-move => _ result4 Hlifts_red Hsrng_red.
-(* invert_ntt's pre: wpoly_intt_irng via widening + bridge *)
-split; first by apply wpoly_bmul_orng_intt_irng;
-  apply (wpoly_srng_widen _ 6283009 6283008 (q-1) (q-1)); smt().
-move => _ result5 Hlifts_invntt Hsrng_invntt.
-(* caddq's pre: wpoly_srng (q-1) (q-1) via widening *)
-split; first by apply (wpoly_srng_widen _ invntt_obound invntt_obound (q-1) (q-1));
-  first 2 smt(invntt_obound_fits_for_caddq param_sets);
-  exact Hsrng_invntt.
-move => _ result6 Hlifts_caddq Hurng_caddq.
-(* use_hints' pre: wpoly_urng 2 hints slice *)
+(* invert_ntt's pre is the range of subtract_to_intt_range *)
+move => _ result4 Hlifts_sub _ result6 Hlifts_invntt Hsrng_invntt.
+(* use_hints' pre: the invNTT output widened to (-q, q), and the hints slice *)
 split.
-+ have /= Hslice_h := kvec_slice_eq _hints (i{hr} * n) _ _; 1,2: smt().
++ split; 1: by apply (wpoly_srng_widen _ invntt_obound invntt_obound);
+    smt(invntt_obound_add_eta_le param_sets).
+  have /= Hslice_h := kvec_slice_eq _hints (i{hr} * n) _ _; 1,2: smt().
   have Hdiv_h : i{hr} * n %/ n = i{hr} by smt().
   move: Hslice_h; rewrite Hdiv_h => Hslice_h.
   rewrite -Hslice_h.
   by move: Hhints_rng; rewrite /wpolykvec_urng KArray.allP => H; apply H; smt(gt0_k).
-move => _ result7 Hliftu_useh Hurng_useh.
+move => _ _ result7 Hliftu_useh Hurng_useh.
 (* Final goal: invariant at i+1 *)
 split; 1: smt().
 move => k Hk_lo Hk_hi.
@@ -351,15 +336,13 @@ case (k = i{hr}) => Hki.
     move: Hslice_h2; rewrite Hnnd => Hslice_h2.
     by rewrite Hslice_h2.
   rewrite H_hints_slice; congr.
-  (* Algebraic chain: liftu result6 = (signer_commitment_spec ...).[i] *)
-  have Hliftu_eq : liftu_wpoly result6 = lifts_wpoly result6
-    by rewrite -wpoly_urng_lifts_eq_liftu.
+  (* Algebraic chain: lifts result6 = (signer_commitment_spec ...).[i] *)
   (* the inverse NTT consumes Montgomery form: read the subtraction through liftm *)
   have Hm : liftm_wpoly result4 =
       liftm_wpoly (init (fun (i_0 : int) => _az.[i{hr} * n + i_0])) &+
       (&-) (basemul (lifts_wpoly _ch) (lifts_wpoly result1)).
-  + by rewrite -Hlifts_pmmar /liftm_wpoly Hlifts_red Hlifts_sub scaleD scaleN.
-  rewrite Hliftu_eq Hlifts_caddq Hlifts_invntt Hm Hlifts_ntt.
+  + by rewrite -Hlifts_pmmar /liftm_wpoly Hlifts_sub scaleD scaleN.
+  rewrite Hlifts_invntt Hm Hlifts_ntt.
   (* Unfold signer_commitment_spec + decompose the kvec ops *)
   rewrite /signer_commitment_spec /invnttv KArray.mapiE; 1: smt(gt0_k).
   rewrite polykvec_sub_iE; 1: smt(gt0_k).
@@ -424,7 +407,7 @@ lemma reconstruct_signer_commitment_ph
         a_times_signer_response = _az /\ hints = _hints /\
         wpoly_ntt_orng _ch /\
         wpolykvec_urng (kvec_unflatten256 _hints) 2 /\
-        wpolykvec_srng (kvec_unflatten256 _az) (lvec * (q-1)) (lvec * (q-1))
+        wpolykvec_srng (kvec_unflatten256 _az) (q-1) (q-1)
         ==>
         BytesW1.of_list (to_list res) =
           w1Encode (UseHint (liftu_wpolykvec (kvec_unflatten256 _hints))

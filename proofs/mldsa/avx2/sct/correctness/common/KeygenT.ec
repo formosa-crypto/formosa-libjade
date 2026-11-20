@@ -80,7 +80,7 @@ qed.
 (* ================================================================== *)
 (* __compute_t0_t1                                                      *)
 (* Computes t = A*s1 + s2 (in coefficient domain), then Power2Round.   *)
-(* Sequential: multiply_with_matrix_A → reduce32 → invNTT →           *)
+(* Sequential: multiply_with_matrix_A → invNTT →                      *)
 (*             add(s2) → conditionally_add_modulus → power2round       *)
 (* Spec: (t1, t0) = Power2Round(invNTT(A*NTT(s1)) + s2)               *)
 (* ================================================================== *)
@@ -92,7 +92,6 @@ wp; call column_vector____power2round_ll.
 call column_vector____conditionally_add_modulus_ll.
 call column_vector____add_ll.
 call column_vector__invert_ntt_montgomery_ll.
-call column_vector__reduce32_ll.
 call row_vector____multiply_with_matrix_A_ll.
 by auto.
 qed.
@@ -116,20 +115,16 @@ lemma __compute_t0_t1_correct
         wpolykvec_srng (kvec_unflatten256 res.`2) (2^(d-1) - 1) (2^(d-1))
     ].
 proof.
-have Hbound := invntt_obound_fits_for_caddq.
+have Hbound := invntt_obound_add_eta_le.
 proc.
 ecall (column_vector____power2round_correct t).
 ecall (column_vector____conditionally_add_modulus_correct t).
 ecall (column_vector____add_correct t _s2 invntt_obound Eta).
 ecall (column_vector__invert_ntt_montgomery_correct t).
-ecall (column_vector__reduce32_correct t).
 ecall (row_vector____multiply_with_matrix_A_correct _mat _s1).
 auto => /> Hurng_mat Horng_s1 Hsrng_s2.
 move => _ result Hlifts_mul Hsrng_mul.
-split; first by apply (wpolykvec_srng_widen _ (lvec * 8380416) (lvec * 8380416) 2143289343 2143289343); smt(param_sets).
-move => _ result0 Hlifts_red Hsrng_red.
-split; first by apply wpolykvec_bmul_orng_intt_irng;
-  apply (wpolykvec_srng_widen _ 6283009 6283008 (q-1) (q-1)); smt().
+split; first by apply wpolykvec_bmul_orng_intt_irng.
 move => _ result1 Hlifts_invntt Hsrng_invntt.
 split; 1: smt().
 move => _ result2 Hlifts_add Hsrng_add.
@@ -143,7 +138,7 @@ have Hchain :
                       (lifts_wpolylvec (lvec_unflatten256 _s1)))
   + lifts_wpolykvec (kvec_unflatten256 _s2)
   = liftu_wpolykvec (kvec_unflatten256 result3).
-+ by rewrite -Hlifts_mul -(liftm_wpolykvec_lifts _ _ Hlifts_red) -Hlifts_invntt -Hlifts_add -Hlifts_cond Heq3.
++ by rewrite -Hlifts_mul -Hlifts_invntt -Hlifts_add -Hlifts_cond Heq3.
 rewrite Hchain.
 rewrite /Power2Round /=.
 by split; [exact Ht1_eq | exact Hurng_t1].

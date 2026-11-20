@@ -66,10 +66,9 @@ fn reconstruct_signer_commitment(
         c_times_t1 = polynomial::pointwise_montgomery_multiply_and_reduce(c_times_t1, challenge_as_ntt, t1_element);
 
         commitment_element = commitment[i * COEFFICIENTS_IN_POLYNOMIAL: COEFFICIENTS_IN_POLYNOMIAL];
-        commitment_element = polynomial::subtract(commitment_element, Az_element, c_times_t1);
-        commitment_element = polynomial::reduce32(commitment_element);
+        commitment_element = polynomial::subtract_to_intt_range(
+            commitment_element, Az_element, c_times_t1);
         commitment_element = polynomial::invert_ntt_montgomery(commitment_element);
-        commitment_element = polynomial::conditionally_add_modulus(commitment_element);
 
         hints_element = hints[i * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL];
         commitment_element = polynomial::use_hints(commitment_element, hints_element);
