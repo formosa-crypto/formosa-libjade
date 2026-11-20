@@ -4,7 +4,7 @@ from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 require import ArrayExtra.
 require import JWordExtra JModelExtra EclibExtra JWordList.
 require import Array256.
-require BaseT PreludeT Gamma1T.
+require BaseT PreludeT Gamma1T JArrayExtra.
 
 abstract theory SignatureT.
 
@@ -12,6 +12,11 @@ clone import BaseT.BaseT as B.
 import S R MLDSAParams.
 clone import PreludeT.PreludeT as PR with theory B <- B.
 clone import Gamma1T.Gamma1T as G1 with theory B <- B, theory PR <- PR.
+
+(* the u32 view of a K-vector written by 256-bit stores *)
+clone JArrayExtra.PWAE as PWK with op size <- kpolys, op wsize <- kpolys_bytes,
+  theory P <- Array_kpolys, theory W <- WArray_kpolys_bytes
+  proof wsizeE by rewrite /kpolys_bytes.
 
 import BitEncoding BitChunking.
 
@@ -136,53 +141,52 @@ while (0 <= i{1} <= kvec /\
 seq 0 3 : (#pre /\ decoded_offset{2} = 256*encoded_offset{2});
   1: by auto => /> &1 &2 ???????;rewrite /(`<<`) /= /#.
 
-(* Set Zero *)
-seq 1 3 : (#pre /\
+(* Set Zero: 32 stores of eight zero coefficients *)
+seq 1 4 : (#pre /\
       (liftu_wpolykvec (kvec_unflatten256 hints{2})).[i{1}] = h{1}.[i{1}] /\
       wpoly_urng 2 (kvec_unflatten256 hints{2}).[i{1}]).
  + wp; conseq />;1:smt().
-   while {2} (0 <= j{2} <= n /\ 0 <= encoded_offset{2} < kvec /\
-      decoded_offset{2} = encoded_offset{2} * n /\
-      condition_zero{2} = (j{2} < n) /\
-     (forall (k : int),
-        0 <= k < encoded_offset{2} =>
-          (liftu_wpolykvec (kvec_unflatten256 hints{2})).[k] =
-            h{1}.[k] /\
-     wpoly_urng 2 (kvec_unflatten256 hints{2}).[k]) /\
-     (forall jj, 0 <= jj < j{2} =>
-  (kvec_unflatten256 hints{2}).[encoded_offset{2}].[jj] = W32.zero)) (n - j{2}); last first.
+   while {2} (0 <= k{2} <= 32 /\ inc{2} = 32 /\ zeros{2} = set0_256 /\
+      0 <= encoded_offset{2} < kvec /\ decoded_offset{2} = encoded_offset{2} * n /\
+     (forall (r : int),
+        0 <= r < encoded_offset{2} =>
+          (liftu_wpolykvec (kvec_unflatten256 hints{2})).[r] = h{1}.[r] /\
+     wpoly_urng 2 (kvec_unflatten256 hints{2}).[r]) /\
+     (forall jj, 0 <= jj < 8 * k{2} =>
+  (kvec_unflatten256 hints{2}).[encoded_offset{2}].[jj] = W32.zero)) (32 - k{2}); last first.
    + auto => /> &1 &2 ?????????;split;1:smt().
-      move  => c2 h2 j2;split;1:smt().
-      move => ???????H; do split.
-      + move => k kbl kbh.
+      move  => h2 k2;split;1:smt().
+      move => 6? H; do split.
+      + move => r rbl rbh.
         split.
         + by rewrite mapiE 1:/# get_setE 1:/# ifF 1:/#; smt(KArray.mapiE).
         by smt(KArray.allP).
-      + rewrite get_setE 1:/# ifT 1:/# tP => k kb.
-        by  rewrite mapiE 1:/# /= Array256.initiE 1:/# /=  mapiE 1:/# /= H 1:/# /=.
-      + rewrite /wpoly_urng allP => k kb /=.
+      + rewrite get_setE 1:/# ifT 1:/# tP => r rb.
+        by rewrite mapiE 1:/# /= Array256.initiE 1:/# /= mapiE 1:/# /= H 1:/# /=.
+      + rewrite /wpoly_urng allP => r rb /=.
         by rewrite H /#.
  + move => &1 _z;auto => /> &2 ???? H H0 ?; do split; 1,2,5:smt().
-   + move => k kbl kbh.
-     have  := H k _;1:smt().
+   + move => r rbl rbh.
+     have  := H r _;1:smt().
      rewrite mapiE 1:/# /= tP /wpoly_urng allP => [# HH HH0].
      split.
      + rewrite mapiE 1:/# /= tP => kk kkb.
        rewrite mapiE 1:/# /= initiE 1:/# /= get_of_list 1:/# nth_sub 1:/# /=.
-       by have := HH kk kkb; rewrite  initiE 1:/# /= mapiE 1:/# /= get_of_list 1:/# nth_sub 1:/# /= get_setE /#.
-   +  rewrite allP => kk kkb /=;rewrite initiE 1:/# /= get_of_list 1:/# nth_sub 1:/# /= get_setE 1:/#.
+       rewrite PWK.store_get 1..4:#smt:(gt0_k) ifF 1:/#.
+       by have := HH kk kkb; rewrite mapiE 1:/# /= initiE 1:/# /= get_of_list 1:/# nth_sub /#.
+   +  rewrite allP => kk kkb /=;rewrite initiE 1:/# /= get_of_list 1:/# nth_sub 1:/# /=.
+     rewrite PWK.store_get 1..4:#smt:(gt0_k) ifF 1:/#.
      have /= := HH0 kk kkb.
-     rewrite initiE 1:/# /= get_of_list 1:/# nth_sub 1:/# /= => HH1.
-     by smt().
+     by rewrite initiE 1:/# /= get_of_list 1:/# nth_sub 1:/# /=.
    + move => jj jjbl jjbh.
      rewrite initiE 1:/# /= get_of_list 1:/# nth_sub 1:/# /=.
-     case (jj = j{2}) => ?.
-     + by rewrite get_setE 1:/# ifT 1:/#.
-     rewrite get_setE 1:/# ifF 1:/#.
-     have /= := H0 jj _;1:smt().
-     by rewrite initiE 1:/# /= get_of_list 1:/# nth_sub /#.
+     rewrite PWK.store_get 1..4:#smt:(gt0_k).
+     case (jj < 8 * k{2}) => ?.
+     + rewrite ifF 1:/#; have /= := H0 jj _;1:smt().
+       by rewrite initiE 1:/# /= get_of_list 1:/# nth_sub /#.
+     by rewrite ifT 1:/# W8u32.get_zero.
 
- seq 0 5 : (#pre /\
+ seq 0 4 : (#pre /\
     current_true_hints_seen{2} = to_uint (zeroextu64 hint_encoded{2}.[w_hint + encoded_offset{2}]) /\
     condition_decreasing{2} = (current_true_hints_seen{2} < previous_true_hints_seen{2}));
    1: by auto => />; rewrite /SLH64.protect_64.

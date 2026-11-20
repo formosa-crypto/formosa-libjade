@@ -158,10 +158,13 @@ namespace signature {
         reg ui64 decoded_offset encoded_offset;
         reg u8 done1, done2, done3;
         reg bool within_bounds not_done1 not_done2 not_done3;
-        reg bool condition_zero condition_decreasing condition_too_many condition_not_first;
+        reg bool condition_decreasing condition_too_many condition_not_first;
         reg bool condition_unordered condition_well_formed condition_nonzero;
         reg u64 hint hint_at_j hint_at_j_minus_one ill_formed_hint true_hints_seen;
+        reg u256 zeros;
         #[msf] reg u64 ms;
+
+        inline int k;
 
         ms = #init_msf();
 
@@ -178,16 +181,11 @@ namespace signature {
             ms = #update_msf(not_done1, ms);
             decoded_offset = encoded_offset;
             decoded_offset <<= LOG_2_COEFFICIENTS_IN_POLYNOMIAL;
-            j = 0;
 
-            while { condition_zero = j < COEFFICIENTS_IN_POLYNOMIAL; } (condition_zero) {
-                ms = #update_msf(condition_zero, ms);
-                index = decoded_offset;
-                index += j;
-                hints[index] = 0;
-                j += 1;
+            zeros = #set0_256();
+            for k = 0 to COEFFICIENTS_IN_POLYNOMIAL / 8 {
+                hints.[:u256 4 * decoded_offset + 32 * k] = zeros;
             }
-            ms = #update_msf(!condition_zero, ms);
 
             true_hints_seen = (64u)hint_encoded[MAX_ONES_IN_HINT + encoded_offset];
             true_hints_seen = #protect(true_hints_seen, ms);

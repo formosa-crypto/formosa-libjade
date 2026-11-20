@@ -2881,7 +2881,7 @@ while (b_hint_encoded = BArray84.init_arr (W8.of_int 255)
     /\ (ill_formed_hint = W64.zero => BArray4096.is_init b_hints 0 (1024 * encoded_offset))
     /\ valid trace_signature____decode_hint).
 + (* a row: zeroed first *)
-  seq 14 : (b_hint_encoded = BArray84.init_arr (W8.of_int 255)
+  seq 13 : (b_hint_encoded = BArray84.init_arr (W8.of_int 255)
       /\ ill_formed_hint = W64.zero /\ 0 <= encoded_offset < 4
       /\ 0 <= previous_true_hints_seen <= 80 /\ decoded_offset = 256 * encoded_offset
       /\ BArray4096.is_init b_hints 0 (1024 * (encoded_offset + 1))
@@ -2892,11 +2892,11 @@ while (b_hint_encoded = BArray84.init_arr (W8.of_int 255)
     while (b_hint_encoded = BArray84.init_arr (W8.of_int 255)
         /\ ill_formed_hint = W64.zero /\ 0 <= encoded_offset < 4
         /\ 0 <= previous_true_hints_seen <= 80 /\ decoded_offset = 256 * encoded_offset
-        /\ 0 <= j <= 256 /\ condition_zero = (j < 256)
-        /\ BArray4096.is_init b_hints 0 (1024 * encoded_offset + 4 * j)
+        /\ 0 <= k <= 32
+        /\ BArray4096.is_init b_hints 0 (1024 * encoded_offset + 32 * k)
         /\ valid trace_signature____decode_hint).
     + auto => /> *.
-      rewrite BI4096.is_init_set32d_in 1,2:/# /=.
+      rewrite BI4096.is_init_set256d_in 1,2:/# /=.
       smt(BI4096.is_init_sub).
     auto => /> *.
     rewrite /JUtils.(`<<`) /SLH64.protect_64 /=.
