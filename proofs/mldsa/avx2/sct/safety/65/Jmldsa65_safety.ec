@@ -1420,13 +1420,16 @@ abbrev  error_polynomial__ETA2_ENCODING_CONSTANTS =
 (W256.of_int
 (-25480207347730548941657020188721492090752456717537638033530380222208))]).
 
-abbrev [-printing] error_polynomial__SHIFTS =
+abbrev  error_polynomial__ETA2_DECODING_SHIFTS =
+(BArray64.of_list256
+[(W256.of_int
+ 566158880123151266946890095140503385940937615878238220190345680912384);
 (W256.of_int
-107839786668602559184514066897402134367680229671084479353429526839296).
+781838453510573199199011675048716228997326914257080593264960832798728)]).
 
-abbrev [-printing] error_polynomial__DECODING_SHUFFLES =
+abbrev [-printing] error_polynomial__ETA4_DECODING_SHIFTS =
 (W256.of_int
-(-6793906561703790865943291268746375741561545978554779831640812377080064)).
+754878506830868355929186793520671181254583487837650960253794241216512).
 
 abbrev [-printing] error_polynomial__ENCODING_SHUFFLES =
 (W256.of_int
@@ -1616,13 +1619,9 @@ module M = {
     var temp:W64.t;
     var mask:W256.t;
     var eta_0:W256.t;
-    var decoding_shuffles:W256.t;
     var shifts:W256.t;
+    var i:int;
     var coefficients:W256.t;
-    var bytes:W128.t;
-    var input_offset:int;
-    var output_offset:int;
-    var byte_group:int;
     var trace_error_polynomial__decode_eta4:trace;
     trace_error_polynomial__decode_eta4 <- [];
     trace_error_polynomial__decode_eta4 <-
@@ -1634,53 +1633,26 @@ module M = {
     temp <- (W64.of_int 4);
     eta_0 <- (zeroextu256 (VMOV_64 temp));
     eta_0 <- (VPBROADCAST_8u32 (truncateu32 eta_0));
-    decoding_shuffles <- error_polynomial__DECODING_SHUFFLES;
-    shifts <- error_polynomial__SHIFTS;
-    coefficients <- (set0_256);
-    input_offset <- 0;
-    output_offset <- 0;
-    while ((input_offset < 128)) {
+    shifts <- error_polynomial__ETA4_DECODING_SHIFTS;
+    i <- 0;
+    while ((i < 32)) {
       trace_error_polynomial__decode_eta4 <-
       (trace_error_polynomial__decode_eta4 ++
-      [(Assert, ((0 <= input_offset) /\ ((input_offset + 16) <= 128)))]);
-      bytes <- (BArray128.get128d encoded input_offset);
-      byte_group <- 0;
-      while ((byte_group < 4)) {
-        coefficients <- (VINSERTI128 coefficients bytes (W8.of_int 0));
-        coefficients <- (VINSERTI128 coefficients bytes (W8.of_int 1));
-        coefficients <- (VPSHUFB_256 coefficients decoding_shuffles);
-        coefficients <- (VPSRLV_8u32 coefficients shifts);
-        coefficients <- (VPAND_256 coefficients mask);
-        coefficients <- (VPSUB_8u32 eta_0 coefficients);
-        trace_error_polynomial__decode_eta4 <-
-        (trace_error_polynomial__decode_eta4 ++
-        [(Assert, ((0 <= output_offset) /\ ((output_offset + 32) <= 1024)))]);
-        b_decoded <-
-        (BArray1024.set256d b_decoded output_offset
-        (W256.of_int
-        115792089237316195423570985008687907853269984665640564039457584007913129639935
-        ));
-        decoded <- (BArray1024.set256d decoded output_offset coefficients);
-        trace_error_polynomial__decode_eta4 <-
-        (trace_error_polynomial__decode_eta4 ++
-        [(Assert,
-         ((0 <= (output_offset + 32)) /\
-         ((output_offset + 32) <= 18446744073709551615)))]);
-        output_offset <- (output_offset + 32);
-        bytes <- (VPSRLDQ_128 bytes (W8.of_int 4));
-        trace_error_polynomial__decode_eta4 <-
-        (trace_error_polynomial__decode_eta4 ++
-        [(Assert,
-         ((0 <= (byte_group + 1)) /\
-         ((byte_group + 1) <= 18446744073709551615)))]);
-        byte_group <- (byte_group + 1);
-      }
+      [(Assert, ((0 <= (4 * i)) /\ (((4 * i) + 4) <= 128)))]);
+      coefficients <- (VPBROADCAST_8u32 (BArray128.get32d encoded (4 * i)));
+      coefficients <- (VPSRLV_8u32 coefficients shifts);
+      coefficients <- (VPAND_256 coefficients mask);
+      coefficients <- (VPSUB_8u32 eta_0 coefficients);
       trace_error_polynomial__decode_eta4 <-
       (trace_error_polynomial__decode_eta4 ++
-      [(Assert,
-       ((0 <= (input_offset + 16)) /\
-       ((input_offset + 16) <= 18446744073709551615)))]);
-      input_offset <- (input_offset + 16);
+      [(Assert, ((0 <= (32 * i)) /\ (((32 * i) + 32) <= 1024)))]);
+      b_decoded <-
+      (BArray1024.set256d b_decoded (32 * i)
+      (W256.of_int
+      115792089237316195423570985008687907853269984665640564039457584007913129639935
+      ));
+      decoded <- (BArray1024.set256d decoded (32 * i) coefficients);
+      i <- (i + 1);
     }
     return (decoded, b_decoded, trace_error_polynomial__decode_eta4);
   }
