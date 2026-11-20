@@ -90,17 +90,9 @@ namespace error_polynomial {
         return encoded;
     }
 
-    u256 DECODING_SHUFFLES = (32u8)[
-        -1, -1, -1, 3,
-        -1, -1, -1, 3,
-        -1, -1, -1, 2,
-        -1, -1, -1, 2,
-        -1, -1, -1, 1,
-        -1, -1, -1, 1,
-        -1, -1, -1, 0,
-        -1, -1, -1, 0
-    ];
-    u256 SHIFTS = (8u32)[4, 0, 4, 0, 4, 0, 4, 0];
+    // Eight 4-bit coefficients per 4 bytes: the 4 bytes at 4 i in every lane,
+    // shifted right by 4 k in lane k.
+    u256 ETA4_DECODING_SHIFTS = (8u32)[28, 24, 20, 16, 12, 8, 4, 0];
     #[safety =
        { requires = is_arr_init(encoded,0,ENCODED_ERROR_POLYNOMIAL_SIZE)
        , ensures = is_arr_init(decoded,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
@@ -111,15 +103,10 @@ namespace error_polynomial {
         reg ptr u8[ENCODED_ERROR_POLYNOMIAL_SIZE] encoded
     ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
     {
-        reg u128 bytes;
-
-        reg u256 coefficients;
-        reg u256 decoding_shuffles;
-        reg u256 mask shifts;
-        reg u256 eta;
-
-        reg ui64 input_offset output_offset byte_group;
+        reg u256 coefficients mask shifts eta;
         reg u64 temp;
+
+        inline int i;
 
         temp = (1 << 4) - 1;
         mask = (256u)#VMOV(temp);
@@ -129,40 +116,25 @@ namespace error_polynomial {
         eta = (256u)#VMOV(temp);
         eta = #VPBROADCAST_8u32(eta);
 
-        decoding_shuffles = DECODING_SHUFFLES;
-        shifts = SHIFTS;
-
-        coefficients = #set0_256();
-
-        input_offset = 0;
-        output_offset = 0;
-        while (input_offset < ENCODED_ERROR_POLYNOMIAL_SIZE) {
-            bytes = encoded.[:u128 input_offset];
-
-            byte_group = 0;
-            while (byte_group < 4) {
-                coefficients = #VINSERTI128(coefficients, bytes, 0);
-                coefficients = #VINSERTI128(coefficients, bytes, 1);
-
-                coefficients = #VPSHUFB_256(coefficients, decoding_shuffles);
-                coefficients = #VPSRLV_8u32(coefficients, shifts);
-                coefficients = #VPAND_256(coefficients, mask);
-
-                coefficients = #VPSUB_8u32(eta, coefficients);
-
-                decoded.[:u256 output_offset] = coefficients;
-                output_offset += 32;
-
-                bytes = #VPSRLDQ_128(bytes, 4);
-                byte_group += 1;
-            }
-            input_offset += 16;
+        shifts = ETA4_DECODING_SHIFTS;
+        for i = 0 to COEFFICIENTS_IN_POLYNOMIAL / 8 {
+            coefficients = #VPBROADCAST_8u32(encoded.[:u32 4 * i]);
+            coefficients = #VPSRLV_8u32(coefficients, shifts);
+            coefficients = #VPAND_256(coefficients, mask);
+            coefficients = #VPSUB_8u32(eta, coefficients);
+            decoded.[:u256 32 * i] = coefficients;
         }
 
         return decoded;
     }
 
     // ETA = 2
+    // the shifts of decode_eta2: the groups at 3 i, then the last group
+    u256[2] ETA2_DECODING_SHIFTS = {
+        (8u32)[21, 18, 15, 12, 9, 6, 3, 0],
+        (8u32)[29, 26, 23, 20, 17, 14, 11, 8]
+    };
+
     u256[5] ETA2_ENCODING_CONSTANTS = {
         (32u8)[
             (1 << 3), 1, (1 << 3), 1, (1 << 3), 1, (1 << 3), 1,
@@ -352,7 +324,9 @@ namespace error_polynomial {
         return encoded;
     }
 
-    // TODO: Is it worthwhile vectorizing this function?
+    // Eight 3-bit coefficients per 3 bytes: the 4 bytes at 3 i in every lane,
+    // shifted right by 3 k in lane k; the last group reads the last 4 bytes of
+    // the encoding, one byte earlier, and shifts by 8 more.
     #[safety =
        { requires = is_arr_init(encoded,0,ENCODED_ERROR_POLYNOMIAL_SIZE)
        , ensures = is_arr_init(polynomial,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
@@ -363,108 +337,34 @@ namespace error_polynomial {
         reg ptr u8[ENCODED_ERROR_POLYNOMIAL_SIZE] encoded
     ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL]
     {
-        reg u32 t0 t1 t2;
-        reg u32 coefficient temp;
+        reg u256 coefficients mask shifts eta;
+        reg u64 temp;
 
-        inline int ETA_BITS_MASK = (1 << 3) - 1;
+        inline int i;
 
-        reg ui64 input_offset = 0;
-        reg ui64 out_offset = 0;
+        temp = (1 << 3) - 1;
+        mask = (256u)#VMOV(temp);
+        mask = #VPBROADCAST_8u32(mask);
 
-        while (input_offset < ENCODED_ERROR_POLYNOMIAL_SIZE) {
-            t0 = (32u) encoded[input_offset + 0];
-            t1 = (32u) encoded[input_offset + 1];
-            t2 = (32u) encoded[input_offset + 2];
+        temp = ETA;
+        eta = (256u)#VMOV(temp);
+        eta = #VPBROADCAST_8u32(eta);
 
-            // r->coeffs[8*i+0] = (a[3*i+0] >> 0) & 7;
-            // r->coeffs[8*i+0] = ETA - r->coeffs[8*i+0];
-            temp = t0;
-            temp &= ETA_BITS_MASK;
-
-            coefficient = ETA;
-            coefficient -= temp;
-
-            polynomial[out_offset] = coefficient;
-
-            // r->coeffs[8*i+1] =  (a[3*i+0] >> 3) & 7;
-            // r->coeffs[8*i+1] = ETA - r->coeffs[8*i+1];
-            temp = t0;
-            temp >>= 3;
-            temp &= ETA_BITS_MASK;
-
-            coefficient = ETA;
-            coefficient -= temp;
-
-            polynomial[out_offset + 1] = coefficient;
-
-            // r->coeffs[8*i+2] = ((a[3*i+0] >> 6) | (a[3*i+1] << 2)) & 7;
-            // r->coeffs[8*i+2] = ETA - r->coeffs[8*i+2];
-            temp = t0 >> 6;
-            temp = #LEA_32(4 * t1 + temp);
-            temp &= ETA_BITS_MASK;
-
-            coefficient = ETA;
-            coefficient -= temp;
-
-            polynomial[out_offset + 2] = coefficient;
-
-            // r->coeffs[8*i+3] =  (a[3*i+1] >> 1) & 7;
-            // r->coeffs[8*i+3] = ETA - r->coeffs[8*i+3];
-            temp = t1;
-            temp >>= 1;
-            temp &= ETA_BITS_MASK;
-
-            coefficient = ETA;
-            coefficient -= temp;
-
-            polynomial[out_offset + 3] = coefficient;
-
-            // r->coeffs[8*i+4] =  (a[3*i+1] >> 4) & 7;
-            // r->coeffs[8*i+4] = ETA - r->coeffs[8*i+4];
-            temp = t1;
-            temp >>= 4;
-            temp &= ETA_BITS_MASK;
-
-            coefficient = ETA;
-            coefficient -= temp;
-
-            polynomial[out_offset + 4] = coefficient;
-
-            // r->coeffs[8*i+5] = ((a[3*i+1] >> 7) | (a[3*i+2] << 1)) & 7;
-            // r->coeffs[8*i+5] = ETA - r->coeffs[8*i+5];
-            temp = t1 >> 7;
-            temp = #LEA_32(2 * t2 + temp);
-            temp &= ETA_BITS_MASK;
-
-            coefficient = ETA;
-            coefficient -= temp;
-
-            polynomial[out_offset + 5] = coefficient;
-
-            // r->coeffs[8*i+6] =  (a[3*i+2] >> 2) & 7;
-            // r->coeffs[8*i+6] = ETA - r->coeffs[8*i+6];
-            temp = t2;
-            temp >>= 2;
-            temp &= ETA_BITS_MASK;
-
-            coefficient = ETA;
-            coefficient -= temp;
-
-            polynomial[out_offset + 6] = coefficient;
-
-            // r->coeffs[8*i+7] =  (a[3*i+2] >> 5) & 7;
-            // r->coeffs[8*i+7] = ETA - r->coeffs[8*i+7];
-            temp = t2 >> 5;
-            temp &= ETA_BITS_MASK;
-
-            coefficient = ETA;
-            coefficient -= temp;
-
-            polynomial[out_offset + 7] = coefficient;
-
-            out_offset += 8;
-            input_offset += 3;
+        shifts = ETA2_DECODING_SHIFTS[0];
+        for i = 0 to COEFFICIENTS_IN_POLYNOMIAL / 8 - 1 {
+            coefficients = #VPBROADCAST_8u32(encoded.[:u32 3 * i]);
+            coefficients = #VPSRLV_8u32(coefficients, shifts);
+            coefficients = #VPAND_256(coefficients, mask);
+            coefficients = #VPSUB_8u32(eta, coefficients);
+            polynomial.[:u256 32 * i] = coefficients;
         }
+
+        shifts = ETA2_DECODING_SHIFTS[1];
+        coefficients = #VPBROADCAST_8u32(encoded.[:u32 ENCODED_ERROR_POLYNOMIAL_SIZE - 4]);
+        coefficients = #VPSRLV_8u32(coefficients, shifts);
+        coefficients = #VPAND_256(coefficients, mask);
+        coefficients = #VPSUB_8u32(eta, coefficients);
+        polynomial.[:u256 4 * COEFFICIENTS_IN_POLYNOMIAL - 32] = coefficients;
 
         return polynomial;
     }

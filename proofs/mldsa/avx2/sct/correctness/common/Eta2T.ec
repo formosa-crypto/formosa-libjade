@@ -17,6 +17,39 @@ clone BSWA as BSWA_256u3 with
   theory WE    <- WE3,
   theory BSW   <- BSW3.
 
+(* the 32-bit reads of the encoding *)
+clone BSWAS as BSWAS_96u8_32 with
+      op asize <- 96, op bsize <- 8, op ssize <- 32,
+  theory A    <- Array96, theory BSA <- BSA96,
+  theory WB   <- W8  { rename "_XX" as "_8" }, theory WEB <- WE8, theory BSWB <- BSW8,
+  theory WS   <- W32 { rename "_XX" as "_32" }, theory WES <- WE32, theory BSWS <- BSW32,
+  theory BSWA <- BSWA_96u8
+  proof le_size by done.
+
+lemma BSWAS_96u8_32_slicegetE o (p : W8.t Array96.t) :
+  0 <= o * 8 <= 96 * 8 - 32 =>
+  get32_direct (WArray96.init8 (fun i => p.[i])) o = BSWAS_96u8_32.sliceget p (o * 8).
+proof.
+move=> ho; rewrite /get32_direct /pack4_t; apply W32.wordP => k kb.
+rewrite /BSWAS_96u8_32.sliceget W32.get_bits2w // /BSWAS_96u8_32.tobits.
+rewrite initiE 1:/# /= initiE 1:/# /= initiE 1:/# /=.
+rewrite nth_take 1,2:/# nth_drop 1,2:/# (BitEncoding.BitChunking.nth_flatten false 8).
++ by rewrite allP => x /mapP [? [_ ->]].
+rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
+by rewrite get_to_list get_w2bits /#.
+qed.
+
+(* a 64-bit word moved into a 256-bit register *)
+lemma zeroextu256_VMOV_64E (x : W64.t) : zeroextu256 (VMOV_64 x) = zeroextu256 x.
+proof.
+rewrite /VMOV_64 zeroextu256E zeroextu256E wordP => i ib.
+rewrite pack2E pack2E pack4E initiE 1:/# /= initiE 1:/# /= initiE 1:/# /= initiE 1:/# /=.
+case (i %/ 64 = 0) => ?; 1: by rewrite ifT 1:/# initiE 1:/# /= get_of_list /#.
+case (i %/ 128 = 0) => ?; 2: by auto.
+rewrite initiE 1:/# /= get_of_list 1:/#.
+by have -> /= : (i %% 128 %/ 64) = 1 by smt().
+qed.
+
 (* a 128-bit write into the encoding *)
 op wr128 (t : W8.t Array96.t) (o : int) (s : W128.t) : W8.t Array96.t =
   Array96.init (WArray96.get8 (WArray96.set128_direct (WArray96.init8 (fun i => t.[i])) o s)).
@@ -224,8 +257,6 @@ have <- : p = to_uint (W3.init (fun (j : int) => bytes.[(3 * i + j) %/ 8].[(3 * 
 by have /= := W32.to_sintK_small (2 - p); smt().
 qed.
 
-lemma zext8_32E (x : W8.t) : W32.of_int (W8.to_uint x) = zeroextu32 x by done.
-
 lemma error_polynomial_decode_eta2_circuit _a :
    hoare [ M.error_polynomial__decode_eta2 :
        encoded = _a /\ valid_eta_bytes _a
@@ -237,9 +268,29 @@ lemma error_polynomial_decode_eta2_circuit _a :
    ].
 proof.
 proc.
-proc rewrite eta_encE; swap ^input_offset<- 1; unroll for ^while.
-proc change 1 : { eTA_BITS_MASK <- 7; }; 1: by auto.
-cfold 1; cfold 1; wp -3; proc rewrite /=; proc rewrite zext8_32E.
+proc rewrite zeroextu256_VMOV_64E; proc rewrite eta_encE.
+(* the reads and writes are slices of the arrays *)
+proc change ^while.1 : {
+  coefficients <- VPBROADCAST_8u32
+    (if 0 <= 3 * i * 8 <= 8 * 96 - 32
+     then BSWAS_96u8_32.sliceget encoded (3 * i * 8)
+     else get32_direct (WArray96.init8 (fun i_0 => encoded.[i_0])) (3 * i)); }.
++ auto => /> &2; case: (0 <= 3 * i{2} * 8 <= 8 * 96 - 32) => h; 2: by rewrite ifF.
+  by rewrite ifT // -BSWAS_96u8_32_slicegetE.
+proc change ^while.5 : {
+  polynomial <-
+    if 0 <= 32 * i * 8 <= 32 * 256 - 256
+    then BSWAS_256u32_256.sliceset polynomial (32 * i * 8) coefficients
+    else Array256.init (get32 (set256_direct
+           (WArray1024.init32 (fun i_0 => polynomial.[i_0])) (32 * i) coefficients)); }.
++ auto => /> &2; case: (0 <= 32 * i{2} * 8 <= 32 * 256 - 256) => h; 2: by rewrite ifF.
+  by rewrite ifT // BSWAS_256u32_256_slicesetE.
+proc change 12 : { coefficients <- VPBROADCAST_8u32 (BSWAS_96u8_32.sliceget encoded 736); }.
++ by auto => /> &2 _; rewrite -(BSWAS_96u8_32_slicegetE 92).
+proc change 16 : { polynomial <- BSWAS_256u32_256.sliceset polynomial 7936 coefficients; }.
++ by auto => /> &2 _; rewrite (BSWAS_256u32_256_slicesetE _ 992).
+(* the offsets are constants once the loop is unrolled *)
+cfold ^inc<-; unroll for ^while; wp -1; kill ^i<-; 1: by auto.
 conseq (: encoded = _a /\
   List.all (fun i => W3.init (fun j => encoded.[(3 * i + j) %/ 8].[(3 * i + j) %% 8])
                        \ule W3.of_int 4) (iotared 0 256) ==> _); last by circuit.
@@ -291,7 +342,7 @@ lemma error_polynomial_decode_ll : islossless M.error_polynomial__decode.
 proof.
 proc; rcondt 1; 1: by auto.
 inline *; wp.
-by proc rewrite eta_encE; swap ^input_offset<- 1; unroll for ^while; auto.
+by while true (inc - i); auto => /> /#.
 qed.
 
 (* -------------------------------------------------------------------- *)

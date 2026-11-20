@@ -1420,13 +1420,16 @@ abbrev  error_polynomial__ETA2_ENCODING_CONSTANTS =
 (W256.of_int
 (-25480207347730548941657020188721492090752456717537638033530380222208))]).
 
-abbrev [-printing] error_polynomial__SHIFTS =
+abbrev  error_polynomial__ETA2_DECODING_SHIFTS =
+(BArray64.of_list256
+[(W256.of_int
+ 566158880123151266946890095140503385940937615878238220190345680912384);
 (W256.of_int
-107839786668602559184514066897402134367680229671084479353429526839296).
+781838453510573199199011675048716228997326914257080593264960832798728)]).
 
-abbrev [-printing] error_polynomial__DECODING_SHUFFLES =
+abbrev [-printing] error_polynomial__ETA4_DECODING_SHIFTS =
 (W256.of_int
-(-6793906561703790865943291268746375741561545978554779831640812377080064)).
+754878506830868355929186793520671181254583487837650960253794241216512).
 
 abbrev [-printing] error_polynomial__ENCODING_SHUFFLES =
 (W256.of_int
@@ -1791,215 +1794,55 @@ module M = {
                                       b_encoded:BArray96.t) : BArray1024.t *
                                                               BArray1024.t *
                                                               trace = {
-    var eTA_BITS_MASK:int;
-    var t0:W32.t;
-    var t1:W32.t;
-    var t2:W32.t;
-    var temp:W32.t;
-    var coefficient:W32.t;
-    var input_offset:int;
-    var out_offset:int;
+    var temp:W64.t;
+    var mask:W256.t;
+    var eta_0:W256.t;
+    var shifts:W256.t;
+    var i:int;
+    var coefficients:W256.t;
     var trace_error_polynomial__decode_eta2:trace;
     trace_error_polynomial__decode_eta2 <- [];
     trace_error_polynomial__decode_eta2 <-
     (trace_error_polynomial__decode_eta2 ++
     [(Assert, (BArray96.is_init b_encoded 0 96))]);
-    eTA_BITS_MASK <- 7;
-    input_offset <- 0;
-    out_offset <- 0;
-    while ((input_offset < 96)) {
+    temp <- (W64.of_int 7);
+    mask <- (zeroextu256 (VMOV_64 temp));
+    mask <- (VPBROADCAST_8u32 (truncateu32 mask));
+    temp <- (W64.of_int 2);
+    eta_0 <- (zeroextu256 (VMOV_64 temp));
+    eta_0 <- (VPBROADCAST_8u32 (truncateu32 eta_0));
+    shifts <- (BArray64.get256 error_polynomial__ETA2_DECODING_SHIFTS 0);
+    i <- 0;
+    while ((i < 31)) {
       trace_error_polynomial__decode_eta2 <-
       (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= input_offset) /\ (input_offset <= 18446744073709551615)))]);
+      [(Assert, ((0 <= (3 * i)) /\ (((3 * i) + 4) <= 96)))]);
+      coefficients <- (VPBROADCAST_8u32 (BArray96.get32d encoded (3 * i)));
+      coefficients <- (VPSRLV_8u32 coefficients shifts);
+      coefficients <- (VPAND_256 coefficients mask);
+      coefficients <- (VPSUB_8u32 eta_0 coefficients);
       trace_error_polynomial__decode_eta2 <-
       (trace_error_polynomial__decode_eta2 ++
-      [(Assert, ((0 <= input_offset) /\ ((input_offset + 1) <= 96)))]);
-      t0 <- (zeroextu32 (BArray96.get8 encoded input_offset));
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (input_offset + 1)) /\
-       ((input_offset + 1) <= 18446744073709551615)))]);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (input_offset + 1)) /\ (((input_offset + 1) + 1) <= 96)))]);
-      t1 <- (zeroextu32 (BArray96.get8 encoded (input_offset + 1)));
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (input_offset + 2)) /\
-       ((input_offset + 2) <= 18446744073709551615)))]);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (input_offset + 2)) /\ (((input_offset + 2) + 1) <= 96)))]);
-      t2 <- (zeroextu32 (BArray96.get8 encoded (input_offset + 2)));
-      temp <- t0;
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int 2);
-      coefficient <- (coefficient - temp);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (out_offset * 4)) /\ (((out_offset * 4) + 4) <= 1024)))]);
+      [(Assert, ((0 <= (32 * i)) /\ (((32 * i) + 32) <= 1024)))]);
       b_polynomial <-
-      (BArray1024.set32d b_polynomial (out_offset * 4)
-      (W32.of_int 4294967295));
-      polynomial <- (BArray1024.set32 polynomial out_offset coefficient);
-      temp <- t0;
-      temp <- (temp `>>` (W8.of_int 3));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int 2);
-      coefficient <- (coefficient - temp);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (out_offset + 1)) /\
-       ((out_offset + 1) <= 18446744073709551615)))]);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= ((out_offset + 1) * 4)) /\
-       ((((out_offset + 1) * 4) + 4) <= 1024)))]);
-      b_polynomial <-
-      (BArray1024.set32d b_polynomial ((out_offset + 1) * 4)
-      (W32.of_int 4294967295));
-      polynomial <-
-      (BArray1024.set32 polynomial (out_offset + 1) coefficient);
-      temp <- (t0 `>>` (W8.of_int 6));
-      temp <- (LEA_32 (((W32.of_int 4) * t1) + temp));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int 2);
-      coefficient <- (coefficient - temp);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (out_offset + 2)) /\
-       ((out_offset + 2) <= 18446744073709551615)))]);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= ((out_offset + 2) * 4)) /\
-       ((((out_offset + 2) * 4) + 4) <= 1024)))]);
-      b_polynomial <-
-      (BArray1024.set32d b_polynomial ((out_offset + 2) * 4)
-      (W32.of_int 4294967295));
-      polynomial <-
-      (BArray1024.set32 polynomial (out_offset + 2) coefficient);
-      temp <- t1;
-      temp <- (temp `>>` (W8.of_int 1));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int 2);
-      coefficient <- (coefficient - temp);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (out_offset + 3)) /\
-       ((out_offset + 3) <= 18446744073709551615)))]);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= ((out_offset + 3) * 4)) /\
-       ((((out_offset + 3) * 4) + 4) <= 1024)))]);
-      b_polynomial <-
-      (BArray1024.set32d b_polynomial ((out_offset + 3) * 4)
-      (W32.of_int 4294967295));
-      polynomial <-
-      (BArray1024.set32 polynomial (out_offset + 3) coefficient);
-      temp <- t1;
-      temp <- (temp `>>` (W8.of_int 4));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int 2);
-      coefficient <- (coefficient - temp);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (out_offset + 4)) /\
-       ((out_offset + 4) <= 18446744073709551615)))]);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= ((out_offset + 4) * 4)) /\
-       ((((out_offset + 4) * 4) + 4) <= 1024)))]);
-      b_polynomial <-
-      (BArray1024.set32d b_polynomial ((out_offset + 4) * 4)
-      (W32.of_int 4294967295));
-      polynomial <-
-      (BArray1024.set32 polynomial (out_offset + 4) coefficient);
-      temp <- (t1 `>>` (W8.of_int 7));
-      temp <- (LEA_32 (((W32.of_int 2) * t2) + temp));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int 2);
-      coefficient <- (coefficient - temp);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (out_offset + 5)) /\
-       ((out_offset + 5) <= 18446744073709551615)))]);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= ((out_offset + 5) * 4)) /\
-       ((((out_offset + 5) * 4) + 4) <= 1024)))]);
-      b_polynomial <-
-      (BArray1024.set32d b_polynomial ((out_offset + 5) * 4)
-      (W32.of_int 4294967295));
-      polynomial <-
-      (BArray1024.set32 polynomial (out_offset + 5) coefficient);
-      temp <- t2;
-      temp <- (temp `>>` (W8.of_int 2));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int 2);
-      coefficient <- (coefficient - temp);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (out_offset + 6)) /\
-       ((out_offset + 6) <= 18446744073709551615)))]);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= ((out_offset + 6) * 4)) /\
-       ((((out_offset + 6) * 4) + 4) <= 1024)))]);
-      b_polynomial <-
-      (BArray1024.set32d b_polynomial ((out_offset + 6) * 4)
-      (W32.of_int 4294967295));
-      polynomial <-
-      (BArray1024.set32 polynomial (out_offset + 6) coefficient);
-      temp <- (t2 `>>` (W8.of_int 5));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int 2);
-      coefficient <- (coefficient - temp);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (out_offset + 7)) /\
-       ((out_offset + 7) <= 18446744073709551615)))]);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= ((out_offset + 7) * 4)) /\
-       ((((out_offset + 7) * 4) + 4) <= 1024)))]);
-      b_polynomial <-
-      (BArray1024.set32d b_polynomial ((out_offset + 7) * 4)
-      (W32.of_int 4294967295));
-      polynomial <-
-      (BArray1024.set32 polynomial (out_offset + 7) coefficient);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (out_offset + 8)) /\
-       ((out_offset + 8) <= 18446744073709551615)))]);
-      out_offset <- (out_offset + 8);
-      trace_error_polynomial__decode_eta2 <-
-      (trace_error_polynomial__decode_eta2 ++
-      [(Assert,
-       ((0 <= (input_offset + 3)) /\
-       ((input_offset + 3) <= 18446744073709551615)))]);
-      input_offset <- (input_offset + 3);
+      (BArray1024.set256d b_polynomial (32 * i)
+      (W256.of_int
+      115792089237316195423570985008687907853269984665640564039457584007913129639935
+      ));
+      polynomial <- (BArray1024.set256d polynomial (32 * i) coefficients);
+      i <- (i + 1);
     }
+    shifts <- (BArray64.get256 error_polynomial__ETA2_DECODING_SHIFTS 1);
+    coefficients <- (VPBROADCAST_8u32 (BArray96.get32d encoded 92));
+    coefficients <- (VPSRLV_8u32 coefficients shifts);
+    coefficients <- (VPAND_256 coefficients mask);
+    coefficients <- (VPSUB_8u32 eta_0 coefficients);
+    b_polynomial <-
+    (BArray1024.set256d b_polynomial 992
+    (W256.of_int
+    115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ));
+    polynomial <- (BArray1024.set256d polynomial 992 coefficients);
     return (polynomial, b_polynomial, trace_error_polynomial__decode_eta2);
   }
   proc error_polynomial__encode (encoded:BArray96.t, b_encoded:BArray96.t,

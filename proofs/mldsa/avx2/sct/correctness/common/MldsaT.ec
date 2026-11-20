@@ -151,48 +151,35 @@ module M = {
   }
   proc error_polynomial__decode_eta4 (decoded:W32.t Array256.t,
                                       encoded:W8.t Array_eta_enc.t) : W32.t Array256.t = {
+    var inc:int;
     var temp:W64.t;
     var mask:W256.t;
     var eta_0:W256.t;
-    var decoding_shuffles:W256.t;
     var shifts:W256.t;
+    var i:int;
     var coefficients:W256.t;
-    var bytes:W128.t;
-    var input_offset:int;
-    var output_offset:int;
-    var byte_group:int;
     temp <- (W64.of_int ((1 `<<` 4) - 1));
     mask <- (zeroextu256 (VMOV_64 temp));
     mask <- (VPBROADCAST_8u32 (truncateu32 mask));
     temp <- (W64.of_int P.Eta);
     eta_0 <- (zeroextu256 (VMOV_64 temp));
     eta_0 <- (VPBROADCAST_8u32 (truncateu32 eta_0));
-    decoding_shuffles <- error_polynomial__DECODING_SHUFFLES;
-    shifts <- error_polynomial__SHIFTS;
-    coefficients <- (set0_256);
-    input_offset <- 0;
-    output_offset <- 0;
-    while ((input_offset < eta_enc)) {
-      bytes <-
-      (get128_direct (WArray_eta_enc.init8 (fun i => encoded.[i])) input_offset);
-      byte_group <- 0;
-      while ((byte_group < 4)) {
-        coefficients <- (VINSERTI128 coefficients bytes (W8.of_int 0));
-        coefficients <- (VINSERTI128 coefficients bytes (W8.of_int 1));
-        coefficients <- (VPSHUFB_256 coefficients decoding_shuffles);
-        coefficients <- (VPSRLV_8u32 coefficients shifts);
-        coefficients <- (VPAND_256 coefficients mask);
-        coefficients <- (VPSUB_8u32 eta_0 coefficients);
-        decoded <-
-        (Array256.init
-        (WArray1024.get32
-        (WArray1024.set256_direct (WArray1024.init32 (fun i => decoded.[i]))
-        output_offset coefficients)));
-        output_offset <- (output_offset + 32);
-        bytes <- (VPSRLDQ_128 bytes (W8.of_int 4));
-        byte_group <- (byte_group + 1);
-      }
-      input_offset <- (input_offset + 16);
+    shifts <- error_polynomial__ETA4_DECODING_SHIFTS;
+    inc <- (256 %/ 8);
+    i <- 0;
+    while ((i < inc)) {
+      coefficients <-
+      (VPBROADCAST_8u32
+      (get32_direct (WArray_eta_enc.init8 (fun i_0 => encoded.[i_0])) (4 * i)));
+      coefficients <- (VPSRLV_8u32 coefficients shifts);
+      coefficients <- (VPAND_256 coefficients mask);
+      coefficients <- (VPSUB_8u32 eta_0 coefficients);
+      decoded <-
+      (Array256.init
+      (WArray1024.get32
+      (WArray1024.set256_direct
+      (WArray1024.init32 (fun i_0 => decoded.[i_0])) (32 * i) coefficients)));
+      i <- (i + 1);
     }
     return decoded;
   }
@@ -375,70 +362,50 @@ module M = {
   }
   proc error_polynomial__decode_eta2 (polynomial:W32.t Array256.t,
                                       encoded:W8.t Array_eta_enc.t) : W32.t Array256.t = {
-    var eTA_BITS_MASK:int;
-    var t0:W32.t;
-    var t1:W32.t;
-    var t2:W32.t;
-    var temp:W32.t;
-    var coefficient:W32.t;
-    var input_offset:int;
-    var out_offset:int;
-    eTA_BITS_MASK <- ((1 `<<` 3) - 1);
-    input_offset <- 0;
-    out_offset <- 0;
-    while ((input_offset < eta_enc)) {
-      t0 <- (zeroextu32 encoded.[(input_offset + 0)]);
-      t1 <- (zeroextu32 encoded.[(input_offset + 1)]);
-      t2 <- (zeroextu32 encoded.[(input_offset + 2)]);
-      temp <- t0;
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int P.Eta);
-      coefficient <- (coefficient - temp);
-      polynomial.[out_offset] <- coefficient;
-      temp <- t0;
-      temp <- (temp `>>` (W8.of_int 3));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int P.Eta);
-      coefficient <- (coefficient - temp);
-      polynomial.[(out_offset + 1)] <- coefficient;
-      temp <- (t0 `>>` (W8.of_int 6));
-      temp <- (LEA_32 (((W32.of_int 4) * t1) + temp));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int P.Eta);
-      coefficient <- (coefficient - temp);
-      polynomial.[(out_offset + 2)] <- coefficient;
-      temp <- t1;
-      temp <- (temp `>>` (W8.of_int 1));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int P.Eta);
-      coefficient <- (coefficient - temp);
-      polynomial.[(out_offset + 3)] <- coefficient;
-      temp <- t1;
-      temp <- (temp `>>` (W8.of_int 4));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int P.Eta);
-      coefficient <- (coefficient - temp);
-      polynomial.[(out_offset + 4)] <- coefficient;
-      temp <- (t1 `>>` (W8.of_int 7));
-      temp <- (LEA_32 (((W32.of_int 2) * t2) + temp));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int P.Eta);
-      coefficient <- (coefficient - temp);
-      polynomial.[(out_offset + 5)] <- coefficient;
-      temp <- t2;
-      temp <- (temp `>>` (W8.of_int 2));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int P.Eta);
-      coefficient <- (coefficient - temp);
-      polynomial.[(out_offset + 6)] <- coefficient;
-      temp <- (t2 `>>` (W8.of_int 5));
-      temp <- (temp `&` (W32.of_int eTA_BITS_MASK));
-      coefficient <- (W32.of_int P.Eta);
-      coefficient <- (coefficient - temp);
-      polynomial.[(out_offset + 7)] <- coefficient;
-      out_offset <- (out_offset + 8);
-      input_offset <- (input_offset + 3);
+    var inc:int;
+    var temp:W64.t;
+    var mask:W256.t;
+    var eta_0:W256.t;
+    var shifts:W256.t;
+    var i:int;
+    var coefficients:W256.t;
+    temp <- (W64.of_int ((1 `<<` 3) - 1));
+    mask <- (zeroextu256 (VMOV_64 temp));
+    mask <- (VPBROADCAST_8u32 (truncateu32 mask));
+    temp <- (W64.of_int P.Eta);
+    eta_0 <- (zeroextu256 (VMOV_64 temp));
+    eta_0 <- (VPBROADCAST_8u32 (truncateu32 eta_0));
+    shifts <- error_polynomial__ETA2_DECODING_SHIFTS.[0];
+    inc <- ((256 %/ 8) - 1);
+    i <- 0;
+    while ((i < inc)) {
+      coefficients <-
+      (VPBROADCAST_8u32
+      (get32_direct (WArray_eta_enc.init8 (fun i_0 => encoded.[i_0])) (3 * i)));
+      coefficients <- (VPSRLV_8u32 coefficients shifts);
+      coefficients <- (VPAND_256 coefficients mask);
+      coefficients <- (VPSUB_8u32 eta_0 coefficients);
+      polynomial <-
+      (Array256.init
+      (WArray1024.get32
+      (WArray1024.set256_direct
+      (WArray1024.init32 (fun i_0 => polynomial.[i_0])) (32 * i) coefficients
+      )));
+      i <- (i + 1);
     }
+    shifts <- error_polynomial__ETA2_DECODING_SHIFTS.[1];
+    coefficients <-
+    (VPBROADCAST_8u32
+    (get32_direct (WArray_eta_enc.init8 (fun i_0 => encoded.[i_0])) (eta_enc - 4)));
+    coefficients <- (VPSRLV_8u32 coefficients shifts);
+    coefficients <- (VPAND_256 coefficients mask);
+    coefficients <- (VPSUB_8u32 eta_0 coefficients);
+    polynomial <-
+    (Array256.init
+    (WArray1024.get32
+    (WArray1024.set256_direct
+    (WArray1024.init32 (fun i_0 => polynomial.[i_0])) ((4 * 256) - 32)
+    coefficients)));
     return polynomial;
   }
   proc error_polynomial__encode (encoded:W8.t Array_eta_enc.t,

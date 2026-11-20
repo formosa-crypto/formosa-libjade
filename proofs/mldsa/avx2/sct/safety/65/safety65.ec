@@ -628,9 +628,7 @@ conseq (_ :
   ==> BArray1024.is_init b_decoded 0 (4 * 256)
    /\ valid trace_error_polynomial__decode_eta4).
 + by move=> &hr />; rewrite -!(BI128.is_init_full _ 128) //.
-swap 12 1.
-do 9! (unroll for ^while).
-cfold* ^output_offset<-.
+unroll for ^while.
 by auto => /> *.
 qed.
 

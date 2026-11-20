@@ -8,6 +8,28 @@ require import ArrayExtra JWord_extra EclibExtra JWordList.
 require import WArray1024 WArray128.
 require BaseT ErrorPolynomialT.
 
+(* the 32-bit reads of the encoding *)
+clone BSWAS as BSWAS_128u8_32 with
+      op asize <- 128, op bsize <- 8, op ssize <- 32,
+  theory A    <- Array128, theory BSA <- BSA128,
+  theory WB   <- W8  { rename "_XX" as "_8" }, theory WEB <- WE8, theory BSWB <- BSW8,
+  theory WS   <- W32 { rename "_XX" as "_32" }, theory WES <- WE32, theory BSWS <- BSW32,
+  theory BSWA <- BSWA_128u8
+  proof le_size by done.
+
+lemma BSWAS_128u8_32_slicegetE o (p : W8.t Array128.t) :
+  0 <= o * 8 <= 128 * 8 - 32 =>
+  get32_direct (WArray128.init8 (fun i => p.[i])) o = BSWAS_128u8_32.sliceget p (o * 8).
+proof.
+move=> ho; rewrite /get32_direct /pack4_t; apply W32.wordP => k kb.
+rewrite /BSWAS_128u8_32.sliceget W32.get_bits2w // /BSWAS_128u8_32.tobits.
+rewrite initiE 1:/# /= initiE 1:/# /= initiE 1:/# /=.
+rewrite nth_take 1,2:/# nth_drop 1,2:/# (BitEncoding.BitChunking.nth_flatten false 8).
++ by rewrite allP => x /mapP [? [_ ->]].
+rewrite (nth_map witness); 1: by rewrite size_to_list; smt().
+by rewrite get_to_list get_w2bits /#.
+qed.
+
 (* The encoding of a polynomial with coefficients in [-Eta, Eta], for the
    sets where Eta = 4 (ML-DSA-65): 4 bits per coefficient, 128 bytes per
    polynomial. *)
@@ -289,28 +311,24 @@ proc change 5 : { eta_0 <- zeroextu256 temp; }.
   case (i %/ 128 = 0) => ?; 2: by auto.
   rewrite initiE 1:/# /= get_of_list 1:/#.
   by have -> /= : (i %% 128 %/ 64) = 1 by smt().
-proc change ^while.1 : { bytes <- if (0 <= input_offset*8 <= 8*128-128)
-                                   then BSWAS_128u8_128.sliceget encoded (input_offset*8)
-                                   else get128_direct (WArray128.init8 (fun (i_0 : int) => encoded.[i_0])) input_offset ;}.
-                + auto => /> &2.
-                  case (0 <= input_offset{2} * 8 <= 896); last by auto.
-                  by move => ?; rewrite -BSWAS_128u8_128_slicegetE /#.
-proc change ^while.^while.7 : {decoded <- if (0 <= output_offset*8 <= 32*256-256)
-                                            then BSWAS_256u32_256.sliceset decoded (output_offset*8) coefficients
-                                            else Array256.init (get32 (set256_direct (WArray1024.init32 (fun (i_0 : int) => decoded.[i_0])) output_offset coefficients));}.
-               + auto => /> &2.
-                 case (0 <= output_offset{2} * 8 <= 7936); last by auto.
-                 by move => ?; rewrite BSWAS_256u32_256_slicesetE /#.
-
-swap 10 1.
-unroll for ^while.
-do 8!(unroll for ^while).
-
-
-cfold 10.
-do 8!(cfold ^byte_group<-).
-wp -3.
-
+(* the reads and writes are slices of the arrays *)
+proc change ^while.1 : {
+  coefficients <- VPBROADCAST_8u32
+    (if 0 <= 4 * i * 8 <= 8 * 128 - 32
+     then BSWAS_128u8_32.sliceget encoded (4 * i * 8)
+     else get32_direct (WArray128.init8 (fun i_0 => encoded.[i_0])) (4 * i)); }.
++ auto => /> &2; case: (0 <= 4 * i{2} * 8 <= 8 * 128 - 32) => h; 2: by rewrite ifF.
+  by rewrite ifT // -BSWAS_128u8_32_slicegetE.
+proc change ^while.5 : {
+  decoded <-
+    if 0 <= 32 * i * 8 <= 32 * 256 - 256
+    then BSWAS_256u32_256.sliceset decoded (32 * i * 8) coefficients
+    else Array256.init (get32 (set256_direct
+           (WArray1024.init32 (fun i_0 => decoded.[i_0])) (32 * i) coefficients)); }.
++ auto => /> &2; case: (0 <= 32 * i{2} * 8 <= 32 * 256 - 256) => h; 2: by rewrite ifF.
+  by rewrite ifT // BSWAS_256u32_256_slicesetE.
+(* the offsets are constants once the loop is unrolled *)
+cfold ^inc<-; unroll for ^while; wp -2.
 
 conseq (_: encoded = _a /\
     List.all (fun i => (W4.init (fun j => encoded.[(4*i+j) %/ 8].[(4*i+j) %% 8])) \ule W4.of_int 8) (iotared 0 256)
@@ -354,8 +372,7 @@ lemma error_polynomial_decode_ll : islossless M.error_polynomial__decode.
 proof.
 proc; rcondf 1; 1: by auto.
 inline *; wp.
-while (0 <= input_offset <= 128 /\ input_offset %% 16 = 0) (128 - input_offset); 2: by auto => /> /#.
-by move => *; unroll for ^while; auto => /> /#.
+by while true (inc - i); auto => /> /#.
 qed.
 
 (* -------------------------------------------------------------------- *)

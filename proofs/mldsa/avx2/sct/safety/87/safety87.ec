@@ -612,10 +612,7 @@ conseq (_ :
   ==> BArray1024.is_init b_polynomial 0 (4 * 256)
    /\ valid trace_error_polynomial__decode_eta2).
 + by move=> &hr />; rewrite -!(BI96.is_init_full _ 96) //.
-swap 4 1.
 unroll for ^while.
-cfold* ^eTA_BITS_MASK<-.
-cfold* ^out_offset<-.
 by auto => /> *.
 qed.
 
