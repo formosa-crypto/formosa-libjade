@@ -14,6 +14,7 @@ require "../common/mlkem.jinc"
 { ptr: public, val: secret } ×
 public
 "]
+#[stackzero=loopSCT, stackzerosize=u256]
 export fn jade_kem_mlkem_mlkem512_amd64_avx2_keypair_derand(
     reg ptr u8[MLKEM_PUBLICKEYBYTES] public_key,
     reg ptr u8[MLKEM_SECRETKEYBYTES] secret_key,
@@ -44,6 +45,7 @@ export fn jade_kem_mlkem_mlkem512_amd64_avx2_keypair_derand(
 { ptr: public, val: secret } ×
 public
 "]
+#[stackzero=loopSCT, stackzerosize=u256]
 export fn jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand(
     reg ptr u8[MLKEM_CIPHERTEXTBYTES] ciphertext,
     reg ptr u8[MLKEM_SYMBYTES] shared_secret,
@@ -74,6 +76,7 @@ export fn jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand(
 { ptr: public, val: secret } ×
 public
 "]
+#[stackzero=loopSCT, stackzerosize=u256]
 export fn jade_kem_mlkem_mlkem512_amd64_avx2_dec(
     reg ptr u8[MLKEM_SYMBYTES] shared_secret,
     reg ptr u8[MLKEM_CIPHERTEXTBYTES] ciphertext,
@@ -97,6 +100,7 @@ export fn jade_kem_mlkem_mlkem512_amd64_avx2_dec(
 { ptr: transient, val: secret } →
 public
 "]
+#[stackzero=loopSCT, stackzerosize=u256]
 export fn jade_kem_mlkem_mlkem512_amd64_avx2_check_pk(
     reg ptr u8[MLKEM_PUBLICKEYBYTES] public_key)
     -> reg u64
@@ -118,6 +122,7 @@ export fn jade_kem_mlkem_mlkem512_amd64_avx2_check_pk(
 { ptr: transient, val: secret } →
 public
 "]
+#[stackzero=loopSCT, stackzerosize=u256]
 export fn jade_kem_mlkem_mlkem512_amd64_avx2_check_sk(
     reg ptr u8[MLKEM_SECRETKEYBYTES] secret_key)
     -> reg u64

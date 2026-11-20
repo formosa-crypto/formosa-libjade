@@ -7,7 +7,7 @@
 	.type	ml_dsa_87_verify, %function
 ml_dsa_87_verify:
 	movq	%rsp, %rax
-	leaq	-56(%rsp), %rsp
+	leaq	-64(%rsp), %rsp
 	andq	$-32, %rsp
 	movq	%rbx, (%rsp)
 	movq	%rbp, 8(%rsp)
@@ -40,11 +40,22 @@ ml_dsa_87_verify:
 	movq	32(%rsp), %r14
 	movq	40(%rsp), %r15
 	movq	48(%rsp), %rsp
+	movq	%rsp, %rsi
+	vpxor	%ymm2, %ymm2, %ymm2
+	andq	$-32, %rsp
+	subq	$99264, %rsp
+	movq	$99264, %rdi
+.Lml_dsa_87_verify$4:
+	subq	$32, %rdi
+	vmovdqu	%ymm2, (%rsp,%rdi)
+	jne 	.Lml_dsa_87_verify$4
+	movq	%rsi, %rsp
+	lfence
 	ret
 	.type	ml_dsa_87_sign, %function
 ml_dsa_87_sign:
 	movq	%rsp, %rax
-	leaq	-56(%rsp), %rsp
+	leaq	-64(%rsp), %rsp
 	andq	$-32, %rsp
 	movq	%rbx, (%rsp)
 	movq	%rbp, 8(%rsp)
@@ -76,11 +87,22 @@ ml_dsa_87_sign:
 	movq	32(%rsp), %r14
 	movq	40(%rsp), %r15
 	movq	48(%rsp), %rsp
+	movq	%rsp, %rsi
+	vpxor	%ymm2, %ymm2, %ymm2
+	andq	$-32, %rsp
+	subq	$170592, %rsp
+	movq	$170592, %rdi
+.Lml_dsa_87_sign$4:
+	subq	$32, %rdi
+	vmovdqu	%ymm2, (%rsp,%rdi)
+	jne 	.Lml_dsa_87_sign$4
+	movq	%rsi, %rsp
+	lfence
 	ret
 	.type	ml_dsa_87_keygen, %function
 ml_dsa_87_keygen:
 	movq	%rsp, %rax
-	leaq	-56(%rsp), %rsp
+	leaq	-64(%rsp), %rsp
 	andq	$-32, %rsp
 	movq	%rbx, (%rsp)
 	movq	%rbp, 8(%rsp)
@@ -103,6 +125,17 @@ ml_dsa_87_keygen:
 	movq	32(%rsp), %r14
 	movq	40(%rsp), %r15
 	movq	48(%rsp), %rsp
+	movq	%rsp, %rsi
+	vpxor	%ymm2, %ymm2, %ymm2
+	andq	$-32, %rsp
+	subq	$96320, %rsp
+	movq	$96320, %rdi
+.Lml_dsa_87_keygen$2:
+	subq	$32, %rdi
+	vmovdqu	%ymm2, (%rsp,%rdi)
+	jne 	.Lml_dsa_87_keygen$2
+	movq	%rsi, %rsp
+	lfence
 	ret
 .L__verify_internal$1:
 	movq	%rax, 96992(%rsp)

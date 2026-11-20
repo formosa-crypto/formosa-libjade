@@ -7,7 +7,7 @@
 	.type	ml_dsa_65_verify, %function
 ml_dsa_65_verify:
 	movq	%rsp, %rax
-	leaq	-56(%rsp), %rsp
+	leaq	-64(%rsp), %rsp
 	andq	$-32, %rsp
 	movq	%rbx, (%rsp)
 	movq	%rbp, 8(%rsp)
@@ -40,11 +40,22 @@ ml_dsa_65_verify:
 	movq	32(%rsp), %r14
 	movq	40(%rsp), %r15
 	movq	48(%rsp), %rsp
+	movq	%rsp, %rsi
+	vpxor	%ymm2, %ymm2, %ymm2
+	andq	$-32, %rsp
+	subq	$65280, %rsp
+	movq	$65280, %rdi
+.Lml_dsa_65_verify$4:
+	subq	$32, %rdi
+	vmovdqu	%ymm2, (%rsp,%rdi)
+	jne 	.Lml_dsa_65_verify$4
+	movq	%rsi, %rsp
+	lfence
 	ret
 	.type	ml_dsa_65_sign, %function
 ml_dsa_65_sign:
 	movq	%rsp, %rax
-	leaq	-56(%rsp), %rsp
+	leaq	-64(%rsp), %rsp
 	andq	$-32, %rsp
 	movq	%rbx, (%rsp)
 	movq	%rbp, 8(%rsp)
@@ -76,11 +87,22 @@ ml_dsa_65_sign:
 	movq	32(%rsp), %r14
 	movq	40(%rsp), %r15
 	movq	48(%rsp), %rsp
+	movq	%rsp, %rsi
+	vpxor	%ymm2, %ymm2, %ymm2
+	andq	$-32, %rsp
+	subq	$118048, %rsp
+	movq	$118048, %rdi
+.Lml_dsa_65_sign$4:
+	subq	$32, %rdi
+	vmovdqu	%ymm2, (%rsp,%rdi)
+	jne 	.Lml_dsa_65_sign$4
+	movq	%rsi, %rsp
+	lfence
 	ret
 	.type	ml_dsa_65_keygen, %function
 ml_dsa_65_keygen:
 	movq	%rsp, %rax
-	leaq	-56(%rsp), %rsp
+	leaq	-64(%rsp), %rsp
 	andq	$-32, %rsp
 	movq	%rbx, (%rsp)
 	movq	%rbp, 8(%rsp)
@@ -103,6 +125,17 @@ ml_dsa_65_keygen:
 	movq	32(%rsp), %r14
 	movq	40(%rsp), %r15
 	movq	48(%rsp), %rsp
+	movq	%rsp, %rsi
+	vpxor	%ymm2, %ymm2, %ymm2
+	andq	$-32, %rsp
+	subq	$62528, %rsp
+	movq	$62528, %rdi
+.Lml_dsa_65_keygen$2:
+	subq	$32, %rdi
+	vmovdqu	%ymm2, (%rsp,%rdi)
+	jne 	.Lml_dsa_65_keygen$2
+	movq	%rsi, %rsp
+	lfence
 	ret
 .L__verify_internal$1:
 	movq	%rax, 63008(%rsp)

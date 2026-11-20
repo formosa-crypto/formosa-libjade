@@ -47,11 +47,22 @@ jade_kem_mlkem_mlkem512_amd64_avx2_check_sk:
 	movq	72(%rsp), %r14
 	movq	80(%rsp), %r15
 	movq	88(%rsp), %rsp
+	movq	%rsp, %rsi
+	vpxor	%ymm2, %ymm2, %ymm2
+	andq	$-32, %rsp
+	subq	$576, %rsp
+	movq	$576, %rdi
+.Ljade_kem_mlkem_mlkem512_amd64_avx2_check_sk$2:
+	subq	$32, %rdi
+	vmovdqu	%ymm2, (%rsp,%rdi)
+	jne 	.Ljade_kem_mlkem_mlkem512_amd64_avx2_check_sk$2
+	movq	%rsi, %rsp
+	lfence
 	ret
 	.type	jade_kem_mlkem_mlkem512_amd64_avx2_check_pk, %function
 jade_kem_mlkem_mlkem512_amd64_avx2_check_pk:
 	movq	%rsp, %r10
-	leaq	-1800(%rsp), %rsp
+	leaq	-1824(%rsp), %rsp
 	andq	$-32, %rsp
 	lfence
 	movq	$0, %rax
@@ -181,6 +192,17 @@ jade_kem_mlkem_mlkem512_amd64_avx2_check_pk:
 	lfence
 	movq	$0, %rdx
 	movq	%r10, %rsp
+	movq	%rsp, %rsi
+	vpxor	%ymm2, %ymm2, %ymm2
+	andq	$-32, %rsp
+	subq	$1856, %rsp
+	movq	$1856, %rdi
+.Ljade_kem_mlkem_mlkem512_amd64_avx2_check_pk$5:
+	subq	$32, %rdi
+	vmovdqu	%ymm2, (%rsp,%rdi)
+	jne 	.Ljade_kem_mlkem_mlkem512_amd64_avx2_check_pk$5
+	movq	%rsi, %rsp
+	lfence
 	ret
 	.type	jade_kem_mlkem_mlkem512_amd64_avx2_dec, %function
 jade_kem_mlkem_mlkem512_amd64_avx2_dec:
@@ -1925,6 +1947,17 @@ jade_kem_mlkem_mlkem512_amd64_avx2_dec:
 	movq	9992(%rsp), %r14
 	movq	10000(%rsp), %r15
 	movq	10008(%rsp), %rsp
+	movq	%rsp, %rsi
+	vpxor	%ymm2, %ymm2, %ymm2
+	andq	$-32, %rsp
+	subq	$13344, %rsp
+	movq	$13344, %rdi
+.Ljade_kem_mlkem_mlkem512_amd64_avx2_dec$44:
+	subq	$32, %rdi
+	vmovdqu	%ymm2, (%rsp,%rdi)
+	jne 	.Ljade_kem_mlkem_mlkem512_amd64_avx2_dec$44
+	movq	%rsi, %rsp
+	lfence
 	ret
 	.type	jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand, %function
 jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand:
@@ -3231,11 +3264,22 @@ jade_kem_mlkem_mlkem512_amd64_avx2_enc_derand:
 	movq	9192(%rsp), %r14
 	movq	9200(%rsp), %r15
 	movq	9208(%rsp), %rsp
+	movq	%rsp, %rsi
+	vpxor	%ymm2, %ymm2, %ymm2
+	andq	$-32, %rsp
+	subq	$12544, %rsp
+	movq	$12544, %rdi
+.Ljade_kem_mlkem_mlkem512_amd64_avx2_enc_derand$36:
+	subq	$32, %rdi
+	vmovdqu	%ymm2, (%rsp,%rdi)
+	jne 	.Ljade_kem_mlkem_mlkem512_amd64_avx2_enc_derand$36
+	movq	%rsi, %rsp
+	lfence
 	ret
 	.type	jade_kem_mlkem_mlkem512_amd64_avx2_keypair_derand, %function
 jade_kem_mlkem_mlkem512_amd64_avx2_keypair_derand:
 	movq	%rsp, %rax
-	leaq	-5912(%rsp), %rsp
+	leaq	-5920(%rsp), %rsp
 	andq	$-32, %rsp
 	movq	%rbx, 5856(%rsp)
 	movq	%rbp, 5864(%rsp)
@@ -3813,6 +3857,17 @@ jade_kem_mlkem_mlkem512_amd64_avx2_keypair_derand:
 	movq	5888(%rsp), %r14
 	movq	5896(%rsp), %r15
 	movq	5904(%rsp), %rsp
+	movq	%rsp, %rsi
+	vpxor	%ymm2, %ymm2, %ymm2
+	andq	$-32, %rsp
+	subq	$9248, %rsp
+	movq	$9248, %rdi
+.Ljade_kem_mlkem_mlkem512_amd64_avx2_keypair_derand$23:
+	subq	$32, %rdi
+	vmovdqu	%ymm2, (%rsp,%rdi)
+	jne 	.Ljade_kem_mlkem_mlkem512_amd64_avx2_keypair_derand$23
+	movq	%rsi, %rsp
+	lfence
 	ret
 .L_gen_matrix_avx2$1:
 	movq	%rax, 2176(%rsp)
