@@ -16052,10 +16052,12 @@ module M = {
   proc signature____decode_hint (hints:W32.t Array1024.t,
                                  hint_encoded:W8.t Array84.t) : W32.t Array1024.t *
                                                                 W64.t = {
+    var inc:int;
     var ill_formed_hint:W64.t;
     var ms:W64.t;
     var not_done1:bool;
-    var condition_zero:bool;
+    var zeros:W256.t;
+    var k:int;
     var true_hints_seen:W64.t;
     var condition_decreasing:bool;
     var condition_too_many:bool;
@@ -16075,9 +16077,9 @@ module M = {
     var previous_true_hints_seen:int;
     var encoded_offset:int;
     var decoded_offset:int;
+    var current_true_hints_seen:int;
     var j:int;
     var index:int;
-    var current_true_hints_seen:int;
     ms <- (init_msf);
     ill_formed_hint <- (W64.of_int 0);
     previous_true_hints_seen <- 0;
@@ -16090,17 +16092,17 @@ module M = {
       ms <- (update_msf not_done1 ms);
       decoded_offset <- encoded_offset;
       decoded_offset <- (decoded_offset `<<` 8);
-      j <- 0;
-      condition_zero <- (j < 256);
-      while (condition_zero) {
-        ms <- (update_msf condition_zero ms);
-        index <- decoded_offset;
-        index <- (index + j);
-        hints.[index] <- (W32.of_int 0);
-        j <- (j + 1);
-        condition_zero <- (j < 256);
+      zeros <- (set0_256);
+      inc <- (256 %/ 8);
+      k <- 0;
+      while ((k < inc)) {
+        hints <-
+        (Array1024.init
+        (WArray4096.get32
+        (WArray4096.set256_direct (WArray4096.init32 (fun i => hints.[i]))
+        ((4 * decoded_offset) + (32 * k)) zeros)));
+        k <- (k + 1);
       }
-      ms <- (update_msf (! condition_zero) ms);
       true_hints_seen <- (zeroextu64 hint_encoded.[(80 + encoded_offset)]);
       true_hints_seen <- (protect_64 true_hints_seen ms);
       current_true_hints_seen <- (W64.to_uint true_hints_seen);

@@ -52882,7 +52882,8 @@ module M = {
     var ill_formed_hint:W64.t;
     var ms:W64.t;
     var not_done1:bool;
-    var condition_zero:bool;
+    var zeros:W256.t;
+    var k:int;
     var true_hints_seen:W64.t;
     var condition_decreasing:bool;
     var condition_too_many:bool;
@@ -52902,9 +52903,9 @@ module M = {
     var previous_true_hints_seen:int;
     var encoded_offset:int;
     var decoded_offset:int;
+    var current_true_hints_seen:int;
     var j:int;
     var index:int;
-    var current_true_hints_seen:int;
     var trace_signature____decode_hint:trace;
     trace_signature____decode_hint <- [];
     trace_signature____decode_hint <-
@@ -52927,29 +52928,36 @@ module M = {
        ((0 <= (decoded_offset `<<` 8)) /\
        ((decoded_offset `<<` 8) <= 18446744073709551615)))]);
       decoded_offset <- (decoded_offset `<<` 8);
-      j <- 0;
-      condition_zero <- (j < 256);
-      while (condition_zero) {
-        ms <- (update_msf condition_zero ms);
-        index <- decoded_offset;
+      zeros <- (set0_256);
+      k <- 0;
+      while ((k < 32)) {
         trace_signature____decode_hint <-
         (trace_signature____decode_hint ++
         [(Assert,
-         ((0 <= (index + j)) /\ ((index + j) <= 18446744073709551615)))]);
-        index <- (index + j);
+         ((0 <= (4 * decoded_offset)) /\
+         ((4 * decoded_offset) <= 18446744073709551615)))]);
         trace_signature____decode_hint <-
         (trace_signature____decode_hint ++
-        [(Assert, ((0 <= (index * 4)) /\ (((index * 4) + 4) <= 4096)))]);
+        [(Assert, ((0 <= (32 * k)) /\ ((32 * k) <= 18446744073709551615)))]);
+        trace_signature____decode_hint <-
+        (trace_signature____decode_hint ++
+        [(Assert,
+         ((0 <= ((4 * decoded_offset) + (32 * k))) /\
+         (((4 * decoded_offset) + (32 * k)) <= 18446744073709551615)))]);
+        trace_signature____decode_hint <-
+        (trace_signature____decode_hint ++
+        [(Assert,
+         ((0 <= ((4 * decoded_offset) + (32 * k))) /\
+         ((((4 * decoded_offset) + (32 * k)) + 32) <= 4096)))]);
         b_hints <-
-        (BArray4096.set32d b_hints (index * 4) (W32.of_int 4294967295));
-        hints <- (BArray4096.set32 hints index (W32.of_int 0));
-        trace_signature____decode_hint <-
-        (trace_signature____decode_hint ++
-        [(Assert, ((0 <= (j + 1)) /\ ((j + 1) <= 18446744073709551615)))]);
-        j <- (j + 1);
-        condition_zero <- (j < 256);
+        (BArray4096.set256d b_hints ((4 * decoded_offset) + (32 * k))
+        (W256.of_int
+        115792089237316195423570985008687907853269984665640564039457584007913129639935
+        ));
+        hints <-
+        (BArray4096.set256d hints ((4 * decoded_offset) + (32 * k)) zeros);
+        k <- (k + 1);
       }
-      ms <- (update_msf (! condition_zero) ms);
       trace_signature____decode_hint <-
       (trace_signature____decode_hint ++
       [(Assert,
