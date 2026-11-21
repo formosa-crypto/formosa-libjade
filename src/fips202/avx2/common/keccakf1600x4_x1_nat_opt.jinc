@@ -1,0 +1,734 @@
+/*
+ A four-way and a one-way Keccak-f[1600] permutation interleaved, for a
+ one-way sponge that runs alongside a four-way one: a round of the four-way
+ permutation (keccakf1600x4_nat.jinc) before each of the two rounds of an
+ iteration of the one-way one (keccakf1600_opt.jinc), so that the
+ out-of-order core overlaps the vector and the integer work.
+
+ The rounds are copies of those of the two permutations, with the states on
+ the stack: the four-way round addresses its constants as globals, and the
+ one-way rounds keep every general-purpose register (the subroutine copies
+ both states into its frame and back).
+*/
+from Keccak require "common/keccakf1600_generic.jinc"
+from Keccak require "common/keccakf1600x4_generic.jinc"
+from Keccak require "avx2/common/keccakf1600x4_nat.jinc"
+from Keccak require "ref/common/keccakf1600_opt.jinc"
+
+// one round of keccakf1600x4_nat.jinc (__f1600_loopbody_native), on a stack state
+#[safety =
+   { requires = is_arr_init(st,0,800) && 0 <= i && i < 24
+   , res = { f_st, f_y10, f_y14, f_y8, f_y15, f_y9, f_y13, f_y3, f_y7, f_y2 }
+   , ensures = is_arr_init(f_st,0,800) }
+ ]
+inline fn __f1600_x4_round
+( stack u256[25] st
+, reg ui64 i
+, reg u256 y10 y14 y8 y15 y9 y13 y3 y7 y2
+) -> stack u256[25]
+   , reg u256, reg u256, reg u256, reg u256, reg u256
+   , reg u256, reg u256, reg u256, reg u256
+{
+  reg u256 y0, y1, y4, y5, y6, y11, y12;
+  reg ptr u64[24] rcp;
+  inline int i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12;
+  inline int i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23;
+  i0=0; i1=1; i2=2; i3=3; i4=4; i5=5; i6=6;
+  i7=9; i8=10; i9=13; i10=14; i11=16; i12=17; i13=19; i14=20; i15=23;
+  i16=7; i17=8; i18=11; i19=12; i20= 15; i21= 18; i22= 21; i23= 22;
+  //LLkeccak_f1600_x4_avx2:    
+  y4 = st[i5]; // vmovdqu 0xa0(%rsp), %ymm4         // 160 [5]
+  y0 = y9 ^ st[i14]; // vpxor 0x1c0(%rsp), %ymm9, %ymm0   // 448 [14]
+  st[i16] = y9; // vmovdqu %ymm9, 0x200(%rsp)        // 512 [16]
+  y9 = y10; // vmovdqu %ymm10, %ymm9
+  y11 = st[i6]; // vmovdqu 0xc0(%rsp), %ymm11        // 192 [6]
+  y12 = st[i11]; // vmovdqu 0x160(%rsp), %ymm12       // 352 [11]
+  st[i18] = y3; // vmovdqu %ymm3, 0x240(%rsp)        // 576 [18]
+  y1 = y4 ^ st[i8]; // vpxor 0x100(%rsp), %ymm4, %ymm1   // 256 [8]
+  y10 = st[i2]; // vmovdqu 0x40(%rsp), %ymm10        // 64  [2]
+  st[i17] = y4; // vmovdqu %ymm4, 0x220(%rsp)        // 544 [17]
+  y12 = y12 ^ y3; // vpxor %ymm3, %ymm12, %ymm12
+  y6 = st[i1]; // vmovdqu 0x20(%rsp), %ymm6         // 32  [1]
+  y4 = st[i10]; // vmovdqu 0x140(%rsp), %ymm4        // 320 [10]
+  st[i21] = y14; // vmovdqu %ymm14, 0x2a0(%rsp)       // 672 [21]
+  y0 = y0 ^ y1; // vpxor %ymm1, %ymm0, %ymm0
+  y1 = y11 ^ y8; // vpxor %ymm8, %ymm11, %ymm1
+  y11 = y7 ^ st[i12]; // vpxor 0x180(%rsp), %ymm7, %ymm11  // 384 [12]
+  st[i20] = y10; // vmovdqu %ymm10, 0x280(%rsp)       // 640 [20]
+  y12 = y12 ^ y1; // vpxor %ymm1, %ymm12, %ymm12
+  y1 = y9 ^ y15; // vpxor %ymm15, %ymm9, %ymm1
+  y3 = st[i7]; // vmovdqu 0xe0(%rsp), %ymm3         // 224 [7]
+  st[i19] = y8; // vmovdqu %ymm8, 0x260(%rsp)        // 608 [19]
+  y11 = y11 ^ y1; // vpxor %ymm1, %ymm11, %ymm11
+  y1 = y14 ^ st[i9]; // vpxor 0x120(%rsp), %ymm14, %ymm1  // 288 [9]
+  y12 = y12 ^ y6; // vpxor %ymm6, %ymm12, %ymm12
+  y8 = st[i3]; // vmovdqu 0x60(%rsp), %ymm8         // 96  [3]
+  y11 = y11 ^ y10; // vpxor %ymm10, %ymm11, %ymm11
+  y10 = y13 ^ st[i15]; // vpxor 0x1e0(%rsp), %ymm13, %ymm10 // 480 [15]
+  y3 = y3 ^ y4; // vpxor %ymm4, %ymm3, %ymm3
+  st[i22] = y4; // vmovdqu %ymm4, 0x2c0(%rsp)        // 704 [22]
+  y4 = #VPSRL_4u64(y12, (128u) 0x3f); // vpsrlq $0x3f, %ymm12, %ymm4       // 63
+  y5 = #VPSRL_4u64(y11, (128u) 0x3f); // vpsrlq $0x3f, %ymm11, %ymm5       // 63
+  y0 = y0 ^ st[i0]; // vpxor (%rsp), %ymm0, %ymm0
+  y10 = y10 ^ y1; // vpxor %ymm1, %ymm10, %ymm10
+  y1 = st[i4]; // vmovdqu 0x80(%rsp), %ymm1         // 128 [4]
+  y10 = y10 ^ y8; // vpxor %ymm8, %ymm10, %ymm10
+  y14 = y1; // vmovdqu %ymm1, %ymm14
+  y1 = y2 ^ st[i13]; // vpxor 0x1a0(%rsp), %ymm2, %ymm1   // 416 [13]
+  st[i23] = y14; // vmovdqu %ymm14, 0x2e0(%rsp)       // 736 [23]
+  y1 = y1 ^ y3; // vpxor %ymm3, %ymm1, %ymm1
+  y3 = #VPSLL_4u64(y12, (128u) 0x01); // vpsllq $0x1, %ymm12, %ymm3        // 1
+  y3 = y3 | y4; // vpor %ymm4, %ymm3, %ymm3
+  y4 = #VPSLL_4u64(y11, (128u) 0x01); // vpsllq $0x1, %ymm11, %ymm4        // 1
+  y1 = y1 ^ y14; // vpxor %ymm14, %ymm1, %ymm1
+  y4 = y4 | y5; // vpor %ymm5, %ymm4, %ymm4
+  y14 = #VPSRL_4u64(y10, (128u) 0x3f); // vpsrlq $0x3f, %ymm10, %ymm14      // 63
+  y3 = y3 ^ y1; // vpxor %ymm1, %ymm3, %ymm3
+  y5 = #VPSLL_4u64(y10, (128u) 0x01); // vpsllq $0x1, %ymm10, %ymm5        // 1
+  y4 = y4 ^ y0; // vpxor %ymm0, %ymm4, %ymm4
+  y5 = y5 | y14; // vpor %ymm14, %ymm5, %ymm5
+  y6 = y4 ^ y6; // vpxor %ymm6, %ymm4, %ymm6
+  y5 = y5 ^ y12; // vpxor %ymm12, %ymm5, %ymm5
+  y12 = #VPSRL_4u64(y1, (128u) 0x3f); // vpsrlq $0x3f, %ymm1, %ymm12       // 3f
+  y1 = #VPSLL_4u64(y1, (128u) 0x01); // vpsllq $0x1, %ymm1, %ymm1         // 1
+  y7 = y5 ^ y7; // vpxor %ymm7, %ymm5, %ymm7
+  y9 = y5 ^ y9; // vpxor %ymm9, %ymm5, %ymm9
+  y1 = y1 | y12; // vpor %ymm12, %ymm1, %ymm1
+  y12 = y3 ^ st[i0]; // vpxor (%rsp), %ymm3, %ymm12       // 0   [0]
+  y1 = y1 ^ y11; // vpxor %ymm11, %ymm1, %ymm1
+  y11 = #VPSRL_4u64(y0, (128u) 0x3f); // vpsrlq $0x3f, %ymm0, %ymm11       // 63
+  y0 = #VPSLL_4u64(y0, (128u) 0x01); // vpsllq $0x1, %ymm0, %ymm0         // 1
+  y13 = y1 ^ y13; // vpxor %ymm13, %ymm1, %ymm13
+  y8 = y1 ^ y8; // vpxor %ymm8, %ymm1, %ymm8
+  y0 = y0 | y11; // vpor %ymm11, %ymm0, %ymm0
+  y0 = y0 ^ y10; // vpxor %ymm10, %ymm0, %ymm0
+  y10 = y4 ^ st[i6]; // vpxor 0xc0(%rsp), %ymm4, %ymm10   // 192 [6]
+  y2 = y0 ^ y2; // vpxor %ymm2, %ymm0, %ymm2
+  y11 = #VPSRL_4u64(y10, (128u) 0x14); // vpsrlq $0x14, %ymm10, %ymm11      // 20
+  y10 = #VPSLL_4u64(y10, (128u) 0x2c); // vpsllq $0x2c, %ymm10, %ymm10      // 44
+  y10 = y10 | y11; // vpor %ymm11, %ymm10, %ymm10
+  y11 = y5 ^ y15; // vpxor %ymm15, %ymm5, %ymm11
+  rcp = KECCAK1600_RC;
+  y15 = #VPBROADCAST_4u64(rcp[(64u)i]); // vpbroadcastq (%rsi), %ymm15
+  y14 = #VPSRL_4u64(y11, (128u) 0x15); // vpsrlq $0x15, %ymm11, %ymm14      // 21
+  y11 = #VPSLL_4u64(y11, (128u) 0x2b); // vpsllq $0x2b, %ymm11, %ymm11      // 43
+  y11 = y11 | y14; // vpor %ymm14, %ymm11, %ymm11
+  y14 = !y10 & y11; //#VPANDN_256(y10, y11); // vpandn %ymm11, %ymm10, %ymm14
+  y14 = y14 ^ y15; // vpxor %ymm15, %ymm14, %ymm14
+  y15 = y14 ^ y12; // vpxor %ymm12, %ymm14, %ymm15
+  y14 = #VPSRL_4u64(y13, (128u) 0x2b); // vpsrlq $0x2b, %ymm13, %ymm14      // 32
+  y13 = #VPSLL_4u64(y13, (128u) 0x15); // vpsllq $0x15, %ymm13, %ymm13      // 21
+  st[i0] = y15; // vmovdqu %ymm15, (%rsp)            // 0   [0]
+  y13 = y13 | y14; // vpor %ymm14, %ymm13, %ymm13
+  y14 = !y11 & y13; //#VPANDN_256(y11, y13); // vpandn %ymm13, %ymm11, %ymm14
+  y15 = y14 ^ y10; // vpxor %ymm10, %ymm14, %ymm15
+  y14 = #VPSRL_4u64(y2, (128u) 0x32); // vpsrlq $0x32, %ymm2, %ymm14       // 50
+  y2 = #VPSLL_4u64(y2, (128u) 0xe); // vpsllq $0xe, %ymm2, %ymm2         // 14
+  st[i1] = y15; // vmovdqu %ymm15, 0x20(%rsp)        // 32  [1]
+  y2 = y2 | y14; // vpor %ymm14, %ymm2, %ymm2
+  y14 = !y13 & y2; //#VPANDN_256(y13, y2); // vpandn %ymm2, %ymm13, %ymm14
+  y11 = y14 ^ y11; // vpxor %ymm11, %ymm14, %ymm11
+  st[i2] = y11; // vmovdqu %ymm11, 0x40(%rsp)        // 64  [2]
+  y11 = !y2 & y12; //#VPANDN_256(y2, y12); // vpandn %ymm12, %ymm2, %ymm11
+  y12 = !y12 & y10; //#VPANDN_256(y12, y10); // vpandn %ymm10, %ymm12, %ymm12
+  y11 = y11 ^ y13; // vpxor %ymm13, %ymm11, %ymm11      
+  st[i3] = y11; // vmovdqu %ymm11, 0x60(%rsp)        // 96  [3]
+  y11 = y12 ^ y2; // vpxor %ymm2, %ymm12, %ymm11
+  y2 = #VPSRL_4u64(y8, (128u) 0x24); // vpsrlq $0x24, %ymm8, %ymm2        // 36
+  y8 = #VPSLL_4u64(y8, (128u) 0x1c); // vpsllq $0x1c, %ymm8, %ymm8        // 28
+  st[i4] = y11; // vmovdqu %ymm11, 0x80(%rsp)        // 128 [4]
+  y8 = y8 | y2; // vpor %ymm2, %ymm8, %ymm8
+  y2 = y0 ^ st[i7]; // vpxor 0xe0(%rsp), %ymm0, %ymm2    // 224 [7]
+  y10 = #VPSRL_4u64(y2, (128u) 0x2c); // vpsrlq $0x2c, %ymm2, %ymm10       // 44
+  y2 = #VPSLL_4u64(y2, (128u) 0x14); // vpsllq $0x14, %ymm2, %ymm2        // 20
+  y2 = y2 | y10; // vpor %ymm10, %ymm2, %ymm2
+  y10 = y3 ^ st[i8]; // vpxor 0x100(%rsp), %ymm3, %ymm10  // 256 [8]
+  y11 = #VPSRL_4u64(y10, (128u) 0x3d); // vpsrlq $0x3d, %ymm10, %ymm11      // 61
+  y10 = #VPSLL_4u64(y10, (128u) 0x3); // vpsllq $0x3, %ymm10, %ymm10       // 3
+  y10 = y10 | y11; // vpor %ymm11, %ymm10, %ymm10
+  y11 = !y2 & y10; //#VPANDN_256(y2, y10); // vpandn %ymm10, %ymm2, %ymm11
+  y11 = y11 ^ y8; // vpxor %ymm8, %ymm11, %ymm11
+  st[i5] = y11; // vmovdqu %ymm11, 0xa0(%rsp)        // 160 [5]
+  y11 = y4 ^ st[i11]; // vpxor 0x160(%rsp), %ymm4, %ymm11  // 352 [11]
+  y12 = #VPSRL_4u64(y11, (128u) 0x13); // vpsrlq $0x13, %ymm11, %ymm12      // 19
+  y11 = #VPSLL_4u64(y11, (128u) 0x2d); // vpsllq $0x2d, %ymm11, %ymm11      // 45
+  y11 = y11 | y12; // vpor %ymm12, %ymm11, %ymm11
+  y12 = !y10 & y11; //#VPANDN_256(y10, y11); // vpandn %ymm11, %ymm10, %ymm12
+  y12 = y12 ^ y2; // vpxor %ymm2, %ymm12, %ymm12
+  st[i6] = y12; // vmovdqu %ymm12, 0xc0(%rsp)        // 192 [6]
+  y12 = #VPSRL_4u64(y7, (128u) 0x3); // vpsrlq $0x3, %ymm7, %ymm12        // 3
+  y7 = #VPSLL_4u64(y7, (128u) 0x3d); // vpsllq $0x3d, %ymm7, %ymm7        // 61
+  y7 = y7 | y12; // vpor %ymm12, %ymm7, %ymm7
+  y12 = !y11 & y7; //#VPANDN_256(y11, y7); // vpandn %ymm7, %ymm11, %ymm12
+  y10 = y12 ^ y10; // vpxor %ymm10, %ymm12, %ymm10
+  y12 = !y7 & y8; //#VPANDN_256(y7, y8); // vpandn %ymm8, %ymm7, %ymm12
+  y8 = !y8 & y2; //#VPANDN_256(y8, y2); // vpandn %ymm2, %ymm8, %ymm8
+  y2 = #VPSRL_4u64(y6, (128u) 0x3f); // vpsrlq $0x3f, %ymm6, %ymm2        // 63
+  y6 = #VPSLL_4u64(y6, (128u) 0x1); // vpsllq $0x1, %ymm6, %ymm6         // 1
+  y14 = y12 ^ y11; // vpxor %ymm11, %ymm12, %ymm14
+  y6 = y6 | y2; // vpor %ymm2, %ymm6, %ymm6
+  y2 = #VPSRL_4u64(y9, (128u) 0x3a); // vpsrlq $0x3a, %ymm9, %ymm2        // 58
+  y12 = y8 ^ y7; // vpxor %ymm7, %ymm8, %ymm12
+  y9 = #VPSLL_4u64(y9, (128u) 0x6); // vpsllq $0x6, %ymm9, %ymm9         // 6
+  st[i7] = y12; // vmovdqu %ymm12, 0xe0(%rsp)        // 224 [7]
+  y7 = y0 ^ st[i13]; // vpxor 0x1a0(%rsp), %ymm0, %ymm7   // 416 [13]
+  y9 = y9 | y2; // vpor %ymm2, %ymm9, %ymm9
+  y2 = y1 ^ st[i9]; // vpxor 0x120(%rsp), %ymm1, %ymm2   // 288 [9]
+  y7 = #VPSHUFB_256(y7, ROL8[0]); // vpshufb (%rcx), %ymm7, %ymm7      // rol8
+  y11 = #VPSRL_4u64(y2, (128u) 0x27); // vpsrlq $0x27, %ymm2, %ymm11       // 39
+  y2 = #VPSLL_4u64(y2, (128u) 0x19); // vpsllq $0x19, %ymm2, %ymm2        // 25
+  y11 = y11 | y2; // vpor %ymm2, %ymm11, %ymm11
+  y2 = !y9 & y11; //#VPANDN_256(y9, y11); // vpandn %ymm11, %ymm9, %ymm2
+  y8 = !y11 & y7; //#VPANDN_256(y11, y7); // vpandn %ymm7, %ymm11, %ymm8
+  y12 = y2 ^ y6; // vpxor %ymm6, %ymm2, %ymm12
+  y2 = y3 ^ st[i14]; // vpxor 0x1c0(%rsp), %ymm3, %ymm2   // 448 [14]
+  y8 = y8 ^ y9; // vpxor %ymm9, %ymm8, %ymm8
+  st[i8] = y12; // vmovdqu %ymm12, 0x100(%rsp)       // 256 [8]
+  y12 = #VPSRL_4u64(y2, (128u) 0x2e); // vpsrlq $0x2e, %ymm2, %ymm12       // 46
+  y2 = #VPSLL_4u64(y2, (128u) 0x12); // vpsllq $0x12, %ymm2, %ymm2        // 18
+  y2 = y12 | y2; // vpor %ymm2, %ymm12, %ymm2
+  y12 = !y7 & y2; //#VPANDN_256(y7, y2); // vpandn %ymm2, %ymm7, %ymm12
+  y15 = y12 ^ y11; // vpxor %ymm11, %ymm12, %ymm15
+  y11 = !y2 & y6; //#VPANDN_256(y2, y6); // vpandn %ymm6, %ymm2, %ymm11
+  y6 = !y6 & y9; //#VPANDN_256(y6, y9); // vpandn %ymm9, %ymm6, %ymm6
+  y12 = y11 ^ y7; // vpxor %ymm7, %ymm11, %ymm12
+  st[i9] = y12; // vmovdqu %ymm12, 0x120(%rsp)       // 288 [9]
+  y12 = y6 ^ y2; // vpxor %ymm2, %ymm6, %ymm12
+  y6 = y0 ^ st[i23]; // vpxor 0x2e0(%rsp), %ymm0, %ymm6   // 736 [23]
+  y0 = y0 ^ st[i22]; // vpxor 0x2c0(%rsp), %ymm0, %ymm0   // 704 [22]
+  st[i10] = y12; // vmovdqu %ymm12, 0x140(%rsp)       // 320 [10]
+  y2 = #VPSRL_4u64(y6, (128u) 0x25); // vpsrlq $0x25, %ymm6, %ymm2        // 37
+  y6 = #VPSLL_4u64(y6, (128u) 0x1b); // vpsllq $0x1b, %ymm6, %ymm6        // 27
+  y2 = y2 | y6; // vpor %ymm6, %ymm2, %ymm2
+  y6 = y3 ^ st[i17]; // vpxor 0x220(%rsp), %ymm3, %ymm6   // 544 [17]
+  y3 = y3 ^ st[i16]; // vpxor 0x200(%rsp), %ymm3, %ymm3   // 512 [16]
+  y7 = #VPSRL_4u64(y6, (128u) 0x1c); // vpsrlq $0x1c, %ymm6, %ymm7        // 28
+  y6 = #VPSLL_4u64(y6, (128u) 0x24); // vpsllq $0x24, %ymm6, %ymm6        // 36
+  y7 = y7 | y6; // vpor %ymm6, %ymm7, %ymm7
+  y6 = y4 ^ st[i19]; // vpxor 0x260(%rsp), %ymm4, %ymm6   // 608 [19]
+  y4 = y4 ^ st[i18]; // vpxor 0x240(%rsp), %ymm4, %ymm4   // 576 [18]
+  y12 = #VPSRL_4u64(y6, (128u) 0x36); // vpsrlq $0x36, %ymm6, %ymm12       // 54
+  y6 = #VPSLL_4u64(y6, (128u) 0xa); // vpsllq $0xa, %ymm6, %ymm6         // 10
+  y12 = y12 | y6; // vpor %ymm6, %ymm12, %ymm12        // 
+  y6 = y5 ^ st[i12]; // vpxor 0x180(%rsp), %ymm5, %ymm6   // 382 [12]
+  y5 = y5 ^ st[i20]; // vpxor 0x280(%rsp), %ymm5, %ymm5   // 640 [20]
+  y9 = !y7 & y12; //#VPANDN_256(y7, y12); // vpandn %ymm12, %ymm7, %ymm9       //
+  y11 = #VPSRL_4u64(y6, (128u) 0x31); // vpsrlq $0x31, %ymm6, %ymm11       // 49
+  y6 = #VPSLL_4u64(y6, (128u) 0xf); // vpsllq $0xf, %ymm6, %ymm6         // 15
+  y9 = y9 ^ y2; // vpxor %ymm2, %ymm9, %ymm9
+  y11 = y11 | y6; // vpor %ymm6, %ymm11, %ymm11
+  y6 = !y12 & y11; //#VPANDN_256(y12, y11); // vpandn %ymm11, %ymm12, %ymm6
+  y6 = y6 ^ y7; // vpxor %ymm7, %ymm6, %ymm6
+  st[i11] = y6; // vmovdqu %ymm6, 0x160(%rsp)        // 352 [11]
+  y6 = y1 ^ st[i15]; // vpxor 0x1e0(%rsp), %ymm1, %ymm6   // 480 [15]
+  y1 = y1 ^ st[i21]; // vpxor 0x2a0(%rsp), %ymm1, %ymm1   // 672 [21]
+  y6 = #VPSHUFB_256(y6, ROL56[0]); // vpshufb (%rdx), %ymm6, %ymm6      // rol56
+  y13 = !y11 & y6; //#VPANDN_256(y11, y6); // vpandn %ymm6, %ymm11, %ymm13
+  y13 = y13 ^ y12; // vpxor %ymm12, %ymm13, %ymm13
+  st[i12] = y13; // vmovdqu %ymm13, 0x180(%rsp)       // 384 [12]
+  y13 = !y6 & y2; //#VPANDN_256(y6, y2); // vpandn %ymm2, %ymm6, %ymm13
+  y2 = !y2 & y7; //#VPANDN_256(y2, y7); // vpandn %ymm7, %ymm2, %ymm2
+  y2 = y2 ^ y6; // vpxor %ymm6, %ymm2, %ymm2
+  y6 = #VPSRL_4u64(y4, (128u) 0x3e); // vpsrlq $0x3e, %ymm4, %ymm6        // 62
+  y13 = y13 ^ y11; // vpxor %ymm11, %ymm13, %ymm13
+  st[i13] = y2; // vmovdqu %ymm2, 0x1a0(%rsp)        // 416 [13]
+  y2 = #VPSRL_4u64(y5, (128u) 0x2); // vpsrlq $0x2, %ymm5, %ymm2         // 2
+  y5 = #VPSLL_4u64(y5, (128u) 0x3e); // vpsllq $0x3e, %ymm5, %ymm5        // 62
+  y2 = y2 | y5; // vpor %ymm5, %ymm2, %ymm2
+  y5 = #VPSRL_4u64(y1, (128u) 0x9); // vpsrlq $0x9, %ymm1, %ymm5         // 9
+  y1 = #VPSLL_4u64(y1, (128u) 0x37); // vpsllq $0x37, %ymm1, %ymm1        // 55
+  y4 = #VPSLL_4u64(y4, (128u) 0x2); // vpsllq $0x2, %ymm4, %ymm4         // 2
+  y1 = y5 | y1; // vpor %ymm1, %ymm5, %ymm1
+  y5 = #VPSRL_4u64(y0, (128u) 0x19); // vpsrlq $0x19, %ymm0, %ymm5        // 25
+  y4 = y6 | y4; // vpor %ymm4, %ymm6, %ymm4
+  y0 = #VPSLL_4u64(y0, (128u) 0x27); // vpsllq $0x27, %ymm0, %ymm0        // 39
+  y5 = y5 | y0; // vpor %ymm0, %ymm5, %ymm5
+  y0 = !y1 & y5; //#VPANDN_256(y1, y5); // vpandn %ymm5, %ymm1, %ymm0
+  y0 = y0 ^ y2; // vpxor %ymm2, %ymm0, %ymm0
+  st[i14] = y0; // vmovdqu %ymm0, 0x1c0(%rsp)        // 448 [14]
+  y0 = #VPSRL_4u64(y3, (128u) 0x17); // vpsrlq $0x17, %ymm3, %ymm0        // 23
+  y3 = #VPSLL_4u64(y3, (128u) 0x29); // vpsllq $0x29, %ymm3, %ymm3        // 41
+  y0 = y0 | y3; // vpor %ymm3, %ymm0, %ymm0
+  y7 = !y0 & y4; //#VPANDN_256(y0, y4); // vpandn %ymm4, %ymm0, %ymm7
+  y3 = !y5 & y0; //#VPANDN_256(y5, y0); // vpandn %ymm0, %ymm5, %ymm3
+  y7 = y7 ^ y5; // vpxor %ymm5, %ymm7, %ymm7
+  y5 = !y4 & y2; //#VPANDN_256(y4, y2); // vpandn %ymm2, %ymm4, %ymm5
+  y2 = !y2 & y1; //#VPANDN_256(y2, y1); // vpandn %ymm1, %ymm2, %ymm2
+  y5 = y5 ^ y0; // vpxor %ymm0, %ymm5, %ymm5
+  y3 = y3 ^ y1; // vpxor %ymm1, %ymm3, %ymm3
+  y2 = y2 ^ y4; // vpxor %ymm4, %ymm2, %ymm2
+  st[i15] = y5; // vmovdqu %ymm5, 0x1e0(%rsp)        // 480 [15]
+
+  return st, y10, y14, y8, y15, y9, y13, y3, y7, y2;
+}
+
+// one iteration of keccakf1600_opt.jinc (keccakf1600_opt_loop_body, two
+// rounds) with a four-way round before each of its rounds
+#[safety =
+   { requires = is_arr_init(a,0,200) && is_arr_init(st4,0,800) && rax <=u (64u) 22
+   , res = { f_rax, f_rbp, f_rdi, f_r13, f_r10, f_r11, f_r8, f_rsi, f_r15, f_rbx, f_a, f_e
+           , f_st4, f_y10, f_y14, f_y8, f_y15, f_y9, f_y13, f_y3, f_y7, f_y2 }
+   , ensures = is_arr_init(f_a,0,200) && is_arr_init(f_st4,0,800) && f_rax == rax + (64u) 2 }
+ ]
+inline fn __keccakf1600_x4_x1_nat_opt_iteration
+( reg u64 rax                                   // round counter c
+, reg u64 rbp                                   // a[0]
+, reg u64 rdi                                   // a[10]
+, reg u64 r13                                   // a[12]
+, reg u64 r10                                   // a[18]
+, reg u64 r11                                   // a[19]
+, reg u64 r8                                    // a[20]
+, reg u64 rsi                                   // a[21]
+, reg u64 r15                                   // a[22]
+, reg u64 rbx                                   // a[24]
+, stack u64[25] a
+, stack u64[25] e
+, stack u256[25] st4
+, reg u256 y10 y14 y8 y15 y9 y13 y3 y7 y2
+) -> reg u64, reg u64, reg u64, reg u64, reg u64
+   , reg u64, reg u64, reg u64, reg u64, reg u64
+   , stack u64[25]
+   , stack u64[25]
+   , stack u256[25]
+   , reg u256, reg u256, reg u256, reg u256, reg u256
+   , reg u256, reg u256, reg u256, reg u256
+{
+  reg u64 rcx rdx r9 r12 r14;
+  reg ptr u64[24] RC;
+  #[mmx] reg u64 cnt;
+  #[mmx] reg ui64 i2;
+  reg ui64 i;
+
+  i = (64ui)rax;
+  st4, y10, y14, y8, y15, y9, y13, y3, y7, y2
+    = __f1600_x4_round(st4, i, y10, y14, y8, y15, y9, y13, y3, y7, y2);
+  i += 1;
+  i2 = i;
+  // .LBB0_1:                                   # =>This Inner Loop Header: Depth=1
+  e[0] = r11;                                   // movq %r11, -32(%rsp)
+  e[1] = rdi;                                   // movq %rdi, -24(%rsp)
+  cnt = rax;                                 // movq %rax, 24(%rsp)   (counter spill; dedicated slot for CT)
+  e[2] = rsi;                                   // movq %rsi, 16(%rsp)
+  rcx = a[15];                                  // movq -72(%rsp), %rcx
+  rcx ^= r8;                                    // xorq %r8, %rcx
+  rax = rdi;                                    // movq %rdi, %rax
+  rax ^= a[5];                                  // xorq -48(%rsp), %rax
+  rax ^= rcx;                                   // xorq %rcx, %rax
+  rdx = a[16];                                  // movq -128(%rsp), %rdx
+  rdx ^= rsi;                                   // xorq %rsi, %rdx
+  rcx = a[11];                                  // movq -64(%rsp), %rcx
+  rsi = a[6];                                   // movq -88(%rsp), %rsi
+  rcx ^= rsi;                                   // xorq %rsi, %rcx
+  rcx ^= rdx;                                   // xorq %rdx, %rcx
+  rdx = a[17];                                  // movq -112(%rsp), %rdx
+  rdx ^= r15;                                   // xorq %r15, %rdx
+  r9 = r13;                                     // movq %r13, %r9
+  r9 ^= a[7];                                   // xorq -96(%rsp), %r9
+  r9 ^= rdx;                                    // xorq %rdx, %r9
+  rdx = r10;                                    // movq %r10, %rdx
+  rdx ^= a[23];                                 // xorq -80(%rsp), %rdx
+  r12 = a[13];                                  // movq -104(%rsp), %r12
+  r12 ^= a[8];                                  // xorq (%rsp), %r12
+  r12 ^= rdx;                                   // xorq %rdx, %r12
+  rdx = r11;                                    // movq %r11, %rdx
+  rdx ^= rbx;                                   // xorq %rbx, %rdx
+  r14 = a[14];                                  // movq -56(%rsp), %r14
+  r14 ^= a[9];                                  // xorq -120(%rsp), %r14
+  r14 ^= rdx;                                   // xorq %rdx, %r14
+  rax ^= rbp;                                   // xorq %rbp, %rax
+  rcx ^= a[1];                                  // xorq -16(%rsp), %rcx
+  r9 ^= a[2];                                   // xorq 8(%rsp), %r9
+  rdi = a[3];                                   // movq -40(%rsp), %rdi
+  r12 ^= rdi;                                   // xorq %rdi, %r12
+  r14 ^= a[4];                                  // xorq -8(%rsp), %r14
+  rdx = #RORX_64(r12, 63);                      // rorxq $63, %r12, %rdx
+  rdx ^= rcx;                                   // xorq %rcx, %rdx
+  e[10] = rdx;                                  // movq %rdx, 88(%rsp)
+  r11 = #RORX_64(rcx, 63);                      // rorxq $63, %rcx, %r11
+  r11 ^= r14;                                   // xorq %r14, %r11
+  e[9] = r11;                                   // movq %r11, 80(%rsp)
+  rcx = #RORX_64(r14, 63);                      // rorxq $63, %r14, %rcx
+  rcx ^= r9;                                    // xorq %r9, %rcx
+  r9 = #RORX_64(r9, 63);                        // rorxq $63, %r9, %r9
+  r9 ^= rax;                                    // xorq %rax, %r9
+  rax = #RORX_64(rax, 63);                      // rorxq $63, %rax, %rax
+  rax ^= r12;                                   // xorq %r12, %rax
+  rbp ^= r11;                                   // xorq %r11, %rbp
+  rsi ^= r9;                                    // xorq %r9, %rsi
+  r11 = r9;                                     // movq %r9, %r11
+  r9 = #RORX_64(rsi, 20);                       // rorxq $20, %rsi, %r9
+  r13 ^= rdx;                                   // xorq %rdx, %r13
+  r14 = #RORX_64(r13, 21);                      // rorxq $21, %r13, %r14
+  r10 ^= rcx;                                   // xorq %rcx, %r10
+  r10 = #RORX_64(r10, 43);                      // rorxq $43, %r10, %r10
+  rbx ^= rax;                                   // xorq %rax, %rbx
+  rbx = #RORX_64(rbx, 50);                      // rorxq $50, %rbx, %rbx
+  rsi = !rbx & rbp;                             // andnq %rbp, %rbx, %rsi
+  rsi ^= r10;                                   // xorq %r10, %rsi
+  a[6] = rsi;                                   // movq %rsi, -88(%rsp)
+  rsi = !r14 & r10;                             // andnq %r10, %r14, %rsi
+  r10 = !r10 & rbx;                             // andnq %rbx, %r10, %r10
+  r10 ^= r14;                                   // xorq %r14, %r10
+  e[8] = r10;                                   // movq %r10, 64(%rsp)
+  r12 = !r9 & r14;                              // andnq %r14, %r9, %r12
+  RC = KECCAK1600_RC;                           // leaq KeccakF_RoundConstants(%rip), %r10
+  r14 = cnt;                                    // movq 24(%rsp), %r14   (counter reload)
+  r12 ^= RC[r14];                               // xorq 16(%r10,%r14,8), %r12  %corrected index
+  r12 ^= rbp;                                   // xorq %rbp, %r12
+  rsi ^= r9;                                    // xorq %r9, %rsi
+  e[6] = rsi;                                   // movq %rsi, 48(%rsp)
+  r9 = !rbp & r9;                               // andnq %r9, %rbp, %r9
+  r9 ^= rbx;                                    // xorq %rbx, %r9
+  e[7] = r9;                                    // movq %r9, 56(%rsp)
+  rdi ^= rcx;                                   // xorq %rcx, %rdi
+  rdx = rcx;                                    // movq %rcx, %rdx
+  r9 = #RORX_64(rdi, 36);                       // rorxq $36, %rdi, %r9
+  rsi = a[9];                                   // movq -120(%rsp), %rsi
+  rsi ^= rax;                                   // xorq %rax, %rsi
+  r10 = #RORX_64(rsi, 44);                      // rorxq $44, %rsi, %r10
+  rsi = e[1];                                   // movq -24(%rsp), %rsi
+  r13 = e[9];                                   // movq 80(%rsp), %r13
+  rsi ^= r13;                                   // xorq %r13, %rsi
+  rsi = #RORX_64(rsi, 61);                      // rorxq $61, %rsi, %rsi
+  rdi = a[16];                                  // movq -128(%rsp), %rdi
+  rcx = r11;                                    // movq %r11, %rcx
+  rdi ^= r11;                                   // xorq %r11, %rdi
+  rdi = #RORX_64(rdi, 19);                      // rorxq $19, %rdi, %rdi
+  rbp = e[10];                                  // movq 88(%rsp), %rbp
+  r15 ^= rbp;                                   // xorq %rbp, %r15
+  rbx = #RORX_64(r15, 3);                       // rorxq $3, %r15, %rbx
+  r15 = !rbx & r9;                              // andnq %r9, %rbx, %r15
+  r15 ^= rdi;                                   // xorq %rdi, %r15
+  e[1] = r15;                                   // movq %r15, -24(%rsp)
+  r15 = !rsi & rdi;                             // andnq %rdi, %rsi, %r15
+  rdi = !rdi & rbx;                             // andnq %rbx, %rdi, %rdi
+  rdi ^= rsi;                                   // xorq %rsi, %rdi
+  e[5] = rdi;                                   // movq %rdi, 40(%rsp)
+  rsi = !r10 & rsi;                             // andnq %rsi, %r10, %rsi
+  rsi ^= r9;                                    // xorq %r9, %rsi
+  a[16] = rsi;                                  // movq %rsi, -128(%rsp)
+  r15 ^= r10;                                   // xorq %r10, %r15
+  a[3] = r15;                                   // movq %r15, -40(%rsp)
+  rsi = !r9 & r10;                              // andnq %r10, %r9, %rsi
+  rsi ^= rbx;                                   // xorq %rbx, %rsi
+  a[9] = rsi;                                   // movq %rsi, -120(%rsp)
+  rsi = a[1];                                   // movq -16(%rsp), %rsi
+  rsi ^= r11;                                   // xorq %r11, %rsi
+  rsi = #RORX_64(rsi, 63);                      // rorxq $63, %rsi, %rsi
+  rdi = a[7];                                   // movq -96(%rsp), %rdi
+  rdi ^= rbp;                                   // xorq %rbp, %rdi
+  rdi = #RORX_64(rdi, 58);                      // rorxq $58, %rdi, %rdi
+  r9 = a[13];                                   // movq -104(%rsp), %r9
+  r9 ^= rdx;                                    // xorq %rdx, %r9
+  r9 = #RORX_64(r9, 39);                        // rorxq $39, %r9, %r9
+  r10 = e[0];                                   // movq -32(%rsp), %r10
+  r10 ^= rax;                                   // xorq %rax, %r10
+  r10 = #RORX_64(r10, 56);                      // rorxq $56, %r10, %r10
+  r14 = r13;                                    // movq %r13, %r14
+  r8 ^= r13;                                    // xorq %r13, %r8
+  r8 = #RORX_64(r8, 46);                        // rorxq $46, %r8, %r8
+  r11 = !r8 & rsi;                              // andnq %rsi, %r8, %r11
+  r11 ^= r10;                                   // xorq %r10, %r11
+  a[13] = r11;                                  // movq %r11, -104(%rsp)
+  r11 = !r9 & r10;                              // andnq %r10, %r9, %r11
+  r13 = !r10 & r8;                              // andnq %r8, %r10, %r13
+  r13 ^= r9;                                    // xorq %r9, %r13
+  r9 = !rdi & r9;                               // andnq %r9, %rdi, %r9
+  r9 ^= rsi;                                    // xorq %rsi, %r9
+  a[7] = r9;                                    // movq %r9, -96(%rsp)
+  r11 ^= rdi;                                   // xorq %rdi, %r11
+  e[4] = r11;                                   // movq %r11, 32(%rsp)
+  rsi = !rsi & rdi;                             // andnq %rdi, %rsi, %rsi
+  rsi ^= r8;                                    // xorq %r8, %rsi
+  e[0] = rsi;                                   // movq %rsi, -32(%rsp)
+  rsi = a[4];                                   // movq -8(%rsp), %rsi
+  rsi ^= rax;                                   // xorq %rax, %rsi
+  rsi = #RORX_64(rsi, 37);                      // rorxq $37, %rsi, %rsi
+  rdi = a[5];                                   // movq -48(%rsp), %rdi
+  rdi ^= r14;                                   // xorq %r14, %rdi
+  rdi = #RORX_64(rdi, 28);                      // rorxq $28, %rdi, %rdi
+  r8 = a[11];                                   // movq -64(%rsp), %r8
+  r8 ^= rcx;                                    // xorq %rcx, %r8
+  r8 = #RORX_64(r8, 54);                        // rorxq $54, %r8, %r8
+  r9 = a[17];                                   // movq -112(%rsp), %r9
+  r9 ^= rbp;                                    // xorq %rbp, %r9
+  r11 = #RORX_64(r9, 49);                       // rorxq $49, %r9, %r11
+  r9 = a[23];                                   // movq -80(%rsp), %r9
+  r9 ^= rdx;                                    // xorq %rdx, %r9
+  rbx = #RORX_64(r9, 8);                        // rorxq $8, %r9, %rbx
+  r10 = !rbx & rsi;                             // andnq %rsi, %rbx, %r10
+  r10 ^= r11;                                   // xorq %r11, %r10
+  r15 = !r8 & r11;                              // andnq %r11, %r8, %r15
+  r11 = !r11 & rbx;                             // andnq %rbx, %r11, %r11
+  r11 ^= r8;                                    // xorq %r8, %r11
+  a[17] = r11;                                  // movq %r11, -112(%rsp)
+  r8 = !rdi & r8;                               // andnq %r8, %rdi, %r8
+  r8 ^= rsi;                                    // xorq %rsi, %r8
+  a[23] = r8;                                   // movq %r8, -80(%rsp)
+  r15 ^= rdi;                                   // xorq %rdi, %r15
+  a[5] = r15;                                   // movq %r15, -48(%rsp)
+  rsi = !rsi & rdi;                             // andnq %rdi, %rsi, %rsi
+  rsi ^= rbx;                                   // xorq %rbx, %rsi
+  a[11] = rsi;                                  // movq %rsi, -64(%rsp)
+  rsi = rbp;                                    // movq %rbp, %rsi
+  rsi ^= a[2];                                  // xorq 8(%rsp), %rsi
+  rdx ^= a[8];                                  // xorq (%rsp), %rdx
+  rax ^= a[14];                                 // xorq -56(%rsp), %rax
+  rdi = r14;                                    // movq %r14, %rdi
+  rdi ^= a[15];                                 // xorq -72(%rsp), %rdi
+  rcx ^= e[2];                                  // xorq 16(%rsp), %rcx
+  rsi = #RORX_64(rsi, 2);                       // rorxq $2, %rsi, %rsi
+  rdx = #RORX_64(rdx, 9);                       // rorxq $9, %rdx, %rdx
+  rax = #RORX_64(rax, 25);                      // rorxq $25, %rax, %rax
+  rdi = #RORX_64(rdi, 23);                      // rorxq $23, %rdi, %rdi
+  rcx = #RORX_64(rcx, 62);                      // rorxq $62, %rcx, %rcx
+  r9 = !rcx & rsi;                              // andnq %rsi, %rcx, %r9
+  r9 ^= rdi;                                    // xorq %rdi, %r9
+  a[15] = r9;                                   // movq %r9, -72(%rsp)
+  r14 = !rax & rdi;                             // andnq %rdi, %rax, %r14
+  r11 = !rdi & rcx;                             // andnq %rcx, %rdi, %r11
+  r11 ^= rax;                                   // xorq %rax, %r11
+  rax = !rdx & rax;                             // andnq %rax, %rdx, %rax
+  rax ^= rsi;                                   // xorq %rsi, %rax
+  rbp = rax;                                    // movq %rax, %rbp
+  a[14] = rax;                                  // movq %rax, -56(%rsp)
+  r14 ^= rdx;                                   // xorq %rdx, %r14
+  e[2] = r14;                                   // movq %r14, 16(%rsp)
+  rdi = !rsi & rdx;                             // andnq %rdx, %rsi, %rdi
+  rdi ^= rcx;                                   // xorq %rcx, %rdi
+
+  i = i2;
+  st4, y10, y14, y8, y15, y9, y13, y3, y7, y2
+    = __f1600_x4_round(st4, i, y10, y14, y8, y15, y9, y13, y3, y7, y2);
+  // ===================== round (E -> A), iota RC[c+1] ===================
+  rax = r8;                                     // movq %r8, %rax
+  rax ^= a[7];                                  // xorq -96(%rsp), %rax
+  rsi = a[16];                                  // movq -128(%rsp), %rsi
+  rsi ^= rbp;                                   // xorq %rbp, %rsi
+  rsi ^= rax;                                   // xorq %rax, %rsi
+  rbp = a[3];                                   // movq -40(%rsp), %rbp
+  rax = rbp;                                    // movq %rbp, %rax
+  rax ^= e[6];                                  // xorq 48(%rsp), %rax
+  rdx = r15;                                    // movq %r15, %rdx
+  rdx ^= e[4];                                  // xorq 32(%rsp), %rdx
+  rdx ^= rax;                                   // xorq %rax, %rdx
+  rax = e[5];                                   // movq 40(%rsp), %rax
+  rax ^= a[17];                                 // xorq -112(%rsp), %rax
+  r8 = r11;                                     // movq %r11, %r8
+  r8 ^= e[8];                                   // xorq 64(%rsp), %r8
+  r8 ^= rax;                                    // xorq %rax, %r8
+  rbx = a[13];                                  // movq -104(%rsp), %rbx
+  rbx ^= e[1];                                  // xorq -24(%rsp), %rbx
+  rcx = r9;                                     // movq %r9, %rcx
+  rcx ^= a[6];                                  // xorq -88(%rsp), %rcx
+  rcx ^= rbx;                                   // xorq %rbx, %rcx
+  rbx = e[7];                                   // movq 56(%rsp), %rbx
+  rbx ^= rdi;                                   // xorq %rdi, %rbx
+  rax = e[0];                                   // movq -32(%rsp), %rax
+  rax ^= a[9];                                  // xorq -120(%rsp), %rax
+  rax ^= rbx;                                   // xorq %rbx, %rax
+  rsi ^= r12;                                   // xorq %r12, %rsi
+  rdx ^= r14;                                   // xorq %r14, %rdx
+  r8 ^= r13;                                    // xorq %r13, %r8
+  rcx ^= r10;                                   // xorq %r10, %rcx
+  r14 = a[11];                                  // movq -64(%rsp), %r14
+  rax ^= r14;                                   // xorq %r14, %rax
+  r15 = #RORX_64(rcx, 63);                      // rorxq $63, %rcx, %r15
+  r15 ^= rdx;                                   // xorq %rdx, %r15
+  rbx = #RORX_64(rdx, 63);                      // rorxq $63, %rdx, %rbx
+  rbx ^= rax;                                   // xorq %rax, %rbx
+  r9 = #RORX_64(rax, 63);                       // rorxq $63, %rax, %r9
+  r9 ^= r8;                                     // xorq %r8, %r9
+  r8 = #RORX_64(r8, 63);                        // rorxq $63, %r8, %r8
+  r8 ^= rsi;                                    // xorq %rsi, %r8
+  rdx = #RORX_64(rsi, 63);                      // rorxq $63, %rsi, %rdx
+  rdx ^= rcx;                                   // xorq %rcx, %rdx
+  r12 ^= rbx;                                   // xorq %rbx, %r12
+  rbp ^= r8;                                    // xorq %r8, %rbp
+  rax = #RORX_64(rbp, 20);                      // rorxq $20, %rbp, %rax
+  r13 ^= r15;                                   // xorq %r15, %r13
+  rcx = #RORX_64(r13, 21);                      // rorxq $21, %r13, %rcx
+  r10 ^= r9;                                    // xorq %r9, %r10
+  rsi = #RORX_64(r10, 43);                      // rorxq $43, %r10, %rsi
+  rdi ^= rdx;                                   // xorq %rdx, %rdi
+  rdi = #RORX_64(rdi, 50);                      // rorxq $50, %rdi, %rdi
+  r10 = !rdi & r12;                             // andnq %r12, %rdi, %r10
+  r10 ^= rsi;                                   // xorq %rsi, %r10
+  a[3] = r10;                                   // movq %r10, -40(%rsp)
+  r10 = !rcx & rsi;                             // andnq %rsi, %rcx, %r10
+  rsi = !rsi & rdi;                             // andnq %rdi, %rsi, %rsi
+  rsi ^= rcx;                                   // xorq %rcx, %rsi
+  a[2] = rsi;                                   // movq %rsi, 8(%rsp)
+  rbp = !rax & rcx;                             // andnq %rcx, %rax, %rbp
+  rcx = cnt;                                    // movq 24(%rsp), %rcx   (counter reload)
+  RC = KECCAK1600_RC;                           // leaq KeccakF_RoundConstants(%rip), %rsi
+  rbp ^= RC[rcx + 1];                           // xorq 24(%rsi,%rcx,8), %rbp     % corrected index
+  rbp ^= r12;                                   // xorq %r12, %rbp
+  e[9] = rbp;                                   // park idle rbp (a[0]) in dead e[9] -> frees 1 GP reg across round-2 tail
+  r10 ^= rax;                                   // xorq %rax, %r10
+  a[1] = r10;                                   // movq %r10, -16(%rsp)
+  rax = !r12 & rax;                             // andnq %rax, %r12, %rax
+  rax ^= rdi;                                   // xorq %rdi, %rax
+  a[4] = rax;                                   // movq %rax, -8(%rsp)
+  rax = a[6];                                   // movq -88(%rsp), %rax
+  rax ^= r9;                                    // xorq %r9, %rax
+  rax = #RORX_64(rax, 36);                      // rorxq $36, %rax, %rax
+  rcx = a[9];                                   // movq -120(%rsp), %rcx
+  rcx ^= rdx;                                   // xorq %rdx, %rcx
+  rcx = #RORX_64(rcx, 44);                      // rorxq $44, %rcx, %rcx
+  rsi = a[7];                                   // movq -96(%rsp), %rsi
+  rsi ^= rbx;                                   // xorq %rbx, %rsi
+  rsi = #RORX_64(rsi, 61);                      // rorxq $61, %rsi, %rsi
+  rdi = a[5];                                   // movq -48(%rsp), %rdi
+  rdi ^= r8;                                    // xorq %r8, %rdi
+  rdi = #RORX_64(rdi, 19);                      // rorxq $19, %rdi, %rdi
+  r11 ^= r15;                                   // xorq %r15, %r11
+  r10 = #RORX_64(r11, 3);                       // rorxq $3, %r11, %r10
+  r11 = !r10 & rax;                             // andnq %rax, %r10, %r11
+  r11 ^= rdi;                                   // xorq %rdi, %r11
+  a[8] = r11;                                   // movq %r11, (%rsp)
+  r11 = !rsi & rdi;                             // andnq %rdi, %rsi, %r11
+  rdi = !rdi & r10;                             // andnq %r10, %rdi, %rdi
+  rdi ^= rsi;                                   // xorq %rsi, %rdi
+  a[7] = rdi;                                   // movq %rdi, -96(%rsp)
+  rsi = !rcx & rsi;                             // andnq %rsi, %rcx, %rsi
+  rsi ^= rax;                                   // xorq %rax, %rsi
+  a[5] = rsi;                                   // movq %rsi, -48(%rsp)
+  r11 ^= rcx;                                   // xorq %rcx, %r11
+  a[6] = r11;                                   // movq %r11, -88(%rsp)
+  rax = !rax & rcx;                             // andnq %rcx, %rax, %rax
+  rax ^= r10;                                   // xorq %r10, %rax
+  a[9] = rax;                                   // movq %rax, -120(%rsp)
+  rax = e[6];                                   // movq 48(%rsp), %rax
+  rax ^= r8;                                    // xorq %r8, %rax
+  rax = #RORX_64(rax, 63);                      // rorxq $63, %rax, %rax
+  rcx = e[5];                                   // movq 40(%rsp), %rcx
+  rcx ^= r15;                                   // xorq %r15, %rcx
+  rcx = #RORX_64(rcx, 58);                      // rorxq $58, %rcx, %rcx
+  rsi = a[13];                                  // movq -104(%rsp), %rsi
+  rsi ^= r9;                                    // xorq %r9, %rsi
+  rsi = #RORX_64(rsi, 39);                      // rorxq $39, %rsi, %rsi
+  rdi = r14;                                    // movq %r14, %rdi
+  rdi ^= rdx;                                   // xorq %rdx, %rdi
+  rdi = #RORX_64(rdi, 56);                      // rorxq $56, %rdi, %rdi
+  r10 = a[14];                                  // movq -56(%rsp), %r10
+  r10 ^= rbx;                                   // xorq %rbx, %r10
+  r10 = #RORX_64(r10, 46);                      // rorxq $46, %r10, %r10
+  r11 = !r10 & rax;                             // andnq %rax, %r10, %r11
+  r11 ^= rdi;                                   // xorq %rdi, %r11
+  a[13] = r11;                                  // movq %r11, -104(%rsp)
+  r11 = !rsi & rdi;                             // andnq %rdi, %rsi, %r11
+  r13 = !rdi & r10;                             // andnq %r10, %rdi, %r13
+  r13 ^= rsi;                                   // xorq %rsi, %r13
+  rdi = !rcx & rsi;                             // andnq %rsi, %rcx, %rdi
+  rdi ^= rax;                                   // xorq %rax, %rdi
+  r11 ^= rcx;                                   // xorq %rcx, %r11
+  a[11] = r11;                                  // movq %r11, -64(%rsp)
+  rax = !rax & rcx;                             // andnq %rcx, %rax, %rax
+  rax ^= r10;                                   // xorq %r10, %rax
+  a[14] = rax;                                  // movq %rax, -56(%rsp)
+  rax = e[7];                                   // movq 56(%rsp), %rax
+  rax ^= rdx;                                   // xorq %rdx, %rax
+  rax = #RORX_64(rax, 37);                      // rorxq $37, %rax, %rax
+  rcx = a[16];                                  // movq -128(%rsp), %rcx
+  rcx ^= rbx;                                   // xorq %rbx, %rcx
+  rcx = #RORX_64(rcx, 28);                      // rorxq $28, %rcx, %rcx
+  rsi = e[4];                                   // movq 32(%rsp), %rsi
+  rsi ^= r8;                                    // xorq %r8, %rsi
+  r11 = #RORX_64(rsi, 54);                      // rorxq $54, %rsi, %r11
+  rsi = a[17];                                  // movq -112(%rsp), %rsi
+  rsi ^= r15;                                   // xorq %r15, %rsi
+  r14 = #RORX_64(rsi, 49);                      // rorxq $49, %rsi, %r14
+  rsi = a[15];                                  // movq -72(%rsp), %rsi
+  rsi ^= r9;                                    // xorq %r9, %rsi
+  r12 = #RORX_64(rsi, 8);                       // rorxq $8, %rsi, %r12
+  r10 = !r12 & rax;                             // andnq %rax, %r12, %r10
+  r10 ^= r14;                                   // xorq %r14, %r10
+  rsi = !r11 & r14;                             // andnq %r14, %r11, %rsi
+  r14 = !r14 & r12;                             // andnq %r12, %r14, %r14
+  r14 ^= r11;                                   // xorq %r11, %r14
+  a[17] = r14;                                  // movq %r14, -112(%rsp)
+  r11 = !rcx & r11;                             // andnq %r11, %rcx, %r11
+  r11 ^= rax;                                   // xorq %rax, %r11
+  a[15] = r11;                                  // movq %r11, -72(%rsp)
+  rsi ^= rcx;                                   // xorq %rcx, %rsi
+  a[16] = rsi;                                  // movq %rsi, -128(%rsp)
+  r11 = !rax & rcx;                             // andnq %rcx, %rax, %r11
+  r11 ^= r12;                                   // xorq %r12, %r11
+  r15 ^= e[8];                                  // xorq 64(%rsp), %r15
+  r9 ^= e[1];                                   // xorq -24(%rsp), %r9
+  rdx ^= e[0];                                  // xorq -32(%rsp), %rdx
+  rbx ^= a[23];                                 // xorq -80(%rsp), %rbx
+  r8 ^= e[2];                                   // xorq 16(%rsp), %r8
+  rax = #RORX_64(r15, 2);                       // rorxq $2, %r15, %rax
+  rcx = #RORX_64(r9, 9);                        // rorxq $9, %r9, %rcx
+  rdx = #RORX_64(rdx, 25);                      // rorxq $25, %rdx, %rdx
+  r9 = #RORX_64(rbx, 23);                       // rorxq $23, %rbx, %r9
+  r14 = #RORX_64(r8, 62);                       // rorxq $62, %r8, %r14
+  r8 = !r14 & rax;                              // andnq %rax, %r14, %r8
+  r8 ^= r9;                                     // xorq %r9, %r8
+  a[23] = r8;                                   // movq %r8, -80(%rsp)
+  rsi = !rdx & r9;                              // andnq %r9, %rdx, %rsi
+  r15 = !r9 & r14;                              // andnq %r14, %r9, %r15
+  r15 ^= rdx;                                   // xorq %rdx, %r15
+  r8 = !rcx & rdx;                              // andnq %rdx, %rcx, %r8
+  r8 ^= rax;                                    // xorq %rax, %r8
+  rsi ^= rcx;                                   // xorq %rcx, %rsi
+  rbx = !rax & rcx;                             // andnq %rcx, %rax, %rbx
+  rbx ^= r14;                                   // xorq %r14, %rbx
+  rcx = cnt;                                 // movq 24(%rsp), %rcx   (counter reload)
+  rcx += 2;                                     // addq $2, %rcx
+  rax = rcx;                                    // movq %rcx, %rax
+  // cmpq $22, %rcx                             # loop condition rcx < 22
+  // jb .LBB0_1                                 # branch back to loop header
+
+  rbp = e[9];                                   // restore parked a[0]
+  return rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e,
+         st4, y10, y14, y8, y15, y9, y13, y3, y7, y2;
+}
+
+inline fn __keccakf1600_x4_x1_nat_opt
+( stack u256[25] st4
+, stack u64[25] a
+) -> stack u256[25], stack u64[25]
+{
+  stack u64[25] e;
+  reg u64 rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx;
+  reg u256 y10, y14, y8, y15, y9, y13, y3, y7, y2;
+
+  y10, y14, y8, y15, y9, y13, y3, y7, y2 = __regs_fetch(st4);
+  rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx = read_regs_opt(a);
+  rax = 0;
+  while {
+    rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e,
+    st4, y10, y14, y8, y15, y9, y13, y3, y7, y2
+      = __keccakf1600_x4_x1_nat_opt_iteration(
+          rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e,
+          st4, y10, y14, y8, y15, y9, y13, y3, y7, y2);
+  } (rax < 24)
+  st4 = __regs_unfetch(st4, y10, y14, y8, y15, y9, y13, y3, y7, y2);
+  a = store_regs_opt(a, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx);
+  return st4, a;
+}
+
+#[returnaddress="stack"]
+fn _keccakf1600_x4_x1_nat_opt
+( reg mut ptr u256[25] p4
+, reg mut ptr u64[25] p1
+) -> reg ptr u256[25], reg ptr u64[25]
+{
+  stack u256[25] s4;
+  stack u64[25] s1;
+  #[mmx] reg ptr u256[25] q4;
+  #[mmx] reg ptr u64[25] q1;
+  reg u64 t1;
+  reg u256 t4;
+  inline int j;
+
+  for j = 0 to 25 { t4 = p4[j]; s4[j] = t4; t1 = p1[j]; s1[j] = t1; }
+  q4 = p4; q1 = p1;
+  s4, s1 = __keccakf1600_x4_x1_nat_opt(s4, s1);
+  p4 = q4; p1 = q1;
+  for j = 0 to 25 { t4 = s4[j]; p4[j] = t4; t1 = s1[j]; p1[j] = t1; }
+  return p4, p1;
+}
