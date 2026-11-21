@@ -1305,30 +1305,30 @@ qed.
 
 (* the PEXT mask of the matrix A sampler: bit 4k+3 for each of the 8 lanes *)
 lemma lane_signs_bit (i : int) :
-  (W32.of_int 2290649224).[i] = (0 <= i < 32 /\ i %% 4 = 3).
+  (W64.of_int 2290649224).[i] = (0 <= i < 32 /\ i %% 4 = 3).
 proof.
-rewrite W32.of_intwE /int_bit; case: (0 <= i < 32) => hi //=.
-have : i \in iota_ 0 32 by rewrite mem_iota /#.
-rewrite -iotaredE /=; do 31! (case=> [-> // |]).
+rewrite W64.of_intwE /int_bit; case: (0 <= i < 64) => hi /=; last by smt().
+have : i \in iota_ 0 64 by rewrite mem_iota /#.
+rewrite -iotaredE /=; do 63! (case=> [-> // |]).
 by move=> ->.
 qed.
 
 (* so PEXT with it gives a byte *)
-lemma pext_lane_signs_ule (x : W32.t) :
-  zeroextu64 (PEXT_32 x (W32.of_int 2290649224)) \ule W64.of_int 255.
+lemma pext_lane_signs_ule (x : W64.t) :
+  PEXT_64 x (W64.of_int 2290649224) \ule W64.of_int 255.
 proof.
-have hf : filter (fun i => (W32.of_int 2290649224).[i]) (iota_ 0 32)
+have hf : filter (fun i => (W64.of_int 2290649224).[i]) (iota_ 0 64)
           = mkseq (fun k => 4 * k + 3) 8.
 + rewrite (eq_filter _ (fun i => 0 <= i < 32 /\ i %% 4 = 3)) => [i /=|].
   + by rewrite lane_signs_bit.
   by rewrite -iotaredE /mkseq -iotaredE.
-pose w := zeroextu64 (PEXT_32 x (W32.of_int 2290649224)).
+pose w := PEXT_64 x (W64.of_int 2290649224).
 rewrite (_ : w = lane_signs w) 2:lane_signs_ule //.
 apply W64.wordP => b hb.
 rewrite /lane_signs /w W64.andwE (_ : 255 = 2 ^ 8 - 1) // W64.of_int_powm1 // hb.
-rewrite zeroextu64_bit /PEXT_32 /= hf.
-case: (0 <= b < 32) => //= hb32; case: (b < 8) => //= hb8.
-by rewrite W32.get_bits2w // nth_default // size_map size_mkseq /#.
+rewrite /PEXT_64 /= hf.
+case: (b < 8) => //= hb8.
+by rewrite W64.get_bits2w // nth_default // size_map size_mkseq /#.
 qed.
 
 lemma matrix_A____bytestream_to_potential_coefficients_proof _bytestream _byte_shuffle
@@ -1389,32 +1389,30 @@ while (b_randombytes = BArray848.init_arr (W8.of_int 255)
     /\ to_uint input_offset %% 24 = 0 /\ to_uint input_offset <= 768
     /\ 3 * to_uint bytes_filled <= 4 * to_uint input_offset
     /\ condition_loop = (to_uint input_offset < 768)
-    /\ lane_signs = W32.of_int 2290649224
+    /\ lane_signs = W64.of_int 2290649224
     /\ valid trace_matrix_A__rejection_sample_multiple_blocks).
 + auto; ecall (matrix_A____bytestream_to_potential_coefficients_proof param_1 param_0 param).
   auto => /> &hr hle hmod hinit himod hio h34 hvalid hlt r hv.
-  rewrite /SLH64.protect_32.
-  have := pext_lane_signs_ule (MOVEMASK_32u8 (VPCMPGT_8u32 modulus{hr} r.`1)).
-  move: (zeroextu64 (PEXT_32 _ _)) => g hg.
+  rewrite /SLH64.protect_64.
+  have := pext_lane_signs_ule (zeroextu64 (MOVEMASK_32u8 (VPCMPGT_8u32 modulus{hr} r.`1))).
+  move: (PEXT_64 _ _) => g hg.
   have {hg} hg : to_uint g < 256 by move: hg; rewrite W64.uleE /#.
   have hg0 := W64.to_uint_cmp g.
-  have hp := to_uint_popcnt64_byte _ hg.
-  move: (POPCNT_64 g).`6 hp => p hp.
+  (* the byte mask of the comparison counts 4 per accepted candidate *)
+  have [n [hn hp]] := to_uint_popcnt_movemask_cmp modulus{hr} r.`1.
+  move: (POPCNT_64 _).`6 hp => p hp.
   have hb0 := W64.to_uint_cmp bytes_filled{hr}.
   have hi0 := W64.to_uint_cmp input_offset{hr}.
   have hio744 : to_uint input_offset{hr} <= 744 by smt().
   have hio3 : to_uint input_offset{hr} + 32 <= 848 by smt().
   have hbf : to_uint bytes_filled{hr} + 32 <= 1024 by smt().
-  have hs : to_uint (p `<<` W8.of_int 2) = 4 * to_uint p.
-  + by rewrite /(`<<`) /= W64.to_uint_shl // /ptr_modulus /= modz_small /#.
-  have hb : to_uint (bytes_filled{hr} + (p `<<` W8.of_int 2))
-            = to_uint bytes_filled{hr} + 4 * to_uint p.
-  + by rewrite W64.to_uintD_small hs /#.
+  have hb : to_uint (bytes_filled{hr} + p) = to_uint bytes_filled{hr} + 4 * n.
+  + by rewrite W64.to_uintD_small hp /#.
   have hin : to_uint (input_offset{hr} + W64.of_int 24) = to_uint input_offset{hr} + 24.
   + by rewrite W64.to_uintD_small W64.of_uintK /= /#.
   have hg8 : to_uint (W64.of_int 8 * g) = 8 * to_uint g.
   + by rewrite W64.to_uintM_small W64.of_uintK /= /#.
-  (* the 32 bytes written, of which the first 4 * p hold coefficients *)
+  (* the 32 bytes written, of which the first 4 * n hold coefficients *)
   have hA : BArray1024.is_init
       (BArray1024.set256d b_polynomial{hr} (to_uint bytes_filled{hr})
          (W256.of_int
@@ -1425,7 +1423,7 @@ while (b_randombytes = BArray848.init_arr (W8.of_int 255)
       (BArray1024.set256d b_polynomial{hr} (to_uint bytes_filled{hr})
          (W256.of_int
             115792089237316195423570985008687907853269984665640564039457584007913129639935))
-      0 (to_uint bytes_filled{hr} + 4 * to_uint p).
+      0 (to_uint bytes_filled{hr} + 4 * n).
   + by apply (BI1024.is_init_sub _ 0 (to_uint bytes_filled{hr} + 32)) => // /#.
   rewrite ?W64.uleE ?W64.ultE hb hin hg8 /=.
   smt().
