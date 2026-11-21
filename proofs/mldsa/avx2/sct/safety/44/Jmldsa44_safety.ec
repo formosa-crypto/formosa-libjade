@@ -42,6 +42,15 @@ abbrev [-printing] commitment__ENCODING_SHUFFLES_bits4 =
 (W256.of_int
 6809477063014005108496892811167092228318171255968858956394831878370493989120).
 
+abbrev [-printing] error_4x__ERROR_COEFFICIENTS_ETA4 =
+(W256.of_int
+(-454079668476231377987382308722805133924785825411517203186587039222300802300)
+).
+
+abbrev [-printing] error_4x__ERROR_COEFFICIENTS_ETA2 =
+(W256.of_int
+1355164797045218797098100747103885221269129335023744513058924560427587207426).
+
 abbrev [-printing] t1__mask =
 (W256.of_int
 27580025446916579586740047030762717305835781530194468456916412547466239).
@@ -53166,39 +53175,18 @@ module M = {
     }
     return (s2, b_s2, trace_s2____decode);
   }
-  proc error_4x____bytestream_to_coefficients (bytestream:W128.t) : W256.t *
-                                                                    trace = {
+  proc error_4x____bytestream_to_coefficients (bytestream:W128.t,
+                                               nibble_mask:W256.t) : 
+  W256.t * trace = {
     var coefficients:W256.t;
-    var temp:W64.t;
-    var mask:W256.t;
     var odd_coefficients:W256.t;
     var trace_error_4x____bytestream_to_coefficients:trace;
     trace_error_4x____bytestream_to_coefficients <- [];
-    temp <- (W64.of_int 15);
-    mask <- (zeroextu256 (VMOV_64 temp));
-    mask <- (VPBROADCAST_32u8 (truncateu8 mask));
     coefficients <- (VPMOVZX_16u8_16u16 bytestream);
     odd_coefficients <- (VPSLL_16u16 coefficients (W128.of_int 4));
     coefficients <- (VPOR_256 coefficients odd_coefficients);
-    coefficients <- (VPAND_256 coefficients mask);
+    coefficients <- (VPAND_256 coefficients nibble_mask);
     return (coefficients, trace_error_4x____bytestream_to_coefficients);
-  }
-  proc error_4x____reduce_coefficients (coefficients:W256.t) : W256.t * trace = {
-    var temp:W64.t;
-    var multiplier:W256.t;
-    var quotient:W256.t;
-    var trace_error_4x____reduce_coefficients:trace;
-    trace_error_4x____reduce_coefficients <- [];
-    temp <- (W64.of_int 18446744073709545056);
-    multiplier <- (zeroextu256 (VMOV_64 temp));
-    multiplier <- (VPBROADCAST_8u32 (truncateu32 multiplier));
-    quotient <- (VPMULHRS_16u16 coefficients multiplier);
-    temp <- (W64.of_int 5);
-    multiplier <- (zeroextu256 (VMOV_64 temp));
-    multiplier <- (VPBROADCAST_8u32 (truncateu32 multiplier));
-    quotient <- (VPMULL_16u16 quotient multiplier);
-    coefficients <- (VPADD_8u32 coefficients quotient);
-    return (coefficients, trace_error_4x____reduce_coefficients);
   }
   proc error_4x____reduce_coefficient (coefficient:W32.t) : W32.t * trace = {
     var quotient:W32.t;
@@ -53215,53 +53203,42 @@ module M = {
                                              b_error:BArray1024.t,
                                              bytes_filled:W64.t,
                                              good_overall:W64.t,
-                                             coefficient_block:W128.t) : 
+                                             coefficient_block:W128.t,
+                                             shuffle_table_pointer:BArray2048.t,
+                                             b_shuffle_table_pointer:BArray2048.t) : 
   BArray1024.t * BArray1024.t * W64.t * W64.t * trace = {
     var good:W64.t;
-    var shuffle_table_pointer:BArray2048.t;
-    var shuffle_table_idx:W64.t;
     var shuffles:W128.t;
     var error_coefficients_128:W128.t;
     var error_coefficients:W256.t;
-    var param:W256.t;
-    var result:W256.t;
     var  _0:bool;
     var  _1:bool;
     var  _2:bool;
     var  _3:bool;
     var  _4:bool;
     var trace_error_4x____write_out_8_coefficients:trace;
-    shuffle_table_pointer <- witness;
     trace_error_4x____write_out_8_coefficients <- [];
     trace_error_4x____write_out_8_coefficients <-
     (trace_error_4x____write_out_8_coefficients ++
     [(Assert,
-     (((BArray1024.is_init b_error 0 (W64.to_uint bytes_filled)) /\
+     ((((BArray1024.is_init b_error 0 (W64.to_uint bytes_filled)) /\
+       (BArray2048.is_init b_shuffle_table_pointer 0 2048)) /\
       (bytes_filled \ule (W64.of_int 992))) /\
      ((bytes_filled \umod (W64.of_int 4)) = (W64.of_int 0))))]);
-    good <- good_overall;
-    good <- (good `&` (W64.of_int 255));
+    good <- (zeroextu64 (truncateu8 good_overall));
     good_overall <- (good_overall `>>` (W8.of_int 8));
-    shuffle_table_pointer <- cOMPACTION_INDEX_TABLE;
-    shuffle_table_idx <- good;
-    shuffle_table_idx <- (shuffle_table_idx `<<` (W8.of_int 3));
     trace_error_4x____write_out_8_coefficients <-
     (trace_error_4x____write_out_8_coefficients ++
     [(Assert,
-     ((0 <= (W64.to_uint shuffle_table_idx)) /\
-     (((W64.to_uint shuffle_table_idx) + 8) <= 2048)))]);
+     ((0 <= (W64.to_uint ((W64.of_int 8) * good))) /\
+     (((W64.to_uint ((W64.of_int 8) * good)) + 8) <= 2048)))]);
     shuffles <-
     (VMOV_64
-    (BArray2048.get64d shuffle_table_pointer (W64.to_uint shuffle_table_idx))
-    );
+    (BArray2048.get64d shuffle_table_pointer
+    (W64.to_uint ((W64.of_int 8) * good))));
     error_coefficients_128 <- (VPSHUFB_128 coefficient_block shuffles);
     error_coefficients <-
     (VPMOVSX_8u8_8u32 (truncateu64 error_coefficients_128));
-    param <- error_coefficients;
-    (result, tmp__trace) <@ error_4x____reduce_coefficients (param);
-    trace_error_4x____write_out_8_coefficients <-
-    (trace_error_4x____write_out_8_coefficients ++ tmp__trace);
-    error_coefficients <- result;
     trace_error_4x____write_out_8_coefficients <-
     (trace_error_4x____write_out_8_coefficients ++
     [(Assert,
@@ -53275,10 +53252,197 @@ module M = {
     error <-
     (BArray1024.set256d error (W64.to_uint bytes_filled) error_coefficients);
     ( _0,  _1,  _2,  _3,  _4, good) <- (POPCNT_64 good);
-    good <- (good `<<` (W8.of_int 2));
-    bytes_filled <- (bytes_filled + good);
+    bytes_filled <- (LEA_64 (bytes_filled + ((W64.of_int 4) * good)));
     return (error, b_error, bytes_filled, good_overall,
            trace_error_4x____write_out_8_coefficients);
+  }
+  proc error_4x____write_out_32_coefficients (error:BArray1024.t,
+                                              b_error:BArray1024.t,
+                                              bytes_filled:W64.t,
+                                              good_overall:W64.t,
+                                              coefficients:W256.t,
+                                              shuffle_table_pointer:BArray2048.t,
+                                              b_shuffle_table_pointer:BArray2048.t) : 
+  BArray1024.t * BArray1024.t * W64.t * trace = {
+    var aux:BArray1024.t;
+    var aux_0:BArray1024.t;
+    var aux_1:W64.t;
+    var aux_2:W64.t;
+    var coefficient_block:W128.t;
+    var param:BArray2048.t;
+    var param_0:W128.t;
+    var param_1:W64.t;
+    var param_2:W64.t;
+    var param_3:BArray1024.t;
+    var result:W64.t;
+    var result_0:W64.t;
+    var result_1:BArray1024.t;
+    var param_4:BArray2048.t;
+    var param_5:W128.t;
+    var param_6:W64.t;
+    var param_7:W64.t;
+    var param_8:BArray1024.t;
+    var result_2:W64.t;
+    var result_3:W64.t;
+    var result_4:BArray1024.t;
+    var param_9:BArray2048.t;
+    var param_10:W128.t;
+    var param_11:W64.t;
+    var param_12:W64.t;
+    var param_13:BArray1024.t;
+    var result_5:W64.t;
+    var result_6:W64.t;
+    var result_7:BArray1024.t;
+    var param_14:BArray2048.t;
+    var param_15:W128.t;
+    var param_16:W64.t;
+    var param_17:W64.t;
+    var param_18:BArray1024.t;
+    var result_8:W64.t;
+    var result_9:W64.t;
+    var result_10:BArray1024.t;
+    var b_result:BArray1024.t;
+    var b_param:BArray1024.t;
+    var b_result_0:BArray1024.t;
+    var b_param_0:BArray1024.t;
+    var b_result_1:BArray1024.t;
+    var b_param_1:BArray1024.t;
+    var b_result_2:BArray1024.t;
+    var b_param_2:BArray1024.t;
+    var trace_error_4x____write_out_32_coefficients:trace;
+    b_param <- witness;
+    b_param_0 <- witness;
+    b_param_1 <- witness;
+    b_param_2 <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    b_result_1 <- witness;
+    b_result_2 <- witness;
+    param <- witness;
+    param_3 <- witness;
+    param_4 <- witness;
+    param_8 <- witness;
+    param_9 <- witness;
+    param_13 <- witness;
+    param_14 <- witness;
+    param_18 <- witness;
+    result_1 <- witness;
+    result_4 <- witness;
+    result_7 <- witness;
+    result_10 <- witness;
+    trace_error_4x____write_out_32_coefficients <- [];
+    trace_error_4x____write_out_32_coefficients <-
+    (trace_error_4x____write_out_32_coefficients ++
+    [(Assert,
+     ((((BArray1024.is_init b_error 0 (W64.to_uint bytes_filled)) /\
+       (BArray2048.is_init b_shuffle_table_pointer 0 2048)) /\
+      (bytes_filled \ule (W64.of_int 896))) /\
+     ((bytes_filled \umod (W64.of_int 4)) = (W64.of_int 0))))]);
+    coefficient_block <- (VEXTRACTI128 coefficients (W8.of_int 0));
+    b_param_2 <- b_error;
+    param_3 <- error;
+    param_2 <- bytes_filled;
+    param_1 <- good_overall;
+    param_0 <- coefficient_block;
+    param <- shuffle_table_pointer;
+    (aux, aux_0, aux_1, aux_2, tmp__trace) <@ error_4x____write_out_8_coefficients (
+    param_3, b_param_2, param_2, param_1, param_0, param,
+    (BArray2048.init_arr (W8.of_int 255)));
+    result_1 <- aux;
+    b_result_2 <- aux_0;
+    result_0 <- aux_1;
+    result <- aux_2;
+    trace_error_4x____write_out_32_coefficients <-
+    (trace_error_4x____write_out_32_coefficients ++ tmp__trace);
+    trace_error_4x____write_out_32_coefficients <-
+    (trace_error_4x____write_out_32_coefficients ++
+    [(Assert,
+     (((BArray1024.is_init b_result_2 0 (W64.to_uint result_0)) /\
+      (result_0 \ule (W64.of_int 1024))) /\
+     ((result_0 \umod (W64.of_int 4)) = (W64.of_int 0))))]);
+    b_error <- b_result_2;
+    error <- result_1;
+    bytes_filled <- result_0;
+    good_overall <- result;
+    coefficient_block <- (VPSRLDQ_128 coefficient_block (W8.of_int 8));
+    b_param_1 <- b_error;
+    param_8 <- error;
+    param_7 <- bytes_filled;
+    param_6 <- good_overall;
+    param_5 <- coefficient_block;
+    param_4 <- shuffle_table_pointer;
+    (aux, aux_0, aux_1, aux_2, tmp__trace) <@ error_4x____write_out_8_coefficients (
+    param_8, b_param_1, param_7, param_6, param_5, param_4,
+    (BArray2048.init_arr (W8.of_int 255)));
+    result_4 <- aux;
+    b_result_1 <- aux_0;
+    result_3 <- aux_1;
+    result_2 <- aux_2;
+    trace_error_4x____write_out_32_coefficients <-
+    (trace_error_4x____write_out_32_coefficients ++ tmp__trace);
+    trace_error_4x____write_out_32_coefficients <-
+    (trace_error_4x____write_out_32_coefficients ++
+    [(Assert,
+     (((BArray1024.is_init b_result_1 0 (W64.to_uint result_3)) /\
+      (result_3 \ule (W64.of_int 1024))) /\
+     ((result_3 \umod (W64.of_int 4)) = (W64.of_int 0))))]);
+    b_error <- b_result_1;
+    error <- result_4;
+    bytes_filled <- result_3;
+    good_overall <- result_2;
+    coefficient_block <- (VEXTRACTI128 coefficients (W8.of_int 1));
+    b_param_0 <- b_error;
+    param_13 <- error;
+    param_12 <- bytes_filled;
+    param_11 <- good_overall;
+    param_10 <- coefficient_block;
+    param_9 <- shuffle_table_pointer;
+    (aux, aux_0, aux_1, aux_2, tmp__trace) <@ error_4x____write_out_8_coefficients (
+    param_13, b_param_0, param_12, param_11, param_10, param_9,
+    (BArray2048.init_arr (W8.of_int 255)));
+    result_7 <- aux;
+    b_result_0 <- aux_0;
+    result_6 <- aux_1;
+    result_5 <- aux_2;
+    trace_error_4x____write_out_32_coefficients <-
+    (trace_error_4x____write_out_32_coefficients ++ tmp__trace);
+    trace_error_4x____write_out_32_coefficients <-
+    (trace_error_4x____write_out_32_coefficients ++
+    [(Assert,
+     (((BArray1024.is_init b_result_0 0 (W64.to_uint result_6)) /\
+      (result_6 \ule (W64.of_int 1024))) /\
+     ((result_6 \umod (W64.of_int 4)) = (W64.of_int 0))))]);
+    b_error <- b_result_0;
+    error <- result_7;
+    bytes_filled <- result_6;
+    good_overall <- result_5;
+    coefficient_block <- (VPSRLDQ_128 coefficient_block (W8.of_int 8));
+    b_param <- b_error;
+    param_18 <- error;
+    param_17 <- bytes_filled;
+    param_16 <- good_overall;
+    param_15 <- coefficient_block;
+    param_14 <- shuffle_table_pointer;
+    (aux, aux_0, aux_1, aux_2, tmp__trace) <@ error_4x____write_out_8_coefficients (
+    param_18, b_param, param_17, param_16, param_15, param_14,
+    (BArray2048.init_arr (W8.of_int 255)));
+    result_10 <- aux;
+    b_result <- aux_0;
+    result_9 <- aux_1;
+    result_8 <- aux_2;
+    trace_error_4x____write_out_32_coefficients <-
+    (trace_error_4x____write_out_32_coefficients ++ tmp__trace);
+    trace_error_4x____write_out_32_coefficients <-
+    (trace_error_4x____write_out_32_coefficients ++
+    [(Assert,
+     (((BArray1024.is_init b_result 0 (W64.to_uint result_9)) /\
+      (result_9 \ule (W64.of_int 1024))) /\
+     ((result_9 \umod (W64.of_int 4)) = (W64.of_int 0))))]);
+    b_error <- b_result;
+    error <- result_10;
+    bytes_filled <- result_9;
+    return (error, b_error, bytes_filled,
+           trace_error_4x____write_out_32_coefficients);
   }
   proc error_4x__rejection_sample_multiple_blocks (error:BArray1024.t,
                                                    b_error:BArray1024.t,
@@ -53291,94 +53455,98 @@ module M = {
     var aux_2:W64.t;
     var filled:W64.t;
     var ms:W64.t;
+    var values:W256.t;
+    var shuffle_table_pointer:BArray2048.t;
     var temp:W64.t;
-    var eta_0:W256.t;
     var bound:W256.t;
+    var nibble_mask:W256.t;
     var bytes_filled:W64.t;
     var xof_offset:W64.t;
-    var stop_sampling:W64.t;
     var condition_loop:bool;
     var bytestream:W128.t;
-    var coefficients:W256.t;
+    var candidates:W256.t;
     var comparisons:W256.t;
     var good_overall:W64.t;
+    var coefficients:W256.t;
+    var slack:W64.t;
+    var room:W64.t;
     var coefficient_block:W128.t;
-    var condition:bool;
+    var candidate_index:W64.t;
     var coefficient:W32.t;
-    var param:W128.t;
-    var result:W256.t;
+    var shift:W32.t;
+    var accepted:W32.t;
+    var param:W256.t;
     var param_0:W128.t;
-    var param_1:W64.t;
-    var param_2:W64.t;
-    var param_3:BArray1024.t;
+    var result:W256.t;
+    var param_1:BArray2048.t;
+    var param_2:W256.t;
+    var param_3:W64.t;
+    var param_4:W64.t;
+    var param_5:BArray1024.t;
     var result_0:W64.t;
-    var result_1:W64.t;
-    var result_2:BArray1024.t;
-    var param_4:W128.t;
-    var param_5:W64.t;
-    var param_6:W64.t;
-    var param_7:BArray1024.t;
-    var result_3:W64.t;
-    var result_4:W64.t;
-    var result_5:BArray1024.t;
-    var param_8:W128.t;
-    var param_9:W64.t;
+    var result_1:BArray1024.t;
+    var param_6:W256.t;
+    var param_7:W128.t;
+    var result_2:W256.t;
+    var param_8:BArray2048.t;
+    var param_9:W256.t;
     var param_10:W64.t;
-    var param_11:BArray1024.t;
+    var param_11:W64.t;
+    var param_12:BArray1024.t;
+    var result_3:W64.t;
+    var result_4:BArray1024.t;
+    var param_13:W256.t;
+    var param_14:W128.t;
+    var result_5:W256.t;
+    var param_15:BArray2048.t;
+    var param_16:W128.t;
+    var param_17:W64.t;
+    var param_18:W64.t;
+    var param_19:BArray1024.t;
     var result_6:W64.t;
     var result_7:W64.t;
     var result_8:BArray1024.t;
-    var param_12:W128.t;
-    var param_13:W64.t;
-    var param_14:W64.t;
-    var param_15:BArray1024.t;
-    var result_9:W64.t;
-    var result_10:W64.t;
-    var result_11:BArray1024.t;
-    var param_16:W32.t;
-    var result_12:W32.t;
-    var param_17:W32.t;
-    var result_13:W32.t;
+    var param_20:W32.t;
+    var result_9:W32.t;
     var b_result:BArray1024.t;
     var b_param:BArray1024.t;
     var b_result_0:BArray1024.t;
     var b_param_0:BArray1024.t;
     var b_result_1:BArray1024.t;
     var b_param_1:BArray1024.t;
-    var b_result_2:BArray1024.t;
-    var b_param_2:BArray1024.t;
     var trace_error_4x__rejection_sample_multiple_blocks:trace;
     b_param <- witness;
     b_param_0 <- witness;
     b_param_1 <- witness;
-    b_param_2 <- witness;
     b_result <- witness;
     b_result_0 <- witness;
     b_result_1 <- witness;
-    b_result_2 <- witness;
-    param_3 <- witness;
-    param_7 <- witness;
-    param_11 <- witness;
+    param_1 <- witness;
+    param_5 <- witness;
+    param_8 <- witness;
+    param_12 <- witness;
     param_15 <- witness;
-    result_2 <- witness;
-    result_5 <- witness;
+    param_19 <- witness;
+    result_1 <- witness;
+    result_4 <- witness;
     result_8 <- witness;
-    result_11 <- witness;
+    shuffle_table_pointer <- witness;
     trace_error_4x__rejection_sample_multiple_blocks <- [];
     trace_error_4x__rejection_sample_multiple_blocks <-
     (trace_error_4x__rejection_sample_multiple_blocks ++
     [(Assert, (BArray272.is_init b_randombytes 0 272))]);
     ms <- (init_msf);
-    temp <- (W64.of_int 2);
-    eta_0 <- (zeroextu256 (VMOV_64 temp));
-    eta_0 <- (VPBROADCAST_32u8 (truncateu8 eta_0));
+    values <- error_4x__ERROR_COEFFICIENTS_ETA2;
+    shuffle_table_pointer <- cOMPACTION_INDEX_TABLE;
     temp <- (W64.of_int 15);
     bound <- (zeroextu256 (VMOV_64 temp));
     bound <- (VPBROADCAST_32u8 (truncateu8 bound));
+    temp <- (W64.of_int 15);
+    nibble_mask <- (zeroextu256 (VMOV_64 temp));
+    nibble_mask <- (VPBROADCAST_32u8 (truncateu8 nibble_mask));
     bytes_filled <- (W64.of_int 0);
     xof_offset <- (W64.of_int 0);
-    stop_sampling <- (W64.of_int 0);
-    condition_loop <- (stop_sampling <> (W64.of_int 1));
+    condition_loop <- (xof_offset \ult (W64.of_int 128));
     while (condition_loop) {
       ms <- (update_msf condition_loop ms);
       trace_error_4x__rejection_sample_multiple_blocks <-
@@ -53387,259 +53555,220 @@ module M = {
        ((0 <= (W64.to_uint xof_offset)) /\
        (((W64.to_uint xof_offset) + 16) <= 272)))]);
       bytestream <- (BArray272.get128d randombytes (W64.to_uint xof_offset));
-      param <- bytestream;
-      (result, tmp__trace) <@ error_4x____bytestream_to_coefficients (param);
+      param_0 <- bytestream;
+      param <- nibble_mask;
+      (result, tmp__trace) <@ error_4x____bytestream_to_coefficients (
+      param_0, param);
       trace_error_4x__rejection_sample_multiple_blocks <-
       (trace_error_4x__rejection_sample_multiple_blocks ++ tmp__trace);
-      coefficients <- result;
-      comparisons <- (VPSUB_32u8 coefficients bound);
+      candidates <- result;
+      comparisons <- (VPSUB_32u8 candidates bound);
       good_overall <- (zeroextu64 (MOVEMASK_32u8 comparisons));
-      coefficients <- (VPSUB_32u8 eta_0 coefficients);
-      coefficient_block <- (VEXTRACTI128 coefficients (W8.of_int 0));
       (* Erased call to declassify *)
       good_overall <- (protect_64 good_overall ms);
-      b_param_2 <- b_error;
-      param_3 <- error;
-      param_2 <- bytes_filled;
-      param_1 <- good_overall;
-      param_0 <- coefficient_block;
-      (aux, aux_0, aux_1, aux_2, tmp__trace) <@ error_4x____write_out_8_coefficients (
-      param_3, b_param_2, param_2, param_1, param_0);
-      result_2 <- aux;
-      b_result_2 <- aux_0;
-      result_1 <- aux_1;
-      result_0 <- aux_2;
+      coefficients <- (VPSHUFB_256 values candidates);
+      b_param_1 <- b_error;
+      param_5 <- error;
+      param_4 <- bytes_filled;
+      param_3 <- good_overall;
+      param_2 <- coefficients;
+      param_1 <- shuffle_table_pointer;
+      (aux, aux_0, aux_1, tmp__trace) <@ error_4x____write_out_32_coefficients (
+      param_5, b_param_1, param_4, param_3, param_2, param_1,
+      (BArray2048.init_arr (W8.of_int 255)));
+      result_1 <- aux;
+      b_result_1 <- aux_0;
+      result_0 <- aux_1;
       trace_error_4x__rejection_sample_multiple_blocks <-
       (trace_error_4x__rejection_sample_multiple_blocks ++ tmp__trace);
       trace_error_4x__rejection_sample_multiple_blocks <-
       (trace_error_4x__rejection_sample_multiple_blocks ++
       [(Assert,
-       (((BArray1024.is_init b_result_2 0 (W64.to_uint result_1)) /\
-        (result_1 \ule (W64.of_int 1024))) /\
-       ((result_1 \umod (W64.of_int 4)) = (W64.of_int 0))))]);
-      b_error <- b_result_2;
-      error <- result_2;
-      bytes_filled <- result_1;
-      good_overall <- result_0;
-      xof_offset <- (xof_offset + (W64.of_int 4));
-      condition <- (bytes_filled \ult (W64.of_int 992));
-      if (condition) {
-        ms <- (update_msf condition ms);
-        coefficient_block <- (VPSRLDQ_128 coefficient_block (W8.of_int 8));
-        b_param_1 <- b_error;
-        param_7 <- error;
-        param_6 <- bytes_filled;
-        param_5 <- good_overall;
-        param_4 <- coefficient_block;
-        (aux, aux_0, aux_1, aux_2, tmp__trace) <@ error_4x____write_out_8_coefficients (
-        param_7, b_param_1, param_6, param_5, param_4);
-        result_5 <- aux;
-        b_result_1 <- aux_0;
-        result_4 <- aux_1;
-        result_3 <- aux_2;
-        trace_error_4x__rejection_sample_multiple_blocks <-
-        (trace_error_4x__rejection_sample_multiple_blocks ++ tmp__trace);
-        trace_error_4x__rejection_sample_multiple_blocks <-
-        (trace_error_4x__rejection_sample_multiple_blocks ++
-        [(Assert,
-         (((BArray1024.is_init b_result_1 0 (W64.to_uint result_4)) /\
-          (result_4 \ule (W64.of_int 1024))) /\
-         ((result_4 \umod (W64.of_int 4)) = (W64.of_int 0))))]);
-        b_error <- b_result_1;
-        error <- result_5;
-        bytes_filled <- result_4;
-        good_overall <- result_3;
-        xof_offset <- (xof_offset + (W64.of_int 4));
-        condition <- (bytes_filled \ult (W64.of_int 992));
-        if (condition) {
-          ms <- (update_msf condition ms);
-          coefficient_block <- (VEXTRACTI128 coefficients (W8.of_int 1));
-          b_param_0 <- b_error;
-          param_11 <- error;
-          param_10 <- bytes_filled;
-          param_9 <- good_overall;
-          param_8 <- coefficient_block;
-          (aux, aux_0, aux_1, aux_2, tmp__trace) <@ error_4x____write_out_8_coefficients (
-          param_11, b_param_0, param_10, param_9, param_8);
-          result_8 <- aux;
-          b_result_0 <- aux_0;
-          result_7 <- aux_1;
-          result_6 <- aux_2;
-          trace_error_4x__rejection_sample_multiple_blocks <-
-          (trace_error_4x__rejection_sample_multiple_blocks ++ tmp__trace);
-          trace_error_4x__rejection_sample_multiple_blocks <-
-          (trace_error_4x__rejection_sample_multiple_blocks ++
-          [(Assert,
-           (((BArray1024.is_init b_result_0 0 (W64.to_uint result_7)) /\
-            (result_7 \ule (W64.of_int 1024))) /\
-           ((result_7 \umod (W64.of_int 4)) = (W64.of_int 0))))]);
-          b_error <- b_result_0;
-          error <- result_8;
-          bytes_filled <- result_7;
-          good_overall <- result_6;
-          xof_offset <- (xof_offset + (W64.of_int 4));
-          condition <- (bytes_filled \ult (W64.of_int 992));
-          if (condition) {
-            ms <- (update_msf condition ms);
-            coefficient_block <-
-            (VPSRLDQ_128 coefficient_block (W8.of_int 8));
-            b_param <- b_error;
-            param_15 <- error;
-            param_14 <- bytes_filled;
-            param_13 <- good_overall;
-            param_12 <- coefficient_block;
-            (aux, aux_0, aux_1, aux_2, tmp__trace) <@ error_4x____write_out_8_coefficients (
-            param_15, b_param, param_14, param_13, param_12);
-            result_11 <- aux;
-            b_result <- aux_0;
-            result_10 <- aux_1;
-            result_9 <- aux_2;
-            trace_error_4x__rejection_sample_multiple_blocks <-
-            (trace_error_4x__rejection_sample_multiple_blocks ++ tmp__trace);
-            trace_error_4x__rejection_sample_multiple_blocks <-
-            (trace_error_4x__rejection_sample_multiple_blocks ++
-            [(Assert,
-             (((BArray1024.is_init b_result 0 (W64.to_uint result_10)) /\
-              (result_10 \ule (W64.of_int 1024))) /\
-             ((result_10 \umod (W64.of_int 4)) = (W64.of_int 0))))]);
-            b_error <- b_result;
-            error <- result_11;
-            bytes_filled <- result_10;
-            xof_offset <- (xof_offset + (W64.of_int 4));
-          } else {
-            ms <- (update_msf (! condition) ms);
-          }
-        } else {
-          ms <- (update_msf (! condition) ms);
-        }
-      } else {
-        ms <- (update_msf (! condition) ms);
-      }
-      condition <- ((W64.of_int 992) \ule bytes_filled);
-      if (condition) {
-        ms <- (update_msf condition ms);
-        stop_sampling <- (W64.of_int 1);
-      } else {
-        ms <- (update_msf (! condition) ms);
-        condition <- ((W64.of_int 256) \ule xof_offset);
-        if (condition) {
-          ms <- (update_msf condition ms);
-          stop_sampling <- (W64.of_int 1);
-        } else {
-          ms <- (update_msf (! condition) ms);
-        }
-      }
-      condition_loop <- (stop_sampling <> (W64.of_int 1));
+       (((BArray1024.is_init b_result_1 0 (W64.to_uint result_0)) /\
+        (result_0 \ule (W64.of_int 1024))) /\
+       ((result_0 \umod (W64.of_int 4)) = (W64.of_int 0))))]);
+      b_error <- b_result_1;
+      error <- result_1;
+      bytes_filled <- result_0;
+      xof_offset <- (xof_offset + (W64.of_int 16));
+      condition_loop <- (xof_offset \ult (W64.of_int 128));
     }
     ms <- (update_msf (! condition_loop) ms);
-    filled <- bytes_filled;
-    filled <- (filled `>>` (W8.of_int 2));
-    condition <- (filled \ult (W64.of_int 256));
-    if (condition) {
-      ms <- (update_msf condition ms);
-      condition <- (xof_offset \ult (W64.of_int 272));
-      if (condition) {
-        ms <- (update_msf condition ms);
-        stop_sampling <- (W64.of_int 0);
-      } else {
-        ms <- (update_msf (! condition) ms);
-      }
-    } else {
-      ms <- (update_msf (! condition) ms);
-    }
-    condition_loop <- (stop_sampling <> (W64.of_int 1));
+    slack <- (W64.of_int 896);
+    slack <- (slack - bytes_filled);
+    room <- (W64.of_int 256);
+    room <- (room - xof_offset);
+    slack <- (slack `|` room);
+    condition_loop <- ((W64.of_int 0) \sle slack);
     while (condition_loop) {
       ms <- (update_msf condition_loop ms);
       trace_error_4x__rejection_sample_multiple_blocks <-
       (trace_error_4x__rejection_sample_multiple_blocks ++
       [(Assert,
        ((0 <= (W64.to_uint xof_offset)) /\
-       (((W64.to_uint xof_offset) + 1) <= 272)))]);
-      coefficient <-
-      (zeroextu32 (BArray272.get8 randombytes (W64.to_uint xof_offset)));
-      coefficient <- (coefficient `&` (W32.of_int 15));
+       (((W64.to_uint xof_offset) + 16) <= 272)))]);
+      bytestream <- (BArray272.get128d randombytes (W64.to_uint xof_offset));
+      param_7 <- bytestream;
+      param_6 <- nibble_mask;
+      (result_2, tmp__trace) <@ error_4x____bytestream_to_coefficients (
+      param_7, param_6);
+      trace_error_4x__rejection_sample_multiple_blocks <-
+      (trace_error_4x__rejection_sample_multiple_blocks ++ tmp__trace);
+      candidates <- result_2;
+      comparisons <- (VPSUB_32u8 candidates bound);
+      good_overall <- (zeroextu64 (MOVEMASK_32u8 comparisons));
       (* Erased call to declassify *)
-      coefficient <- (protect_32 coefficient ms);
-      condition <- (coefficient \ult (W32.of_int 15));
-      if (condition) {
-        ms <- (update_msf condition ms);
-        param_16 <- coefficient;
-        (result_12, tmp__trace) <@ error_4x____reduce_coefficient (param_16);
-        trace_error_4x__rejection_sample_multiple_blocks <-
-        (trace_error_4x__rejection_sample_multiple_blocks ++ tmp__trace);
-        coefficient <- result_12;
-        coefficient <- (coefficient - (W32.of_int 2));
-        coefficient <- (- coefficient);
-        trace_error_4x__rejection_sample_multiple_blocks <-
-        (trace_error_4x__rejection_sample_multiple_blocks ++
-        [(Assert,
-         ((0 <= ((W64.to_uint filled) * 4)) /\
-         ((((W64.to_uint filled) * 4) + 4) <= 1024)))]);
-        b_error <-
-        (BArray1024.set32d b_error ((W64.to_uint filled) * 4)
-        (W32.of_int 4294967295));
-        error <- (BArray1024.set32 error (W64.to_uint filled) coefficient);
-        filled <- (filled + (W64.of_int 1));
-      } else {
-        ms <- (update_msf (! condition) ms);
-      }
-      condition <- (filled \ult (W64.of_int 256));
-      if (condition) {
-        ms <- (update_msf condition ms);
-        trace_error_4x__rejection_sample_multiple_blocks <-
-        (trace_error_4x__rejection_sample_multiple_blocks ++
-        [(Assert,
-         ((0 <= (W64.to_uint xof_offset)) /\
-         (((W64.to_uint xof_offset) + 1) <= 272)))]);
-        coefficient <-
-        (zeroextu32 (BArray272.get8 randombytes (W64.to_uint xof_offset)));
-        coefficient <- (coefficient `>>` (W8.of_int 4));
-        (* Erased call to declassify *)
-        coefficient <- (protect_32 coefficient ms);
-        condition <- (coefficient \ult (W32.of_int 15));
-        if (condition) {
-          ms <- (update_msf condition ms);
-          param_17 <- coefficient;
-          (result_13, tmp__trace) <@ error_4x____reduce_coefficient (
-          param_17);
-          trace_error_4x__rejection_sample_multiple_blocks <-
-          (trace_error_4x__rejection_sample_multiple_blocks ++ tmp__trace);
-          coefficient <- result_13;
-          coefficient <- (coefficient - (W32.of_int 2));
-          coefficient <- (- coefficient);
-          trace_error_4x__rejection_sample_multiple_blocks <-
-          (trace_error_4x__rejection_sample_multiple_blocks ++
-          [(Assert,
-           ((0 <= ((W64.to_uint filled) * 4)) /\
-           ((((W64.to_uint filled) * 4) + 4) <= 1024)))]);
-          b_error <-
-          (BArray1024.set32d b_error ((W64.to_uint filled) * 4)
-          (W32.of_int 4294967295));
-          error <- (BArray1024.set32 error (W64.to_uint filled) coefficient);
-          filled <- (filled + (W64.of_int 1));
-        } else {
-          ms <- (update_msf (! condition) ms);
-        }
-      } else {
-        ms <- (update_msf (! condition) ms);
-      }
-      xof_offset <- (xof_offset + (W64.of_int 1));
-      condition <- ((W64.of_int 272) \ule xof_offset);
-      if (condition) {
-        ms <- (update_msf condition ms);
-        stop_sampling <- (W64.of_int 1);
-      } else {
-        ms <- (update_msf (! condition) ms);
-        condition <- ((W64.of_int 256) \ule filled);
-        if (condition) {
-          ms <- (update_msf condition ms);
-          stop_sampling <- (W64.of_int 1);
-        } else {
-          ms <- (update_msf (! condition) ms);
-        }
-      }
-      condition_loop <- (stop_sampling <> (W64.of_int 1));
+      good_overall <- (protect_64 good_overall ms);
+      coefficients <- (VPSHUFB_256 values candidates);
+      b_param_0 <- b_error;
+      param_12 <- error;
+      param_11 <- bytes_filled;
+      param_10 <- good_overall;
+      param_9 <- coefficients;
+      param_8 <- shuffle_table_pointer;
+      (aux, aux_0, aux_1, tmp__trace) <@ error_4x____write_out_32_coefficients (
+      param_12, b_param_0, param_11, param_10, param_9, param_8,
+      (BArray2048.init_arr (W8.of_int 255)));
+      result_4 <- aux;
+      b_result_0 <- aux_0;
+      result_3 <- aux_1;
+      trace_error_4x__rejection_sample_multiple_blocks <-
+      (trace_error_4x__rejection_sample_multiple_blocks ++ tmp__trace);
+      trace_error_4x__rejection_sample_multiple_blocks <-
+      (trace_error_4x__rejection_sample_multiple_blocks ++
+      [(Assert,
+       (((BArray1024.is_init b_result_0 0 (W64.to_uint result_3)) /\
+        (result_3 \ule (W64.of_int 1024))) /\
+       ((result_3 \umod (W64.of_int 4)) = (W64.of_int 0))))]);
+      b_error <- b_result_0;
+      error <- result_4;
+      bytes_filled <- result_3;
+      xof_offset <- (xof_offset + (W64.of_int 16));
+      slack <- (W64.of_int 896);
+      slack <- (slack - bytes_filled);
+      room <- (W64.of_int 256);
+      room <- (room - xof_offset);
+      slack <- (slack `|` room);
+      condition_loop <- ((W64.of_int 0) \sle slack);
     }
+    ms <- (update_msf (! condition_loop) ms);
+    slack <- (W64.of_int 992);
+    slack <- (slack - bytes_filled);
+    room <- (W64.of_int 256);
+    room <- (room - xof_offset);
+    slack <- (slack `|` room);
+    condition_loop <- ((W64.of_int 0) \sle slack);
+    while (condition_loop) {
+      ms <- (update_msf condition_loop ms);
+      trace_error_4x__rejection_sample_multiple_blocks <-
+      (trace_error_4x__rejection_sample_multiple_blocks ++
+      [(Assert,
+       ((0 <= (W64.to_uint xof_offset)) /\
+       (((W64.to_uint xof_offset) + 16) <= 272)))]);
+      bytestream <- (BArray272.get128d randombytes (W64.to_uint xof_offset));
+      param_14 <- bytestream;
+      param_13 <- nibble_mask;
+      (result_5, tmp__trace) <@ error_4x____bytestream_to_coefficients (
+      param_14, param_13);
+      trace_error_4x__rejection_sample_multiple_blocks <-
+      (trace_error_4x__rejection_sample_multiple_blocks ++ tmp__trace);
+      candidates <- result_5;
+      comparisons <- (VPSUB_32u8 candidates bound);
+      good_overall <- (zeroextu64 (MOVEMASK_32u8 comparisons));
+      (* Erased call to declassify *)
+      good_overall <- (protect_64 good_overall ms);
+      coefficients <- (VPSHUFB_256 values candidates);
+      coefficient_block <- (VEXTRACTI128 coefficients (W8.of_int 0));
+      b_param <- b_error;
+      param_19 <- error;
+      param_18 <- bytes_filled;
+      param_17 <- good_overall;
+      param_16 <- coefficient_block;
+      param_15 <- shuffle_table_pointer;
+      (aux, aux_0, aux_1, aux_2, tmp__trace) <@ error_4x____write_out_8_coefficients (
+      param_19, b_param, param_18, param_17, param_16, param_15,
+      (BArray2048.init_arr (W8.of_int 255)));
+      result_8 <- aux;
+      b_result <- aux_0;
+      result_7 <- aux_1;
+      result_6 <- aux_2;
+      trace_error_4x__rejection_sample_multiple_blocks <-
+      (trace_error_4x__rejection_sample_multiple_blocks ++ tmp__trace);
+      trace_error_4x__rejection_sample_multiple_blocks <-
+      (trace_error_4x__rejection_sample_multiple_blocks ++
+      [(Assert,
+       (((BArray1024.is_init b_result 0 (W64.to_uint result_7)) /\
+        (result_7 \ule (W64.of_int 1024))) /\
+       ((result_7 \umod (W64.of_int 4)) = (W64.of_int 0))))]);
+      b_error <- b_result;
+      error <- result_8;
+      bytes_filled <- result_7;
+      xof_offset <- (xof_offset + (W64.of_int 4));
+      slack <- (W64.of_int 992);
+      slack <- (slack - bytes_filled);
+      room <- (W64.of_int 256);
+      room <- (room - xof_offset);
+      slack <- (slack `|` room);
+      condition_loop <- ((W64.of_int 0) \sle slack);
+    }
+    ms <- (update_msf (! condition_loop) ms);
+    filled <- bytes_filled;
+    filled <- (filled `>>` (W8.of_int 2));
+    candidate_index <- xof_offset;
+    candidate_index <- (candidate_index `<<` (W8.of_int 1));
+    slack <- filled;
+    slack <- (slack - (W64.of_int 256));
+    room <- candidate_index;
+    room <- (room - (W64.of_int 544));
+    slack <- (slack `&` room);
+    condition_loop <- (slack \slt (W64.of_int 0));
+    while (condition_loop) {
+      ms <- (update_msf condition_loop ms);
+      temp <- candidate_index;
+      temp <- (temp `>>` (W8.of_int 1));
+      trace_error_4x__rejection_sample_multiple_blocks <-
+      (trace_error_4x__rejection_sample_multiple_blocks ++
+      [(Assert,
+       ((0 <= (W64.to_uint temp)) /\ (((W64.to_uint temp) + 1) <= 272)))]);
+      coefficient <-
+      (zeroextu32 (BArray272.get8 randombytes (W64.to_uint temp)));
+      shift <- (truncateu32 candidate_index);
+      shift <- (shift `&` (W32.of_int 1));
+      shift <- (shift `<<` (W8.of_int 2));
+      coefficient <- (SHRX_32 coefficient shift);
+      coefficient <- (coefficient `&` (W32.of_int 15));
+      accepted <- coefficient;
+      accepted <- (accepted - (W32.of_int 15));
+      accepted <- (accepted `>>` (W8.of_int 31));
+      (* Erased call to declassify *)
+      accepted <- (protect_32 accepted ms);
+      param_20 <- coefficient;
+      (result_9, tmp__trace) <@ error_4x____reduce_coefficient (param_20);
+      trace_error_4x__rejection_sample_multiple_blocks <-
+      (trace_error_4x__rejection_sample_multiple_blocks ++ tmp__trace);
+      coefficient <- result_9;
+      coefficient <- (coefficient - (W32.of_int 2));
+      coefficient <- (- coefficient);
+      trace_error_4x__rejection_sample_multiple_blocks <-
+      (trace_error_4x__rejection_sample_multiple_blocks ++
+      [(Assert,
+       ((0 <= ((W64.to_uint filled) * 4)) /\
+       ((((W64.to_uint filled) * 4) + 4) <= 1024)))]);
+      b_error <-
+      (BArray1024.set32d b_error ((W64.to_uint filled) * 4)
+      (W32.of_int 4294967295));
+      error <- (BArray1024.set32 error (W64.to_uint filled) coefficient);
+      temp <- (zeroextu64 accepted);
+      filled <- (filled + temp);
+      candidate_index <- (candidate_index + (W64.of_int 1));
+      slack <- filled;
+      slack <- (slack - (W64.of_int 256));
+      room <- candidate_index;
+      room <- (room - (W64.of_int 544));
+      slack <- (slack `&` room);
+      condition_loop <- (slack \slt (W64.of_int 0));
+    }
+    ms <- (update_msf (! condition_loop) ms);
     return (error, b_error, filled,
            trace_error_4x__rejection_sample_multiple_blocks);
   }
@@ -67595,29 +67724,29 @@ op s2____decode_spec _s2 _b_s2 _encoded _b_encoded =
    (BArray384.is_init _b_encoded 0 (4 * 96))) ==>
    ((BArray4096.is_init res.`2 0 (4 * (4 * 256))) /\ (valid res.`3))].
 
-op error_4x____bytestream_to_coefficients_spec _bytestream =
+op error_4x____bytestream_to_coefficients_spec _bytestream _nibble_mask =
    hoare [M.error_4x____bytestream_to_coefficients :
-   ((_bytestream = bytestream) /\ true) ==> (true /\ (valid res.`2))].
-
-op error_4x____reduce_coefficients_spec _coefficients =
-   hoare [M.error_4x____reduce_coefficients :
-   ((_coefficients = coefficients) /\ true) ==> (true /\ (valid res.`2))].
+   (((_nibble_mask = nibble_mask) /\ (_bytestream = bytestream)) /\ true) ==>
+   (true /\ (valid res.`2))].
 
 op error_4x____reduce_coefficient_spec _coefficient =
    hoare [M.error_4x____reduce_coefficient :
    ((_coefficient = coefficient) /\ true) ==> (true /\ (valid res.`2))].
 
-op error_4x____write_out_8_coefficients_spec _error _b_error _bytes_filled _good_overall _coefficient_block =
+op error_4x____write_out_8_coefficients_spec _error _b_error _bytes_filled _good_overall _coefficient_block _shuffle_table_pointer _b_shuffle_table_pointer =
    hoare [M.error_4x____write_out_8_coefficients :
-   (((_coefficient_block = coefficient_block) /\
+   (((_b_shuffle_table_pointer = b_shuffle_table_pointer) /\
+    ((_shuffle_table_pointer = shuffle_table_pointer) /\
+    ((_coefficient_block = coefficient_block) /\
     ((_good_overall = good_overall) /\
     ((_bytes_filled = bytes_filled) /\
-    ((_b_error = b_error) /\ (_error = error))))) /\
+    ((_b_error = b_error) /\ (_error = error))))))) /\
    (true /\
    (true /\
    (true /\
    (((W64.to_uint (W64.of_int 4)) <> 0) /\
-   (((BArray1024.is_init _b_error 0 (W64.to_uint _bytes_filled)) /\
+   ((((BArray1024.is_init _b_error 0 (W64.to_uint _bytes_filled)) /\
+     (BArray2048.is_init _b_shuffle_table_pointer 0 2048)) /\
     (_bytes_filled \ule (W64.of_int ((4 * 256) - 32)))) /\
    ((_bytes_filled \umod (W64.of_int 4)) = (W64.of_int 0)))))))) ==>
    ((true /\
@@ -67628,6 +67757,31 @@ op error_4x____write_out_8_coefficients_spec _error _b_error _bytes_filled _good
      (res.`3 \ule (W64.of_int (4 * 256)))) /\
     ((res.`3 \umod (W64.of_int 4)) = (W64.of_int 0))))))) /\
    (valid res.`5))].
+
+op error_4x____write_out_32_coefficients_spec _error _b_error _bytes_filled _good_overall _coefficients _shuffle_table_pointer _b_shuffle_table_pointer =
+   hoare [M.error_4x____write_out_32_coefficients :
+   (((_b_shuffle_table_pointer = b_shuffle_table_pointer) /\
+    ((_shuffle_table_pointer = shuffle_table_pointer) /\
+    ((_coefficients = coefficients) /\
+    ((_good_overall = good_overall) /\
+    ((_bytes_filled = bytes_filled) /\
+    ((_b_error = b_error) /\ (_error = error))))))) /\
+   (true /\
+   (true /\
+   (true /\
+   (((W64.to_uint (W64.of_int 4)) <> 0) /\
+   ((((BArray1024.is_init _b_error 0 (W64.to_uint _bytes_filled)) /\
+     (BArray2048.is_init _b_shuffle_table_pointer 0 2048)) /\
+    (_bytes_filled \ule (W64.of_int ((4 * 256) - (4 * 32))))) /\
+   ((_bytes_filled \umod (W64.of_int 4)) = (W64.of_int 0)))))))) ==>
+   ((true /\
+    (true /\
+    (true /\
+    (((W64.to_uint (W64.of_int 4)) <> 0) /\
+    (((BArray1024.is_init res.`2 0 (W64.to_uint res.`3)) /\
+     (res.`3 \ule (W64.of_int (4 * 256)))) /\
+    ((res.`3 \umod (W64.of_int 4)) = (W64.of_int 0))))))) /\
+   (valid res.`4))].
 
 op error_4x__rejection_sample_multiple_blocks_spec _error _b_error _randombytes _b_randombytes =
    hoare [M.error_4x__rejection_sample_multiple_blocks :

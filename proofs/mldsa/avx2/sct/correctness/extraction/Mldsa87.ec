@@ -33,6 +33,15 @@ abbrev commitment__ENCODING_SHUFFLES_bits4 =
 (W256.of_int
 6809477063014005108496892811167092228318171255968858956394831878370493989120).
 
+abbrev error_4x__ERROR_COEFFICIENTS_ETA4 =
+(W256.of_int
+(-454079668476231377987382308722805133924785825411517203186587039222300802300)
+).
+
+abbrev error_4x__ERROR_COEFFICIENTS_ETA2 =
+(W256.of_int
+1355164797045218797098100747103885221269129335023744513058924560427587207426).
+
 abbrev t1__mask =
 (W256.of_int
 27580025446916579586740047030762717305835781530194468456916412547466239).
@@ -16246,33 +16255,15 @@ module M = {
     }
     return s2;
   }
-  proc error_4x____bytestream_to_coefficients (bytestream:W128.t) : W256.t = {
+  proc error_4x____bytestream_to_coefficients (bytestream:W128.t,
+                                               nibble_mask:W256.t) : 
+  W256.t = {
     var coefficients:W256.t;
-    var temp:W64.t;
-    var mask:W256.t;
     var odd_coefficients:W256.t;
-    temp <- (W64.of_int ((1 `<<` 4) - 1));
-    mask <- (zeroextu256 (VMOV_64 temp));
-    mask <- (VPBROADCAST_32u8 (truncateu8 mask));
     coefficients <- (VPMOVZX_16u8_16u16 bytestream);
     odd_coefficients <- (VPSLL_16u16 coefficients (W128.of_int 4));
     coefficients <- (VPOR_256 coefficients odd_coefficients);
-    coefficients <- (VPAND_256 coefficients mask);
-    return coefficients;
-  }
-  proc error_4x____reduce_coefficients (coefficients:W256.t) : W256.t = {
-    var temp:W64.t;
-    var multiplier:W256.t;
-    var quotient:W256.t;
-    temp <- (W64.of_int (- 6560));
-    multiplier <- (zeroextu256 (VMOV_64 temp));
-    multiplier <- (VPBROADCAST_8u32 (truncateu32 multiplier));
-    quotient <- (VPMULHRS_16u16 coefficients multiplier);
-    temp <- (W64.of_int 5);
-    multiplier <- (zeroextu256 (VMOV_64 temp));
-    multiplier <- (VPBROADCAST_8u32 (truncateu32 multiplier));
-    quotient <- (VPMULL_16u16 quotient multiplier);
-    coefficients <- (VPADD_8u32 coefficients quotient);
+    coefficients <- (VPAND_256 coefficients nibble_mask);
     return coefficients;
   }
   proc error_4x____reduce_coefficient (coefficient:W32.t) : W32.t = {
@@ -16287,11 +16278,10 @@ module M = {
   proc error_4x____write_out_8_coefficients (error:W32.t Array256.t,
                                              bytes_filled:W64.t,
                                              good_overall:W64.t,
-                                             coefficient_block:W128.t) : 
+                                             coefficient_block:W128.t,
+                                             shuffle_table_pointer:W8.t Array2048.t) : 
   W32.t Array256.t * W64.t * W64.t = {
     var good:W64.t;
-    var shuffle_table_pointer:W8.t Array2048.t;
-    var shuffle_table_idx:W64.t;
     var shuffles:W128.t;
     var error_coefficients_128:W128.t;
     var error_coefficients:W256.t;
@@ -16300,210 +16290,217 @@ module M = {
     var  _2:bool;
     var  _3:bool;
     var  _4:bool;
-    shuffle_table_pointer <- witness;
-    good <- good_overall;
-    good <- (good `&` (W64.of_int 255));
+    good <- (zeroextu64 (truncateu8 good_overall));
     good_overall <- (good_overall `>>` (W8.of_int 8));
-    shuffle_table_pointer <- cOMPACTION_INDEX_TABLE;
-    shuffle_table_idx <- good;
-    shuffle_table_idx <- (shuffle_table_idx `<<` (W8.of_int 3));
     shuffles <-
     (VMOV_64
     (get64_direct (WArray2048.init8 (fun i => shuffle_table_pointer.[i]))
-    (W64.to_uint shuffle_table_idx)));
+    (W64.to_uint ((W64.of_int 8) * good))));
     error_coefficients_128 <- (VPSHUFB_128 coefficient_block shuffles);
     error_coefficients <-
     (VPMOVSX_8u8_8u32 (truncateu64 error_coefficients_128));
-    if ((2 = 2)) {
-      error_coefficients <@ error_4x____reduce_coefficients (error_coefficients);
-    } else {
-      
-    }
     error <-
     (Array256.init
     (WArray1024.get32
     (WArray1024.set256_direct (WArray1024.init32 (fun i => error.[i]))
     (W64.to_uint bytes_filled) error_coefficients)));
     ( _0,  _1,  _2,  _3,  _4, good) <- (POPCNT_64 good);
-    good <- (good `<<` (W8.of_int 2));
-    bytes_filled <- (bytes_filled + good);
+    bytes_filled <- (LEA_64 (bytes_filled + ((W64.of_int 4) * good)));
     return (error, bytes_filled, good_overall);
+  }
+  proc error_4x____write_out_32_coefficients (error:W32.t Array256.t,
+                                              bytes_filled:W64.t,
+                                              good_overall:W64.t,
+                                              coefficients:W256.t,
+                                              shuffle_table_pointer:W8.t Array2048.t) : 
+  W32.t Array256.t * W64.t = {
+    var coefficient_block:W128.t;
+    var  _0:W64.t;
+    coefficient_block <- (VEXTRACTI128 coefficients (W8.of_int 0));
+    (error, bytes_filled, good_overall) <@ error_4x____write_out_8_coefficients (
+    error, bytes_filled, good_overall, coefficient_block,
+    shuffle_table_pointer);
+    coefficient_block <- (VPSRLDQ_128 coefficient_block (W8.of_int 8));
+    (error, bytes_filled, good_overall) <@ error_4x____write_out_8_coefficients (
+    error, bytes_filled, good_overall, coefficient_block,
+    shuffle_table_pointer);
+    coefficient_block <- (VEXTRACTI128 coefficients (W8.of_int 1));
+    (error, bytes_filled, good_overall) <@ error_4x____write_out_8_coefficients (
+    error, bytes_filled, good_overall, coefficient_block,
+    shuffle_table_pointer);
+    coefficient_block <- (VPSRLDQ_128 coefficient_block (W8.of_int 8));
+    (error, bytes_filled,  _0) <@ error_4x____write_out_8_coefficients (
+    error, bytes_filled, good_overall, coefficient_block,
+    shuffle_table_pointer);
+    return (error, bytes_filled);
   }
   proc error_4x__rejection_sample_multiple_blocks (error:W32.t Array256.t,
                                                    randombytes:W8.t Array272.t) : 
   W32.t Array256.t * W64.t = {
     var filled:W64.t;
     var ms:W64.t;
+    var values:W256.t;
+    var shuffle_table_pointer:W8.t Array2048.t;
     var temp:W64.t;
-    var eta_0:W256.t;
     var bound:W256.t;
+    var nibble_mask:W256.t;
     var bytes_filled:W64.t;
     var xof_offset:W64.t;
-    var stop_sampling:W64.t;
     var condition_loop:bool;
     var bytestream:W128.t;
-    var coefficients:W256.t;
+    var candidates:W256.t;
     var comparisons:W256.t;
     var good_overall:W64.t;
+    var coefficients:W256.t;
+    var slack:W64.t;
+    var room:W64.t;
     var coefficient_block:W128.t;
-    var condition:bool;
+    var candidate_index:W64.t;
     var coefficient:W32.t;
+    var shift:W32.t;
+    var accepted:W32.t;
     var  _0:W64.t;
+    shuffle_table_pointer <- witness;
     ms <- (init_msf);
-    temp <- (W64.of_int 2);
-    eta_0 <- (zeroextu256 (VMOV_64 temp));
-    eta_0 <- (VPBROADCAST_32u8 (truncateu8 eta_0));
+    if ((2 = 2)) {
+      values <- error_4x__ERROR_COEFFICIENTS_ETA2;
+    } else {
+      values <- error_4x__ERROR_COEFFICIENTS_ETA4;
+    }
+    shuffle_table_pointer <- cOMPACTION_INDEX_TABLE;
     temp <- (W64.of_int 15);
     bound <- (zeroextu256 (VMOV_64 temp));
     bound <- (VPBROADCAST_32u8 (truncateu8 bound));
+    temp <- (W64.of_int ((1 `<<` 4) - 1));
+    nibble_mask <- (zeroextu256 (VMOV_64 temp));
+    nibble_mask <- (VPBROADCAST_32u8 (truncateu8 nibble_mask));
     bytes_filled <- (W64.of_int 0);
     xof_offset <- (W64.of_int 0);
-    stop_sampling <- (W64.of_int 0);
-    condition_loop <- (stop_sampling <> (W64.of_int 1));
+    condition_loop <- (xof_offset \ult (W64.of_int ((256 %/ 32) * 16)));
     while (condition_loop) {
       ms <- (update_msf condition_loop ms);
       bytestream <-
       (get128_direct (WArray272.init8 (fun i => randombytes.[i]))
       (W64.to_uint xof_offset));
-      coefficients <@ error_4x____bytestream_to_coefficients (bytestream);
-      comparisons <- (VPSUB_32u8 coefficients bound);
+      candidates <@ error_4x____bytestream_to_coefficients (bytestream,
+      nibble_mask);
+      comparisons <- (VPSUB_32u8 candidates bound);
       good_overall <- (zeroextu64 (MOVEMASK_32u8 comparisons));
-      coefficients <- (VPSUB_32u8 eta_0 coefficients);
-      coefficient_block <- (VEXTRACTI128 coefficients (W8.of_int 0));
       (* Erased call to declassify *)
       good_overall <- (protect_64 good_overall ms);
-      (error, bytes_filled, good_overall) <@ error_4x____write_out_8_coefficients (
-      error, bytes_filled, good_overall, coefficient_block);
+      coefficients <- (VPSHUFB_256 values candidates);
+      (error, bytes_filled) <@ error_4x____write_out_32_coefficients (
+      error, bytes_filled, good_overall, coefficients,
+      shuffle_table_pointer);
+      xof_offset <- (xof_offset + (W64.of_int 16));
+      condition_loop <- (xof_offset \ult (W64.of_int ((256 %/ 32) * 16)));
+    }
+    ms <- (update_msf (! condition_loop) ms);
+    slack <- (W64.of_int (((256 * 32) %/ 8) - (4 * 32)));
+    slack <- (slack - bytes_filled);
+    room <- (W64.of_int ((2 * 136) - 16));
+    room <- (room - xof_offset);
+    slack <- (slack `|` room);
+    condition_loop <- ((W64.of_int 0) \sle slack);
+    while (condition_loop) {
+      ms <- (update_msf condition_loop ms);
+      bytestream <-
+      (get128_direct (WArray272.init8 (fun i => randombytes.[i]))
+      (W64.to_uint xof_offset));
+      candidates <@ error_4x____bytestream_to_coefficients (bytestream,
+      nibble_mask);
+      comparisons <- (VPSUB_32u8 candidates bound);
+      good_overall <- (zeroextu64 (MOVEMASK_32u8 comparisons));
+      (* Erased call to declassify *)
+      good_overall <- (protect_64 good_overall ms);
+      coefficients <- (VPSHUFB_256 values candidates);
+      (error, bytes_filled) <@ error_4x____write_out_32_coefficients (
+      error, bytes_filled, good_overall, coefficients,
+      shuffle_table_pointer);
+      xof_offset <- (xof_offset + (W64.of_int 16));
+      slack <- (W64.of_int (((256 * 32) %/ 8) - (4 * 32)));
+      slack <- (slack - bytes_filled);
+      room <- (W64.of_int ((2 * 136) - 16));
+      room <- (room - xof_offset);
+      slack <- (slack `|` room);
+      condition_loop <- ((W64.of_int 0) \sle slack);
+    }
+    ms <- (update_msf (! condition_loop) ms);
+    slack <- (W64.of_int (((256 * 32) %/ 8) - (4 * 8)));
+    slack <- (slack - bytes_filled);
+    room <- (W64.of_int ((2 * 136) - 16));
+    room <- (room - xof_offset);
+    slack <- (slack `|` room);
+    condition_loop <- ((W64.of_int 0) \sle slack);
+    while (condition_loop) {
+      ms <- (update_msf condition_loop ms);
+      bytestream <-
+      (get128_direct (WArray272.init8 (fun i => randombytes.[i]))
+      (W64.to_uint xof_offset));
+      candidates <@ error_4x____bytestream_to_coefficients (bytestream,
+      nibble_mask);
+      comparisons <- (VPSUB_32u8 candidates bound);
+      good_overall <- (zeroextu64 (MOVEMASK_32u8 comparisons));
+      (* Erased call to declassify *)
+      good_overall <- (protect_64 good_overall ms);
+      coefficients <- (VPSHUFB_256 values candidates);
+      coefficient_block <- (VEXTRACTI128 coefficients (W8.of_int 0));
+      (error, bytes_filled,  _0) <@ error_4x____write_out_8_coefficients (
+      error, bytes_filled, good_overall, coefficient_block,
+      shuffle_table_pointer);
       xof_offset <- (xof_offset + (W64.of_int 4));
-      condition <- (bytes_filled \ult (W64.of_int (((256 * 32) %/ 8) - 32)));
-      if (condition) {
-        ms <- (update_msf condition ms);
-        coefficient_block <- (VPSRLDQ_128 coefficient_block (W8.of_int 8));
-        (error, bytes_filled, good_overall) <@ error_4x____write_out_8_coefficients (
-        error, bytes_filled, good_overall, coefficient_block);
-        xof_offset <- (xof_offset + (W64.of_int 4));
-        condition <-
-        (bytes_filled \ult (W64.of_int (((256 * 32) %/ 8) - 32)));
-        if (condition) {
-          ms <- (update_msf condition ms);
-          coefficient_block <- (VEXTRACTI128 coefficients (W8.of_int 1));
-          (error, bytes_filled, good_overall) <@ error_4x____write_out_8_coefficients (
-          error, bytes_filled, good_overall, coefficient_block);
-          xof_offset <- (xof_offset + (W64.of_int 4));
-          condition <-
-          (bytes_filled \ult (W64.of_int (((256 * 32) %/ 8) - 32)));
-          if (condition) {
-            ms <- (update_msf condition ms);
-            coefficient_block <-
-            (VPSRLDQ_128 coefficient_block (W8.of_int 8));
-            (error, bytes_filled,  _0) <@ error_4x____write_out_8_coefficients (
-            error, bytes_filled, good_overall, coefficient_block);
-            xof_offset <- (xof_offset + (W64.of_int 4));
-          } else {
-            ms <- (update_msf (! condition) ms);
-          }
-        } else {
-          ms <- (update_msf (! condition) ms);
-        }
-      } else {
-        ms <- (update_msf (! condition) ms);
-      }
-      condition <- ((W64.of_int (((256 * 32) %/ 8) - 32)) \ule bytes_filled);
-      if (condition) {
-        ms <- (update_msf condition ms);
-        stop_sampling <- (W64.of_int 1);
-      } else {
-        ms <- (update_msf (! condition) ms);
-        condition <- ((W64.of_int ((2 * 136) - 16)) \ule xof_offset);
-        if (condition) {
-          ms <- (update_msf condition ms);
-          stop_sampling <- (W64.of_int 1);
-        } else {
-          ms <- (update_msf (! condition) ms);
-        }
-      }
-      condition_loop <- (stop_sampling <> (W64.of_int 1));
+      slack <- (W64.of_int (((256 * 32) %/ 8) - (4 * 8)));
+      slack <- (slack - bytes_filled);
+      room <- (W64.of_int ((2 * 136) - 16));
+      room <- (room - xof_offset);
+      slack <- (slack `|` room);
+      condition_loop <- ((W64.of_int 0) \sle slack);
     }
     ms <- (update_msf (! condition_loop) ms);
     filled <- bytes_filled;
     filled <- (filled `>>` (W8.of_int 2));
-    condition <- (filled \ult (W64.of_int 256));
-    if (condition) {
-      ms <- (update_msf condition ms);
-      condition <- (xof_offset \ult (W64.of_int (2 * 136)));
-      if (condition) {
-        ms <- (update_msf condition ms);
-        stop_sampling <- (W64.of_int 0);
-      } else {
-        ms <- (update_msf (! condition) ms);
-      }
-    } else {
-      ms <- (update_msf (! condition) ms);
-    }
-    condition_loop <- (stop_sampling <> (W64.of_int 1));
+    candidate_index <- xof_offset;
+    candidate_index <- (candidate_index `<<` (W8.of_int 1));
+    slack <- filled;
+    slack <- (slack - (W64.of_int 256));
+    room <- candidate_index;
+    room <- (room - (W64.of_int (2 * (2 * 136))));
+    slack <- (slack `&` room);
+    condition_loop <- (slack \slt (W64.of_int 0));
     while (condition_loop) {
       ms <- (update_msf condition_loop ms);
-      coefficient <- (zeroextu32 randombytes.[(W64.to_uint xof_offset)]);
+      temp <- candidate_index;
+      temp <- (temp `>>` (W8.of_int 1));
+      coefficient <- (zeroextu32 randombytes.[(W64.to_uint temp)]);
+      shift <- (truncateu32 candidate_index);
+      shift <- (shift `&` (W32.of_int 1));
+      shift <- (shift `<<` (W8.of_int 2));
+      coefficient <- (SHRX_32 coefficient shift);
       coefficient <- (coefficient `&` (W32.of_int 15));
+      accepted <- coefficient;
+      accepted <- (accepted - (W32.of_int 15));
+      accepted <- (accepted `>>` (W8.of_int 31));
       (* Erased call to declassify *)
-      coefficient <- (protect_32 coefficient ms);
-      condition <- (coefficient \ult (W32.of_int 15));
-      if (condition) {
-        ms <- (update_msf condition ms);
-        if ((2 = 2)) {
-          coefficient <@ error_4x____reduce_coefficient (coefficient);
-        } else {
-          
-        }
-        coefficient <- (coefficient - (W32.of_int 2));
-        coefficient <- (- coefficient);
-        error.[(W64.to_uint filled)] <- coefficient;
-        filled <- (filled + (W64.of_int 1));
+      accepted <- (protect_32 accepted ms);
+      if ((2 = 2)) {
+        coefficient <@ error_4x____reduce_coefficient (coefficient);
       } else {
-        ms <- (update_msf (! condition) ms);
+        
       }
-      condition <- (filled \ult (W64.of_int 256));
-      if (condition) {
-        ms <- (update_msf condition ms);
-        coefficient <- (zeroextu32 randombytes.[(W64.to_uint xof_offset)]);
-        coefficient <- (coefficient `>>` (W8.of_int 4));
-        (* Erased call to declassify *)
-        coefficient <- (protect_32 coefficient ms);
-        condition <- (coefficient \ult (W32.of_int 15));
-        if (condition) {
-          ms <- (update_msf condition ms);
-          if ((2 = 2)) {
-            coefficient <@ error_4x____reduce_coefficient (coefficient);
-          } else {
-            
-          }
-          coefficient <- (coefficient - (W32.of_int 2));
-          coefficient <- (- coefficient);
-          error.[(W64.to_uint filled)] <- coefficient;
-          filled <- (filled + (W64.of_int 1));
-        } else {
-          ms <- (update_msf (! condition) ms);
-        }
-      } else {
-        ms <- (update_msf (! condition) ms);
-      }
-      xof_offset <- (xof_offset + (W64.of_int 1));
-      condition <- ((W64.of_int (2 * 136)) \ule xof_offset);
-      if (condition) {
-        ms <- (update_msf condition ms);
-        stop_sampling <- (W64.of_int 1);
-      } else {
-        ms <- (update_msf (! condition) ms);
-        condition <- ((W64.of_int 256) \ule filled);
-        if (condition) {
-          ms <- (update_msf condition ms);
-          stop_sampling <- (W64.of_int 1);
-        } else {
-          ms <- (update_msf (! condition) ms);
-        }
-      }
-      condition_loop <- (stop_sampling <> (W64.of_int 1));
+      coefficient <- (coefficient - (W32.of_int 2));
+      coefficient <- (- coefficient);
+      error.[(W64.to_uint filled)] <- coefficient;
+      temp <- (zeroextu64 accepted);
+      filled <- (filled + temp);
+      candidate_index <- (candidate_index + (W64.of_int 1));
+      slack <- filled;
+      slack <- (slack - (W64.of_int 256));
+      room <- candidate_index;
+      room <- (room - (W64.of_int (2 * (2 * 136))));
+      slack <- (slack `&` room);
+      condition_loop <- (slack \slt (W64.of_int 0));
     }
+    ms <- (update_msf (! condition_loop) ms);
     return (error, filled);
   }
   proc error_4x__rejection_sample_one_block (error:W32.t Array256.t,

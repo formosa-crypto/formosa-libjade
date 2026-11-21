@@ -1,45 +1,32 @@
-inline
-fn __bytestream_to_coefficients(reg u128 bytestream) -> reg u256 {
-    reg u256 coefficients odd_coefficients;
-    reg u256 mask;
-    reg u64 temp;
+// Entry c of each lane: the coefficient ETA - (c mod (2 ETA + 1)) of the
+// candidate c, as a signed byte. VPSHUFB with these tables maps the 32
+// candidates of a block to their coefficients. For ETA = 4 the accepted
+// candidates are below 9, and their coefficient is 4 - c.
+u256 ERROR_COEFFICIENTS_ETA2 = (32u8)[
+     2, -2, -1,  0,  1,  2, -2, -1,  0,  1,  2, -2, -1,  0,  1,  2,
+     2, -2, -1,  0,  1,  2, -2, -1,  0,  1,  2, -2, -1,  0,  1,  2];
 
-    temp = (1 << 4) - 1;
-    mask = (256u)#VMOV(temp);
-    mask = #VPBROADCAST_32u8(mask);
+u256 ERROR_COEFFICIENTS_ETA4 = (32u8)[
+    -2, -1,  0,  1,  2,  3,  4, -4, -3, -2, -1,  0,  1,  2,  3,  4,
+    -2, -1,  0,  1,  2,  3,  4, -4, -3, -2, -1,  0,  1,  2,  3,  4];
+
+// The 32 candidates of 16 bytes, one per byte: the low nibble of a byte, then
+// its high nibble. nibble_mask holds 15 in every byte.
+inline
+fn __bytestream_to_coefficients(reg u128 bytestream, reg u256 nibble_mask) -> reg u256 {
+    reg u256 coefficients odd_coefficients;
 
     coefficients = #VPMOVZX_16u8_16u16(bytestream);
 
     odd_coefficients = #VPSLL_16u16(coefficients, 4);
 
     coefficients = #VPOR_256(coefficients, odd_coefficients);
-    coefficients = #VPAND_256(coefficients, mask);
+    coefficients = #VPAND_256(coefficients, nibble_mask);
 
     return coefficients;
 }
 
-// ETA = 2: the candidates 0 <= c < 15 are reduced modulo 5, eight lanes at
-// a time (the lanes hold 2 - c) or one at a time (c itself)
-inline fn __reduce_coefficients(reg u256 coefficients) -> reg u256 {
-    reg u256 multiplier quotient;
-    reg u64 temp;
-
-    temp = -6560;
-    multiplier = (256u)#VMOV(temp);
-    multiplier = #VPBROADCAST_8u32(multiplier);
-
-    quotient = #VPMULHRS_16u16(coefficients, multiplier);
-
-    temp = 5;
-    multiplier = (256u)#VMOV(temp);
-    multiplier = #VPBROADCAST_8u32(multiplier);
-    quotient = #VPMULL_16u16(quotient, multiplier);
-
-    coefficients = #VPADD_8u32(coefficients, quotient);
-
-    return coefficients;
-}
-
+// ETA = 2: a candidate 0 <= c < 15 is reduced modulo 5
 inline fn __reduce_coefficient(reg u32 coefficient) -> reg u32 {
     reg u32 quotient;
 
@@ -52,8 +39,15 @@ inline fn __reduce_coefficient(reg u32 coefficient) -> reg u32 {
     return coefficient;
 }
 
+// Writes the coefficients of the accepted candidates of a group of 8, whose
+// coefficient bytes are the low 8 bytes of coefficient_block and whose
+// acceptance mask is the low byte of good_overall: the row of the mask in
+// COMPACTION_INDEX_TABLE packs their bytes to the front, and all 8 lanes are
+// stored; the ones past the accepted candidates lie past the filled
+// coefficients. Returns good_overall shifted to the next group.
 #[safety =
    { requires = is_arr_init(error,0,bytes_filled)
+             && is_arr_init(shuffle_table_pointer,0,2048)
              && bytes_filled <= 4 * COEFFICIENTS_IN_POLYNOMIAL - 32
              && bytes_filled % 4 == 0
    , ensures = is_arr_init(error,0,bytes_filled)
@@ -66,42 +60,70 @@ __write_out_8_coefficients(
     reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] error,
     reg u64 bytes_filled,
     reg u64 good_overall,
-    reg u128 coefficient_block
+    reg u128 coefficient_block,
+    reg ptr u8[2048] shuffle_table_pointer
 ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL], reg u64, reg u64
 {
     reg u256 error_coefficients;
     reg u128 error_coefficients_128;
     reg u128 shuffles;
 
-    reg ptr u8[2048] shuffle_table_pointer;
-    reg u64 shuffle_table_idx;
-
     reg u64 good;
 
-    good = good_overall;
-    good &= 0xFF;
-
+    good = (64u)(8u)good_overall;
     good_overall >>= 8;
 
-    shuffle_table_pointer = COMPACTION_INDEX_TABLE;
-
-    shuffle_table_idx = good;
-    shuffle_table_idx <<= 3;
-    shuffles = #VMOV_64(shuffle_table_pointer.[:u64 shuffle_table_idx]);
+    shuffles = #VMOV_64(shuffle_table_pointer.[:u64 8 * good]);
 
     error_coefficients_128 = #VPSHUFB_128(coefficient_block, shuffles);
     error_coefficients = #VPMOVSX_8u8_8u32(error_coefficients_128);
-    #[inline] if (ETA == 2) {
-        error_coefficients = __reduce_coefficients(error_coefficients);
-    }
 
     error.[:u256 bytes_filled] = error_coefficients;
 
     _, _, _, _, _, good = #POPCNT_64(good);
-    good <<= 2;
-    bytes_filled += good;
+    bytes_filled = #LEA_64(bytes_filled + 4 * good);
 
     return error, bytes_filled, good_overall;
+}
+
+// The same for the 4 groups of a block of 32 candidates, whose coefficient
+// bytes are coefficients and whose acceptance mask is the low 32 bits of
+// good_overall.
+#[safety =
+   { requires = is_arr_init(error,0,bytes_filled)
+             && is_arr_init(shuffle_table_pointer,0,2048)
+             && bytes_filled <= 4 * COEFFICIENTS_IN_POLYNOMIAL - 4 * 32
+             && bytes_filled % 4 == 0
+   , ensures = is_arr_init(error,0,bytes_filled)
+            && bytes_filled <= 4 * COEFFICIENTS_IN_POLYNOMIAL
+            && bytes_filled % 4 == 0
+   }
+ ]
+inline fn
+__write_out_32_coefficients(
+    reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL] error,
+    reg u64 bytes_filled,
+    reg u64 good_overall,
+    reg u256 coefficients,
+    reg ptr u8[2048] shuffle_table_pointer
+) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL], reg u64
+{
+    reg u128 coefficient_block;
+
+    coefficient_block = #VEXTRACTI128(coefficients, 0);
+    error, bytes_filled, good_overall = __write_out_8_coefficients(
+        error, bytes_filled, good_overall, coefficient_block, shuffle_table_pointer);
+    coefficient_block = #VPSRLDQ_128(coefficient_block, 8);
+    error, bytes_filled, good_overall = __write_out_8_coefficients(
+        error, bytes_filled, good_overall, coefficient_block, shuffle_table_pointer);
+    coefficient_block = #VEXTRACTI128(coefficients, 1);
+    error, bytes_filled, good_overall = __write_out_8_coefficients(
+        error, bytes_filled, good_overall, coefficient_block, shuffle_table_pointer);
+    coefficient_block = #VPSRLDQ_128(coefficient_block, 8);
+    error, bytes_filled, _ = __write_out_8_coefficients(
+        error, bytes_filled, good_overall, coefficient_block, shuffle_table_pointer);
+
+    return error, bytes_filled;
 }
 
 #[safety =
@@ -116,194 +138,167 @@ fn rejection_sample_multiple_blocks(
 ) -> reg ptr u32[COEFFICIENTS_IN_POLYNOMIAL], reg u64
 {
     reg u128 bytestream;
-    reg u256 coefficients comparisons;
+    reg u256 candidates comparisons coefficients;
+    reg u256 values bound nibble_mask;
     reg u128 coefficient_block;
-    reg u256 eta bound;
+    reg ptr u8[2048] shuffle_table_pointer;
 
     reg u64 good_overall;
 
     reg u64 xof_offset;
     reg u64 bytes_filled filled;
+    reg u64 slack room candidate_index;
+    reg u32 coefficient accepted shift;
 
     reg u64 temp;
 
-    reg u64 stop_sampling;
-
-    reg u32 coefficient;
-
-    reg bool condition_loop condition;
+    reg bool condition_loop;
     #[msf] reg u64 ms;
 
     ms = #init_msf();
 
-    temp = ETA;
-    eta = (256u)#VMOV(temp);
-    eta = #VPBROADCAST_32u8(eta);
+    #[inline] if (ETA == 2) {
+        values = ERROR_COEFFICIENTS_ETA2;
+    } else {
+        values = ERROR_COEFFICIENTS_ETA4;
+    }
+    shuffle_table_pointer = COMPACTION_INDEX_TABLE;
 
     temp = ERROR_REJECTION_BOUND;
     bound = (256u)#VMOV(temp);
     bound = #VPBROADCAST_32u8(bound);
 
+    temp = (1 << 4) - 1;
+    nibble_mask = (256u)#VMOV(temp);
+    nibble_mask = #VPBROADCAST_32u8(nibble_mask);
+
     bytes_filled = 0;
     xof_offset = 0;
 
-    stop_sampling = 0;
-
-    while { condition_loop = stop_sampling != 1; } (condition_loop) {
+    // The first 8 blocks of 16 bytes hold COEFFICIENTS_IN_POLYNOMIAL
+    // candidates: they cannot overflow the polynomial, and the loop branches
+    // on the offset only.
+    while { condition_loop = xof_offset < (COEFFICIENTS_IN_POLYNOMIAL / 32) * 16; }
+          (condition_loop) {
         ms = #update_msf(condition_loop, ms);
         bytestream = randombytes.[:u128 xof_offset];
+        candidates = __bytestream_to_coefficients(bytestream, nibble_mask);
 
-        coefficients = __bytestream_to_coefficients(bytestream);
-
-        comparisons = #VPSUB_32u8(coefficients, bound);
+        comparisons = #VPSUB_32u8(candidates, bound);
         good_overall = (64u)#MOVEMASK_32u8(comparisons);
-
-        coefficients = #VPSUB_32u8(eta, coefficients);
-
-        // Handle the first 16 coefficients
-        coefficient_block = #VEXTRACTI128(coefficients, 0);
-
-        // Start with the first 8
         () = #declassify(good_overall);
         good_overall = #protect(good_overall, ms);
-        error, bytes_filled, good_overall = __write_out_8_coefficients(error, bytes_filled, good_overall, coefficient_block);
+
+        coefficients = #VPSHUFB_256(values, candidates);
+        error, bytes_filled = __write_out_32_coefficients(
+            error, bytes_filled, good_overall, coefficients, shuffle_table_pointer);
+
+        xof_offset += 16;
+    }
+    ms = #update_msf(!condition_loop, ms);
+
+    // Then whole blocks while 32 more coefficients fit and 16 more bytes
+    // remain: both differences are non-negative.
+    while {
+        slack = BYTES_PER_UNCOMPRESSED_POLYNOMIAL - 4 * 32;
+        slack -= bytes_filled;
+        room = REJECTION_SAMPLING_BYTES - 16;
+        room -= xof_offset;
+        slack |= room;
+        condition_loop = slack >=s 0;
+    } (condition_loop) {
+        ms = #update_msf(condition_loop, ms);
+        bytestream = randombytes.[:u128 xof_offset];
+        candidates = __bytestream_to_coefficients(bytestream, nibble_mask);
+
+        comparisons = #VPSUB_32u8(candidates, bound);
+        good_overall = (64u)#MOVEMASK_32u8(comparisons);
+        () = #declassify(good_overall);
+        good_overall = #protect(good_overall, ms);
+
+        coefficients = #VPSHUFB_256(values, candidates);
+        error, bytes_filled = __write_out_32_coefficients(
+            error, bytes_filled, good_overall, coefficients, shuffle_table_pointer);
+
+        xof_offset += 16;
+    }
+    ms = #update_msf(!condition_loop, ms);
+
+    // Then groups of 8 candidates, the first 4 of 16 more bytes, while 8
+    // more coefficients fit.
+    while {
+        slack = BYTES_PER_UNCOMPRESSED_POLYNOMIAL - 4 * 8;
+        slack -= bytes_filled;
+        room = REJECTION_SAMPLING_BYTES - 16;
+        room -= xof_offset;
+        slack |= room;
+        condition_loop = slack >=s 0;
+    } (condition_loop) {
+        ms = #update_msf(condition_loop, ms);
+        bytestream = randombytes.[:u128 xof_offset];
+        candidates = __bytestream_to_coefficients(bytestream, nibble_mask);
+
+        comparisons = #VPSUB_32u8(candidates, bound);
+        good_overall = (64u)#MOVEMASK_32u8(comparisons);
+        () = #declassify(good_overall);
+        good_overall = #protect(good_overall, ms);
+
+        coefficients = #VPSHUFB_256(values, candidates);
+        coefficient_block = #VEXTRACTI128(coefficients, 0);
+        error, bytes_filled, _ = __write_out_8_coefficients(
+            error, bytes_filled, good_overall, coefficient_block, shuffle_table_pointer);
 
         xof_offset += 4;
-
-        condition = bytes_filled < BYTES_PER_UNCOMPRESSED_POLYNOMIAL - 32;
-        if (condition) {
-            ms = #update_msf(condition, ms);
-            // Then the next 8
-            coefficient_block = #VPSRLDQ_128(coefficient_block, 8);
-            error, bytes_filled, good_overall = __write_out_8_coefficients(error, bytes_filled, good_overall, coefficient_block);
-            xof_offset += 4;
-
-            condition = bytes_filled < BYTES_PER_UNCOMPRESSED_POLYNOMIAL - 32;
-            if (condition) {
-                ms = #update_msf(condition, ms);
-                // Then the next 16 coefficients
-                coefficient_block = #VEXTRACTI128(coefficients, 1);
-
-                // Start with the first 8
-                error, bytes_filled, good_overall = __write_out_8_coefficients(error, bytes_filled, good_overall, coefficient_block);
-                xof_offset += 4;
-
-                condition = bytes_filled < BYTES_PER_UNCOMPRESSED_POLYNOMIAL - 32;
-                if (condition) {
-                    ms = #update_msf(condition, ms);
-                    // Finally, the last 8
-                    coefficient_block = #VPSRLDQ_128(coefficient_block, 8);
-                    error, bytes_filled, _ = __write_out_8_coefficients(error, bytes_filled, good_overall, coefficient_block);
-                    xof_offset += 4;
-                } else {
-                    ms = #update_msf(!condition, ms);
-                }
-            } else {
-                ms = #update_msf(!condition, ms);
-            }
-        } else {
-            ms = #update_msf(!condition, ms);
-        }
-
-        condition = bytes_filled >= BYTES_PER_UNCOMPRESSED_POLYNOMIAL - 32;
-        if (condition) {
-            ms = #update_msf(condition, ms);
-            stop_sampling = 1;
-        } else {
-            ms = #update_msf(!condition, ms);
-            condition = xof_offset >= REJECTION_SAMPLING_BYTES - 16;
-            if (condition) {
-                ms = #update_msf(condition, ms);
-                stop_sampling = 1;
-            } else {
-                ms = #update_msf(!condition, ms);
-            }
-        }
     }
     ms = #update_msf(!condition_loop, ms);
 
     filled = bytes_filled;
     filled >>= 2;
 
-    // stop_sampling is already 1 here.
-    condition = filled < COEFFICIENTS_IN_POLYNOMIAL;
-    if (condition) {
-        ms = #update_msf(condition, ms);
-        condition = xof_offset < REJECTION_SAMPLING_BYTES;
-        if (condition) {
-            ms = #update_msf(condition, ms);
-            stop_sampling = 0;
-        } else {
-            ms = #update_msf(!condition, ms);
-        }
-    } else {
-        ms = #update_msf(!condition, ms);
-    }
-
-    while { condition_loop = stop_sampling != 1; } (condition_loop) {
+    // Then one candidate at a time while coefficients are missing and
+    // candidates remain: both differences are negative. The coefficient of
+    // a candidate is stored at the first missing position, and the position
+    // advances if the candidate is accepted.
+    candidate_index = xof_offset;
+    candidate_index <<= 1;
+    while {
+        slack = filled;
+        slack -= COEFFICIENTS_IN_POLYNOMIAL;
+        room = candidate_index;
+        room -= 2 * REJECTION_SAMPLING_BYTES;
+        slack &= room;
+        condition_loop = slack <s 0;
+    } (condition_loop) {
         ms = #update_msf(condition_loop, ms);
-        coefficient = (32u)randombytes[xof_offset];
+        // The low nibble of a byte, then its high nibble.
+        temp = candidate_index;
+        temp >>= 1;
+        coefficient = (32u)randombytes[temp];
+        shift = (32u)candidate_index;
+        shift &= 1;
+        shift <<= 2;
+        coefficient = #SHRX_32(coefficient, shift);
         coefficient &= 0xF;
-        () = #declassify(coefficient);
-        coefficient = #protect_32(coefficient, ms);
 
-        condition = coefficient < ERROR_REJECTION_BOUND;
-        if (condition) {
-            ms = #update_msf(condition, ms);
-            #[inline] if (ETA == 2) {
-                coefficient = __reduce_coefficient(coefficient);
-            }
-            coefficient -= ETA;
-            coefficient = -coefficient;
+        // 1 if the candidate is below the bound
+        accepted = coefficient;
+        accepted -= ERROR_REJECTION_BOUND;
+        accepted >>= 31;
+        () = #declassify(accepted);
+        accepted = #protect_32(accepted, ms);
 
-            error[filled] = coefficient;
-            filled += 1;
-        } else {
-            ms = #update_msf(!condition, ms);
+        #[inline] if (ETA == 2) {
+            coefficient = __reduce_coefficient(coefficient);
         }
+        coefficient -= ETA;
+        coefficient = -coefficient;
 
-        condition = filled < COEFFICIENTS_IN_POLYNOMIAL;
-        if (condition) {
-            ms = #update_msf(condition, ms);
-            coefficient = (32u)randombytes[xof_offset];
-            coefficient >>= 4;
-            () = #declassify(coefficient);
-            coefficient = #protect_32(coefficient, ms);
-
-            condition = coefficient < ERROR_REJECTION_BOUND;
-            if (condition) {
-                ms = #update_msf(condition, ms);
-                #[inline] if (ETA == 2) {
-                    coefficient = __reduce_coefficient(coefficient);
-                }
-                coefficient -= ETA;
-                coefficient = -coefficient;
-
-                error[filled] = coefficient;
-                filled += 1;
-            } else {
-                ms = #update_msf(!condition, ms);
-            }
-        } else {
-            ms = #update_msf(!condition, ms);
-        }
-
-        xof_offset += 1;
-        condition = xof_offset >= REJECTION_SAMPLING_BYTES;
-        if (condition) {
-            ms = #update_msf(condition, ms);
-            stop_sampling = 1;
-        } else {
-            ms = #update_msf(!condition, ms);
-            condition = filled >= COEFFICIENTS_IN_POLYNOMIAL;
-            if (condition) {
-                ms = #update_msf(condition, ms);
-                stop_sampling = 1;
-            } else {
-                ms = #update_msf(!condition, ms);
-            }
-        }
+        error[filled] = coefficient;
+        temp = (64u)accepted;
+        filled += temp;
+        candidate_index += 1;
     }
+    ms = #update_msf(!condition_loop, ms);
 
     return error, filled;
 }

@@ -3058,8 +3058,8 @@ auto; ecall (error_polynomial__decode_proof param_0 b_param_0 param b_param).
 by auto => /> *.
 qed.
 
-lemma error_4x____bytestream_to_coefficients_proof _bytestream :
-      (error_4x____bytestream_to_coefficients_spec _bytestream).
+lemma error_4x____bytestream_to_coefficients_proof _bytestream _nibble_mask :
+      (error_4x____bytestream_to_coefficients_spec _bytestream _nibble_mask).
 proof.
 hint +safety.
 rewrite /error_4x____bytestream_to_coefficients_spec; proc.
@@ -3067,47 +3067,97 @@ conseq (_ : _ ==> valid trace_error_4x____bytestream_to_coefficients).
 by auto => /> *.
 qed.
 
-lemma error_4x____write_out_8_coefficients_proof _error _b_error _bytes_filled _good_overall
-    _coefficient_block :
-  error_4x____write_out_8_coefficients_spec _error _b_error _bytes_filled _good_overall
-    _coefficient_block.
+(* the write-out of a group, with the bound on the bytes it adds: 32 bytes are
+   written at bytes_filled, which advances by 4 bytes per accepted candidate.
+   The acceptance mask of the group is a byte: its row of the compaction
+   table is in bounds, and at most 8 candidates are accepted *)
+lemma error_4x____write_out_8_coefficients_exact _error _b_error _bytes_filled _good_overall
+    _coefficient_block _table _b_table :
+  hoare [M.error_4x____write_out_8_coefficients :
+       _b_table = b_shuffle_table_pointer /\ _table = shuffle_table_pointer
+    /\ _coefficient_block = coefficient_block /\ _good_overall = good_overall
+    /\ _bytes_filled = bytes_filled /\ _b_error = b_error /\ _error = error
+    /\ BArray1024.is_init _b_error 0 (to_uint _bytes_filled)
+    /\ BArray2048.is_init _b_table 0 2048
+    /\ to_uint _bytes_filled <= 992 /\ to_uint _bytes_filled %% 4 = 0
+    ==>
+       BArray1024.is_init res.`2 0 (to_uint res.`3)
+    /\ to_uint _bytes_filled <= to_uint res.`3 <= to_uint _bytes_filled + 32
+    /\ to_uint res.`3 %% 4 = 0
+    /\ valid res.`5 ].
 proof.
 hint +safety.
-rewrite /error_4x____write_out_8_coefficients_spec; proc.
-
-conseq (_ : _
-  ==> (W64.to_uint (W64.of_int 4)) <> 0
-   /\ BArray1024.is_init b_error 0 (W64.to_uint bytes_filled)
-   /\ bytes_filled \ule (W64.of_int (4 * 256))
-   /\ (bytes_filled \umod (W64.of_int 4)) = (W64.of_int 0)
-   /\ valid trace_error_4x____write_out_8_coefficients).
-+ by move=> />.
-(* eight coefficients (32 bytes) are written at bytes_filled, then bytes_filled
-   advances by four bytes per accepted coefficient (at most eight) *)
-auto => /> hinit hle hmod.
-have hgood : to_uint (_good_overall `&` W64.of_int 255) < 256.
-+ have -> : W64.of_int 255 = W64.of_int (2 ^ 8 - 1) by done.
-  by rewrite W64.to_uint_and_mod //; smt(modz_cmp).
-have hpop := to_uint_popcnt64_byte _ hgood.
-have hle' : to_uint _bytes_filled <= 992 by move: hle; rewrite W64.uleE /= /#.
+proc; auto => /> hinit htab hle hmod.
+have hg : to_uint (zeroextu64 (truncateu8 _good_overall)) < 256.
++ by rewrite W8u8.to_uint_zeroextu64; smt(to_uint_W8_lt256).
+have hp := to_uint_popcnt64_byte _ hg.
 have hcmp := W64.to_uint_cmp _bytes_filled.
-have hmod' : to_uint _bytes_filled %% 4 = 0.
-+ by move: hmod; rewrite W64.umodE /ulift2 W64.to_uint_eq !W64.of_uintK /= /#.
-have hsh3 : to_uint (_good_overall `&` W64.of_int 255 `<<` W8.of_int 3)
-            = 8 * to_uint (_good_overall `&` W64.of_int 255).
-+ by rewrite /(`<<`) /= W64.to_uint_shl // /ptr_modulus /= modz_small; smt(W64.to_uint_cmp).
-have hsh2 : to_uint ((POPCNT_64 (_good_overall `&` W64.of_int 255)).`6 `<<` W8.of_int 2)
-            = 4 * to_uint (POPCNT_64 (_good_overall `&` W64.of_int 255)).`6.
-+ by rewrite /(`<<`) /= W64.to_uint_shl // /ptr_modulus /= modz_small; smt(W64.to_uint_cmp).
-have hfinal : BArray1024.is_init
-    (BArray1024.set256d _b_error (to_uint _bytes_filled)
-       (W256.of_int 115792089237316195423570985008687907853269984665640564039457584007913129639935))
-    0 (to_uint _bytes_filled + 4 * to_uint (POPCNT_64 (_good_overall `&` W64.of_int 255)).`6).
-+ apply (BI1024.is_init_sub _ 0 (to_uint _bytes_filled + 32)) => //; last smt(W64.to_uint_cmp).
-  by rewrite BI1024.is_init_set256d_in 1,2:/# /= hinit.
-rewrite hsh3 W64.to_uintD_small hsh2 1:/# W64.uleE W64.umodE /ulift2 W64.to_uint_eq.
-rewrite W64.to_uintD_small hsh2 1:/# !W64.of_uintK /=.
-smt(W64.to_uint_cmp).
+rewrite (W64.to_uintM_small (W64.of_int 8)) /= 1:/#.
+rewrite /LEA_64 WE64.to_uint_addmul_small /= 1:/#.
+rewrite BI1024.is_init_set256d_grow //= 1:/# W64.uleE WE64.umod_eq0 /= hmod /=.
+by smt(W64.to_uint_cmp).
+qed.
+
+lemma error_4x____write_out_8_coefficients_proof _error _b_error _bytes_filled _good_overall
+    _coefficient_block _table _b_table :
+  error_4x____write_out_8_coefficients_spec _error _b_error _bytes_filled _good_overall
+    _coefficient_block _table _b_table.
+proof.
+rewrite /error_4x____write_out_8_coefficients_spec.
+conseq (error_4x____write_out_8_coefficients_exact _error _b_error _bytes_filled
+          _good_overall _coefficient_block _table _b_table).
++ by move=> &hr />; rewrite W64.uleE WE64.umod_eq0.
+move=> &hr /> hinit htab; rewrite W64.uleE WE64.umod_eq0 /= => hle hmod r hri hlo hhi hrm hv.
+by rewrite W64.uleE WE64.umod_eq0 /= hrm /= /#.
+qed.
+
+(* the write-out of a block: four groups *)
+lemma error_4x____write_out_32_coefficients_exact _error _b_error _bytes_filled _good_overall
+    _coefficients _table _b_table :
+  hoare [M.error_4x____write_out_32_coefficients :
+       _b_table = b_shuffle_table_pointer /\ _table = shuffle_table_pointer
+    /\ _coefficients = coefficients /\ _good_overall = good_overall
+    /\ _bytes_filled = bytes_filled /\ _b_error = b_error /\ _error = error
+    /\ BArray1024.is_init _b_error 0 (to_uint _bytes_filled)
+    /\ BArray2048.is_init _b_table 0 2048
+    /\ to_uint _bytes_filled <= 896 /\ to_uint _bytes_filled %% 4 = 0
+    ==>
+       BArray1024.is_init res.`2 0 (to_uint res.`3)
+    /\ to_uint _bytes_filled <= to_uint res.`3 <= to_uint _bytes_filled + 128
+    /\ to_uint res.`3 %% 4 = 0
+    /\ valid res.`4 ].
+proof.
+hint +safety.
+proc.
+auto; ecall (error_4x____write_out_8_coefficients_exact param_18 b_param param_17 param_16
+               param_15 param_14 (BArray2048.init_arr (W8.of_int 255))).
+auto; ecall (error_4x____write_out_8_coefficients_exact param_13 b_param_0 param_12 param_11
+               param_10 param_9 (BArray2048.init_arr (W8.of_int 255))).
+auto; ecall (error_4x____write_out_8_coefficients_exact param_8 b_param_1 param_7 param_6
+               param_5 param_4 (BArray2048.init_arr (W8.of_int 255))).
+auto; ecall (error_4x____write_out_8_coefficients_exact param_3 b_param_2 param_2 param_1
+               param_0 param (BArray2048.init_arr (W8.of_int 255))).
+auto => /> hinit htab hle hmod.
+split; first by smt().
+move=> _ r0 hi0 hl0 hh0 hm0 hv0; split; first by smt().
+move=> _ r1 hi1 hl1 hh1 hm1 hv1; split; first by smt().
+move=> _ r2 hi2 hl2 hh2 hm2 hv2; split; first by smt().
+move=> _ r3 hi3 hl3 hh3 hm3 hv3.
+rewrite !W64.uleE !WE64.umod_eq0 /= hmod hm0 hm1 hm2 hm3 /=.
+by smt().
+qed.
+
+lemma error_4x____write_out_32_coefficients_proof _error _b_error _bytes_filled _good_overall
+    _coefficients _table _b_table :
+  error_4x____write_out_32_coefficients_spec _error _b_error _bytes_filled _good_overall
+    _coefficients _table _b_table.
+proof.
+rewrite /error_4x____write_out_32_coefficients_spec.
+conseq (error_4x____write_out_32_coefficients_exact _error _b_error _bytes_filled
+          _good_overall _coefficients _table _b_table).
++ by move=> &hr />; rewrite W64.uleE WE64.umod_eq0.
+move=> &hr /> hinit htab; rewrite W64.uleE WE64.umod_eq0 /= => hle hmod r hri hlo hhi hrm hv.
+by rewrite W64.uleE WE64.umod_eq0 /= hrm /= /#.
 qed.
 
 lemma error_4x__rejection_sample_multiple_blocks_proof _error _b_error _randombytes _b_randombytes :
@@ -3115,7 +3165,6 @@ lemma error_4x__rejection_sample_multiple_blocks_proof _error _b_error _randomby
 proof.
 hint +safety.
 rewrite /error_4x__rejection_sample_multiple_blocks_spec; proc.
-
 conseq (_ :
      b_randombytes = BArray272.init_arr (W8.of_int 255)
   ==> BArray1024.is_init b_error 0 (W64.to_uint ((W64.of_int 4) * filled))
@@ -3123,121 +3172,96 @@ conseq (_ :
    /\ valid trace_error_4x__rejection_sample_multiple_blocks).
 + by move=> &hr />; rewrite -!(BI272.is_init_full _ 272) //.
 + by move=> />.
-have h01 : W64.zero <> W64.one by rewrite W64.to_uint_eq.
-have hz0 : to_uint W64.zero = 0 by done.
-(* second phase: two candidate coefficients per byte; the stop flag is only
-   raised inside the loops *)
+wp.
+(* one candidate at a time, stored at the first missing position, which
+   advances by the acceptance bit of the candidate *)
 while (b_randombytes = BArray272.init_arr (W8.of_int 255)
     /\ to_uint filled <= 256 /\ BArray1024.is_init b_error 0 (4 * to_uint filled)
-    /\ to_uint xof_offset <= 272
-    /\ (stop_sampling = W64.zero \/ stop_sampling = W64.one)
-    /\ condition_loop = (stop_sampling <> W64.one)
-    /\ (stop_sampling = W64.zero => to_uint xof_offset < 272 /\ to_uint filled < 256)
+    /\ to_uint candidate_index <= 544
+    /\ condition_loop = (to_uint filled < 256 /\ to_uint candidate_index < 544)
     /\ valid trace_error_4x__rejection_sample_multiple_blocks).
-+ auto => /> &hr hle hinit hxo hstop hbnd hvalid hne.
-  have hz : stop_sampling{hr} = W64.zero by smt().
-  have [hlt hlt2] := hbnd hz.
-  have hf0 := W64.to_uint_cmp filled{hr}; have hx0 := W64.to_uint_cmp xof_offset{hr}.
-  have hx1 : to_uint (xof_offset{hr} + W64.of_int 1) = to_uint xof_offset{hr} + 1.
-  + by rewrite W64.to_uintD_small W64.of_uintK /= /#.
-  have hf1 : to_uint (filled{hr} + W64.of_int 1) = to_uint filled{hr} + 1.
-  + by rewrite W64.to_uintD_small W64.of_uintK /= /#.
-  have hf2 : to_uint (filled{hr} + W64.of_int 1 + W64.of_int 1) = to_uint filled{hr} + 2.
-  + by rewrite W64.to_uintD_small hf1 W64.of_uintK /= /#.
-  have hs1 : BArray1024.is_init
-      (BArray1024.set32d b_error{hr} (to_uint filled{hr} * 4) (W32.of_int 4294967295))
-      0 (4 * (to_uint filled{hr} + 1)).
-  + by rewrite BI1024.is_init_set32d_in 1,2:/# /=; smt(BI1024.is_init_le0).
-  have hs2 : BArray1024.is_init
-      (BArray1024.set32d
-         (BArray1024.set32d b_error{hr} (to_uint filled{hr} * 4) (W32.of_int 4294967295))
-         ((to_uint filled{hr} + 1) * 4) (W32.of_int 4294967295))
-      0 (4 * (to_uint filled{hr} + 2)).
-  + by rewrite BI1024.is_init_set32d_in 1,2:/# /=; smt(BI1024.is_init_le0).
-  rewrite ?W64.uleE ?W64.ultE ?hx1 ?hf1 ?hf2 /=.
-  smt().
-(* first phase: 32 candidates per 16 bytes, written eight at a time by
-   write_out, each call after the first guarded by the room left *)
++ auto => /> &hr hle hinit hci hvalid hf hn.
+  rewrite /SLH64.protect_32.
+  have hc1 : to_uint (candidate_index{hr} + W64.one) = to_uint candidate_index{hr} + 1.
+  + by rewrite W64.to_uintD_small /= /#.
+  pose a := W2u32.zeroextu64 _.
+  have ha : 0 <= to_uint a <= 1.
+  + by rewrite /a to_uint_zeroextu64 /(`>>`) /= WE32.to_uint_shr_msb; case: (W32.msb _).
+  have hfD : to_uint (filled{hr} + a) = to_uint filled{hr} + to_uint a.
+  + by rewrite W64.to_uintD_small; smt(W64.to_uint_cmp).
+  rewrite W64.shr_div_le //= hc1 hfD.
+  rewrite BI1024.is_init_set32d_grow /= 1:mulzC // 1:/#.
+  rewrite WE64.slt0_andw !WE64.slt0_sub //= ?hfD ?hc1; 1,2: smt(W64.to_uint_cmp).
+  by smt(W64.to_uint_cmp).
 wp.
+(* groups of 8 candidates while 8 more coefficients fit *)
 while (b_randombytes = BArray272.init_arr (W8.of_int 255)
     /\ to_uint bytes_filled <= 1024 /\ to_uint bytes_filled %% 4 = 0
     /\ BArray1024.is_init b_error 0 (to_uint bytes_filled)
     /\ to_uint xof_offset <= 272
-    /\ (stop_sampling = W64.zero \/ stop_sampling = W64.one)
-    /\ condition_loop = (stop_sampling <> W64.one)
-    /\ (stop_sampling = W64.zero => to_uint bytes_filled < 992 /\ to_uint xof_offset < 256)
+    /\ condition_loop = (to_uint bytes_filled <= 992 /\ to_uint xof_offset <= 256)
     /\ valid trace_error_4x__rejection_sample_multiple_blocks).
-+ wp.
-  seq 30 : (b_randombytes = BArray272.init_arr (W8.of_int 255)
-      /\ to_uint bytes_filled <= 1024 /\ to_uint bytes_filled %% 4 = 0
-      /\ BArray1024.is_init b_error 0 (to_uint bytes_filled)
-      /\ to_uint xof_offset <= 260 /\ stop_sampling = W64.zero
-      /\ condition = (to_uint bytes_filled < 992)
-      /\ valid trace_error_4x__rejection_sample_multiple_blocks).
-  + auto; ecall (error_4x____write_out_8_coefficients_proof param_3 b_param_2 param_2 param_1 param_0).
-    auto; ecall (error_4x____bytestream_to_coefficients_proof param).
-    auto => /> &hr hle hmod hinit hxo hstop hbnd hvalid hne.
-    have hz : stop_sampling{hr} = W64.zero by smt().
-    have [hlt hlt2] := hbnd hz.
-    have hx0 := W64.to_uint_cmp xof_offset{hr}; have hb0 := W64.to_uint_cmp bytes_filled{hr}.
-    have hx4 : to_uint (xof_offset{hr} + W64.of_int 4) = to_uint xof_offset{hr} + 4.
-    + by rewrite W64.to_uintD_small W64.of_uintK /= /#.
-    rewrite ?W64.uleE ?W64.ultE ?W64.umodE /ulift2 ?W64.to_uint_eq ?W64.of_uintK hx4 /=.
-    move=> r hv; (split; first smt()); move=> _ _ r1 hinit1 hle1 hmod1 hv1.
-    move: hle1 hmod1; rewrite W64.uleE W64.to_uint_eq !W64.of_uintK /= => hle1 hmod1.
-    by rewrite W64.ultE /=; do ! (split; first smt()); smt().
-  if; last by auto => /> *; rewrite ?W64.uleE ?W64.ultE ?W64.of_uintK /=; smt().
-  seq 20 : (b_randombytes = BArray272.init_arr (W8.of_int 255)
-      /\ to_uint bytes_filled <= 1024 /\ to_uint bytes_filled %% 4 = 0
-      /\ BArray1024.is_init b_error 0 (to_uint bytes_filled)
-      /\ to_uint xof_offset <= 264 /\ stop_sampling = W64.zero
-      /\ condition = (to_uint bytes_filled < 992)
-      /\ valid trace_error_4x__rejection_sample_multiple_blocks).
-  + auto; ecall (error_4x____write_out_8_coefficients_proof param_7 b_param_1 param_6 param_5 param_4).
-    auto => /> &hr hle hmod hinit hxo hvalid hlt.
-    have hx0 := W64.to_uint_cmp xof_offset{hr}; have hb0 := W64.to_uint_cmp bytes_filled{hr}.
-    have hx4 : to_uint (xof_offset{hr} + W64.of_int 4) = to_uint xof_offset{hr} + 4.
-    + by rewrite W64.to_uintD_small W64.of_uintK /= /#.
-    rewrite ?W64.uleE ?W64.ultE ?W64.umodE /ulift2 ?W64.to_uint_eq ?W64.of_uintK hx4 /=.
-    (split; first smt()); move=> _ _ r1 hinit1 hle1 hmod1 hv1.
-    move: hle1 hmod1; rewrite W64.uleE W64.to_uint_eq !W64.of_uintK /= => hle1 hmod1.
-    by rewrite W64.ultE /=; do ! (split; first smt()); smt().
-  if; last by auto => /> *; rewrite ?W64.uleE ?W64.ultE ?W64.of_uintK /=; smt().
-  seq 20 : (b_randombytes = BArray272.init_arr (W8.of_int 255)
-      /\ to_uint bytes_filled <= 1024 /\ to_uint bytes_filled %% 4 = 0
-      /\ BArray1024.is_init b_error 0 (to_uint bytes_filled)
-      /\ to_uint xof_offset <= 268 /\ stop_sampling = W64.zero
-      /\ condition = (to_uint bytes_filled < 992)
-      /\ valid trace_error_4x__rejection_sample_multiple_blocks).
-  + auto; ecall (error_4x____write_out_8_coefficients_proof param_11 b_param_0 param_10 param_9 param_8).
-    auto => /> &hr hle hmod hinit hxo hvalid hlt.
-    have hx0 := W64.to_uint_cmp xof_offset{hr}; have hb0 := W64.to_uint_cmp bytes_filled{hr}.
-    have hx4 : to_uint (xof_offset{hr} + W64.of_int 4) = to_uint xof_offset{hr} + 4.
-    + by rewrite W64.to_uintD_small W64.of_uintK /= /#.
-    rewrite ?W64.uleE ?W64.ultE ?W64.umodE /ulift2 ?W64.to_uint_eq ?W64.of_uintK hx4 /=.
-    (split; first smt()); move=> _ _ r1 hinit1 hle1 hmod1 hv1.
-    move: hle1 hmod1; rewrite W64.uleE W64.to_uint_eq !W64.of_uintK /= => hle1 hmod1.
-    by rewrite W64.ultE /=; do ! (split; first smt()); smt().
-  if; last by auto => /> *; rewrite ?W64.uleE ?W64.ultE ?W64.of_uintK /=; smt().
-  auto; ecall (error_4x____write_out_8_coefficients_proof param_15 b_param param_14 param_13 param_12).
-  auto => /> &hr hle hmod hinit hxo hvalid hlt.
-  have hx0 := W64.to_uint_cmp xof_offset{hr}; have hb0 := W64.to_uint_cmp bytes_filled{hr}.
++ auto; ecall (error_4x____write_out_8_coefficients_exact param_19 b_param param_18 param_17
+                 param_16 param_15 (BArray2048.init_arr (W8.of_int 255))).
+  auto; ecall (error_4x____bytestream_to_coefficients_proof param_14 param_13).
+  auto => /> &hr hle hmod hinit hxo hvalid hbf hoff.
   have hx4 : to_uint (xof_offset{hr} + W64.of_int 4) = to_uint xof_offset{hr} + 4.
   + by rewrite W64.to_uintD_small W64.of_uintK /= /#.
-  rewrite ?W64.uleE ?W64.ultE ?W64.umodE /ulift2 ?W64.to_uint_eq ?W64.of_uintK hx4 /=.
-  (split; first smt()); move=> _ _ r1 hinit1 hle1 hmod1 hv1.
-  move: hle1 hmod1; rewrite W64.uleE W64.to_uint_eq !W64.of_uintK /= => hle1 hmod1.
-  by rewrite ?W64.uleE ?W64.ultE /=; do ! (split; first smt()); smt().
-(* between the phases *)
-auto => /> b0 bf0 cl0 st0 tr0 xo0 hcl hle hmod hinit hxo hstop hne hbnd hv.
-rewrite !W64.ultE ?W64.uleE !W64.shr_div !W64.of_uintK W8.of_uintK /=.
-have hbf : 4 * (to_uint bf0 %/ 4) = to_uint bf0 by smt().
-rewrite hbf.
-have hexit : forall (b1 : BArray1024.t) (f0 : W64.t), to_uint f0 <= 256 =>
-    BArray1024.is_init b1 0 (4 * to_uint f0) =>
-    BArray1024.is_init b1 0 (to_uint (W64.of_int 4 * f0)) /\ (f0 \ule W64.of_int 256).
-+ by move=> b1 f0 hf hb; rewrite to_uint_mul4 1:/# W64.uleE /=.
-smt().
+  move=> r0 hv0 r1 h1 h2 h3 h4 h5.
+  rewrite WE64.sge0_orw !WE64.sge0_sub //= ?hx4 1,2:/#.
+  rewrite W64.uleE WE64.umod_eq0 /= h4 /=.
+  by smt(W64.to_uint_cmp).
+wp.
+(* whole blocks while 32 more coefficients fit *)
+while (b_randombytes = BArray272.init_arr (W8.of_int 255)
+    /\ to_uint bytes_filled <= 1024 /\ to_uint bytes_filled %% 4 = 0
+    /\ BArray1024.is_init b_error 0 (to_uint bytes_filled)
+    /\ to_uint xof_offset <= 272
+    /\ condition_loop = (to_uint bytes_filled <= 896 /\ to_uint xof_offset <= 256)
+    /\ valid trace_error_4x__rejection_sample_multiple_blocks).
++ auto; ecall (error_4x____write_out_32_coefficients_exact param_12 b_param_0 param_11 param_10
+                 param_9 param_8 (BArray2048.init_arr (W8.of_int 255))).
+  auto; ecall (error_4x____bytestream_to_coefficients_proof param_7 param_6).
+  auto => /> &hr hle hmod hinit hxo hvalid hbf hoff.
+  have hx16 : to_uint (xof_offset{hr} + W64.of_int 16) = to_uint xof_offset{hr} + 16.
+  + by rewrite W64.to_uintD_small W64.of_uintK /= /#.
+  move=> r0 hv0 r1 h1 h2 h3 h4 h5.
+  rewrite WE64.sge0_orw !WE64.sge0_sub //= ?hx16 1,2:/#.
+  rewrite W64.uleE WE64.umod_eq0 /= h4 /=.
+  by smt(W64.to_uint_cmp).
+wp.
+(* the first 8 blocks: at most 8 bytes of coefficients per byte so far *)
+while (b_randombytes = BArray272.init_arr (W8.of_int 255)
+    /\ to_uint bytes_filled <= 1024 /\ to_uint bytes_filled %% 4 = 0
+    /\ BArray1024.is_init b_error 0 (to_uint bytes_filled)
+    /\ to_uint xof_offset <= 128 /\ to_uint xof_offset %% 16 = 0
+    /\ to_uint bytes_filled <= 8 * to_uint xof_offset
+    /\ condition_loop = (to_uint xof_offset < 128)
+    /\ valid trace_error_4x__rejection_sample_multiple_blocks).
++ auto; ecall (error_4x____write_out_32_coefficients_exact param_5 b_param_1 param_4 param_3
+                 param_2 param_1 (BArray2048.init_arr (W8.of_int 255))).
+  auto; ecall (error_4x____bytestream_to_coefficients_proof param_0 param).
+  auto => /> &hr hle hmod hinit hxo hxm hb8 hvalid hoff.
+  have hx16 : to_uint (xof_offset{hr} + W64.of_int 16) = to_uint xof_offset{hr} + 16.
+  + by rewrite W64.to_uintD_small W64.of_uintK /= /#.
+  move=> r0 hv0; (split; first by smt()) => _ r1 h1 h2 h3 h4 h5.
+  rewrite W64.ultE /= hx16 W64.uleE WE64.umod_eq0 /= h4 /=.
+  by smt(W64.to_uint_cmp).
+(* between the loops *)
+auto => />.
+move=> b0 bf0 cl0 tr0 off0 _ hbf0 hmod0 hi0 hoff0 _ _ _ hv0.
+split; first by rewrite WE64.sge0_orw !WE64.sge0_sub //=; smt().
+move=> b1 bf1 cl1 tr1 off1 _ hbf1 hmod1 hi1 hoff1 _ hv1.
+split; first by rewrite WE64.sge0_orw !WE64.sge0_sub //=; smt().
+move=> b2 bf2 cl2 tr2 off2 _ hbf2 hmod2 hi2 hoff2 _ hv2.
+have hsr : to_uint (bf2 `>>` W8.of_int 2) = to_uint bf2 %/ 4 by rewrite W64.shr_div_le.
+have hsl : to_uint (off2 `<<` W8.one) = 2 * to_uint off2.
++ by rewrite /(`<<`) /= WE64.to_uint_shl_small //= /#.
+rewrite WE64.slt0_andw !WE64.slt0_sub //= ?hsr ?hsl; 1,2: smt().
+have -> : 4 * (to_uint bf2 %/ 4) = to_uint bf2 by smt().
+split; first by rewrite hi2 /=; smt().
+move=> b3 ci cl3 f tr3 _ hf hi3 hci _ hv3.
+by rewrite to_uint_mul4 1:/# hi3 W64.uleE /=.
 qed.
 
 lemma error_4x__rejection_sample_one_block_proof _error _b_error _filled _randombytes _b_randombytes :

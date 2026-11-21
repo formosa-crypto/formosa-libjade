@@ -4,7 +4,7 @@ from Jasmin require import JWord JModel_x86.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
 from CryptoSpecs require import Keccak1600_Spec.
 require import MldsaConstants Agree Avx2red Compaction Prefixarray Rejstream Warraypack.
-require import CircuitBindings Bindings JWordExtra.
+require import CircuitBindings Bindings JWordExtra JModelExtra.
 require import Array4 Array25 Array64 Array136 Array256 Array272 Array2048.
 require import WArray272 WArray1024 WArray2048.
 require BaseT PreludeT ErrorVectorsT Sha3x4.
@@ -254,16 +254,100 @@ proof. by rewrite /scands /= /nibbles /=. qed.
 (* of the 16 input bytes, in stream order                               *)
 lemma error_4x____bytestream_to_coefficientsP (bs_ : W128.t) :
   hoare[ M.error_4x____bytestream_to_coefficients :
-    bytestream = bs_ ==> res = W32u8.pack32 (scands (W16u8.to_list bs_)) ].
+    bytestream = bs_ /\ nibble_mask = VPBROADCAST_32u8 (W8.of_int 15)
+    ==> res = W32u8.pack32 (scands (W16u8.to_list bs_)) ].
 proof.
 proc; wp; skip => &hr |>.
-by rewrite scands16E nibble_decodeE.
+by rewrite scands16E -nibble_decodeE truncateu8_bcastE.
 qed.
 
 (* -------------------------------------------------------------------- *)
 (* -------------------------------------------------------------------- *)
-(* the coefficient byte of a candidate, as computed by VPSUB_32u8       *)
-op cbyte (z : W8.t) : W8.t = W8.of_int Eta - z.
+(* the coefficient byte of a candidate, as read in the table of the     *)
+(* code: Eta - (z mod (2 Eta + 1)), which is Eta - sred z for an        *)
+(* accepted candidate; its sign extension is the coefficient            *)
+op cbyte (z : W8.t) : W8.t = W8.of_int Eta - (z \umod W8.of_int (2 * Eta + 1)).
+
+lemma cbyteE (z : W8.t) : saccept z => cbyte z = W8.of_int Eta - sred z.
+proof.
+rewrite /saccept /cbyte /sred rej_boundE; have [->|->] /= := Eta_cases => // hz.
+have -> // : z \umod W8.of_int 9 = z.
+by apply W8.to_uint_eq; rewrite WE8.to_uintUM /= pmod_small; smt(W8.to_uint_cmp).
+qed.
+
+lemma movsx_cbyteE (z : W8.t) : saccept z => MOVSX_u32s8 (cbyte z) = scoeff z.
+proof.
+move=> hz; rewrite cbyteE // /scoeff MOVSX_u32s8_subE //; 1: smt(Eta_cases).
+rewrite /sred; case: (Eta = 2) => _; last by smt(W8.to_uint_cmp).
+by rewrite WE8.to_uintUM /=; smt(W8.to_uint_cmp).
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* the tables of the code: a lane lists cbyte of the 16 nibbles         *)
+op ctable2 : W8.t list =
+  [W8.of_int 2; W8.of_int 1; W8.of_int 0; W8.of_int (-1); W8.of_int (-2);
+   W8.of_int 2; W8.of_int 1; W8.of_int 0; W8.of_int (-1); W8.of_int (-2);
+   W8.of_int 2; W8.of_int 1; W8.of_int 0; W8.of_int (-1); W8.of_int (-2);
+   W8.of_int 2].
+
+op ctable4 : W8.t list =
+  [W8.of_int 4; W8.of_int 3; W8.of_int 2; W8.of_int 1; W8.of_int 0;
+   W8.of_int (-1); W8.of_int (-2); W8.of_int (-3); W8.of_int (-4);
+   W8.of_int 4; W8.of_int 3; W8.of_int 2; W8.of_int 1; W8.of_int 0;
+   W8.of_int (-1); W8.of_int (-2)].
+
+op ctable : W8.t list = if Eta = 2 then ctable2 else ctable4.
+
+lemma eta2_tableE :
+  error_4x__ERROR_COEFFICIENTS_ETA2 = W32u8.pack32 (ctable2 ++ ctable2).
+proof.
+apply W32u8.wordP => i hi; rewrite W32u8.pack32bE // W32u8.bits8_div 1:/# of_uintK /=.
+have : i \in iota_ 0 32 by rewrite mem_iota /#.
+by rewrite /ctable2 -iotaredE /=; do 31! (case=> [-> // |]); move=> ->.
+qed.
+
+lemma eta4_tableE :
+  error_4x__ERROR_COEFFICIENTS_ETA4 = W32u8.pack32 (ctable4 ++ ctable4).
+proof.
+apply W32u8.wordP => i hi; rewrite W32u8.pack32bE // W32u8.bits8_div 1:/# of_uintK /=.
+have : i \in iota_ 0 32 by rewrite mem_iota /#.
+by rewrite /ctable4 -iotaredE /=; do 31! (case=> [-> // |]); move=> ->.
+qed.
+
+(* the lookup of a nibble in a lane of the table *)
+lemma ctable_lookup (k : int) : k \in iota_ 0 16 =>
+  VPSHUFB_128_B (W16u8.pack16 ctable) (W8.of_int k) = cbyte (W8.of_int k).
+proof.
+rewrite /ctable /cbyte /ctable2 /ctable4; have [->|->] /= := Eta_cases.
+- rewrite -iotaredE /=.
+  by move=> [|[|[|[|[|[|[|[|[|[|[|[|[|[|[|]]]]]]]]]]]]]]] ->; rewrite /(\umod) /ulift2 /=.
+rewrite -iotaredE /=.
+by move=> [|[|[|[|[|[|[|[|[|[|[|[|[|[|[|]]]]]]]]]]]]]]] ->; rewrite /(\umod) /ulift2 /=.
+qed.
+
+(* the VPSHUFB of the code maps the candidates to their coefficient     *)
+(* bytes                                                                *)
+lemma cbyte_lookupE (zs : W8.t list) :
+  size zs = 32 => (forall z, z \in zs => to_uint z < 16) =>
+  VPSHUFB_256
+    (if Eta = 2 then error_4x__ERROR_COEFFICIENTS_ETA2
+     else error_4x__ERROR_COEFFICIENTS_ETA4)
+    (W32u8.pack32 zs)
+  = W32u8.pack32 (map cbyte zs).
+proof.
+move=> szzs hnib; apply W32u8.wordP => i hi.
+rewrite VPSHUFB_256_bits8 // !W32u8.pack32bE // !get_of_list //.
+rewrite (nth_map W8.zero) 1:/#.
+have -> : (if Eta = 2 then error_4x__ERROR_COEFFICIENTS_ETA2
+           else error_4x__ERROR_COEFFICIENTS_ETA4) \bits128 (i %/ 16)
+          = W16u8.pack16 ctable.
+- rewrite /ctable; case: (Eta = 2) => _.
+  - by rewrite eta2_tableE pack32_dup_bits128 // /#.
+  by rewrite eta4_tableE pack32_dup_bits128 // /#.
+have hz : to_uint (nth W8.zero zs i) < 16 by apply hnib; apply mem_nth => /#.
+rewrite -(W8.to_uintK (nth W8.zero zs i)) ctable_lookup //.
+by rewrite mem_iota; smt(W8.to_uint_cmp).
+qed.
 
 (* -------------------------------------------------------------------- *)
 (* writing eight dwords at the end of the agreed prefix extends the     *)
@@ -287,28 +371,22 @@ by have := hag i _ _ => //#.
 qed.
 
 (* -------------------------------------------------------------------- *)
-(* the shuffle of one 8-candidate group: its accepted coefficient bytes *)
-(* come first                                                           *)
+(* the shuffle of one 8-candidate group by the row of a mask: the bytes *)
+(* selected by the mask come first                                      *)
 op shuffled (x : W128.t) (h : W64.t) : W64.t =
   truncateu64 (VPSHUFB_128 x
-    (VMOV_64 (W8u8.pack8 (Array2048.sub cOMPACTION_INDEX_TABLE
-       (to_uint (h `<<` W8.of_int 3)) 8)))).
+    (VMOV_64 (W8u8.pack8 (Array2048.sub cOMPACTION_INDEX_TABLE (8 * to_uint h) 8)))).
 
-lemma shuffledP (zs : W8.t list) (x : W128.t) (h : W64.t) :
-  take 8 (W16u8.to_list x) = map cbyte zs =>
-  size zs = 8 =>
-  to_uint h = bs2int (map saccept zs) =>
-  take (count idfun (map saccept zs)) (W8u8.to_list (shuffled x h))
-  = map cbyte (filter saccept zs).
+lemma shuffledP (bs : bool list) (x : W128.t) (h : W64.t) :
+  size bs = 8 => to_uint h = bs2int bs =>
+  take (count idfun bs) (W8u8.to_list (shuffled x h))
+  = mask bs (take 8 (W16u8.to_list x)).
 proof.
-move=> hx szzs hh.
-have szbits : size (map saccept zs) = 8 by rewrite size_map.
-have hint2bs : int2bs 8 (bs2int (map saccept zs)) = map saccept zs.
-- by have := bs2intK (map saccept zs); rewrite szbits.
-rewrite -{1}hint2bs /shuffled (shuffle_slot8 h (map saccept zs)) //.
-rewrite (shuffle_compact8 x (bs2int (map saccept zs))) //.
-- have := bs2int_le2Xs (map saccept zs); rewrite szbits bs2int_ge0 /= => /#.
-by rewrite hint2bs hx -map_mask filter_mask'.
+move=> szbs hh.
+have hint2bs : int2bs 8 (bs2int bs) = bs by have := bs2intK bs; rewrite szbs.
+rewrite -{1}hint2bs /shuffled hh (shuffle_compact8 x (bs2int bs)).
+- by have := bs2int_le2Xs bs; rewrite szbs bs2int_ge0 /= => /#.
+by rewrite hint2bs.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -329,13 +407,10 @@ have hcle : count idfun (map saccept zs) <= 8.
 by apply agree_fill8 => //; smt(count_ge0).
 qed.
 
-(* for Eta = 4, the coefficient is the sign extension of its byte       *)
-lemma sagree_store4 (p : wpoly) (old : W32.t list) (zs : W8.t list)
-                    (x : W128.t) (h : W64.t) :
-  Eta = 4 =>
+lemma sagree_store (p : wpoly) (old : W32.t list) (zs : W8.t list)
+                   (x : W128.t) (h : W64.t) :
   take 8 (W16u8.to_list x) = map cbyte zs =>
   size zs = 8 =>
-  (forall z, z \in zs => to_uint z < 16) =>
   to_uint h = bs2int (map saccept zs) =>
   size old <= 248 =>
   agree p 0 old =>
@@ -344,86 +419,17 @@ lemma sagree_store4 (p : wpoly) (old : W32.t list) (zs : W8.t list)
            (size old) 8 p)
         0 (old ++ map scoeff (filter saccept zs)).
 proof.
-move=> heta hx szzs hnib hh szold hag; apply sagree_storeW => //.
-rewrite VPMOVSX_8u8_8u32_to_listE -map_take (shuffledP zs) // -map_comp.
-apply eq_in_map => z /mem_filter [_ hz] @/(\o) @/scoeff @/cbyte @/sred.
-by rewrite heta /= MOVSX_u32s8_subE //; smt(mem_mask).
+move=> hx szzs hh szold hag; apply sagree_storeW => //.
+rewrite VPMOVSX_8u8_8u32_to_listE -map_take (shuffledP (map saccept zs)) ?size_map //.
+rewrite hx -map_mask filter_mask' -map_comp -filter_mask'.
+by apply eq_in_map => z /mem_filter [hacc _] @/(\o); exact movsx_cbyteE.
 qed.
 
-(* for Eta = 2, the code reduces the sign extension modulo 5: a dword   *)
-(* c = 2 - z with z < 15 becomes 2 - (z mod 5)                          *)
-op red5_ok (w r : W256.t) (i : int) =
-  (W32.of_int 2 - (w \bits32 i)) \ult W32.of_int 15 =>
-  r \bits32 i = W32.of_int 2 - ((W32.of_int 2 - (w \bits32 i)) \umod W32.of_int 5).
-
-lemma reduce_coefficientsP (w : W256.t) :
-  hoare[ M.error_4x____reduce_coefficients :
-    coefficients = w
-    ==>
-       red5_ok w res 0 /\ red5_ok w res 1 /\ red5_ok w res 2 /\ red5_ok w res 3
-    /\ red5_ok w res 4 /\ red5_ok w res 5 /\ red5_ok w res 6 /\ red5_ok w res 7 ].
-proof. by proc; circuit. qed.
-
+(* the scalar reduction of a candidate modulo 5, for Eta = 2            *)
 lemma reduce_coefficientP (c : W32.t) :
   hoare[ M.error_4x____reduce_coefficient :
     coefficient = c /\ c \ult W32.of_int 15 ==> res = c \umod W32.of_int 5 ].
 proof. by proc; circuit. qed.
-
-lemma zext_umod5E (z : W8.t) :
-  zeroextu32 z \umod W32.of_int 5 = zeroextu32 (z \umod W8.of_int 5).
-proof.
-apply W32.to_uint_eq.
-by rewrite WE32.to_uintUM !W4u8.to_uint_zeroextu32 WE8.to_uintUM.
-qed.
-
-lemma VPMOVSX_8u8_8u32_bitsE (v : W64.t) (i : int) :
-  0 <= i < 8 => VPMOVSX_8u8_8u32 v \bits32 i = MOVSX_u32s8 (v \bits8 i).
-proof.
-move=> hi; rewrite /VPMOVSX_8u8_8u32 /=.
-have : i \in iota_ 0 8 by rewrite mem_iota /#.
-by rewrite -iotaredE /=; move=> [|[|[|[|[|[|[|]]]]]]] ->.
-qed.
-
-lemma sagree_store2 (p : wpoly) (old : W32.t list) (zs : W8.t list)
-                    (x : W128.t) (h : W64.t) (r : W256.t) :
-  Eta = 2 =>
-  take 8 (W16u8.to_list x) = map cbyte zs =>
-  size zs = 8 =>
-  (forall z, z \in zs => to_uint z < 16) =>
-  to_uint h = bs2int (map saccept zs) =>
-  (forall i, 0 <= i < 8 => red5_ok (VPMOVSX_8u8_8u32 (shuffled x h)) r i) =>
-  size old <= 248 =>
-  agree p 0 old =>
-  agree (Array256.fill (fun i => r \bits32 (i - size old)) (size old) 8 p)
-        0 (old ++ map scoeff (filter saccept zs)).
-proof.
-move=> heta hx szzs hnib hh hr szold hag; apply sagree_storeW => //.
-have hpre := shuffledP zs x h hx szzs hh.
-have hcle : count idfun (map saccept zs) <= 8.
-- by have := count_size idfun (map saccept zs); rewrite size_map szzs.
-have szk : size (map scoeff (filter saccept zs)) = count idfun (map saccept zs).
-- by rewrite size_map size_filter count_map.
-apply (eq_from_nth W32.zero).
-- by rewrite size_take ?count_ge0 W8u32.Pack.size_to_list szk /#.
-move=> i; rewrite size_take ?count_ge0 W8u32.Pack.size_to_list => hi.
-have hi8 : 0 <= i < 8 by smt().
-have hik : i < count idfun (map saccept zs) by smt().
-rewrite nth_take ?count_ge0 // W8u32.Pack.to_listE nth_mkseq //= W8u32.get_unpack32 //.
-have hb : (shuffled x h) \bits8 i = nth W8.zero (map cbyte (filter saccept zs)) i.
-- by rewrite -hpre nth_take ?count_ge0 // W8u8.nth_to_list.
-rewrite (nth_map W8.zero) in hb; 1: smt(size_map).
-rewrite (nth_map W8.zero); 1: smt(size_map size_filter count_map).
-have /mem_filter [hacc hin] : nth W8.zero (filter saccept zs) i \in filter saccept zs.
-- by apply mem_nth; smt(size_map size_filter count_map).
-move: (nth W8.zero (filter saccept zs) i) hb hacc hin => z hb hacc hin.
-have hz : W32.of_int 2 - (VPMOVSX_8u8_8u32 (shuffled x h) \bits32 i) = zeroextu32 z.
-- rewrite VPMOVSX_8u8_8u32_bitsE // hb /cbyte heta MOVSX_u32s8_subE //; 1: smt().
-  by ring.
-have := hr i hi8; rewrite /red5_ok hz.
-move: hacc; rewrite /saccept rej_boundE heta /= => hacc.
-rewrite ultE /= W4u8.to_uint_zeroextu32 hacc /= => ->.
-by rewrite zext_umod5E /scoeff /sred heta.
-qed.
 
 (* -------------------------------------------------------------------- *)
 section.
@@ -466,7 +472,15 @@ end section.
 (* -------------------------------------------------------------------- *)
 (* the write-out step as a proc spec: one 8-candidate group is          *)
 (* compacted, sign-extended and stored; the mask window advances        *)
-
+lemma popcnt_lea8 (bf h : W64.t) (bs : bool list) :
+  size bs = 8 => to_uint h = bs2int bs => to_uint bf <= 1024 =>
+  to_uint (LEA_64 (bf + W64.of_int 4 * (POPCNT_64 h).`6))
+  = to_uint bf + 4 * count idfun bs.
+proof.
+move=> szbs hh hbf; rewrite /LEA_64 popcnt6E (popcnt_count8 _ bs) //.
+have hcle : count idfun bs <= 8 by have := count_size idfun bs; rewrite szbs.
+by rewrite W64.to_uintD_small W64.to_uintM_small !of_uintK /=; smt(count_ge0).
+qed.
 
 lemma error_4x____write_out_8_coefficientsP
   (p_ : wpoly) (old : W32.t list) (zs zs' : W8.t list)
@@ -474,9 +488,9 @@ lemma error_4x____write_out_8_coefficientsP
 hoare[ M.error_4x____write_out_8_coefficients :
      error = p_ /\ bytes_filled = bf_ /\ good_overall = go_
   /\ coefficient_block = cb_
+  /\ shuffle_table_pointer = cOMPACTION_INDEX_TABLE
   /\ take 8 (W16u8.to_list cb_) = map cbyte zs
   /\ size zs = 8
-  /\ (forall z, z \in zs => to_uint z < 16)
   /\ to_uint go_ = bs2int (map saccept (zs ++ zs'))
   /\ size old <= 248
   /\ to_uint bf_ = 4 * size old
@@ -486,74 +500,30 @@ hoare[ M.error_4x____write_out_8_coefficients :
   /\ to_uint res.`2 = 4 * size (old ++ map scoeff (filter saccept zs))
   /\ to_uint res.`3 = bs2int (map saccept zs') ].
 proof.
-proc.
-have [heta|heta] := Eta_cases.
-(* for Eta = 2, the stored dwords are reduced modulo 5 *)
-- rcondt ^if; 1: by auto.
-  seq 10 : (error = p_ /\ bytes_filled = bf_ /\ good = go_ `&` W64.of_int 255
-    /\ good_overall = go_ `>>` W8.of_int 8
-    /\ error_coefficients = VPMOVSX_8u8_8u32 (shuffled cb_ (go_ `&` W64.of_int 255))
-    /\ take 8 (W16u8.to_list cb_) = map cbyte zs /\ size zs = 8
-    /\ (forall z, z \in zs => to_uint z < 16)
-    /\ to_uint go_ = bs2int (map saccept (zs ++ zs'))
-    /\ size old <= 248 /\ to_uint bf_ = 4 * size old /\ agree p_ 0 old).
-  - auto => &hr [#] 4!-> hcb szzs hnib hgo szold hbf hag /=.
-    have szmap : size (map saccept zs) = 8 by rewrite size_map szzs.
-    have hand : to_uint (go_ `&` W64.of_int 255) = bs2int (map saccept zs).
-    - rewrite (and255_bs2int _ (map saccept (zs ++ zs'))) // map_cat.
-      by rewrite (_ : 8 = size (map saccept zs)) 1:szmap // take_size_cat.
-    have hm : 0 <= bs2int (map saccept zs) < 256.
-    - by rewrite bs2int_ge0 /=; have := bs2int_le2Xs (map saccept zs); rewrite szmap.
-    have hidx : to_uint ((go_ `&` W64.of_int 255) `<<` W8.of_int 3)
-                = 8 * bs2int (map saccept zs).
-    - by apply (shuffle_slot8 _ (map saccept zs)).
-    by rewrite /shuffled /= WArray2048_get64E 1:hidx 1:/#.
-  wp; ecall (reduce_coefficientsP (VPMOVSX_8u8_8u32 (shuffled cb_ (go_ `&` W64.of_int 255)))).
-  skip => &hr [#] 5!-> hcb szzs hnib hgo szold hbf hag r [#] h0 h1 h2 h3 h4 h5 h6 h7 /=.
-  have hr : forall i, 0 <= i < 8 =>
-    red5_ok (VPMOVSX_8u8_8u32 (shuffled cb_ (go_ `&` W64.of_int 255))) r i.
-  - move=> i hi; have : i \in iota_ 0 8 by rewrite mem_iota /#.
-    by rewrite -iotaredE /= => -[|[|[|[|[|[|[|]]]]]]] ->.
-  have szmap : size (map saccept zs) = 8 by rewrite size_map szzs.
-  have hand : to_uint (go_ `&` W64.of_int 255) = bs2int (map saccept zs).
-  - rewrite (and255_bs2int _ (map saccept (zs ++ zs'))) // map_cat.
-    by rewrite (_ : 8 = size (map saccept zs)) 1:szmap // take_size_cat.
-  have hm : 0 <= bs2int (map saccept zs) < 256.
-  - by rewrite bs2int_ge0 /=; have := bs2int_le2Xs (map saccept zs); rewrite szmap.
-  do ! split.
-  - rewrite wpoly_set256_alignedE 1,2:#smt:(size_ge0).
-    rewrite (_ : to_uint bf_ %/ 4 = size old) 1:/#.
-    by apply (sagree_store2 _ _ _ cb_ (go_ `&` W64.of_int 255) r).
-  - rewrite (popcnt_step8 _ _ (map saccept zs)) // 1:/#.
-    rewrite size_cat size_map size_filter.
-    rewrite (count_map saccept idfun) hbf /preim /idfun /=.
-    by ring.
-  rewrite (shr8_bs2int _ (map saccept (zs ++ zs'))) // map_cat.
-  by rewrite (_ : 8 = size (map saccept zs)) 1:szmap // drop_size_cat.
-rcondf ^if; 1: by auto => /#.
-wp; skip => &hr |> hcb szzs hnib hgo szold hbf hag.
+proc; wp; skip => &hr |> hcb szzs hgo szold hbf hag.
 have szmap : size (map saccept zs) = 8 by rewrite size_map szzs.
-have hand : to_uint (good_overall{hr} `&` W64.of_int 255)
-            = bs2int (map saccept zs).
-- rewrite (and255_bs2int _ (map saccept (zs ++ zs'))) // map_cat.
+have hgood : to_uint (zeroextu64 (truncateu8 good_overall{hr}))
+             = bs2int (map saccept zs).
+- rewrite W8u8.zeroext_truncateu8_and /=.
+  rewrite (and255_bs2int _ (map saccept (zs ++ zs'))) // map_cat.
   by rewrite (_ : 8 = size (map saccept zs)) 1:szmap // take_size_cat.
 have hm : 0 <= bs2int (map saccept zs) < 256.
 - by rewrite bs2int_ge0 /=; have := bs2int_le2Xs (map saccept zs); rewrite szmap.
-have hidx : to_uint ((good_overall{hr} `&` W64.of_int 255) `<<` W8.of_int 3)
-            = 8 * bs2int (map saccept zs).
-- by apply (shuffle_slot8 _ (map saccept zs)).
+have hidx : to_uint (W64.of_int 8 * zeroextu64 (truncateu8 good_overall{hr}))
+            = 8 * to_uint (zeroextu64 (truncateu8 good_overall{hr})).
+- by rewrite W64.to_uintM_small of_uintK //= /#.
 do ! split.
 - rewrite WArray2048_get64E 1:hidx 1:/#.
   rewrite wpoly_set256_alignedE 1,2:#smt:(size_ge0).
-  rewrite (_ : to_uint bytes_filled{hr} %/ 4 = size old) 1:/#.
+  rewrite (_ : to_uint bytes_filled{hr} %/ 4 = size old) 1:/# hidx.
   rewrite -truncateu64_128E.
-  by apply sagree_store4.
-- rewrite (popcnt_step8 _ _ (map saccept zs)) // 1:/#.
+  by apply sagree_store.
+- rewrite (popcnt_lea8 _ _ (map saccept zs)) // 1:/#.
   rewrite size_cat size_map size_filter.
   rewrite (count_map saccept idfun) hbf /preim /idfun /=.
   by ring.
-- rewrite (shr8_bs2int _ (map saccept (zs ++ zs'))) // map_cat.
-  by rewrite (_ : 8 = size (map saccept zs)) 1:szmap // drop_size_cat.
+rewrite (shr8_bs2int _ (map saccept (zs ++ zs'))) // map_cat.
+by rewrite (_ : 8 = size (map saccept zs)) 1:szmap // drop_size_cat.
 qed.
 
 (* ==================================================================== *)
@@ -578,10 +548,12 @@ rewrite /nibbles /= => -[->|->].
 - exact to_uint_hinib_lt16.
 qed.
 
+(* the vector loops: the first off bytes of the buffer are consumed,   *)
+(* the polynomial holds their accepted coefficients, bf bytes of them   *)
 op svsampled (b : W8.t Array272.t) (p : wpoly) (bf off : int) =
-     off <= 256
+     off <= 272
   /\ 4 %| off
-  /\ bf <= 1020
+  /\ bf <= 1024
   /\ bf = 4 * size (sreject (Array272.sub b 0 off))
   /\ agree p 0 (sreject (Array272.sub b 0 off)).
 
@@ -609,8 +581,8 @@ qed.
 (* the loop invariant at the next offset                                *)
 lemma svsampled_advance4 (b : W8.t Array272.t) (p : wpoly) (bf off off' : int) :
   off' = off + 4 =>
-  0 <= off => off' <= 256 => 4 %| off =>
-  4 * size (sreject (Array272.sub b 0 off)) < 992 =>
+  0 <= off => off' <= 272 => 4 %| off =>
+  4 * size (sreject (Array272.sub b 0 off)) <= 992 =>
   bf = 4 * size (sreject (Array272.sub b 0 off)
          ++ map scoeff (filter saccept (scands (Array272.sub b off 4)))) =>
   agree p 0 (sreject (Array272.sub b 0 off)
@@ -628,9 +600,9 @@ split*.
 exact hag.
 qed.
 
-(* the batch offsets stay below 256, so their bumps do not wrap         *)
+(* the offsets stay below 272, so their bumps do not wrap               *)
 lemma to_uintD_small16 (w : W64.t) (n : int) :
-  0 <= n <= 16 => to_uint w < 256 =>
+  0 <= n <= 16 => to_uint w <= 272 =>
   to_uint (w + W64.of_int n) = to_uint w + n.
 proof.
 by move=> hn hw; rewrite to_uintD_small of_uintK pmod_small /#.
@@ -645,15 +617,17 @@ lemma write_out_windowP (p_ : wpoly) (b : W8.t Array272.t) (off rest : int)
 hoare[ M.error_4x____write_out_8_coefficients :
      error = p_ /\ bytes_filled = bf_ /\ good_overall = go_
   /\ coefficient_block = cb_
+  /\ shuffle_table_pointer = cOMPACTION_INDEX_TABLE
   /\ 0 <= off /\ 4 %| off /\ 0 <= rest
-  /\ off + 4 + rest <= 272 /\ off + 4 <= 256
+  /\ off + 4 + rest <= 272
   /\ take 8 (W16u8.to_list cb_) = map cbyte (scands (Array272.sub b off 4))
   /\ to_uint go_ = bs2int (map saccept (scands (Array272.sub b off (4 + rest))))
-  /\ to_uint bf_ < 992
+  /\ to_uint bf_ <= 992
   /\ to_uint bf_ = 4 * size (sreject (Array272.sub b 0 off))
   /\ agree p_ 0 (sreject (Array272.sub b 0 off))
   ==>
      svsampled b res.`1 (to_uint res.`2) (off + 4)
+  /\ to_uint res.`2 <= to_uint bf_ + 32
   /\ to_uint res.`3 = bs2int (map saccept (scands (Array272.sub b (off + 4) rest))) ].
 proof.
 proc*.
@@ -662,16 +636,93 @@ ecall (error_4x____write_out_8_coefficientsP p_
         (scands (Array272.sub b off 4))
         (scands (Array272.sub b (off + 4) rest))
         bf_ go_ cb_).
-auto=> &hr |> ge0_off hdvd ge0_rest hle hle256 hcb hgo hlt hbf hag.
+auto=> &hr |> ge0_off hdvd ge0_rest hle hcb hgo hlt hbf hag.
 do ! split.
 - by rewrite size_scands size_sub.
-- by move=> z /scands_nib.
 - by move: hgo; rewrite PA_272_136.sub_cat_272 // scands_cat.
 - by smt(size_ge0).
-move=> _ _ _ _ result hragree hrsz hrgo.
-by apply (svsampled_advance4 _ _ _ off) => //; smt().
+move=> _ _ _ result hragree hrsz hrgo.
+split; 1: by apply (svsampled_advance4 _ _ _ off) => //; smt().
+by rewrite hrsz hbf size_cat; have := size_window4_le8 b off; smt().
 qed.
 
+(* -------------------------------------------------------------------- *)
+(* writing out the four windows of a 16-byte block                      *)
+lemma write_out_blockP (p_ : wpoly) (b : W8.t Array272.t) (off : int)
+                       (bf_ go_ : W64.t) (co_ : W256.t) :
+hoare[ M.error_4x____write_out_32_coefficients :
+     error = p_ /\ bytes_filled = bf_ /\ good_overall = go_ /\ coefficients = co_
+  /\ shuffle_table_pointer = cOMPACTION_INDEX_TABLE
+  /\ 0 <= off /\ 4 %| off /\ off + 16 <= 272
+  /\ co_ = W32u8.pack32 (map cbyte (scands (Array272.sub b off 16)))
+  /\ to_uint go_ = bs2int (map saccept (scands (Array272.sub b off 16)))
+  /\ to_uint bf_ <= 896
+  /\ to_uint bf_ = 4 * size (sreject (Array272.sub b 0 off))
+  /\ agree p_ 0 (sreject (Array272.sub b 0 off))
+  ==>
+     svsampled b res.`1 (to_uint res.`2) (off + 16) ].
+proof.
+proc.
+seq 2 : (
+     shuffle_table_pointer = cOMPACTION_INDEX_TABLE /\ coefficients = co_
+  /\ 0 <= off /\ 4 %| off /\ off + 16 <= 272
+  /\ co_ = W32u8.pack32 (map cbyte (scands (Array272.sub b off 16)))
+  /\ to_uint bf_ <= 896
+  /\ svsampled b error (to_uint bytes_filled) (off + 4)
+  /\ to_uint bytes_filled <= to_uint bf_ + 32
+  /\ to_uint good_overall = bs2int (map saccept (scands (Array272.sub b (off + 4) 12)))
+  /\ coefficient_block = VEXTRACTI128 co_ W8.zero
+).
+- ecall (write_out_windowP p_ b off 12 bf_ go_ (VEXTRACTI128 co_ W8.zero)).
+  auto=> &hr |> ge0_off hdvd hle hgo hbf896 hbf hag.
+  split; last by smt().
+  rewrite !sub4E_272 !sub16E_272 scands16E /scands /= /nibbles /=.
+  by rewrite VEXTRACTI128_0_pack32E /=.
+exlim error, bytes_filled, good_overall => p1 bf1 go1.
+seq 2 : (
+     shuffle_table_pointer = cOMPACTION_INDEX_TABLE /\ coefficients = co_
+  /\ 0 <= off /\ 4 %| off /\ off + 16 <= 272
+  /\ co_ = W32u8.pack32 (map cbyte (scands (Array272.sub b off 16)))
+  /\ to_uint bf_ <= 896
+  /\ svsampled b error (to_uint bytes_filled) (off + 8)
+  /\ to_uint bytes_filled <= to_uint bf_ + 64
+  /\ to_uint good_overall = bs2int (map saccept (scands (Array272.sub b (off + 8) 8)))
+).
+- ecall (write_out_windowP p1 b (off + 4) 8 bf1 go1
+           (VPSRLDQ_128 (VEXTRACTI128 co_ W8.zero) (W8.of_int 8))).
+  auto=> &hr |> ge0_off hdvd hle hbf896 hsv hbf hgo.
+  move: hsv => @/svsampled [#] hoffle hdvd4 hbfle hsz hag.
+  split; last by smt().
+  do ! split; 1,2,4,5,6: smt().
+  rewrite !sub4E_272 !sub16E_272 scands16E /scands /= /nibbles /=.
+  by rewrite VEXTRACTI128_0_pack32E VPSRLDQ8_pack16E /=.
+exlim error, bytes_filled, good_overall => p2 bf2 go2.
+seq 2 : (
+     shuffle_table_pointer = cOMPACTION_INDEX_TABLE /\ coefficients = co_
+  /\ 0 <= off /\ 4 %| off /\ off + 16 <= 272
+  /\ co_ = W32u8.pack32 (map cbyte (scands (Array272.sub b off 16)))
+  /\ to_uint bf_ <= 896
+  /\ svsampled b error (to_uint bytes_filled) (off + 12)
+  /\ to_uint bytes_filled <= to_uint bf_ + 96
+  /\ to_uint good_overall = bs2int (map saccept (scands (Array272.sub b (off + 12) 4)))
+  /\ coefficient_block = VEXTRACTI128 co_ W8.one
+).
+- ecall (write_out_windowP p2 b (off + 8) 4 bf2 go2 (VEXTRACTI128 co_ W8.one)).
+  auto=> &hr |> ge0_off hdvd hle hbf896 hsv hbf hgo.
+  move: hsv => @/svsampled [#] hoffle hdvd4 hbfle hsz hag.
+  split; last by smt().
+  do ! split; 1,2,4,5,6: smt().
+  rewrite !sub4E_272 !sub16E_272 scands16E /scands /= /nibbles /=.
+  by rewrite VEXTRACTI128_1_pack32E /=.
+exlim error, bytes_filled, good_overall => p3 bf3 go3.
+ecall (write_out_windowP p3 b (off + 12) 0 bf3 go3
+         (VPSRLDQ_128 (VEXTRACTI128 co_ W8.one) (W8.of_int 8))).
+auto=> &hr |> ge0_off hdvd hle hbf896 hsv hbf hgo.
+move: hsv => @/svsampled [#] hoffle hdvd4 hbfle hsz hag.
+do ! split; 1,2,4,5,6: smt().
+rewrite !sub4E_272 !sub16E_272 scands16E /scands /= /nibbles /=.
+by rewrite VEXTRACTI128_1_pack32E VPSRLDQ8_pack16E /=.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (* the candidate stream contributed by one nibble                       *)
@@ -720,16 +771,6 @@ case: (Eta = 2) => heta /=; last by ring.
 by move: hn; rewrite /saccept rej_boundE heta /= => hn; rewrite red5_scalarE //; ring.
 qed.
 
-(* -------------------------------------------------------------------- *)
-lemma sreject_step272 (a : W8.t Array272.t) (n : int) : 0 <= n =>
-  sreject (Array272.sub a 0 (n + 1))
-  = sreject (Array272.sub a 0 n)
-    ++ (halfstep (a.[n] `&` W8.of_int 15) ++ halfstep (a.[n] `>>>` 4)).
-proof.
-move=> hn; rewrite sreject_block // sub1E_272.
-by rewrite sreject1E.
-qed.
-
 lemma zext_and15E (b : W8.t) :
   zeroextu32 b `&` W32.of_int 15 = zeroextu32 (b `&` W8.of_int 15).
 proof.
@@ -749,11 +790,94 @@ rewrite /range -iotaredE /=.
 by rewrite ?W32.get_out // ?W8.get_out //= ?orbF; rewrite !W8.get_to_uint /=.
 qed.
 
-op ssampled (b : W8.t Array272.t) (p : wpoly) (fl off : int) =
-     off <= 272
-  /\ fl <= 256
-  /\ filled_ok p (sreject (Array272.sub b 0 off)) fl.
+(* -------------------------------------------------------------------- *)
+(* at most two accepted candidates per byte                             *)
+lemma size_sreject_sub (b : W8.t Array272.t) (n : int) :
+  0 <= n <= 272 => size (sreject (Array272.sub b 0 n)) <= 2 * n.
+proof.
+move=> hn; rewrite srejectE size_map size_filter.
+by have := count_size saccept (scands (Array272.sub b 0 n)); rewrite size_scands size_sub /#.
+qed.
 
+(* -------------------------------------------------------------------- *)
+(* the candidate loop: the coefficients of the first n candidates of    *)
+(* the buffer                                                           *)
+op nsamp (b : W8.t Array272.t) (n : int) : W32.t list =
+  map scoeff (filter saccept (take n (scands (Array272.sub b 0 272)))).
+
+lemma nsamp_bytes (b : W8.t Array272.t) (off : int) : 0 <= off <= 272 =>
+  nsamp b (2 * off) = sreject (Array272.sub b 0 off).
+proof.
+move=> hoff; rewrite /nsamp srejectE (_ : 272 = off + (272 - off)) 1:/#.
+rewrite PA_272_136.sub_cat_272 1,2:/# scands_cat.
+have hsz : size (scands (Array272.sub b 0 off)) = 2 * off.
+- by rewrite size_scands size_sub /#.
+by rewrite -hsz take_size_cat.
+qed.
+
+lemma nsamp_full (b : W8.t Array272.t) :
+  nsamp b 544 = sreject (Array272.sub b 0 272).
+proof. by rewrite (nsamp_bytes b 272). qed.
+
+(* candidate n: the low nibble of byte n / 2, then its high nibble      *)
+lemma nth_scands (b : W8.t Array272.t) (n : int) : 0 <= n < 544 =>
+  nth W8.zero (scands (Array272.sub b 0 272)) n
+  = if n %% 2 = 0 then b.[n %/ 2] `&` W8.of_int 15 else b.[n %/ 2] `>>>` 4.
+proof.
+move=> hn; pose k := n %/ 2.
+rewrite (_ : 272 = k + (272 - k)) 1:/# PA_272_136.sub_cat_272 1,2:/# scands_cat.
+rewrite nth_cat size_scands size_sub 1:/# ifF 1:/#.
+rewrite (_ : 272 - k = 1 + (271 - k)) 1:/# PA_272_136.sub_cat_272 1,2:/# scands_cat.
+rewrite sub1E_272 /= (_ : scands [b.[k]] = nibbles b.[k]).
+- by rewrite /scands /= flatten_cons flatten_nil cats0.
+rewrite /nibbles /=; case: (n %% 2 = 0) => hp.
+- by rewrite (_ : n - 2 * k = 0) 1:/#.
+by rewrite (_ : n - 2 * k = 1) 1:/#.
+qed.
+
+lemma nsampS (b : W8.t Array272.t) (n : int) : 0 <= n < 544 =>
+  nsamp b (n + 1)
+  = nsamp b n ++ halfstep (nth W8.zero (scands (Array272.sub b 0 272)) n).
+proof.
+move=> hn; rewrite /nsamp (take_nth W8.zero) 1:size_scands 1:size_sub 1:/# 1:/#.
+rewrite -cats1 filter_cat map_cat /=.
+by case: (saccept (nth W8.zero (scands (Array272.sub b 0 272)) n)).
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* the candidate of the last loop, and its acceptance bit               *)
+lemma cand_extractE (b : W8.t) (n : W64.t) :
+  SHRX_32 (zeroextu32 b) ((truncateu32 n `&` W32.one) `<<` W8.of_int 2) `&` W32.of_int 15
+  = zeroextu32 (if to_uint n %% 2 = 0 then b `&` W8.of_int 15 else b `>>>` 4).
+proof.
+have hs : to_uint ((truncateu32 n `&` W32.one) `<<` W8.of_int 2) = 4 * (to_uint n %% 2).
+- rewrite /(`<<`) /= W32.to_uint_shl //= (_ : W32.one = W32.of_int (2 ^ 1 - 1)) //.
+  rewrite W32.to_uint_and_mod //=.
+  rewrite -truncateu32_64E /truncateu32 of_uintK /= modz_dvd //.
+  by rewrite pmod_small /#.
+rewrite /SHRX_32 hs; case: (to_uint n %% 2 = 0) => hp.
+- by rewrite hp /= WE32.shr0 zext_and15E.
+have -> /= : to_uint n %% 2 = 1 by smt().
+have := zext_shr4E b; rewrite /(`>>`) /= => ->.
+rewrite zext_and15E; congr.
+apply W8.wordP => i hi; rewrite W8.andwE W8.of_intwE /W8.int_bit /= hi /=.
+case: (i < 4) => h4; last by rewrite W8.get_out /#.
+have : i \in iota_ 0 4 by rewrite mem_iota /#.
+by rewrite -iotaredE /= => -[|[|[|]]] ->.
+qed.
+
+lemma accepted_bitE (z : W8.t) : to_uint z < 16 =>
+  to_uint (zeroextu64 ((zeroextu32 z - W32.of_int rej_bound) `>>` W8.of_int 31))
+  = b2i (saccept z).
+proof.
+move=> hz; have hb := rej_bound_rng.
+have hzK : to_uint (zeroextu32 z) = to_uint z by rewrite W4u8.to_uint_zeroextu32.
+have hbK : to_uint (W32.of_int rej_bound) = rej_bound by rewrite of_uintK pmod_small /#.
+rewrite to_uint_zeroextu64 /(`>>`) /= WE32.to_uint_shr_msb.
+by rewrite WE32.msb_sub ?hzK ?hbK /= 1,2:/#.
+qed.
+
+(* ==================================================================== *)
 lemma error_4x__rejection_sample_multiple_blocksP (buf : W8.t Array272.t)
 : hoare[
   M.error_4x__rejection_sample_multiple_blocks :
@@ -765,318 +889,267 @@ lemma error_4x__rejection_sample_multiple_blocksP (buf : W8.t Array272.t)
 proof.
 proc => /=.
 (* the reduction modulo 5, for Eta = 2, as one assignment *)
-proc change ^while{2}.^if.^if : { coefficient <- sred32 coefficient; }.
+proc change ^while{4}.^if : { coefficient <- sred32 coefficient; }.
 - by inline *; if{1}; auto => /> &2 h; rewrite /sred32 h.
-proc change ^while{2}.^if{2}.^if.^if : { coefficient <- sred32 coefficient; }.
-- by inline *; if{1}; auto => /> &2 h; rewrite /sred32 h.
-seq 7 : (randombytes = buf
-  /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
-  /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)).
-- by auto => &hr |>; rewrite !truncateu8_bcastE.
-sp 4.
-seq 1 : (
+seq 12 : (
      randombytes = buf
-  /\ to_uint bytes_filled <= 1020
-  /\ to_uint xof_offset <= 256
-  /\ 4 %| to_uint xof_offset
-  /\ (to_uint bytes_filled < 992 => to_uint xof_offset = 256)
-  /\ to_uint bytes_filled = 4 * size (sreject (Array272.sub buf 0 (to_uint xof_offset)))
-  /\ agree error 0 (sreject (Array272.sub buf 0 (to_uint xof_offset)))
-).
+  /\ values = (if Eta = 2 then error_4x__ERROR_COEFFICIENTS_ETA2
+               else error_4x__ERROR_COEFFICIENTS_ETA4)
+  /\ shuffle_table_pointer = cOMPACTION_INDEX_TABLE
+  /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
+  /\ nibble_mask = VPBROADCAST_32u8 (W8.of_int 15)
+  /\ bytes_filled = W64.zero /\ xof_offset = W64.zero).
+- by auto => &hr |>; rewrite !truncateu8_bcastE.
+(* the first 8 blocks: at most 2 coefficients per byte so far, hence    *)
+(* room for the 32 of the block                                         *)
+seq 2 : (
+     randombytes = buf
+  /\ values = (if Eta = 2 then error_4x__ERROR_COEFFICIENTS_ETA2
+               else error_4x__ERROR_COEFFICIENTS_ETA4)
+  /\ shuffle_table_pointer = cOMPACTION_INDEX_TABLE
+  /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
+  /\ nibble_mask = VPBROADCAST_32u8 (W8.of_int 15)
+  /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
+  /\ to_uint xof_offset = 128).
 - while (
        randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
+    /\ values = (if Eta = 2 then error_4x__ERROR_COEFFICIENTS_ETA2
+                 else error_4x__ERROR_COEFFICIENTS_ETA4)
+    /\ shuffle_table_pointer = cOMPACTION_INDEX_TABLE
     /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
+    /\ nibble_mask = VPBROADCAST_32u8 (W8.of_int 15)
     /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
-    /\ (to_uint bytes_filled < 992 /\ to_uint xof_offset < 256 =>
-          16 %| to_uint xof_offset)
-    /\ condition_loop = (stop_sampling <> W64.one)
-    /\ stop_sampling = W64.of_int (b2i (!(
-            to_uint bytes_filled < 992
-         /\ to_uint xof_offset < 256)))
-  ); last first.
-  - by hoare split; auto=> &hr @/svsampled |> * /=; smt(of_int_b2i_eq1P).
+    /\ 16 %| to_uint xof_offset /\ to_uint xof_offset <= 128
+    /\ condition_loop = (xof_offset \ult W64.of_int 128)); last first.
+  - auto => &hr |>; rewrite /svsampled /=.
+    by rewrite !dvdz0 /= => bf cl e off _ _ _ hle; rewrite ultE of_uintK /= /#.
   exlim xof_offset => off0.
   seq 3 : (
        randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
+    /\ values = (if Eta = 2 then error_4x__ERROR_COEFFICIENTS_ETA2
+                 else error_4x__ERROR_COEFFICIENTS_ETA4)
+    /\ shuffle_table_pointer = cOMPACTION_INDEX_TABLE
     /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
+    /\ nibble_mask = VPBROADCAST_32u8 (W8.of_int 15)
     /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
-    /\ to_uint bytes_filled < 992
-    /\ to_uint off0 < 256
-    /\ 16 %| to_uint off0
-    /\ xof_offset = off0
-    /\ stop_sampling = W64.of_int 0
-    /\ coefficients
-         = W32u8.pack32 (scands (Array272.sub buf (to_uint off0) 16))
-  ).
+    /\ 16 %| to_uint off0 /\ to_uint off0 < 128 /\ xof_offset = off0
+    /\ candidates = W32u8.pack32 (scands (Array272.sub buf (to_uint off0) 16))).
   - ecall (error_4x____bytestream_to_coefficientsP
              (W16u8.pack16 (Array272.sub buf (to_uint off0) 16))).
-    auto=> &hr |> hsv hlt hflag.
-    have {hflag} [h992 h256] : to_uint bytes_filled{hr} < 992 /\ to_uint xof_offset{hr} < 256
-      by smt(of_int_b2i_eq1P).
+    auto=> &hr |> hsv hdvd hle; rewrite ultE of_uintK /= => hlt.
     by rewrite WArray272_get128E 1:#smt:(W64.to_uint_cmp) sub16E_272 /= /#.
-  seq 5 : (
-       randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
-    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
-    /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
-    /\ to_uint bytes_filled < 992
-    /\ to_uint off0 < 256
-    /\ 16 %| to_uint off0
-    /\ xof_offset = off0
-    /\ stop_sampling = W64.of_int 0
+  seq 4 : (#pre
     /\ to_uint good_overall
          = bs2int (map saccept (scands (Array272.sub buf (to_uint off0) 16)))
     /\ coefficients
-         = W32u8.pack32 (map cbyte (scands (Array272.sub buf (to_uint off0) 16)))
-    /\ coefficient_block = VEXTRACTI128 coefficients W8.zero
-  ).
-  - auto=> &hr |> hsv h992 h256 h16.
-    by rewrite !sub16E_272 movemask_scands16E scands16E VPSUB_bcast_pack32E /= /cbyte.
-  exlim error => p0.
-  exlim bytes_filled => bf0.
-  exlim good_overall => go0.
-  exlim coefficient_block => cb0.
-  seq 2 : (
-       randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
-    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
-    /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
-    /\ xof_offset = off0 + W64.of_int 4
-    /\ stop_sampling = W64.of_int 0
-    /\ to_uint off0 < 256
-    /\ 16 %| to_uint off0
-    /\ to_uint good_overall
-         = bs2int (map saccept (scands (Array272.sub buf (to_uint off0 + 4) 12)))
-    /\ coefficients
-         = W32u8.pack32 (map cbyte (scands (Array272.sub buf (to_uint off0) 16)))
-    /\ coefficient_block = VEXTRACTI128 coefficients W8.zero
-  ).
-  - wp; ecall (write_out_windowP p0 buf (to_uint off0) 12 bf0 go0 cb0).
-    auto=> &hr |> hsv h992 h256 h16 hgo.
-    move: hsv => @/svsampled [#] hoffle hdvd4 hbfle hsz hag.
-    do ! split; 1,2,3,4,6: smt(W64.to_uint_cmp).
-    - rewrite !sub4E_272 !sub16E_272 scands16E.
-      by rewrite /scands /= /nibbles /= /cbyte /=.
-    - exact hag.
-    move=> *.
-    by rewrite (to_uintD_small16 xof_offset{hr} 4) //.
-  sp 1; if; last first.
-  - auto=> &hr |> hsv hlt h16 hgo hnl.
-    rewrite !uleE ?ultE !of_uintK /= !to_uintD_small ?of_uintK /=.
-    - by move: hlt => /#.
-    move: hnl; rewrite ultE of_uintK /= => hnl.
-    by smt().
-  seq 1 : (#pre); 1: by auto.
-  sp 1.
-  exlim error => p1.
-  exlim bytes_filled => bf1.
-  exlim good_overall => go1.
-  exlim coefficient_block => cb1.
-  seq 2 : (
-       randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
-    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
-    /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
-    /\ xof_offset = off0 + W64.of_int 8
-    /\ stop_sampling = W64.of_int 0
-    /\ to_uint off0 < 256
-    /\ 16 %| to_uint off0
-    /\ to_uint good_overall
-         = bs2int (map saccept (scands (Array272.sub buf (to_uint off0 + 8) 8)))
-    /\ coefficients
-         = W32u8.pack32 (map cbyte (scands (Array272.sub buf (to_uint off0) 16)))
-  ).
-  - wp; ecall (write_out_windowP p1 buf (to_uint off0 + 4) 8 bf1 go1 cb1).
-    auto=> &hr |> hsv h256o h16 hgo hlt992.
-    have hoff4 : to_uint (off0 + W64.of_int 4) = to_uint off0 + 4
-      by rewrite (to_uintD_small16 off0 4).
-    move: hsv; rewrite hoff4 => @/svsampled [#] hoffle hdvd4 hbfle hsz hag.
-    move: hlt992; rewrite ultE of_uintK /= => hlt992.
-    do ! split; 1,2,3,4,6: smt(W64.to_uint_cmp).
-    - rewrite !sub4E_272 !sub16E_272 scands16E.
-      rewrite /scands /= /nibbles /= /cbyte /=.
-      by rewrite VEXTRACTI128_0_pack32E VPSRLDQ8_pack16E /=.
-    - by smt().
-    - exact hag.
-    move=> *.
-    by smt(to_uintD_small16).
-  sp 1; if; last first.
-  - auto=> &hr |> hsv h256o h16 hgo hnl.
-    rewrite !uleE ?ultE !of_uintK /= !to_uintD_small ?of_uintK /=.
-    - by move: h256o => /#.
-    move: hnl; rewrite ultE of_uintK /= => hnl.
-    by smt().
-  seq 1 : (#pre); 1: by auto.
-  sp 1.
-  exlim error => p2.
-  exlim bytes_filled => bf2.
-  exlim good_overall => go2.
-  exlim coefficient_block => cb2.
-  seq 2 : (
-       randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
-    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
-    /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
-    /\ xof_offset = off0 + W64.of_int 12
-    /\ stop_sampling = W64.of_int 0
-    /\ to_uint off0 < 256
-    /\ 16 %| to_uint off0
-    /\ to_uint good_overall
-         = bs2int (map saccept (scands (Array272.sub buf (to_uint off0 + 12) 4)))
-    /\ coefficients
-         = W32u8.pack32 (map cbyte (scands (Array272.sub buf (to_uint off0) 16)))
-    /\ coefficient_block = VEXTRACTI128 coefficients W8.one
-  ).
-  - wp; ecall (write_out_windowP p2 buf (to_uint off0 + 8) 4 bf2 go2 cb2).
-    auto=> &hr |> hsv h256o h16 hgo hlt992.
-    have hoff8 : to_uint (off0 + W64.of_int 8) = to_uint off0 + 8
-      by rewrite (to_uintD_small16 off0 8).
-    move: hsv; rewrite hoff8 => @/svsampled [#] hoffle hdvd4 hbfle hsz hag.
-    move: hlt992; rewrite ultE of_uintK /= => hlt992.
-    do ! split; 1,2,3,4,6: smt(W64.to_uint_cmp).
-    - rewrite !sub4E_272 !sub16E_272 scands16E.
-      rewrite /scands /= /nibbles /= /cbyte /=.
-      by rewrite VEXTRACTI128_1_pack32E /=.
-    - by smt().
-    - exact hag.
-    move=> *.
-    by smt(to_uintD_small16).
-  sp 1; if; last first.
-  - auto=> &hr |> hsv h256o h16 hgo hnl.
-    rewrite !uleE ?ultE !of_uintK /= !to_uintD_small ?of_uintK /=.
-    - by move: h256o => /#.
-    move: hnl; rewrite ultE of_uintK /= => hnl.
-    by smt().
-  seq 1 : (#pre); 1: by auto.
-  sp 1.
-  exlim error => p3.
-  exlim bytes_filled => bf3.
-  exlim good_overall => go3.
-  exlim coefficient_block => cb3.
-  seq 2 : (
-       randombytes = buf
-    /\ eta_0 = VPBROADCAST_32u8 (W8.of_int Eta)
-    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
-    /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
-    /\ xof_offset = off0 + W64.of_int 16
-    /\ stop_sampling = W64.of_int 0
-    /\ to_uint off0 < 256
-    /\ 16 %| to_uint off0
-  ).
-  - wp; ecall (write_out_windowP p3 buf (to_uint off0 + 12) 0 bf3 go3 cb3).
-    auto=> &hr |> hsv h256o h16 hgo hlt992.
-    have hoff12 : to_uint (off0 + W64.of_int 12) = to_uint off0 + 12
-      by rewrite (to_uintD_small16 off0 12).
-    move: hsv; rewrite hoff12 => @/svsampled [#] hoffle hdvd4 hbfle hsz hag.
-    move: hlt992; rewrite ultE of_uintK /= => hlt992.
-    do ! split; 1,2,3,4,6: smt(W64.to_uint_cmp).
-    - rewrite !sub4E_272 !sub16E_272 scands16E.
-      rewrite /scands /= /nibbles /= /cbyte /=.
-      by rewrite VEXTRACTI128_1_pack32E VPSRLDQ8_pack16E /=.
-    - by smt().
-    - exact hag.
-    move=> *.
-    by smt(to_uintD_small16).
-  auto=> &hr |> hsv h256o h16.
-  rewrite !uleE ?ultE !of_uintK /= !to_uintD_small ?of_uintK /=.
-  - by move: h256o => /#.
-  by smt(dvdzD dvdzz).
-seq < ^while : (
+         = W32u8.pack32 (map cbyte (scands (Array272.sub buf (to_uint off0) 16)))).
+  - wp; skip => &hr hpre; split; first exact hpre.
+    have [#] hb hv hs hbd hnm hsv hdvd hlt hx hc := hpre.
+    rewrite hv hbd hc /SLH64.protect_64; split.
+    - by rewrite sub16E_272 movemask_scands16E.
+    by rewrite cbyte_lookupE ?size_scands ?size_sub // => z /scands_nib.
+  exlim error, bytes_filled, good_overall, coefficients => p0 bf0 go0 co0.
+  wp; ecall (write_out_blockP p0 buf (to_uint off0) bf0 go0 co0).
+  skip => &hr [#] 4!-> [#] hb hv hs hbd hnm hsv hdvd hlt hx hc hgo hco.
+  have @/svsampled [#] hoffle hdvd4 hbfle hsz hag := hsv.
+  have hsub := size_sreject_sub buf (to_uint off0) _; first by smt(W64.to_uint_cmp).
+  have hoffD : to_uint (off0 + W64.of_int 16) = to_uint off0 + 16.
+  - by rewrite (to_uintD_small16 off0 16) // /#.
+  move: hoffle hdvd4 hsz hag; rewrite hx => hoffle hdvd4 hsz hag.
+  have hle112 : to_uint off0 <= 112 by move: hdvd hlt => /dvdzP [q ->] /#.
+  split; first by rewrite /= hs hco hgo hag hdvd4 /=; smt(W64.to_uint_cmp).
+  move=> _ result [#] h1 h2 h3 h4 h5 /=.
+  rewrite hoffD hb hs hbd hnm h1 h2 h3 h4 h5 /=; split; first exact hv.
+  by split; [smt(dvdzD dvdzz) | smt()].
+(* whole blocks while 32 more coefficients fit *)
+seq 8 : (
      randombytes = buf
-  /\ ssampled buf error (to_uint filled) (to_uint xof_offset)
-  /\ condition_loop = (stop_sampling <> W64.one)
-  /\ stop_sampling = W64.of_int (b2i (!(
-        to_uint xof_offset < 272 /\ to_uint filled < 256)))
-).
-- auto=> &hr |> hbfle hoffle hdvd himp hsz hag.
-  rewrite /ssampled !ultE !to_uint_shr2 !of_uintK /=.
+  /\ values = (if Eta = 2 then error_4x__ERROR_COEFFICIENTS_ETA2
+               else error_4x__ERROR_COEFFICIENTS_ETA4)
+  /\ shuffle_table_pointer = cOMPACTION_INDEX_TABLE
+  /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
+  /\ nibble_mask = VPBROADCAST_32u8 (W8.of_int 15)
+  /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)).
+- while (
+       randombytes = buf
+    /\ values = (if Eta = 2 then error_4x__ERROR_COEFFICIENTS_ETA2
+                 else error_4x__ERROR_COEFFICIENTS_ETA4)
+    /\ shuffle_table_pointer = cOMPACTION_INDEX_TABLE
+    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
+    /\ nibble_mask = VPBROADCAST_32u8 (W8.of_int 15)
+    /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
+    /\ condition_loop = (to_uint bytes_filled <= 896 /\ to_uint xof_offset <= 256)
+  ); last first.
+  - wp; skip => &hr [#] hb hv hs hbd hnm hsv _ /=.
+    have @/svsampled [#] h1 h2 h3 h4 h5 := hsv.
+    by rewrite WE64.sge0_orw !WE64.sge0_sub //=; smt(W64.to_uint_cmp).
+  exlim xof_offset => off0.
+  seq 3 : (
+       randombytes = buf
+    /\ values = (if Eta = 2 then error_4x__ERROR_COEFFICIENTS_ETA2
+                 else error_4x__ERROR_COEFFICIENTS_ETA4)
+    /\ shuffle_table_pointer = cOMPACTION_INDEX_TABLE
+    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
+    /\ nibble_mask = VPBROADCAST_32u8 (W8.of_int 15)
+    /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
+    /\ to_uint bytes_filled <= 896 /\ to_uint off0 <= 256 /\ xof_offset = off0
+    /\ candidates = W32u8.pack32 (scands (Array272.sub buf (to_uint off0) 16))).
+  - ecall (error_4x____bytestream_to_coefficientsP
+             (W16u8.pack16 (Array272.sub buf (to_uint off0) 16))).
+    auto=> &hr |> hsv hbf hle.
+    by rewrite WArray272_get128E 1:#smt:(W64.to_uint_cmp) sub16E_272 /= /#.
+  seq 4 : (#pre
+    /\ to_uint good_overall
+         = bs2int (map saccept (scands (Array272.sub buf (to_uint off0) 16)))
+    /\ coefficients
+         = W32u8.pack32 (map cbyte (scands (Array272.sub buf (to_uint off0) 16)))).
+  - wp; skip => &hr hpre; split; first exact hpre.
+    have [#] hb hv hs hbd hnm hsv hbf hle hx hc := hpre.
+    rewrite hv hbd hc /SLH64.protect_64; split.
+    - by rewrite sub16E_272 movemask_scands16E.
+    by rewrite cbyte_lookupE ?size_scands ?size_sub // => z /scands_nib.
+  exlim error, bytes_filled, good_overall, coefficients => p0 bf0 go0 co0.
+  wp; ecall (write_out_blockP p0 buf (to_uint off0) bf0 go0 co0).
+  skip => &hr [#] 4!-> [#] hb hv hs hbd hnm hsv hbf hle hx hc hgo hco.
+  have @/svsampled [#] hoffle hdvd4 hbfle hsz hag := hsv.
+  have hoffD : to_uint (off0 + W64.of_int 16) = to_uint off0 + 16.
+  - by rewrite (to_uintD_small16 off0 16) // /#.
+  move: hoffle hdvd4 hsz hag; rewrite hx => hoffle hdvd4 hsz hag.
+  split; first by rewrite /= hs hco hgo hag hdvd4 /=; smt(W64.to_uint_cmp).
+  move=> _ result [#] h1 h2 h3 h4 h5 /=.
+  rewrite hoffD hb hs hbd hnm h1 h2 h3 h4 h5 /=; split; first exact hv.
+  by rewrite WE64.sge0_orw !WE64.sge0_sub //= ?hoffD; smt(W64.to_uint_cmp).
+(* groups of 8 candidates while 8 more coefficients fit *)
+seq 8 : (
+     randombytes = buf
+  /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)).
+- while (
+       randombytes = buf
+    /\ values = (if Eta = 2 then error_4x__ERROR_COEFFICIENTS_ETA2
+                 else error_4x__ERROR_COEFFICIENTS_ETA4)
+    /\ shuffle_table_pointer = cOMPACTION_INDEX_TABLE
+    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
+    /\ nibble_mask = VPBROADCAST_32u8 (W8.of_int 15)
+    /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
+    /\ condition_loop = (to_uint bytes_filled <= 992 /\ to_uint xof_offset <= 256)
+  ); last first.
+  - wp; skip => &hr [#] hb hv hs hbd hnm hsv /=.
+    have @/svsampled [#] h1 h2 h3 h4 h5 := hsv.
+    by rewrite WE64.sge0_orw !WE64.sge0_sub //=; smt(W64.to_uint_cmp).
+  exlim xof_offset => off0.
+  seq 3 : (
+       randombytes = buf
+    /\ values = (if Eta = 2 then error_4x__ERROR_COEFFICIENTS_ETA2
+                 else error_4x__ERROR_COEFFICIENTS_ETA4)
+    /\ shuffle_table_pointer = cOMPACTION_INDEX_TABLE
+    /\ bound = VPBROADCAST_32u8 (W8.of_int rej_bound)
+    /\ nibble_mask = VPBROADCAST_32u8 (W8.of_int 15)
+    /\ svsampled buf error (to_uint bytes_filled) (to_uint xof_offset)
+    /\ to_uint bytes_filled <= 992 /\ to_uint off0 <= 256 /\ xof_offset = off0
+    /\ candidates = W32u8.pack32 (scands (Array272.sub buf (to_uint off0) 16))).
+  - ecall (error_4x____bytestream_to_coefficientsP
+             (W16u8.pack16 (Array272.sub buf (to_uint off0) 16))).
+    auto=> &hr |> hsv hbf hle.
+    by rewrite WArray272_get128E 1:#smt:(W64.to_uint_cmp) sub16E_272 /= /#.
+  seq 5 : (#pre
+    /\ to_uint good_overall
+         = bs2int (map saccept (scands (Array272.sub buf (to_uint off0) 16)))
+    /\ coefficient_block
+         = VEXTRACTI128
+             (W32u8.pack32 (map cbyte (scands (Array272.sub buf (to_uint off0) 16))))
+             W8.zero).
+  - wp; skip => &hr hpre; split; first exact hpre.
+    have [#] hb hv hs hbd hnm hsv hbf hle hx hc := hpre.
+    rewrite hv hbd hc /SLH64.protect_64; split.
+    - by rewrite sub16E_272 movemask_scands16E.
+    by rewrite cbyte_lookupE ?size_scands ?size_sub // => z /scands_nib.
+  exlim error, bytes_filled, good_overall, coefficient_block => p0 bf0 go0 cb0.
+  wp; ecall (write_out_windowP p0 buf (to_uint off0) 12 bf0 go0 cb0).
+  skip => &hr [#] 4!-> [#] hb hv hs hbd hnm hsv hbf hle hx hc hgo hcb.
+  have @/svsampled [#] hoffle hdvd4 hbfle hsz hag := hsv.
+  have hoffD : to_uint (off0 + W64.of_int 4) = to_uint off0 + 4.
+  - by rewrite (to_uintD_small16 off0 4) // /#.
+  move: hoffle hdvd4 hsz hag; rewrite hx => hoffle hdvd4 hsz hag.
+  split.
+  - rewrite /= hs hgo hag hdvd4 hbf /=; split; first by smt(W64.to_uint_cmp).
+    rewrite hcb !sub4E_272 !sub16E_272 scands16E /scands /= /nibbles /=.
+    split; first by smt().
+    by split; [rewrite VEXTRACTI128_0_pack32E /= | exact hsz].
+  move=> _ result [#] h1 h2 h3 h4 h5 h6 h7 /=.
+  rewrite hoffD hb hs hbd hnm h1 h2 h3 h4 h5 /=; split; first exact hv.
+  by rewrite WE64.sge0_orw !WE64.sge0_sub //= ?hoffD; smt(W64.to_uint_cmp).
+(* one candidate at a time while coefficients are missing *)
+seq 11 : (
+     randombytes = buf
+  /\ to_uint candidate_index <= 544
+  /\ filled_ok error (nsamp buf (to_uint candidate_index)) (to_uint filled)
+  /\ condition_loop = (to_uint filled < 256 /\ to_uint candidate_index < 544)).
+- wp; skip => &hr [#] hb hsv /=; have @/svsampled [#] h1 h2 h3 h4 h5 := hsv.
+  have hci : to_uint (xof_offset{hr} `<<` W8.one) = 2 * to_uint xof_offset{hr}.
+  - by rewrite /(`<<`) /= WE64.to_uint_shl_small //=; smt(W64.to_uint_cmp).
+  have hfl : to_uint (bytes_filled{hr} `>>` W8.of_int 2) = to_uint bytes_filled{hr} %/ 4.
+  - by rewrite to_uint_shr2.
+  rewrite hb WE64.slt0_andw !WE64.slt0_sub //= ?hci ?hfl; 1,2: smt(W64.to_uint_cmp).
+  rewrite nsamp_bytes 1:#smt:(W64.to_uint_cmp) /filled_ok h5 /=.
   by smt().
-while (
+wp; while (
      randombytes = buf
-  /\ ssampled buf error (to_uint filled) (to_uint xof_offset)
-  /\ condition_loop = (stop_sampling <> W64.one)
-  /\ stop_sampling = W64.of_int (b2i (!(
-        to_uint xof_offset < 272 /\ to_uint filled < 256)))
+  /\ to_uint candidate_index <= 544
+  /\ filled_ok error (nsamp buf (to_uint candidate_index)) (to_uint filled)
+  /\ condition_loop = (to_uint filled < 256 /\ to_uint candidate_index < 544)
 ); last first.
-- skip=> &hr |> _ cl e0 f0 off0x _ hs hstop.
-  have @/ssampled [#] hoffle hfle hok := hs.
-  have hb : !(to_uint off0x < 272 /\ to_uint f0 < 256).
-  - by apply of_int_b2i_eq1P; move: hstop; smt().
-  case: (272 <= to_uint off0x) => hoff.
-  - move: hok; have -> : to_uint off0x = 272 by smt().
-    by move=> @/filled_ok.
-  have hf : to_uint f0 = 256 by smt().
-  have -> : 272 = to_uint off0x + (272 - to_uint off0x) by ring.
-  rewrite sreject_block; 1,2: smt(W64.to_uint_cmp).
-  by apply filled_ok_full => //.
-seq 5 : (
+- skip => &hr [#] hb hle hok hcl; split; first by rewrite hb hle hok hcl.
+  move=> ci cl e f hncl [#] _ hle' hok' hcl'.
+  have hsplit : sreject (Array272.sub buf 0 272)
+    = nsamp buf (to_uint ci)
+      ++ map scoeff (filter saccept (drop (to_uint ci) (scands (Array272.sub buf 0 272)))).
+  - rewrite -nsamp_full /nsamp -map_cat -filter_cat cat_take_drop take_oversize //.
+    by rewrite size_scands size_sub.
+  have hfull : filled_ok e (sreject (Array272.sub buf 0 272)) (to_uint f).
+  - rewrite hsplit; case: (to_uint f = 256) => hf; first by apply filled_ok_full.
+    have hci : to_uint ci = 544 by move: hok' => @/filled_ok [_ hmin]; smt().
+    rewrite hci drop_oversize /= ?cats0; first by rewrite size_scands size_sub.
+    by move: hok'; rewrite hci.
+  by move: hfull => @/filled_ok [-> ->].
+(* the candidate, its acceptance bit and its coefficient *)
+seq 16 : (
      randombytes = buf
-  /\ ssampled randombytes error (to_uint filled) (to_uint xof_offset)
-  /\ to_uint filled < 256
-  /\ to_uint xof_offset < 272
-  /\ stop_sampling = W64.of_int 0
-  /\ coefficient = zeroextu32 (randombytes.[to_uint xof_offset] `&` W8.of_int 15)
-  /\ condition = (coefficient \ult W32.of_int rej_bound)
-).
-- auto=> &hr |> hs hne.
-  have [hf256 hoff272] : to_uint filled{hr} < 256 /\ to_uint xof_offset{hr} < 272
-    by smt(of_int_b2i_eq1P).
-  by rewrite /SLH64.protect_32 zext_and15E /=; smt(of_int_b2i_eq1P).
-seq > ^if : (
-     randombytes = buf
-  /\ to_uint xof_offset < 272
-  /\ stop_sampling = W64.of_int 0
-  /\ to_uint filled <= 256
-  /\ filled_ok error
-       (sreject (Array272.sub randombytes 0 (to_uint xof_offset))
-        ++ halfstep (randombytes.[to_uint xof_offset] `&` W8.of_int 15))
-       (to_uint filled)
-).
-- if.
-  - auto=> &hr |> hs hf256 hoff272.
-    have @/ssampled [#] hoffle hfle hok := hs.
-    rewrite saccept_ultE => hsacc; rewrite (scoeffE _ hsacc).
-    rewrite hsacc /= !to_uintD_small ?of_uintK /=; 1: smt().
-    split; 1: smt().
-    by apply filled_ok_snoc.
-  auto=> &hr |> hs hf256 hoff272.
-  have @/ssampled [#] hoffle hfle hok := hs.
-  rewrite saccept_ultE => hrej.
-  by rewrite ifF 1:/# cats0 /#.
-seq > ^if : (
-     randombytes = buf
-  /\ to_uint xof_offset < 272
-  /\ stop_sampling = W64.of_int 0
-  /\ ssampled randombytes error (to_uint filled) (to_uint xof_offset + 1)
-).
-- sp 1; if.
-  - seq 1 : (#pre); 1: by auto.
-    sp 4; if.
-    - auto=> &hr |> hoff272 hfle hok hfu.
-      move: hfu; rewrite ultE of_uintK /= => hf256.
-      rewrite /SLH64.protect_32 zext_shr4E saccept_ultE => hsacc; rewrite (scoeffE _ hsacc).
-      rewrite /ssampled sreject_step272 1:#smt:(W64.to_uint_cmp) hsacc /= catA.
-      rewrite !to_uintD_small ?of_uintK /=; 1: smt().
-      split*; 1,2: by smt(size_cat size_ge0).
-      by apply filled_ok_snoc.
-    auto=> &hr |> hoff272 hfle hok hfu.
-    move: hfu; rewrite ultE of_uintK /= => hf256.
-    rewrite /SLH64.protect_32 zext_shr4E saccept_ultE => hrej.
-    have hsrej : saccept (randombytes{hr}.[to_uint xof_offset{hr}] `>>>` 4) = false by smt().
-    rewrite /ssampled sreject_step272 1:#smt:(W64.to_uint_cmp) hsrej /= cats0.
-    by smt().
-  auto=> &hr |> hoff272 hfle hok hnf.
-  move: hnf; rewrite ultE of_uintK /= => hnf.
-  have hf256 : to_uint filled{hr} = 256 by smt().
-  rewrite /ssampled sreject_step272 1:#smt:(W64.to_uint_cmp) catA.
-  split*; 1,2: by smt(size_cat size_ge0).
-  by apply filled_ok_full => //.
-auto=> &hr |> hoff272 hs.
-have @/ssampled [#] hoffle hfle hok := hs.
-rewrite !uleE !of_uintK /= !to_uintD_small ?of_uintK /=; 1: smt().
-by smt().
+  /\ to_uint candidate_index < 544 /\ to_uint filled < 256
+  /\ filled_ok error (nsamp buf (to_uint candidate_index)) (to_uint filled)
+  /\ to_uint (zeroextu64 accepted)
+       = b2i (saccept (nth W8.zero (scands (Array272.sub buf 0 272))
+                         (to_uint candidate_index)))
+  /\ coefficient
+       = - (sred32 (zeroextu32 (nth W8.zero (scands (Array272.sub buf 0 272))
+                                  (to_uint candidate_index)))
+            - W32.of_int Eta)).
+- wp; skip => &hr [#] hb hle hok hcl hc.
+  have [hf hn] : to_uint filled{hr} < 256 /\ to_uint candidate_index{hr} < 544 by smt().
+  have hsh : to_uint (candidate_index{hr} `>>` W8.one) = to_uint candidate_index{hr} %/ 2.
+  - by rewrite /(`>>`) /= W64.to_uint_shr.
+  rewrite hsh cand_extractE hb hf hn hok /SLH64.protect_32 /=.
+  rewrite nth_scands 1:#smt:(W64.to_uint_cmp) /=.
+  apply accepted_bitE.
+  by case: (to_uint candidate_index{hr} %% 2 = 0) => _;
+       [exact to_uint_lonib_lt16 | exact to_uint_hinib_lt16].
+(* the store at the first missing position, which advances if the      *)
+(* candidate is accepted                                               *)
+wp; skip => &hr [#] hb hn hf hok hacc hco.
+pose z := nth W8.zero (scands (Array272.sub buf 0 272)) (to_uint candidate_index{hr}).
+have hfD : to_uint (filled{hr} + zeroextu64 accepted{hr})
+           = to_uint filled{hr} + b2i (saccept z).
+- by rewrite W64.to_uintD_small hacc -/z; smt(W64.to_uint_cmp).
+have hnD : to_uint (candidate_index{hr} + W64.one) = to_uint candidate_index{hr} + 1.
+- by rewrite W64.to_uintD_small /= /#.
+rewrite /= hb WE64.slt0_andw !WE64.slt0_sub //= ?hfD ?hnD; 1,2: smt(W64.to_uint_cmp).
+split; first by smt().
+rewrite nsampS 1:#smt:(W64.to_uint_cmp) -/z hco -/z.
+case: (saccept z) => hz /=.
+- by rewrite scoeffE //; exact filled_ok_snoc.
+rewrite cats0; move: hok => @/filled_ok [hag hmin]; split => //.
+rewrite /agree => i hi hi2.
+move: hag => @/agree /(_ i hi hi2) <-.
+by rewrite Array256.get_setE 1:/# ifF 1:/#.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1272,53 +1345,70 @@ qed.
 lemma error_4x__rejection_sample_multiple_blocks_ll :
   islossless M.error_4x__rejection_sample_multiple_blocks.
 proof.
-proc; inline M.error_4x____reduce_coefficient.
-while (   to_uint xof_offset <= 272
-       /\ (condition_loop => to_uint xof_offset < 272))
-      (272 - to_uint xof_offset).
-- move=> z; auto=> &hr |> hle hlt hc.
-  have h1 : to_uint (xof_offset{hr} + W64.one) = to_uint xof_offset{hr} + 1.
-  - by rewrite to_uintD_small /= /#.
-  by rewrite !W64.uleE h1 /=; smt().
+proc; inline M.error_4x____reduce_coefficient M.error_4x____write_out_32_coefficients
+  M.error_4x____write_out_8_coefficients M.error_4x____bytestream_to_coefficients.
 wp.
-(* the vectorized loop consumes 4 to 16 bytes per iteration *)
-while (   to_uint xof_offset < 272 /\ 4 %| to_uint xof_offset
-       /\ (condition_loop => to_uint xof_offset < 256))
+(* one candidate per iteration *)
+while (   to_uint candidate_index <= 544
+       /\ (condition_loop => to_uint candidate_index < 544))
+      (544 - to_uint candidate_index).
+- move=> z; auto => &hr |> hle hlt hc.
+  have h1 : to_uint (candidate_index{hr} + W64.one) = to_uint candidate_index{hr} + 1.
+  - by rewrite to_uintD_small /= /#.
+  split; last by rewrite h1 /#.
+  split; first by rewrite h1 /#.
+  by rewrite WE64.slt0_andw (WE64.slt0_sub (candidate_index{hr} + W64.one)) //= ?h1 /#.
+wp.
+(* 4 bytes per iteration *)
+while (   to_uint xof_offset <= 272
+       /\ (condition_loop => to_uint xof_offset <= 256))
       (272 - to_uint xof_offset).
-- move=> z; exlim xof_offset => o.
-  seq 12 : (true) 1%r 1%r 0%r 0%r
-    (to_uint o < 256 /\ 4 %| to_uint o /\ 272 - to_uint o = z /\
-     exists j, 1 <= j <= 4 /\ to_uint xof_offset = to_uint o + 4 * j).
-  + seq 10 : (to_uint o < 256 /\ 4 %| to_uint o /\ 272 - to_uint o = z /\
-              to_uint xof_offset = to_uint o + 4).
-    - wp; call (: true); 1: by auto.
-      wp; call (: true); 1: by auto.
-      auto=> &hr |> h272 hdvd hlt hc.
-      by rewrite to_uintD_small /= /#.
-    sp; if; last by auto=> &hr |> *; exists 1.
-    seq 4 : (to_uint o < 256 /\ 4 %| to_uint o /\ 272 - to_uint o = z /\
-             to_uint xof_offset = to_uint o + 8).
-    - wp; call (: true); 1: by auto.
-      auto=> &hr |> h256 hdvd ho _.
-      by rewrite to_uintD_small /= /#.
-    sp; if; last by auto=> &hr |> *; exists 2.
-    seq 4 : (to_uint o < 256 /\ 4 %| to_uint o /\ 272 - to_uint o = z /\
-             to_uint xof_offset = to_uint o + 12).
-    - wp; call (: true); 1: by auto.
-      auto=> &hr |> h256 hdvd ho _.
-      by rewrite to_uintD_small /= /#.
-    sp; if; last by auto=> &hr |> *; exists 3.
-    wp; call (: true); 1: by auto.
-    auto=> &hr |> h256 hdvd ho _.
-    by exists 4; rewrite to_uintD_small /= /#.
-  + by islossless.
-  + auto=> &hr [h256 [hdvd [<- [j [rgj ho]]]]].
-    have h252 : to_uint o <= 252 by move: hdvd h256 => /dvdzP [q ->] /#.
-    have hd : 4 %| (to_uint o + 4 * j) by rewrite dvdzD // dvdz_mulr.
-    rewrite !W64.uleE ho /= hd /=; smt().
-  + by hoare; conseq (: _ ==> true).
-  + by [].
-by auto=> />; smt().
+- move=> z; auto => &hr |> hle hlt hc.
+  have h1 : to_uint (xof_offset{hr} + W64.of_int 4) = to_uint xof_offset{hr} + 4.
+  - by rewrite to_uintD_small /= /#.
+  split; last by rewrite h1 /#.
+  split; first by rewrite h1 /#.
+  by rewrite WE64.sge0_orw (WE64.sge0_sub _ (xof_offset{hr} + W64.of_int 4)) //= ?h1 /#.
+wp.
+(* 16 bytes per iteration *)
+while (   to_uint xof_offset <= 272
+       /\ (condition_loop => to_uint xof_offset <= 256))
+      (272 - to_uint xof_offset).
+- move=> z; auto => &hr |> hle hlt hc.
+  have h1 : to_uint (xof_offset{hr} + W64.of_int 16) = to_uint xof_offset{hr} + 16.
+  - by rewrite to_uintD_small /= /#.
+  split; last by rewrite h1 /#.
+  split; first by rewrite h1 /#.
+  by rewrite WE64.sge0_orw (WE64.sge0_sub _ (xof_offset{hr} + W64.of_int 16)) //= ?h1 /#.
+wp.
+while (   16 %| to_uint xof_offset /\ to_uint xof_offset <= 128
+       /\ (condition_loop => to_uint xof_offset < 128))
+      (128 - to_uint xof_offset).
+- move=> z; auto => &hr |> hdvd hle hlt hc.
+  have h1 : to_uint (xof_offset{hr} + W64.of_int 16) = to_uint xof_offset{hr} + 16.
+  - by rewrite to_uintD_small /= /#.
+  have h112 : to_uint xof_offset{hr} <= 112.
+  - by have := hlt hc; move: hdvd => /dvdzP [q ->] /#.
+  split; last by rewrite h1 /#.
+  split; first by rewrite h1; smt(dvdzD dvdzz).
+  by split; [rewrite h1 /# | rewrite ultE of_uintK].
+(* between the loops: a loop that runs has room in the buffer *)
+wp; skip => &hr _ /=.
+split; first exact dvdz0.
+move=> bf0 cl0 off0; split; first by smt().
+move=> _ [#] _ hoff0 _; split.
+- split; first by smt().
+  by rewrite WE64.sge0_orw (WE64.sge0_sub _ off0) //= /#.
+move=> bf1 cl1 off1; split; first by smt().
+move=> _ [#] hoff1 _; split.
+- by rewrite hoff1 /= WE64.sge0_orw (WE64.sge0_sub _ off1) //= /#.
+move=> bf2 cl2 off2; split; first by smt().
+move=> _ [#] hoff2 _.
+have hsh : to_uint (off2 `<<` W8.one) = 2 * to_uint off2.
+- by rewrite /(`<<`) /= WE64.to_uint_shl_small //= /#.
+split; last by smt().
+split; first by rewrite hsh /#.
+by rewrite WE64.slt0_andw (WE64.slt0_sub (off2 `<<` W8.one)) //= ?hsh /#.
 qed.
 
 hint solve 0 lossless : shake256_squeezeblock4x_ll error_4x__rejection_sample_one_block_ll.
