@@ -56,4 +56,76 @@ namespace sample {
 
         return matrix_A;
     }
+
+    // __matrix_A, which also hashes the verification key vk (whose first bytes
+    // are rho): the permutations of the hash run alongside the first squeezes
+    // of the matrix, one per block of SHAKE128_RATE bytes, and the result holds
+    // the state of the hash. Its VK_HASH_BLOCKS permutations fit in the full
+    // chunks (BLOCKS each), so the last half chunk never absorbs.
+    #[ct = "public -> _"]
+    inline
+    fn __matrix_A_vk(
+        reg ptr u8[VERIFICATION_KEY_SIZE] vk
+    ) -> stack u32[ROWS_IN_MATRIX_A * COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL],
+         stack u64[25]
+    {
+        stack u32[ROWS_IN_MATRIX_A * COLUMNS_IN_MATRIX_A * COEFFICIENTS_IN_POLYNOMIAL] matrix_A;
+        stack u16[4] domain_separators;
+        stack u8[32] seed;
+        reg u256 copied_32_bytes;
+        stack u64[25] lanes;
+        #[mmx] reg ptr u8[VERIFICATION_KEY_SIZE] vkm;
+
+        inline int row column chunk index lane;
+
+        copied_32_bytes = vk.[:u256 0];
+        seed.[:u256 0] = copied_32_bytes;
+
+        lanes = __state_init(lanes);
+        vkm = vk;
+
+        for chunk = 0 to (ROWS_IN_MATRIX_A * COLUMNS_IN_MATRIX_A) / 4 {
+            index = 4 * chunk;
+
+            for lane = 0 to 4 {
+                row = (index + lane) / COLUMNS_IN_MATRIX_A;
+                column = (index + lane) % COLUMNS_IN_MATRIX_A;
+                domain_separators[lane] = (row << 8) | column;
+            }
+
+            vk = vkm;
+            matrix_A[(index + 0) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
+            matrix_A[(index + 1) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
+            matrix_A[(index + 2) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
+            matrix_A[(index + 3) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
+            lanes
+                = matrix_A::__sample_4_polynomials_vk(
+                    seed,
+                    domain_separators,
+                    lanes, vk, matrix_A::BLOCKS * chunk
+                );
+        }
+
+        // When K * L = 2 (mod 4), one more 4-way call samples the last two
+        // elements
+        if ((ROWS_IN_MATRIX_A * COLUMNS_IN_MATRIX_A) % 4 == 2) {
+            index = ROWS_IN_MATRIX_A * COLUMNS_IN_MATRIX_A - 2;
+
+            for lane = 0 to 2 {
+                row = (index + lane) / COLUMNS_IN_MATRIX_A;
+                column = (index + lane) % COLUMNS_IN_MATRIX_A;
+                domain_separators[lane] = (row << 8) | column;
+            }
+
+            matrix_A[(index + 0) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
+            matrix_A[(index + 1) * COEFFICIENTS_IN_POLYNOMIAL : COEFFICIENTS_IN_POLYNOMIAL],
+            _, _ 
+            = matrix_A::__sample_4_polynomials(
+                seed,
+                domain_separators
+            );
+        }
+
+        return matrix_A, lanes;
+    }
 }
