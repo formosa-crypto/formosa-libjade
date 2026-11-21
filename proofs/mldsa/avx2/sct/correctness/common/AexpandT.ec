@@ -308,32 +308,51 @@ qed.
 (* the lane mask: PEXT keeps bit 4k+3 of the byte mask, the msb of the  *)
 (* dword lane k                                                         *)
 lemma lane_signs_bit (i : int) :
-  (W32.of_int 2290649224).[i] = (0 <= i < 32 /\ i %% 4 = 3).
+  (W64.of_int 2290649224).[i] = (0 <= i < 32 /\ i %% 4 = 3).
 proof.
-rewrite W32.of_intwE /int_bit; case: (0 <= i < 32) => hi //=.
-have : i \in iota_ 0 32 by rewrite mem_iota /#.
-rewrite -iotaredE /=; do 31! (case=> [-> // |]).
+rewrite W64.of_intwE /int_bit; case: (0 <= i < 64) => hi /=; last by smt().
+have : i \in iota_ 0 64 by rewrite mem_iota /#.
+rewrite -iotaredE /=; do 63! (case=> [-> // |]).
 by move=> ->.
 qed.
 
 lemma pext_lane_signs (c : W256.t) :
-  zeroextu64 (PEXT_32 (MOVEMASK_32u8 c) (W32.of_int 2290649224))
+  PEXT_64 (zeroextu64 (MOVEMASK_32u8 c)) (W64.of_int 2290649224)
   = zeroextu64 (MOVEMASK_8u32 c).
 proof.
-have hf : filter (fun i => (W32.of_int 2290649224).[i]) (iota_ 0 32)
+have hf : filter (fun i => (W64.of_int 2290649224).[i]) (iota_ 0 64)
           = mkseq (fun k => 4 * k + 3) 8.
 - rewrite (eq_filter _ (fun i => 0 <= i < 32 /\ i %% 4 = 3)) => [i /=|].
   - by rewrite lane_signs_bit.
   by rewrite -iotaredE /mkseq -iotaredE.
 apply W64.wordP => b hb.
-rewrite movemask_8u32_bit zeroextu64_bit /PEXT_32 /= hf.
+rewrite movemask_8u32_bit /PEXT_64 /= hf.
 case: (0 <= b < 8) => hb8; last first.
-- case: (0 <= b < 32) => // hb32.
-  by rewrite W32.get_bits2w // nth_default // size_map size_mkseq /#.
-rewrite (_ : 0 <= b < 32) 1:/# /= W32.get_bits2w 1:/# (nth_map 0) ?size_mkseq 1:/#.
+- by rewrite W64.get_bits2w // nth_default // size_map size_mkseq /#.
+rewrite W64.get_bits2w 1:/# (nth_map 0) ?size_mkseq 1:/#.
 have := movemask_32u8_bit c (4 * b + 3).
-rewrite nth_mkseq //= zeroextu64_bit (_ : 0 <= 4 * b + 3 < 32) 1:/# /= => ->.
+rewrite nth_mkseq //= (_ : 0 <= 4 * b + 3 < 32) 1:/# /= => ->.
 by rewrite WE8.msbE WE32.msbE /=; congr; ring.
+qed.
+
+(* the byte mask has 4 bits per accepted candidate: its population     *)
+(* count is the size in bytes of the accepted candidates                *)
+lemma count_good_bytes (cs : W32.t list) :
+  size cs = 8 => (forall w, w \in cs => 0 <= to_uint w < 2 ^ 23) =>
+  count idfun (W64.w2bits (zeroextu64 (MOVEMASK_32u8
+    (VPCMPGT_8u32 MODULUS8u32 (W8u32.pack8 cs)))))
+  = 4 * count accept cs.
+proof.
+move=> sz8 bnd; rewrite popcnt_movemask_cmp.
+rewrite (popcnt_count8 _ (map accept cs)) 1:size_map // 1:to_uint_good //.
+by rewrite count_idfun_map.
+qed.
+
+lemma popcnt_bytes_step (bf g : W64.t) (n : int) :
+  count idfun (W64.w2bits g) = 4 * n => 0 <= n <= 8 => to_uint bf <= 1024 =>
+  to_uint (bf + (POPCNT_64 g).`6) = to_uint bf + 4 * n.
+proof.
+by move=> hc hn hbf; rewrite popcnt6E hc W64.to_uintD_small of_uintK /= /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -546,6 +565,8 @@ seq 1: (
     /\ input_offset = off0 + W64.of_int 24
     /\ potential_coefficients = W8u32.pack8 (cands (Array848.sub buf (to_uint off0) 24))
     /\ to_uint good = bs2int (map accept (cands (Array848.sub buf (to_uint off0) 24)))
+    /\ count idfun (W64.w2bits good_bytes)
+       = 4 * count accept (cands (Array848.sub buf (to_uint off0) 24))
   ).
   - auto=> &hr |> hs hio hdvd hrows hne.
     have hoff : to_uint input_offset{hr} < 768 by move: hne; rewrite ultE of_uintK.
@@ -555,9 +576,9 @@ seq 1: (
     - by smt(W64.to_uint_cmp).
     move=> hrs; split; 1: smt().
     rewrite hoff /=.
-    rewrite /SLH64.protect_32 pext_lane_signs.
-    by rewrite -(to_uint_good _ _ (cands_uint_lt _))
-       1:size_cands 1:size_sub.
+    rewrite /SLH64.protect_64 pext_lane_signs; split.
+    - by rewrite -(to_uint_good _ _ (cands_uint_lt _)) 1:size_cands 1:size_sub.
+    by rewrite (count_good_bytes _ _ (cands_uint_lt _)) 1:size_cands 1:size_sub.
 
   (* b. compact-store the accepted candidates, which bytes_filled      *)
   (*    counts: the whole window is consumed                           *)
@@ -572,7 +593,7 @@ seq 1: (
     /\ coefficient_mask = matrix_A__DECODING_TABLE.[1]
     /\ input_offset = off0 + W64.of_int 24
   ).
-  - auto=> &hr |> hs h992 h768 hdvd hrows hgood.
+  - auto=> &hr |> hs h992 h768 hdvd hrows hgood hcnt.
     move: hs => @/vsampled [#] hio0 hdvd0 hble hsz hag.
     pose cs := cands (Array848.sub buf (to_uint off0) 24).
     have szcs : size cs = 8 by rewrite /cs size_cands size_sub.
@@ -582,8 +603,9 @@ seq 1: (
       by rewrite (rejectE (Array848.sub buf (to_uint off0) 24)).
     have hfle : size (filter accept cs) <= 8.
     - by rewrite size_filter; have := count_size accept cs; rewrite szcs.
-    rewrite /vsampled (popcnt_step8 _ _ (map accept cs) _ hgood) 1:size_map //.
-    rewrite count_idfun_map -size_filter hsplit.
+    rewrite (popcnt_bytes_step _ _ (count accept cs) hcnt)
+      1:#smt:(count_ge0 count_size) 1:/#.
+    rewrite -size_filter hsplit.
     do 3? (split; 1: smt()).
     split; 1: by rewrite size_cat /#.
     by apply (agree_store compaction_index_table{hr} _ _ cs good{hr} bytes_filled{hr}) => //#.

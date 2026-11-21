@@ -287,3 +287,50 @@ rewrite (_ : 0 <= b < 32) 1:/# /= packss16_bits8 1:/# (_ : b %% 16 < 8) 1:/# /=.
 rewrite msb_sat8 (_ : 8 * (b %/ 16) + b %% 8 = b) 1:/# packss_permq_bits16 1:/#.
 by rewrite (_ : b < 8) 1:/# /= msb_sat16 hb.
 qed.
+
+(* a lane of a comparison is all ones or all zeros *)
+lemma VPCMPGT_8u32_bitE (a b : W256.t) (i j : int) : 0 <= i < 8 => 0 <= j < 32 =>
+  (VPCMPGT_8u32 a b \bits32 i).[j] = msb (VPCMPGT_8u32 a b \bits32 i).
+proof.
+move=> hi hj; rewrite /VPCMPGT_8u32 W8u32.map2bE // /wcmp WE32.msbE.
+case: (to_sint (b \bits32 i) < to_sint (a \bits32 i)) => _ //.
+have -> : W32.of_int (-1) = W32.onew.
+- by apply W32.to_uint_eq; rewrite W32.of_uintK W32.to_uint_onew.
+by rewrite !W32.onewE /#.
+qed.
+
+(* so its byte mask has 4 bits per bit of its lane mask *)
+lemma popcnt_movemask_cmp (a b : W256.t) :
+  count idfun (W64.w2bits (zeroextu64 (MOVEMASK_32u8 (VPCMPGT_8u32 a b))))
+  = 4 * count idfun (W64.w2bits (zeroextu64 (MOVEMASK_8u32 (VPCMPGT_8u32 a b)))).
+proof.
+pose c := VPCMPGT_8u32 a b; pose f := fun i => msb (c \bits32 i).
+rewrite !W64.w2bitsE.
+rewrite (eq_in_mkseq _ (fun k => 0 <= k < 32 /\ f (k %/ 4))).
+- move=> k hk /=; rewrite movemask_32u8_bit; case: (0 <= k < 32) => hk32 //=.
+  rewrite WE8.msbE /= (_ : k * 8 + 7 = (k %/ 4) * 32 + (8 * (k %% 4) + 7)) 1:/#.
+  by rewrite -W8u32.bits32iE 1:/# /f /c VPCMPGT_8u32_bitE /#.
+rewrite (eq_in_mkseq (fun i => (zeroextu64 (MOVEMASK_8u32 c)).[i])
+          (fun k => 0 <= k < 8 /\ f k)).
+- by move=> k hk /=; rewrite movemask_8u32_bit.
+by move: f => f; rewrite /mkseq -!iotaredE /= /idfun /= /#.
+qed.
+
+lemma count_movemask_8u32_le (x : W256.t) :
+  count idfun (W64.w2bits (zeroextu64 (MOVEMASK_8u32 x))) <= 8.
+proof.
+pose f := fun k => msb (x \bits32 k).
+rewrite W64.w2bitsE (eq_in_mkseq _ (fun k => 0 <= k < 8 /\ f k)).
+- by move=> k hk /=; rewrite movemask_8u32_bit.
+by move: f => f; rewrite /mkseq -!iotaredE /= /idfun /= /#.
+qed.
+
+lemma to_uint_popcnt_movemask_cmp (a b : W256.t) :
+  exists n, 0 <= n <= 8 /\
+    to_uint (POPCNT_64 (zeroextu64 (MOVEMASK_32u8 (VPCMPGT_8u32 a b)))).`6 = 4 * n.
+proof.
+exists (count idfun (W64.w2bits (zeroextu64 (MOVEMASK_8u32 (VPCMPGT_8u32 a b))))).
+rewrite count_ge0 count_movemask_8u32_le /=.
+rewrite /POPCNT_64 /flags_w /rflags_of_popcnt /= popcnt_movemask_cmp.
+by rewrite W64.to_uint_small /=; smt(count_ge0 count_movemask_8u32_le).
+qed.
