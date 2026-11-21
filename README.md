@@ -51,6 +51,16 @@ for each set it covers:
   leakage ([MLDSA_Security.ec](proofs/mldsa/spec/properties/MLDSA_Security.ec)), for
   44, 65 and 87 (`Security<set>.ec` in the same directory).
 
+SHA-2 and HMAC have a specification of their standard and no security theorem:
+
+- SHA-2 (FIPS 180-4), parameter sets sha224, sha256, sha384, sha512, sha512_224,
+  sha512_256, and the multi-way sets sha256x8 (eight SHA-256 hashes at once) and
+  sha512x4 (four SHA-512 hashes):
+  [FIPS180_SHA2.ec](proofs/fips180/spec/FIPS180_SHA2.ec), checked on the NIST CAVP
+  vectors ([validation](proofs/fips180/spec/validation/));
+- HMAC (FIPS 198-1) over SHA-256 and SHA-512, parameter sets sha256 and sha512:
+  [FIPS198_HMAC.ec](proofs/fips180/spec/FIPS198_HMAC.ec).
+
 SHA-3 (FIPS 202) is available as building blocks under
 `src/fips202/<target>/common/`; the self-contained one-shot functions and incremental
 APIs are planned but not exported yet.
@@ -149,6 +159,21 @@ The exported functions of each algorithm, with `<p>` the parameter set:
   - `verify`: verification of a signature on a message with a context
     (Algorithm 3 in FIPS 204). Returns 0 when the signature verifies, -1 when the
     context is longer than 255 bytes, and a nonzero value otherwise.
+- SHA-2, `jade_hash_<p>_amd64_avx2` and `jade_hash_<p>_amd64_avx2_<function>`:
+  - the one-shot hash of a message (Section 6 in FIPS 180-4). No return value.
+  - `init`, `update`, `final`: the incremental hash over a context of the
+    header's size: `update` appends to the message, `final` writes the digest and
+    clears the context. `update` and `final` return 0; 1 for a context of another
+    function or one already finalised; `update` 2 when the message would reach
+    2^61 bytes. On a nonzero result they write nothing.
+  - sha256x8 and sha512x4 hash eight (four) messages of the same length, given by
+    a table of pointers, and have `init_from` too, which starts every lane from a
+    SHA-256 (SHA-512) context.
+- HMAC, `jade_mac_hmac_<p>_amd64_avx2` and `jade_mac_hmac_<p>_amd64_avx2_<function>`:
+  - the one-shot MAC of a message under a key of any length below 2^61 bytes
+    (Section 4 in FIPS 198-1). No return value.
+  - `init` (from the key), `update`, `final`: the incremental MAC, with the
+    results of the SHA-2 contexts.
 
 The header of each implementation describes informally the contract of each function:
 what it requires from the caller, what it ensures, and what the code declassifies.
@@ -169,7 +194,7 @@ CI runs these checks on every pull request and every commit on `main`
 ([checks.yml](.github/workflows/checks.yml)):
 
 - KAT: the known-answer tests of the parameter set (`bench/vectors/`), from NIST ACVP
-  and post-quantum-cryptography/KAT;
+  and post-quantum-cryptography/KAT (ML-KEM, ML-DSA) and NIST CAVP (SHA-2, HMAC);
 - memcheck: Valgrind's memcheck on every operation;
 - CT and SCT: `jasmin-ct` on the entry point;
 - extraction: the committed EasyCrypt models and assembly are the extraction of

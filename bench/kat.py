@@ -3,7 +3,7 @@
 
 Loads _build/<backend>_<scheme>.so (built by `make libs`) and replays the KAT
 vectors through the common derand ABI (adapters/common_abi.h): kem_* for ML-KEM,
-sig_* for ML-DSA; selects the library by backend.
+sig_* for ML-DSA, hash_* for SHA-2, mac_* for HMAC; selects the library by backend.
 
 Usage:
     python3 kat.py --backend jasmin vectors/*.json
@@ -30,6 +30,14 @@ def _mlkem(base, pk, sk, ct):
             "shared_secret": 32}
 
 
+def _hash(base, digest, ctx):
+    return {"kind": "hash", "base": base, "digest": digest, "ctx": ctx}
+
+
+def _mac(base, tag, ctx):
+    return {"kind": "mac", "base": base, "tag": tag, "ctx": ctx}
+
+
 SCHEMES = {
     "ML-DSA-44": _mldsa("mldsa44", 1312, 2560, 2420),
     "ML-DSA-65": _mldsa("mldsa65", 1952, 4032, 3309),
@@ -37,6 +45,18 @@ SCHEMES = {
     "ML-KEM-512": _mlkem("mlkem512", 800, 1632, 768),
     "ML-KEM-768": _mlkem("mlkem768", 1184, 2400, 1088),
     "ML-KEM-1024": _mlkem("mlkem1024", 1568, 3168, 1568),
+    "SHA2-256": _hash("fips180sha256", 32, 112),
+    "SHA2-512": _hash("fips180sha512", 64, 208),
+    "SHA2-224": _hash("fips180sha224", 28, 112),
+    "SHA2-384": _hash("fips180sha384", 48, 208),
+    "SHA2-512/224": _hash("fips180sha512_224", 28, 208),
+    "SHA2-512/256": _hash("fips180sha512_256", 32, 208),
+    # the multi-way sets through bench/adapters/jasmin/hash_x_shim.c, whose
+    # context is the multi-way one followed by one single-way one per lane
+    "SHA2-256 (8-way)": _hash("fips180sha256x8", 32, 784 + 8 * 112),
+    "SHA2-512 (4-way)": _hash("fips180sha512x4", 64, 784 + 4 * 208),
+    "HMAC-SHA2-256": _mac("fips198sha256", 32, 144),
+    "HMAC-SHA2-512": _mac("fips198sha512", 64, 272),
 }
 
 
@@ -254,6 +274,105 @@ class MLKEM(Scheme):
             ssb = out_buf(self.spec["shared_secret"])
             r = self.dec_fn(ssb, in_buf(bytes(self.spec["ciphertext"])), sk)
             rep.check(self.label("check_sk") + ".decaps", r == want, f"got {r}")
+
+
+@runner("hash")
+class Hash(Scheme):
+    OPS = ("hash", "monte")
+
+    def bind(self, lib):
+        self.hash_fn = lib.hash_digest
+        self.hash_fn.restype, self.hash_fn.argtypes = None, [c_void_p, c_void_p, c_size_t]
+        # the incremental functions are optional in the ABI
+        self.stream = getattr(lib, "hash_init", None) is not None
+        if self.stream:
+            lib.hash_init.restype, lib.hash_init.argtypes = None, [c_void_p]
+            lib.hash_update.restype = c_int
+            lib.hash_update.argtypes = [c_void_p, c_void_p, c_size_t]
+            lib.hash_final.restype, lib.hash_final.argtypes = c_int, [c_void_p, c_void_p]
+            self.lib = lib
+
+    def digest(self, msg):
+        out = out_buf(self.spec["digest"])
+        self.hash_fn(out, in_buf(msg), len(msg))
+        return out.raw
+
+    # the message in parts, cut at each split point
+    def stream_digest(self, msg, cuts):
+        ctx, out = out_buf(self.spec["ctx"]), out_buf(self.spec["digest"])
+        self.lib.hash_init(ctx)
+        r, prev = 0, 0
+        for c in cuts + [len(msg)]:
+            r |= self.lib.hash_update(ctx, in_buf(msg[prev:c]), c - prev)
+            prev = c
+        r |= self.lib.hash_final(ctx, out)
+        return r, out.raw
+
+    def hash(self, b, rep):
+        msg = h(b, "message")
+        rep.check_output(self.label("hash"), b, "digest", self.digest(msg))
+        if self.stream:
+            for cuts in ([], [len(msg) // 3, 2 * len(msg) // 3]):
+                r, md = self.stream_digest(msg, cuts)
+                rep.check(self.label("hash") + f".stream{len(cuts)}.result", r == 0, f"got {r}")
+                rep.check_output(self.label("hash") + f".stream{len(cuts)}", b, "digest", md)
+
+    # the Monte Carlo test of the SHAVS (CAVP): from the seed, 100 checkpoints
+    # of 1000 chained hashes, each of the last three digests
+    def monte(self, b, rep):
+        seed = h(b, "seed")
+        for j, want in enumerate(b["digests"]):
+            md = [seed, seed, seed]
+            for _ in range(1000):
+                md = [md[1], md[2], self.digest(md[0] + md[1] + md[2])]
+            seed = md[2]
+            rep.check(f"{self.label('monte')}.{j}", seed.hex() == want.lower(),
+                      f"expected {want[:24]}..., got {seed.hex()[:24]}...")
+
+
+@runner("mac")
+class MAC(Scheme):
+    OPS = ("mac",)
+
+    def bind(self, lib):
+        self.lib = lib
+        lib.mac_tag.restype = None
+        lib.mac_tag.argtypes = [c_void_p, c_void_p, c_size_t, c_void_p, c_size_t]
+        lib.mac_init.restype, lib.mac_init.argtypes = None, [c_void_p, c_void_p, c_size_t]
+        lib.mac_update.restype = c_int
+        lib.mac_update.argtypes = [c_void_p, c_void_p, c_size_t]
+        lib.mac_final.restype, lib.mac_final.argtypes = c_int, [c_void_p, c_void_p]
+
+    def tag(self, key, msg):
+        out = out_buf(self.spec["tag"])
+        self.lib.mac_tag(out, in_buf(key), len(key), in_buf(msg), len(msg))
+        return out.raw
+
+    # the message in parts, cut at each split point
+    def stream_tag(self, key, msg, cuts):
+        ctx, out = out_buf(self.spec["ctx"]), out_buf(self.spec["tag"])
+        self.lib.mac_init(ctx, in_buf(key), len(key))
+        r, prev = 0, 0
+        for c in cuts + [len(msg)]:
+            r |= self.lib.mac_update(ctx, in_buf(msg[prev:c]), c - prev)
+            prev = c
+        r |= self.lib.mac_final(ctx, out)
+        return r, out.raw
+
+    # a vector's tag may be truncated (the Tlen of the CAVP HMAC vectors):
+    # it is compared with the first bytes of the tag
+    def check_tag(self, label, b, actual, rep):
+        want = b["tag"].lower()
+        got = actual[: len(want) // 2].hex()
+        rep.check(f"{label}.tag", got == want, f"expected {want[:24]}..., got {got[:24]}...")
+
+    def mac(self, b, rep):
+        key, msg = h(b, "key"), h(b, "message")
+        self.check_tag(self.label("mac"), b, self.tag(key, msg), rep)
+        for cuts in ([], [len(msg) // 3, 2 * len(msg) // 3]):
+            r, t = self.stream_tag(key, msg, cuts)
+            rep.check(self.label("mac") + f".stream{len(cuts)}.result", r == 0, f"got {r}")
+            self.check_tag(self.label("mac") + f".stream{len(cuts)}", b, t, rep)
 
 
 def load_backend(backend, scheme_base, lib_dir):

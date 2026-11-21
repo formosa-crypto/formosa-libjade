@@ -1,0 +1,4 @@
+hash = { file = "safety_sha384.ec", lemma = "jade_hash_sha384_amd64_avx2_proof" }
+init = { file = "safety_sha384.ec", lemma = "jade_hash_sha384_amd64_avx2_init_proof" }
+update = { file = "safety_sha384.ec", lemma = "jade_hash_sha384_amd64_avx2_update_proof" }
+final = { file = "safety_sha384.ec", lemma = "jade_hash_sha384_amd64_avx2_final_proof" }

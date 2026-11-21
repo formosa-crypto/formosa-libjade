@@ -1,0 +1,11 @@
+primitive      = "FIPS-180"
+standard       = "FIPS 180-4"
+spec           = "FIPS180_SHA2.ec"
+operations     = ["hash", "init", "update", "final"]
+parameter_sets = ["sha256", "sha512", "sha224", "sha384", "sha512_224", "sha512_256", "sha256x8", "sha512x4"]
+
+# the 8-way and 4-way sets also start every lane from a context of the
+# one-way set
+[operations_of]
+sha256x8 = ["hash", "init", "init_from", "update", "final"]
+sha512x4 = ["hash", "init", "init_from", "update", "final"]

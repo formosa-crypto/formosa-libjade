@@ -1,0 +1,15 @@
+[general]
+timeout = 10
+
+provers = Z3@4.13
+
+pragmas = -Warn:uninit
+pragmas = -Warn:unused_unfold
+
+idirs = JazzEC:../../../../arrays
+rdirs = ../../../../arrays
+rdirs = ../../../../core
+
+idirs = Jasmin:../../../../safety/eclib
+rdirs = common
+rdirs = extraction

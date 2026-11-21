@@ -6,10 +6,11 @@ Usage:  claims.py
 
   proofs/<prim>/spec/meta.toml
       the specification of an algorithm: its standard, parameter sets and
-      operations, and the security theorem of the specification: the
-      generic theorem, and its instance for each parameter set it covers:
-      the theorem restated for the set, in a file that clones the theory of
-      the generic theorem
+      operations (those of every set; operations_of gives the operations
+      of a set that has others), and the security theorem of the
+      specification: the generic theorem, and its instance for each
+      parameter set it covers: the theorem restated for the set, in a file
+      that clones the theory of the generic theorem
   src/<prim>/<target>/<profile>/<set>/meta.toml
       an implementation: the properties it claims and its provable security
       (provsec, "functional": correctness and the instance of the security
@@ -116,6 +117,11 @@ def spec(meta, dirs, errors):
     out = {"primitive": s["primitive"], "standard": s["standard"],
            "spec": rel(meta.parent / s["spec"]), "operations": s["operations"],
            "parameter_sets": s["parameter_sets"]}
+    if "operations_of" in s:
+        out["operations_of"] = s["operations_of"]
+        for p in s["operations_of"]:
+            if p not in s["parameter_sets"]:
+                errors.append(f"{rel(meta)}: operations of {p}, no such parameter set")
     if not (meta.parent / s["spec"]).is_file():
         errors.append(f"{rel(meta)}: no file {s['spec']}")
     sec = s.get("spec_security")
@@ -155,7 +161,7 @@ def evidence(sp, impl, dirs, errors):
             continue
         ev = load(pmeta)
         impl["proofs"][p] = {}
-        for op in sp["operations"]:
+        for op in sp.get("operations_of", {}).get(impl["parameter_set"], sp["operations"]):
             if op not in ev:
                 errors.append(f"{rel(pmeta)}: no lemma for {op}")
                 continue

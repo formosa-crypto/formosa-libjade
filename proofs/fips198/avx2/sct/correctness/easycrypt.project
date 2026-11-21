@@ -1,0 +1,17 @@
+[general]
+timeout = 10
+
+provers = Z3@4.13
+
+pragmas = -Warn:uninit
+pragmas = -Warn:unused_unfold
+
+idirs = JazzEC:../../../../arrays
+rdirs = ../../../../arrays
+rdirs = ../../../../core
+
+rdirs = ../../../../fips180/spec
+rdirs = ../../../../fips180/avx2/sct/correctness/common
+rdirs = ../../../../fips180/avx2/sct/correctness/extraction
+rdirs = ../../../../fips180/avx2/sct/safety/common
+rdirs = common

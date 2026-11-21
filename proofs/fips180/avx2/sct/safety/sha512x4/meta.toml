@@ -1,0 +1,5 @@
+hash = { file = "safety_sha512x4.ec", lemma = "jade_hash_sha512x4_amd64_avx2_proof" }
+init = { file = "safety_sha512x4.ec", lemma = "jade_hash_sha512x4_amd64_avx2_init_proof" }
+init_from = { file = "safety_sha512x4.ec", lemma = "jade_hash_sha512x4_amd64_avx2_init_from_proof" }
+update = { file = "safety_sha512x4.ec", lemma = "jade_hash_sha512x4_amd64_avx2_update_proof" }
+final = { file = "safety_sha512x4.ec", lemma = "jade_hash_sha512x4_amd64_avx2_final_proof" }

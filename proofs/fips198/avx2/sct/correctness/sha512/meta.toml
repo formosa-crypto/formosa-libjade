@@ -1,0 +1,4 @@
+mac = { file = "correctness_sha512.ec", lemma = "mac_correct" }
+init = { file = "correctness_sha512.ec", lemma = "init_correct" }
+update = { file = "correctness_sha512.ec", lemma = "update_correct" }
+final = { file = "correctness_sha512.ec", lemma = "final_correct" }

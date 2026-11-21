@@ -1,0 +1,9 @@
+[general]
+timeout = 10
+
+provers = Z3@4.13
+
+pragmas = -Warn:uninit
+pragmas = -Warn:unused_unfold
+
+rdirs = spec

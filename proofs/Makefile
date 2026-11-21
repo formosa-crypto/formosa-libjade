@@ -22,7 +22,7 @@ ECRUNTEST := env ECMEM_LOG=$(abspath $(MEMORY)) ECMEM_EASYCRYPT=$(shell command 
 endif
 
 CONFIG    := tests.config
-SCENARIOS := core fips202 mldsa mlkem mlkem-avx2-generic mlkem-avx2-512 mlkem-avx2-768 mlkem-avx2-1024 mlkem-safety mldsa-safety fips202-safety
+SCENARIOS := core fips202 mldsa mlkem mlkem-avx2-generic mlkem-avx2-512 mlkem-avx2-768 mlkem-avx2-1024 mlkem-safety mldsa-safety fips202-safety fips180 fips180-avx2 fips180-safety fips198-avx2 fips198-safety
 
 # --------------------------------------------------------------------
 .PHONY: default check all $(SCENARIOS) clean
@@ -58,6 +58,9 @@ JASMIN2EC_SAFETY ?= jasmin2ec-safety
 SRC        := ../src
 KECCAK     := -I Keccak=$(SRC)/fips202
 COMMON     := -I Common=$(SRC)/mldsa/avx2/sct/common
+SHA2       := -I Hash=$(SRC)/fips180/common \
+              $(foreach r,HashWord Sha256Kernel Sha512Kernel Sha256KernelX Sha512KernelX,\
+                -I $(r)=$(SRC)/fips180/avx2/sct/common)
 MLDSA_SETS := 44 65 87
 MLKEM_SETS := 512 768 1024
 
@@ -90,6 +93,16 @@ extract-correctness:
 	done
 	python3 mldsa/avx2/sct/correctness/extraction/generalize.py
 	python3 mlkem/avx2/sct/correctness/extraction/generalize.py
+	$(MAKE) --no-print-directory extract-correctness-fips180
+
+# SHA-2: one model of every set (the proofs share the code of the sets),
+# from the harness of its extraction directory, in the byte-array model
+# (barray) its proofs are written in
+.PHONY: extract-correctness-fips180
+extract-correctness-fips180:
+	$(JASMIN2EC) --array-model=barray --output-array=arrays $(SHA2) \
+	  fips180/avx2/sct/correctness/extraction/toEC_sha2.jazz \
+	  -o fips180/avx2/sct/correctness/extraction/Jsha2.ec
 
 # ML-DSA and ML-KEM: the exported functions, whose contracts are the
 # `#[safety = ...]` annotations of the sources
@@ -111,6 +124,14 @@ extract-safety:
 	    -f $${p}_keypair_derand -f $${p}_enc_derand -f $${p}_dec \
 	    -f $${p}_check_pk -f $${p}_check_sk || exit 1; \
 	done
+	$(MAKE) --no-print-directory extract-safety-fips180
+
+# SHA-2: one safety model of the code of every set (the harness of its
+# extraction directory), every function with its contract
+.PHONY: extract-safety-fips180
+extract-safety-fips180:
+	$(SAFETY) $(SHA2) fips180/avx2/sct/safety/extraction/toEC_sha2.jazz \
+	  -o fips180/avx2/sct/safety/extraction/Jsha2_safety.ec
 
 check-extraction: extract
 	@$(MAKE) --no-print-directory extraction-unchanged
@@ -123,6 +144,20 @@ extraction-unchanged:
 	  exit 1; \
 	fi
 	@echo "extracted models up to date"
+
+# --------------------------------------------------------------------
+# The SHA-2 specification evaluated on CAVP vectors: the files
+# fips180/spec/validation/CAVP_*.ec are generated from ../bench/vectors.
+#   make spec-vectors        write them again
+#   make check-spec-vectors  fail if one differs from a fresh generation
+SPEC_VECTORS := python3 fips180/spec/validation/spec_vectors.py
+
+.PHONY: spec-vectors check-spec-vectors
+spec-vectors:
+	$(SPEC_VECTORS) write ../bench/vectors fips180/spec/validation
+
+check-spec-vectors:
+	$(SPEC_VECTORS) check ../bench/vectors fips180/spec/validation
 
 # --------------------------------------------------------------------
 clean:
