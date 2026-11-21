@@ -334,3 +334,22 @@ rewrite count_ge0 count_movemask_8u32_le /=.
 rewrite /POPCNT_64 /flags_w /rflags_of_popcnt /= popcnt_movemask_cmp.
 by rewrite W64.to_uint_small /=; smt(count_ge0 count_movemask_8u32_le).
 qed.
+
+(* a lane of a 256-bit word whose two lanes hold the same 16 bytes *)
+lemma pack32_dup_bits128 (l : W8.t list) (i : int) : size l = 16 => 0 <= i < 2 =>
+  W32u8.pack32 (l ++ l) \bits128 i = W16u8.pack16 l.
+proof.
+move=> szl hi; apply W16u8.wordP => j hj.
+have := bits8_128 (W32u8.pack32 (l ++ l)) (16 * i + j) _; 1: smt().
+rewrite (_ : (16 * i + j) %/ 16 = i) 1:/# (_ : (16 * i + j) %% 16 = j) 1:/# => <-.
+rewrite W32u8.pack32bE 1:/# W16u8.pack16bE 1:/# !get_of_list 1,2:/#.
+by rewrite nth_cat szl; smt().
+qed.
+
+(* a byte of a 256-bit byte shuffle *)
+lemma VPSHUFB_256_bits8 (w m : W256.t) (i : int) : 0 <= i < 32 =>
+  VPSHUFB_256 w m \bits8 i = VPSHUFB_128_B (w \bits128 (i %/ 16)) (m \bits8 i).
+proof.
+move=> hi; rewrite bits8_128 // /VPSHUFB_256 W2u128.map2bE 1:/#.
+by rewrite /VPSHUFB_128 W16u8.mapbE 1:/# -bits8_128.
+qed.

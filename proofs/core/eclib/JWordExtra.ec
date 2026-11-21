@@ -629,6 +629,101 @@ abstract theory WE.
   have := W.to_uint_ule_andw (w - W.one) w.
   by rewrite W.andwC W.to_uintB 1:W.uleE 1:W.to_uint1 // W.to_uint1 /#.
   qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* a word is zero modulo another one                                  *)
+  lemma umod_eq0 (w1 w2 : W.t) :
+    (w1 \umod w2 = W.zero) = (to_uint w1 %% to_uint w2 = 0).
+  proof. by rewrite W.to_uint_eq to_uintUM W.to_uint0. qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* the sign of a word is its most significant bit; the bitwise or of  *)
+  (* two words is non-negative iff both are, their bitwise and is       *)
+  (* negative iff both are                                              *)
+  lemma sge0E (w : W.t) : (W.zero \sle w) = !msb w.
+  proof.
+  rewrite W.sleE !W.to_sintE /smod W.to_uint0 /msb W.half_modulus.
+  by have := W.to_uint_cmp w; have := W.ge2_modulus; smt().
+  qed.
+
+  lemma slt0E (w : W.t) : (w \slt W.zero) = msb w.
+  proof.
+  rewrite W.sltE !W.to_sintE /smod W.to_uint0 /msb W.half_modulus.
+  by have := W.to_uint_cmp w; have := W.ge2_modulus; smt().
+  qed.
+
+  lemma msb_orw (w1 w2 : W.t) : msb (w1 `|` w2) = (msb w1 \/ msb w2).
+  proof. by rewrite !msbE W.orwE. qed.
+
+  lemma msb_andw (w1 w2 : W.t) : msb (w1 `&` w2) = (msb w1 /\ msb w2).
+  proof. by rewrite !msbE W.andwE. qed.
+
+  lemma sge0_orw (w1 w2 : W.t) :
+    (W.zero \sle (w1 `|` w2)) = (W.zero \sle w1 /\ W.zero \sle w2).
+  proof. by rewrite !sge0E msb_orw negb_or. qed.
+
+  lemma slt0_andw (w1 w2 : W.t) :
+    ((w1 `&` w2) \slt W.zero) = (w1 \slt W.zero /\ w2 \slt W.zero).
+  proof. by rewrite !slt0E msb_andw. qed.
+
+  (* the sign of the difference of two words below half the modulus     *)
+  (* compares them                                                      *)
+  lemma msb_sub (w1 w2 : W.t) :
+    to_uint w1 < 2 ^ (size - 1) => to_uint w2 < 2 ^ (size - 1) =>
+    msb (w1 - w2) = (to_uint w1 < to_uint w2).
+  proof.
+  rewrite /msb W.half_modulus => h1 h2.
+  have hc1 := W.to_uint_cmp w1; have hc2 := W.to_uint_cmp w2; have hm := W.ge2_modulus.
+  case: (to_uint w1 < to_uint w2) => hlt /=; last first.
+  - by rewrite W.to_uintB ?W.uleE /#.
+  have -> : w1 - w2 = - (w2 - w1) by ring.
+  rewrite W.to_uintN W.to_uintB ?W.uleE 1:/#.
+  rewrite (_ : - (to_uint w2 - to_uint w1)
+             = (-1) * W.modulus + (W.modulus - (to_uint w2 - to_uint w1))) 1:/#.
+  by rewrite modzMDl pmod_small /#.
+  qed.
+
+  lemma sge0_sub (w1 w2 : W.t) :
+    to_uint w1 < 2 ^ (size - 1) => to_uint w2 < 2 ^ (size - 1) =>
+    (W.zero \sle (w1 - w2)) = (to_uint w2 <= to_uint w1).
+  proof. by move=> h1 h2; rewrite sge0E msb_sub // /#. qed.
+
+  lemma slt0_sub (w1 w2 : W.t) :
+    to_uint w1 < 2 ^ (size - 1) => to_uint w2 < 2 ^ (size - 1) =>
+    ((w1 - w2) \slt W.zero) = (to_uint w1 < to_uint w2).
+  proof. by move=> h1 h2; rewrite slt0E msb_sub. qed.
+
+  (* the most significant bit, by a shift                               *)
+  lemma to_uint_shr_msb (w : W.t) : to_uint (w `>>>` (size - 1)) = b2i (msb w).
+  proof.
+  have hs := W.gt0_size; rewrite W.to_uint_shr 1:/# /msb W.half_modulus.
+  have hc := W.to_uint_cmp w; have hm := W.ge2_modulus.
+  have he : W.modulus = 2 * (W.modulus %/ 2).
+  - by rewrite -W.half_modulus -exprS 1:/#.
+  case: (W.modulus %/ 2 <= to_uint w) => hlt /=; last by rewrite divz_small /#.
+  rewrite (_ : to_uint w = 1 * (W.modulus %/ 2) + (to_uint w - W.modulus %/ 2)) 1:/#.
+  by rewrite divzMDl 1:/# divz_small /#.
+  qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* a left shift, and a sum with a product, that do not wrap           *)
+  lemma to_uint_shl_small (w : W.t) (i : int) : 0 <= i =>
+    to_uint w * 2 ^ i < W.modulus => to_uint (w `<<<` i) = to_uint w * 2 ^ i.
+  proof.
+  move=> hi h; rewrite W.to_uint_shl // pmod_small //.
+  by rewrite h /= mulr_ge0 ?expr_ge0 //; smt(W.to_uint_cmp).
+  qed.
+
+  lemma to_uint_addmul_small (w k w' : W.t) :
+    to_uint w + to_uint k * to_uint w' < W.modulus =>
+    to_uint (w + k * w') = to_uint w + to_uint k * to_uint w'.
+  proof.
+  move=> h; have hc := W.to_uint_cmp w; have hk := W.to_uint_cmp k.
+  have hc' := W.to_uint_cmp w'.
+  have hm : to_uint (k * w') = to_uint k * to_uint w'.
+  - by rewrite W.to_uintM_small // /#.
+  by rewrite W.to_uintD_small hm.
+  qed.
 end WE.
 
 (* -------------------------------------------------------------------- *)
