@@ -206,4 +206,24 @@ move=> &hr _ r; split=> [[_ //] | [_ hv]].
 by split => //; apply A_valid_specE.
 qed.
 
+(* -------------------------------------------------------------------- *)
+(* the matrix of the verification, sampled from the first 32 bytes of   *)
+(* the key, which it also hashes                                        *)
+op vk_rho (vk : W8.t Array_pk_enc.t) : rho = Array32.init (Array_pk_enc."_.[_]" vk).
+
+phoare matrix_A_vk_correct (_vk : W8.t Array_pk_enc.t) :
+    [ M.sample____matrix_A_vk : arg = _vk ==>
+        liftu_wpolymat (mat_unflatten256 res.`1)
+          = expandA (Bytes32.of_list (to_list (vk_rho _vk)))
+     /\ wpolymat_urng (mat_unflatten256 res.`1) q
+     /\ res.`2 = vk_hashed (Array_pk_enc.to_list _vk)] = 1%r.
+proof.
+conseq (: arg = _vk ==>
+            liftu_wpolymat (mat_unflatten256 res.`1)
+              = expandA (Bytes32.of_list (to_list (vk_rho _vk)))
+         /\ wpolymat_urng (mat_unflatten256 res.`1) q)
+       (sample____matrix_A_vk_lanes _vk) => //.
+by conseq sample____matrix_A_vk_eq (matrix_A_correct (vk_rho _vk)) => /#.
+qed.
+
 end MatrixAT.

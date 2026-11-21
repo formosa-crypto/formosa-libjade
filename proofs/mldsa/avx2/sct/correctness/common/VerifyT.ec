@@ -1,7 +1,7 @@
 require import AllCore List IntDiv RealExp.
 from Jasmin require import JModel_x86.
 from Spec require import GFq Rq Parameters MLDSA_W32_Rep.
-require import Array2 Array32 Array64 Array256.
+require import Array2 Array25 Array32 Array64 Array256 WArray64.
 require import BitEncoding JWordList.
 require BaseT PreludeT PolynomialT CommonNttT CommonModularT CommonInvertNttT RoundingT.
 require RowVectorT MatrixAT ChallengeT SignatureT CommitmentT T1T HashingT.
@@ -424,6 +424,18 @@ lemma gamma1_q2 : gamma1 <= q %/ 2 by smt(gamma1_cases).
 
 lemma gamma1_beta_bnd : 0 < gamma1 - Beta <= q %/ 2 by smt(gamma1_q2 beta_gamma1_lt gt0_beta).
 
+(* the hash of the key: the first 64 bytes of the state of the hash     *)
+lemma vk_hash_lanesE (vk : W8.t Array_pk_enc.t) :
+  Array64.init (fun i =>
+    WArray200.WArray200.get8
+      (WArray200.WArray200.init64 (fun i => (AE.vk_hashed (to_list vk)).[i])) (0 + i))
+  = Array64.of_list witness (Bytes64.to_list (H_tr (BytesPK.of_list (to_list vk)))).
+proof.
+apply H_tr_lanesE => j hj; rewrite Array64.initiE //=.
+rewrite /AE.vk_hashed /WArray200.WArray200.get8 /stbytes /WArray200.WArray200.init64.
+by rewrite WArray200.WArray200.initiE 1:/#.
+qed.
+
 lemma verify_internal_correct _m :
     equiv [ MLDSA(MLDSA_XOFA, MLDSA_XOFS, MLDSA_XOF_SIB, SIB_RO).verify ~ M.__verify_internal :
        Glob.mem{2} = _m /\
@@ -497,45 +509,41 @@ sp;if {2}; last first.
               (lvec_unflatten256 signer_response{2}) Hb Hq1 Hq2 Hrng.
   by smt().
   
-(* expand A *)
+(* expand A, and hash the verification key *)
 seq 1 1 : (#pre /\
       liftu_wpolymat (mat_unflatten256 matrix_A{2}) = _A{1} /\
-      wpolymat_urng (mat_unflatten256 matrix_A{2}) q).
+      wpolymat_urng (mat_unflatten256 matrix_A{2}) q /\
+      verification_key_hash_lanes{2} = AE.vk_hashed (to_list verification_key{2})).
   + ecall{1} (ExpandA_correct rho{1}).
-    ecall{2} (matrix_A_correct (Array32.init (fun i => verification_key{2}.[i]))).
-    auto => |> &1 &2 13? rr0 -> ?;congr.
+    ecall{2} (matrix_A_vk_correct verification_key{2}).
+    auto => |> &1 &2 13? rr0 -> ? _;congr.
     apply Bytes32.tP => k kb.
     do 2!(rewrite Bytes32.get_of_list //).
-    rewrite get_to_list initiE 1:/# /=.
+    rewrite get_to_list /vk_rho initiE 1:/# /=.
     rewrite nth_take 1,2:/# BytesPK.get_to_list /=.
     by rewrite BytesPK.get_of_list ?size_to_list -?pk_encE; smt(ge0_t1_enc).
 
 (* anticipate hashing *)
-swap {2} [8..11] -7.
+swap {2} [8..9] -7.
 
-(* verification key hash. *)
-sp 1 1.
-seq 0 1 : (#pre /\
-      verification_key_hash{2} =
-        Array64.of_list witness (Bytes64.to_list (H_tr pk{1}))).
-  + ecall{2} (hash_verification_key_correct verification_key{2}).
-    by auto.
-
-(* message representative *)
-sp 1 1.
+(* message representative: the hash of the key is the first eight words *)
+(* of the state of the hash                                             *)
+sp 2 1.
 seq 0 1 : (#pre /\
       message_representative{2} =
         Array64.of_list witness (Bytes64.to_list mu{1})).
   + ecall{2} (derive_message_representative_ph
-                 verification_key_hash{2}
+                 (Array64.of_list witness
+                    (Bytes64.to_list (H_tr (BytesPK.of_list (to_list verification_key{2})))))
                  (memread _m context_pointer{2} context_size{2})
                  (memread _m message_pointer{2} message_size{2})).
     wp; skip => /> &1 &2 *; do split.
+    + exact (vk_hash_lanesE verification_key{2}).
     + by rewrite !size_memread /=; smt(W64.to_uint_cmp).
     + by rewrite !size_memread /=; smt(W64.to_uint_cmp).
     + by rewrite !size_memread /=; smt(W64.to_uint_cmp).
     + by rewrite !size_memread /=;  smt(W64.to_uint_cmp).
-    move => 4?;do congr.
+    move => 5?;do congr.
     + rewrite Bytes64.tP => k kb.
       by rewrite Bytes64.get_of_list // get_to_list get_of_list //.
     + by rewrite size_memread 1:/# /truncateu8 W64.of_uintK (pmod_small _ W64.modulus) //; smt().

@@ -65,18 +65,17 @@ namespace matrix_A {
         return state, b0, b1, b2, b3;
     }
 
+    // The rejection sampling of 4 polynomials from the first blocks of their
+    // XOFs (in buf0..buf3), then from one more block of each at a time.
     inline
-    fn __sample_4_polynomials(
-        reg ptr u8[32] rho,
-        stack u16[4] domain_separators
+    fn __sample_4_polynomials_from_blocks(
+        stack shakex4_state xof_state,
+        stack u8[REJECTION_SAMPLE_INPUT_SIZE] buf0 buf1 buf2 buf3
     ) -> stack u32[COEFFICIENTS_IN_POLYNOMIAL],
          stack u32[COEFFICIENTS_IN_POLYNOMIAL],
          stack u32[COEFFICIENTS_IN_POLYNOMIAL],
          stack u32[COEFFICIENTS_IN_POLYNOMIAL]
     {
-        stack shakex4_state xof_state;
-        stack u8[REJECTION_SAMPLE_INPUT_SIZE] buf0 buf1 buf2 buf3;
-
         stack u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial0 polynomial1 polynomial2 polynomial3;
 
         reg u64 filled0 filled1 filled2 filled3;
@@ -85,9 +84,6 @@ namespace matrix_A {
         reg u32 stop_sampling;
 
         // Rejection sampling for the first time.
-        xof_state = shake128_absorb_34_4x(xof_state, rho, domain_separators);
-        xof_state, buf0, buf1, buf2, buf3 = __shake128_squeeze_multiple_blocks_4x(xof_state, buf0, buf1, buf2, buf3);
-
         polynomial0, filled = rejection_sample_multiple_blocks(polynomial0, buf0);
         filled0 = filled;
 
@@ -159,5 +155,177 @@ namespace matrix_A {
         }
 
         return polynomial0, polynomial1, polynomial2, polynomial3;
+    }
+
+    inline
+    fn __sample_4_polynomials(
+        reg ptr u8[32] rho,
+        stack u16[4] domain_separators
+    ) -> stack u32[COEFFICIENTS_IN_POLYNOMIAL],
+         stack u32[COEFFICIENTS_IN_POLYNOMIAL],
+         stack u32[COEFFICIENTS_IN_POLYNOMIAL],
+         stack u32[COEFFICIENTS_IN_POLYNOMIAL]
+    {
+        stack shakex4_state xof_state;
+        stack u8[REJECTION_SAMPLE_INPUT_SIZE] buf0 buf1 buf2 buf3;
+        stack u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial0 polynomial1 polynomial2 polynomial3;
+
+        xof_state = shake128_absorb_34_4x(xof_state, rho, domain_separators);
+        xof_state, buf0, buf1, buf2, buf3 = __shake128_squeeze_multiple_blocks_4x(xof_state, buf0, buf1, buf2, buf3);
+        polynomial0, polynomial1, polynomial2, polynomial3 =
+            __sample_4_polynomials_from_blocks(xof_state, buf0, buf1, buf2, buf3);
+
+        return polynomial0, polynomial1, polynomial2, polynomial3;
+    }
+
+    // The hash of the verification key (SHAKE256): one block of SHAKE256_RATE
+    // bytes per permutation, the last one padded.
+    param int VK_HASH_BLOCKS = VERIFICATION_KEY_SIZE / SHAKE256_RATE + 1;
+    param int VK_HASH_LAST = VERIFICATION_KEY_SIZE % SHAKE256_RATE;
+
+    #[safety =
+       { requires = is_arr_init(lanes,0,8 * 25) && is_arr_init(vk,0,VERIFICATION_KEY_SIZE)
+                 && 0 <= k && k < VK_HASH_BLOCKS
+       , ensures = is_arr_init(lanes,0,8 * 25)
+       }
+     ]
+    inline
+    fn __vk_hash_absorb_block(
+        stack u64[25] lanes,
+        reg ptr u8[VERIFICATION_KEY_SIZE] vk,
+        inline int k
+    ) -> stack u64[25]
+    {
+        reg ui64 offset;
+
+        offset = SHAKE256_RATE * k;
+        if (k < VK_HASH_BLOCKS - 1) {
+            lanes, _, _ = A_VERIFICATION_KEY::__addstate(lanes, 0, vk, offset, SHAKE256_RATE, 0);
+        } else {
+            lanes, _, _ = A_VERIFICATION_KEY::__addstate(lanes, 0, vk, offset, VK_HASH_LAST, SHAKE);
+            lanes = __addratebit(lanes, SHAKE256_RATE);
+        }
+        return lanes;
+    }
+
+    #[safety =
+       { requires = is_arr_init(state,0,32 * 25) && is_arr_init(lanes,0,8 * 25)
+                 && is_arr_init(vk,0,VERIFICATION_KEY_SIZE) && 0 <= first_slot
+       , ensures = is_arr_init(state,0,32 * 25)
+                && is_arr_init(b0,0,REJECTION_SAMPLE_INPUT_SIZE)
+                && is_arr_init(b1,0,REJECTION_SAMPLE_INPUT_SIZE)
+                && is_arr_init(b2,0,REJECTION_SAMPLE_INPUT_SIZE)
+                && is_arr_init(b3,0,REJECTION_SAMPLE_INPUT_SIZE)
+                && is_arr_init(lanes,0,8 * 25)
+       }
+     ]
+    inline
+    fn __shake128_squeeze_multiple_blocks_4x_vk(
+      stack shakex4_state state,
+      stack u8[REJECTION_SAMPLE_INPUT_SIZE] b0 b1 b2 b3,
+      stack u64[25] lanes,
+      reg ptr u8[VERIFICATION_KEY_SIZE] vk,
+      inline int first_slot
+    ) ->
+      stack shakex4_state,
+      stack u8[REJECTION_SAMPLE_INPUT_SIZE],
+      stack u8[REJECTION_SAMPLE_INPUT_SIZE],
+      stack u8[REJECTION_SAMPLE_INPUT_SIZE],
+      stack u8[REJECTION_SAMPLE_INPUT_SIZE],
+      stack u64[25]
+    {
+        inline int i;
+        reg u64 zero;
+        #[mmx] reg ptr u8[VERIFICATION_KEY_SIZE] vkm;
+
+        // The pointer to the verification key waits in an MMX register: the
+        // fused permutation needs every general-purpose register.
+        vkm = vk;
+        for i = 0 to BLOCKS
+        {
+            if (first_slot + i < VK_HASH_BLOCKS) {
+                vk = vkm;
+                lanes = __vk_hash_absorb_block(lanes, vk, first_slot + i);
+                state,
+                b0[i*SHAKE128_RATE:SHAKE128_RATE],
+                b1[i*SHAKE128_RATE:SHAKE128_RATE],
+                b2[i*SHAKE128_RATE:SHAKE128_RATE],
+                b3[i*SHAKE128_RATE:SHAKE128_RATE],
+                lanes
+                =
+                __shake128_squeezeblock4x_x1(
+                    state,
+                    b0[i*SHAKE128_RATE:SHAKE128_RATE],
+                    b1[i*SHAKE128_RATE:SHAKE128_RATE],
+                    b2[i*SHAKE128_RATE:SHAKE128_RATE],
+                    b3[i*SHAKE128_RATE:SHAKE128_RATE],
+                    lanes
+                );
+            } else {
+                state,
+                b0[i*SHAKE128_RATE:SHAKE128_RATE],
+                b1[i*SHAKE128_RATE:SHAKE128_RATE],
+                b2[i*SHAKE128_RATE:SHAKE128_RATE],
+                b3[i*SHAKE128_RATE:SHAKE128_RATE]
+                =
+                shake128_squeezeblock4x(
+                    state,
+                    b0[i*SHAKE128_RATE:SHAKE128_RATE],
+                    b1[i*SHAKE128_RATE:SHAKE128_RATE],
+                    b2[i*SHAKE128_RATE:SHAKE128_RATE],
+                    b3[i*SHAKE128_RATE:SHAKE128_RATE]
+                );
+            }
+        }
+
+        // The rejection sampler never reads the padding (one 64-bit word): it
+        // is zeroed so that the whole buffer is initialized.
+        zero = 0;
+        b0.[:u64 REJECTION_SAMPLING_BYTES] = zero;
+        b1.[:u64 REJECTION_SAMPLING_BYTES] = zero;
+        b2.[:u64 REJECTION_SAMPLING_BYTES] = zero;
+        b3.[:u64 REJECTION_SAMPLING_BYTES] = zero;
+
+        return state, b0, b1, b2, b3, lanes;
+    }
+
+
+    // __sample_4_polynomials, with the blocks of the hash of the verification
+    // key from first_slot on absorbed alongside its first squeezes
+    #[safety =
+       { requires = is_arr_init(rho,0,32) && is_arr_init(domain_separators,0,2 * 4)
+                 && is_arr_init(lanes,0,8 * 25)
+                 && is_arr_init(vk,0,VERIFICATION_KEY_SIZE) && 0 <= first_slot
+       , ensures = is_arr_init(polynomial0,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                && is_arr_init(polynomial1,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                && is_arr_init(polynomial2,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                && is_arr_init(polynomial3,0,4 * COEFFICIENTS_IN_POLYNOMIAL)
+                && is_arr_init(lanes,0,8 * 25)
+       }
+     ]
+    inline
+    fn __sample_4_polynomials_vk(
+        reg ptr u8[32] rho,
+        stack u16[4] domain_separators,
+        stack u64[25] lanes,
+        reg ptr u8[VERIFICATION_KEY_SIZE] vk,
+        inline int first_slot
+    ) -> stack u32[COEFFICIENTS_IN_POLYNOMIAL],
+         stack u32[COEFFICIENTS_IN_POLYNOMIAL],
+         stack u32[COEFFICIENTS_IN_POLYNOMIAL],
+         stack u32[COEFFICIENTS_IN_POLYNOMIAL],
+         stack u64[25]
+    {
+        stack shakex4_state xof_state;
+        stack u8[REJECTION_SAMPLE_INPUT_SIZE] buf0 buf1 buf2 buf3;
+        stack u32[COEFFICIENTS_IN_POLYNOMIAL] polynomial0 polynomial1 polynomial2 polynomial3;
+
+        xof_state = shake128_absorb_34_4x(xof_state, rho, domain_separators);
+        xof_state, buf0, buf1, buf2, buf3, lanes = __shake128_squeeze_multiple_blocks_4x_vk(
+            xof_state, buf0, buf1, buf2, buf3, lanes, vk, first_slot);
+        polynomial0, polynomial1, polynomial2, polynomial3 =
+            __sample_4_polynomials_from_blocks(xof_state, buf0, buf1, buf2, buf3);
+
+        return polynomial0, polynomial1, polynomial2, polynomial3, lanes;
     }
 }

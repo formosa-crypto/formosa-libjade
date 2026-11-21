@@ -8013,6 +8013,789 @@ module M = {
     }
     return a;
   }
+  proc __f1600_x4_round (st:W256.t Array25.t, i:int, y10:W256.t, y14:W256.t,
+                         y8:W256.t, y15:W256.t, y9:W256.t, y13:W256.t,
+                         y3:W256.t, y7:W256.t, y2:W256.t) : W256.t Array25.t *
+                                                            W256.t * W256.t *
+                                                            W256.t * W256.t *
+                                                            W256.t * W256.t *
+                                                            W256.t * W256.t *
+                                                            W256.t = {
+    var i0:int;
+    var i1:int;
+    var i2:int;
+    var i3:int;
+    var i4:int;
+    var i5:int;
+    var i6:int;
+    var i7:int;
+    var i8:int;
+    var i9:int;
+    var i10:int;
+    var i11:int;
+    var i12:int;
+    var i13:int;
+    var i14:int;
+    var i15:int;
+    var i16:int;
+    var i17:int;
+    var i18:int;
+    var i19:int;
+    var i20:int;
+    var i21:int;
+    var i22:int;
+    var i23:int;
+    var y4:W256.t;
+    var y0:W256.t;
+    var y11:W256.t;
+    var y12:W256.t;
+    var y1:W256.t;
+    var y6:W256.t;
+    var y5:W256.t;
+    var rcp:W64.t Array24.t;
+    rcp <- witness;
+    i0 <- 0;
+    i1 <- 1;
+    i2 <- 2;
+    i3 <- 3;
+    i4 <- 4;
+    i5 <- 5;
+    i6 <- 6;
+    i7 <- 9;
+    i8 <- 10;
+    i9 <- 13;
+    i10 <- 14;
+    i11 <- 16;
+    i12 <- 17;
+    i13 <- 19;
+    i14 <- 20;
+    i15 <- 23;
+    i16 <- 7;
+    i17 <- 8;
+    i18 <- 11;
+    i19 <- 12;
+    i20 <- 15;
+    i21 <- 18;
+    i22 <- 21;
+    i23 <- 22;
+    y4 <- st.[i5];
+    y0 <- (y9 `^` st.[i14]);
+    st.[i16] <- y9;
+    y9 <- y10;
+    y11 <- st.[i6];
+    y12 <- st.[i11];
+    st.[i18] <- y3;
+    y1 <- (y4 `^` st.[i8]);
+    y10 <- st.[i2];
+    st.[i17] <- y4;
+    y12 <- (y12 `^` y3);
+    y6 <- st.[i1];
+    y4 <- st.[i10];
+    st.[i21] <- y14;
+    y0 <- (y0 `^` y1);
+    y1 <- (y11 `^` y8);
+    y11 <- (y7 `^` st.[i12]);
+    st.[i20] <- y10;
+    y12 <- (y12 `^` y1);
+    y1 <- (y9 `^` y15);
+    y3 <- st.[i7];
+    st.[i19] <- y8;
+    y11 <- (y11 `^` y1);
+    y1 <- (y14 `^` st.[i9]);
+    y12 <- (y12 `^` y6);
+    y8 <- st.[i3];
+    y11 <- (y11 `^` y10);
+    y10 <- (y13 `^` st.[i15]);
+    y3 <- (y3 `^` y4);
+    st.[i22] <- y4;
+    y4 <- (VPSRL_4u64 y12 (W128.of_int 63));
+    y5 <- (VPSRL_4u64 y11 (W128.of_int 63));
+    y0 <- (y0 `^` st.[i0]);
+    y10 <- (y10 `^` y1);
+    y1 <- st.[i4];
+    y10 <- (y10 `^` y8);
+    y14 <- y1;
+    y1 <- (y2 `^` st.[i13]);
+    st.[i23] <- y14;
+    y1 <- (y1 `^` y3);
+    y3 <- (VPSLL_4u64 y12 (W128.of_int 1));
+    y3 <- (y3 `|` y4);
+    y4 <- (VPSLL_4u64 y11 (W128.of_int 1));
+    y1 <- (y1 `^` y14);
+    y4 <- (y4 `|` y5);
+    y14 <- (VPSRL_4u64 y10 (W128.of_int 63));
+    y3 <- (y3 `^` y1);
+    y5 <- (VPSLL_4u64 y10 (W128.of_int 1));
+    y4 <- (y4 `^` y0);
+    y5 <- (y5 `|` y14);
+    y6 <- (y4 `^` y6);
+    y5 <- (y5 `^` y12);
+    y12 <- (VPSRL_4u64 y1 (W128.of_int 63));
+    y1 <- (VPSLL_4u64 y1 (W128.of_int 1));
+    y7 <- (y5 `^` y7);
+    y9 <- (y5 `^` y9);
+    y1 <- (y1 `|` y12);
+    y12 <- (y3 `^` st.[i0]);
+    y1 <- (y1 `^` y11);
+    y11 <- (VPSRL_4u64 y0 (W128.of_int 63));
+    y0 <- (VPSLL_4u64 y0 (W128.of_int 1));
+    y13 <- (y1 `^` y13);
+    y8 <- (y1 `^` y8);
+    y0 <- (y0 `|` y11);
+    y0 <- (y0 `^` y10);
+    y10 <- (y4 `^` st.[i6]);
+    y2 <- (y0 `^` y2);
+    y11 <- (VPSRL_4u64 y10 (W128.of_int 20));
+    y10 <- (VPSLL_4u64 y10 (W128.of_int 44));
+    y10 <- (y10 `|` y11);
+    y11 <- (y5 `^` y15);
+    rcp <- kECCAK1600_RC;
+    y15 <- (VPBROADCAST_4u64 rcp.[(W64.to_uint (W64.of_int i))]);
+    y14 <- (VPSRL_4u64 y11 (W128.of_int 21));
+    y11 <- (VPSLL_4u64 y11 (W128.of_int 43));
+    y11 <- (y11 `|` y14);
+    y14 <- ((invw y10) `&` y11);
+    y14 <- (y14 `^` y15);
+    y15 <- (y14 `^` y12);
+    y14 <- (VPSRL_4u64 y13 (W128.of_int 43));
+    y13 <- (VPSLL_4u64 y13 (W128.of_int 21));
+    st.[i0] <- y15;
+    y13 <- (y13 `|` y14);
+    y14 <- ((invw y11) `&` y13);
+    y15 <- (y14 `^` y10);
+    y14 <- (VPSRL_4u64 y2 (W128.of_int 50));
+    y2 <- (VPSLL_4u64 y2 (W128.of_int 14));
+    st.[i1] <- y15;
+    y2 <- (y2 `|` y14);
+    y14 <- ((invw y13) `&` y2);
+    y11 <- (y14 `^` y11);
+    st.[i2] <- y11;
+    y11 <- ((invw y2) `&` y12);
+    y12 <- ((invw y12) `&` y10);
+    y11 <- (y11 `^` y13);
+    st.[i3] <- y11;
+    y11 <- (y12 `^` y2);
+    y2 <- (VPSRL_4u64 y8 (W128.of_int 36));
+    y8 <- (VPSLL_4u64 y8 (W128.of_int 28));
+    st.[i4] <- y11;
+    y8 <- (y8 `|` y2);
+    y2 <- (y0 `^` st.[i7]);
+    y10 <- (VPSRL_4u64 y2 (W128.of_int 44));
+    y2 <- (VPSLL_4u64 y2 (W128.of_int 20));
+    y2 <- (y2 `|` y10);
+    y10 <- (y3 `^` st.[i8]);
+    y11 <- (VPSRL_4u64 y10 (W128.of_int 61));
+    y10 <- (VPSLL_4u64 y10 (W128.of_int 3));
+    y10 <- (y10 `|` y11);
+    y11 <- ((invw y2) `&` y10);
+    y11 <- (y11 `^` y8);
+    st.[i5] <- y11;
+    y11 <- (y4 `^` st.[i11]);
+    y12 <- (VPSRL_4u64 y11 (W128.of_int 19));
+    y11 <- (VPSLL_4u64 y11 (W128.of_int 45));
+    y11 <- (y11 `|` y12);
+    y12 <- ((invw y10) `&` y11);
+    y12 <- (y12 `^` y2);
+    st.[i6] <- y12;
+    y12 <- (VPSRL_4u64 y7 (W128.of_int 3));
+    y7 <- (VPSLL_4u64 y7 (W128.of_int 61));
+    y7 <- (y7 `|` y12);
+    y12 <- ((invw y11) `&` y7);
+    y10 <- (y12 `^` y10);
+    y12 <- ((invw y7) `&` y8);
+    y8 <- ((invw y8) `&` y2);
+    y2 <- (VPSRL_4u64 y6 (W128.of_int 63));
+    y6 <- (VPSLL_4u64 y6 (W128.of_int 1));
+    y14 <- (y12 `^` y11);
+    y6 <- (y6 `|` y2);
+    y2 <- (VPSRL_4u64 y9 (W128.of_int 58));
+    y12 <- (y8 `^` y7);
+    y9 <- (VPSLL_4u64 y9 (W128.of_int 6));
+    st.[i7] <- y12;
+    y7 <- (y0 `^` st.[i13]);
+    y9 <- (y9 `|` y2);
+    y2 <- (y1 `^` st.[i9]);
+    y7 <- (VPSHUFB_256 y7 rOL8.[0]);
+    y11 <- (VPSRL_4u64 y2 (W128.of_int 39));
+    y2 <- (VPSLL_4u64 y2 (W128.of_int 25));
+    y11 <- (y11 `|` y2);
+    y2 <- ((invw y9) `&` y11);
+    y8 <- ((invw y11) `&` y7);
+    y12 <- (y2 `^` y6);
+    y2 <- (y3 `^` st.[i14]);
+    y8 <- (y8 `^` y9);
+    st.[i8] <- y12;
+    y12 <- (VPSRL_4u64 y2 (W128.of_int 46));
+    y2 <- (VPSLL_4u64 y2 (W128.of_int 18));
+    y2 <- (y12 `|` y2);
+    y12 <- ((invw y7) `&` y2);
+    y15 <- (y12 `^` y11);
+    y11 <- ((invw y2) `&` y6);
+    y6 <- ((invw y6) `&` y9);
+    y12 <- (y11 `^` y7);
+    st.[i9] <- y12;
+    y12 <- (y6 `^` y2);
+    y6 <- (y0 `^` st.[i23]);
+    y0 <- (y0 `^` st.[i22]);
+    st.[i10] <- y12;
+    y2 <- (VPSRL_4u64 y6 (W128.of_int 37));
+    y6 <- (VPSLL_4u64 y6 (W128.of_int 27));
+    y2 <- (y2 `|` y6);
+    y6 <- (y3 `^` st.[i17]);
+    y3 <- (y3 `^` st.[i16]);
+    y7 <- (VPSRL_4u64 y6 (W128.of_int 28));
+    y6 <- (VPSLL_4u64 y6 (W128.of_int 36));
+    y7 <- (y7 `|` y6);
+    y6 <- (y4 `^` st.[i19]);
+    y4 <- (y4 `^` st.[i18]);
+    y12 <- (VPSRL_4u64 y6 (W128.of_int 54));
+    y6 <- (VPSLL_4u64 y6 (W128.of_int 10));
+    y12 <- (y12 `|` y6);
+    y6 <- (y5 `^` st.[i12]);
+    y5 <- (y5 `^` st.[i20]);
+    y9 <- ((invw y7) `&` y12);
+    y11 <- (VPSRL_4u64 y6 (W128.of_int 49));
+    y6 <- (VPSLL_4u64 y6 (W128.of_int 15));
+    y9 <- (y9 `^` y2);
+    y11 <- (y11 `|` y6);
+    y6 <- ((invw y12) `&` y11);
+    y6 <- (y6 `^` y7);
+    st.[i11] <- y6;
+    y6 <- (y1 `^` st.[i15]);
+    y1 <- (y1 `^` st.[i21]);
+    y6 <- (VPSHUFB_256 y6 rOL56.[0]);
+    y13 <- ((invw y11) `&` y6);
+    y13 <- (y13 `^` y12);
+    st.[i12] <- y13;
+    y13 <- ((invw y6) `&` y2);
+    y2 <- ((invw y2) `&` y7);
+    y2 <- (y2 `^` y6);
+    y6 <- (VPSRL_4u64 y4 (W128.of_int 62));
+    y13 <- (y13 `^` y11);
+    st.[i13] <- y2;
+    y2 <- (VPSRL_4u64 y5 (W128.of_int 2));
+    y5 <- (VPSLL_4u64 y5 (W128.of_int 62));
+    y2 <- (y2 `|` y5);
+    y5 <- (VPSRL_4u64 y1 (W128.of_int 9));
+    y1 <- (VPSLL_4u64 y1 (W128.of_int 55));
+    y4 <- (VPSLL_4u64 y4 (W128.of_int 2));
+    y1 <- (y5 `|` y1);
+    y5 <- (VPSRL_4u64 y0 (W128.of_int 25));
+    y4 <- (y6 `|` y4);
+    y0 <- (VPSLL_4u64 y0 (W128.of_int 39));
+    y5 <- (y5 `|` y0);
+    y0 <- ((invw y1) `&` y5);
+    y0 <- (y0 `^` y2);
+    st.[i14] <- y0;
+    y0 <- (VPSRL_4u64 y3 (W128.of_int 23));
+    y3 <- (VPSLL_4u64 y3 (W128.of_int 41));
+    y0 <- (y0 `|` y3);
+    y7 <- ((invw y0) `&` y4);
+    y3 <- ((invw y5) `&` y0);
+    y7 <- (y7 `^` y5);
+    y5 <- ((invw y4) `&` y2);
+    y2 <- ((invw y2) `&` y1);
+    y5 <- (y5 `^` y0);
+    y3 <- (y3 `^` y1);
+    y2 <- (y2 `^` y4);
+    st.[i15] <- y5;
+    return (st, y10, y14, y8, y15, y9, y13, y3, y7, y2);
+  }
+  proc __keccakf1600_x4_x1_nat_opt_iteration (rax:W64.t, rbp:W64.t,
+                                              rdi:W64.t, r13:W64.t,
+                                              r10:W64.t, r11:W64.t, r8:W64.t,
+                                              rsi:W64.t, r15:W64.t,
+                                              rbx:W64.t, a:W64.t Array25.t,
+                                              e:W64.t Array25.t,
+                                              st4:W256.t Array25.t,
+                                              y10:W256.t, y14:W256.t,
+                                              y8:W256.t, y15:W256.t,
+                                              y9:W256.t, y13:W256.t,
+                                              y3:W256.t, y7:W256.t, y2:W256.t) : 
+  W64.t * W64.t * W64.t * W64.t * W64.t * W64.t * W64.t * W64.t * W64.t *
+  W64.t * W64.t Array25.t * W64.t Array25.t * W256.t Array25.t * W256.t *
+  W256.t * W256.t * W256.t * W256.t * W256.t * W256.t * W256.t * W256.t = {
+    var cnt:W64.t;
+    var rcx:W64.t;
+    var rdx:W64.t;
+    var r9:W64.t;
+    var r12:W64.t;
+    var r14:W64.t;
+    var rC:W64.t Array24.t;
+    var i:int;
+    var i2:int;
+    rC <- witness;
+    i <- (W64.to_uint rax);
+    (st4, y10, y14, y8, y15, y9, y13, y3, y7, y2) <@ __f1600_x4_round (
+    st4, i, y10, y14, y8, y15, y9, y13, y3, y7, y2);
+    i <- (i + 1);
+    i2 <- i;
+    e.[0] <- r11;
+    e.[1] <- rdi;
+    cnt <- rax;
+    e.[2] <- rsi;
+    rcx <- a.[15];
+    rcx <- (rcx `^` r8);
+    rax <- rdi;
+    rax <- (rax `^` a.[5]);
+    rax <- (rax `^` rcx);
+    rdx <- a.[16];
+    rdx <- (rdx `^` rsi);
+    rcx <- a.[11];
+    rsi <- a.[6];
+    rcx <- (rcx `^` rsi);
+    rcx <- (rcx `^` rdx);
+    rdx <- a.[17];
+    rdx <- (rdx `^` r15);
+    r9 <- r13;
+    r9 <- (r9 `^` a.[7]);
+    r9 <- (r9 `^` rdx);
+    rdx <- r10;
+    rdx <- (rdx `^` a.[23]);
+    r12 <- a.[13];
+    r12 <- (r12 `^` a.[8]);
+    r12 <- (r12 `^` rdx);
+    rdx <- r11;
+    rdx <- (rdx `^` rbx);
+    r14 <- a.[14];
+    r14 <- (r14 `^` a.[9]);
+    r14 <- (r14 `^` rdx);
+    rax <- (rax `^` rbp);
+    rcx <- (rcx `^` a.[1]);
+    r9 <- (r9 `^` a.[2]);
+    rdi <- a.[3];
+    r12 <- (r12 `^` rdi);
+    r14 <- (r14 `^` a.[4]);
+    rdx <- (RORX_64 r12 (W8.of_int 63));
+    rdx <- (rdx `^` rcx);
+    e.[10] <- rdx;
+    r11 <- (RORX_64 rcx (W8.of_int 63));
+    r11 <- (r11 `^` r14);
+    e.[9] <- r11;
+    rcx <- (RORX_64 r14 (W8.of_int 63));
+    rcx <- (rcx `^` r9);
+    r9 <- (RORX_64 r9 (W8.of_int 63));
+    r9 <- (r9 `^` rax);
+    rax <- (RORX_64 rax (W8.of_int 63));
+    rax <- (rax `^` r12);
+    rbp <- (rbp `^` r11);
+    rsi <- (rsi `^` r9);
+    r11 <- r9;
+    r9 <- (RORX_64 rsi (W8.of_int 20));
+    r13 <- (r13 `^` rdx);
+    r14 <- (RORX_64 r13 (W8.of_int 21));
+    r10 <- (r10 `^` rcx);
+    r10 <- (RORX_64 r10 (W8.of_int 43));
+    rbx <- (rbx `^` rax);
+    rbx <- (RORX_64 rbx (W8.of_int 50));
+    rsi <- ((invw rbx) `&` rbp);
+    rsi <- (rsi `^` r10);
+    a.[6] <- rsi;
+    rsi <- ((invw r14) `&` r10);
+    r10 <- ((invw r10) `&` rbx);
+    r10 <- (r10 `^` r14);
+    e.[8] <- r10;
+    r12 <- ((invw r9) `&` r14);
+    rC <- kECCAK1600_RC;
+    r14 <- cnt;
+    r12 <- (r12 `^` rC.[(W64.to_uint r14)]);
+    r12 <- (r12 `^` rbp);
+    rsi <- (rsi `^` r9);
+    e.[6] <- rsi;
+    r9 <- ((invw rbp) `&` r9);
+    r9 <- (r9 `^` rbx);
+    e.[7] <- r9;
+    rdi <- (rdi `^` rcx);
+    rdx <- rcx;
+    r9 <- (RORX_64 rdi (W8.of_int 36));
+    rsi <- a.[9];
+    rsi <- (rsi `^` rax);
+    r10 <- (RORX_64 rsi (W8.of_int 44));
+    rsi <- e.[1];
+    r13 <- e.[9];
+    rsi <- (rsi `^` r13);
+    rsi <- (RORX_64 rsi (W8.of_int 61));
+    rdi <- a.[16];
+    rcx <- r11;
+    rdi <- (rdi `^` r11);
+    rdi <- (RORX_64 rdi (W8.of_int 19));
+    rbp <- e.[10];
+    r15 <- (r15 `^` rbp);
+    rbx <- (RORX_64 r15 (W8.of_int 3));
+    r15 <- ((invw rbx) `&` r9);
+    r15 <- (r15 `^` rdi);
+    e.[1] <- r15;
+    r15 <- ((invw rsi) `&` rdi);
+    rdi <- ((invw rdi) `&` rbx);
+    rdi <- (rdi `^` rsi);
+    e.[5] <- rdi;
+    rsi <- ((invw r10) `&` rsi);
+    rsi <- (rsi `^` r9);
+    a.[16] <- rsi;
+    r15 <- (r15 `^` r10);
+    a.[3] <- r15;
+    rsi <- ((invw r9) `&` r10);
+    rsi <- (rsi `^` rbx);
+    a.[9] <- rsi;
+    rsi <- a.[1];
+    rsi <- (rsi `^` r11);
+    rsi <- (RORX_64 rsi (W8.of_int 63));
+    rdi <- a.[7];
+    rdi <- (rdi `^` rbp);
+    rdi <- (RORX_64 rdi (W8.of_int 58));
+    r9 <- a.[13];
+    r9 <- (r9 `^` rdx);
+    r9 <- (RORX_64 r9 (W8.of_int 39));
+    r10 <- e.[0];
+    r10 <- (r10 `^` rax);
+    r10 <- (RORX_64 r10 (W8.of_int 56));
+    r14 <- r13;
+    r8 <- (r8 `^` r13);
+    r8 <- (RORX_64 r8 (W8.of_int 46));
+    r11 <- ((invw r8) `&` rsi);
+    r11 <- (r11 `^` r10);
+    a.[13] <- r11;
+    r11 <- ((invw r9) `&` r10);
+    r13 <- ((invw r10) `&` r8);
+    r13 <- (r13 `^` r9);
+    r9 <- ((invw rdi) `&` r9);
+    r9 <- (r9 `^` rsi);
+    a.[7] <- r9;
+    r11 <- (r11 `^` rdi);
+    e.[4] <- r11;
+    rsi <- ((invw rsi) `&` rdi);
+    rsi <- (rsi `^` r8);
+    e.[0] <- rsi;
+    rsi <- a.[4];
+    rsi <- (rsi `^` rax);
+    rsi <- (RORX_64 rsi (W8.of_int 37));
+    rdi <- a.[5];
+    rdi <- (rdi `^` r14);
+    rdi <- (RORX_64 rdi (W8.of_int 28));
+    r8 <- a.[11];
+    r8 <- (r8 `^` rcx);
+    r8 <- (RORX_64 r8 (W8.of_int 54));
+    r9 <- a.[17];
+    r9 <- (r9 `^` rbp);
+    r11 <- (RORX_64 r9 (W8.of_int 49));
+    r9 <- a.[23];
+    r9 <- (r9 `^` rdx);
+    rbx <- (RORX_64 r9 (W8.of_int 8));
+    r10 <- ((invw rbx) `&` rsi);
+    r10 <- (r10 `^` r11);
+    r15 <- ((invw r8) `&` r11);
+    r11 <- ((invw r11) `&` rbx);
+    r11 <- (r11 `^` r8);
+    a.[17] <- r11;
+    r8 <- ((invw rdi) `&` r8);
+    r8 <- (r8 `^` rsi);
+    a.[23] <- r8;
+    r15 <- (r15 `^` rdi);
+    a.[5] <- r15;
+    rsi <- ((invw rsi) `&` rdi);
+    rsi <- (rsi `^` rbx);
+    a.[11] <- rsi;
+    rsi <- rbp;
+    rsi <- (rsi `^` a.[2]);
+    rdx <- (rdx `^` a.[8]);
+    rax <- (rax `^` a.[14]);
+    rdi <- r14;
+    rdi <- (rdi `^` a.[15]);
+    rcx <- (rcx `^` e.[2]);
+    rsi <- (RORX_64 rsi (W8.of_int 2));
+    rdx <- (RORX_64 rdx (W8.of_int 9));
+    rax <- (RORX_64 rax (W8.of_int 25));
+    rdi <- (RORX_64 rdi (W8.of_int 23));
+    rcx <- (RORX_64 rcx (W8.of_int 62));
+    r9 <- ((invw rcx) `&` rsi);
+    r9 <- (r9 `^` rdi);
+    a.[15] <- r9;
+    r14 <- ((invw rax) `&` rdi);
+    r11 <- ((invw rdi) `&` rcx);
+    r11 <- (r11 `^` rax);
+    rax <- ((invw rdx) `&` rax);
+    rax <- (rax `^` rsi);
+    rbp <- rax;
+    a.[14] <- rax;
+    r14 <- (r14 `^` rdx);
+    e.[2] <- r14;
+    rdi <- ((invw rsi) `&` rdx);
+    rdi <- (rdi `^` rcx);
+    i <- i2;
+    (st4, y10, y14, y8, y15, y9, y13, y3, y7, y2) <@ __f1600_x4_round (
+    st4, i, y10, y14, y8, y15, y9, y13, y3, y7, y2);
+    rax <- r8;
+    rax <- (rax `^` a.[7]);
+    rsi <- a.[16];
+    rsi <- (rsi `^` rbp);
+    rsi <- (rsi `^` rax);
+    rbp <- a.[3];
+    rax <- rbp;
+    rax <- (rax `^` e.[6]);
+    rdx <- r15;
+    rdx <- (rdx `^` e.[4]);
+    rdx <- (rdx `^` rax);
+    rax <- e.[5];
+    rax <- (rax `^` a.[17]);
+    r8 <- r11;
+    r8 <- (r8 `^` e.[8]);
+    r8 <- (r8 `^` rax);
+    rbx <- a.[13];
+    rbx <- (rbx `^` e.[1]);
+    rcx <- r9;
+    rcx <- (rcx `^` a.[6]);
+    rcx <- (rcx `^` rbx);
+    rbx <- e.[7];
+    rbx <- (rbx `^` rdi);
+    rax <- e.[0];
+    rax <- (rax `^` a.[9]);
+    rax <- (rax `^` rbx);
+    rsi <- (rsi `^` r12);
+    rdx <- (rdx `^` r14);
+    r8 <- (r8 `^` r13);
+    rcx <- (rcx `^` r10);
+    r14 <- a.[11];
+    rax <- (rax `^` r14);
+    r15 <- (RORX_64 rcx (W8.of_int 63));
+    r15 <- (r15 `^` rdx);
+    rbx <- (RORX_64 rdx (W8.of_int 63));
+    rbx <- (rbx `^` rax);
+    r9 <- (RORX_64 rax (W8.of_int 63));
+    r9 <- (r9 `^` r8);
+    r8 <- (RORX_64 r8 (W8.of_int 63));
+    r8 <- (r8 `^` rsi);
+    rdx <- (RORX_64 rsi (W8.of_int 63));
+    rdx <- (rdx `^` rcx);
+    r12 <- (r12 `^` rbx);
+    rbp <- (rbp `^` r8);
+    rax <- (RORX_64 rbp (W8.of_int 20));
+    r13 <- (r13 `^` r15);
+    rcx <- (RORX_64 r13 (W8.of_int 21));
+    r10 <- (r10 `^` r9);
+    rsi <- (RORX_64 r10 (W8.of_int 43));
+    rdi <- (rdi `^` rdx);
+    rdi <- (RORX_64 rdi (W8.of_int 50));
+    r10 <- ((invw rdi) `&` r12);
+    r10 <- (r10 `^` rsi);
+    a.[3] <- r10;
+    r10 <- ((invw rcx) `&` rsi);
+    rsi <- ((invw rsi) `&` rdi);
+    rsi <- (rsi `^` rcx);
+    a.[2] <- rsi;
+    rbp <- ((invw rax) `&` rcx);
+    rcx <- cnt;
+    rC <- kECCAK1600_RC;
+    rbp <- (rbp `^` rC.[(W64.to_uint (rcx + (W64.of_int 1)))]);
+    rbp <- (rbp `^` r12);
+    e.[9] <- rbp;
+    r10 <- (r10 `^` rax);
+    a.[1] <- r10;
+    rax <- ((invw r12) `&` rax);
+    rax <- (rax `^` rdi);
+    a.[4] <- rax;
+    rax <- a.[6];
+    rax <- (rax `^` r9);
+    rax <- (RORX_64 rax (W8.of_int 36));
+    rcx <- a.[9];
+    rcx <- (rcx `^` rdx);
+    rcx <- (RORX_64 rcx (W8.of_int 44));
+    rsi <- a.[7];
+    rsi <- (rsi `^` rbx);
+    rsi <- (RORX_64 rsi (W8.of_int 61));
+    rdi <- a.[5];
+    rdi <- (rdi `^` r8);
+    rdi <- (RORX_64 rdi (W8.of_int 19));
+    r11 <- (r11 `^` r15);
+    r10 <- (RORX_64 r11 (W8.of_int 3));
+    r11 <- ((invw r10) `&` rax);
+    r11 <- (r11 `^` rdi);
+    a.[8] <- r11;
+    r11 <- ((invw rsi) `&` rdi);
+    rdi <- ((invw rdi) `&` r10);
+    rdi <- (rdi `^` rsi);
+    a.[7] <- rdi;
+    rsi <- ((invw rcx) `&` rsi);
+    rsi <- (rsi `^` rax);
+    a.[5] <- rsi;
+    r11 <- (r11 `^` rcx);
+    a.[6] <- r11;
+    rax <- ((invw rax) `&` rcx);
+    rax <- (rax `^` r10);
+    a.[9] <- rax;
+    rax <- e.[6];
+    rax <- (rax `^` r8);
+    rax <- (RORX_64 rax (W8.of_int 63));
+    rcx <- e.[5];
+    rcx <- (rcx `^` r15);
+    rcx <- (RORX_64 rcx (W8.of_int 58));
+    rsi <- a.[13];
+    rsi <- (rsi `^` r9);
+    rsi <- (RORX_64 rsi (W8.of_int 39));
+    rdi <- r14;
+    rdi <- (rdi `^` rdx);
+    rdi <- (RORX_64 rdi (W8.of_int 56));
+    r10 <- a.[14];
+    r10 <- (r10 `^` rbx);
+    r10 <- (RORX_64 r10 (W8.of_int 46));
+    r11 <- ((invw r10) `&` rax);
+    r11 <- (r11 `^` rdi);
+    a.[13] <- r11;
+    r11 <- ((invw rsi) `&` rdi);
+    r13 <- ((invw rdi) `&` r10);
+    r13 <- (r13 `^` rsi);
+    rdi <- ((invw rcx) `&` rsi);
+    rdi <- (rdi `^` rax);
+    r11 <- (r11 `^` rcx);
+    a.[11] <- r11;
+    rax <- ((invw rax) `&` rcx);
+    rax <- (rax `^` r10);
+    a.[14] <- rax;
+    rax <- e.[7];
+    rax <- (rax `^` rdx);
+    rax <- (RORX_64 rax (W8.of_int 37));
+    rcx <- a.[16];
+    rcx <- (rcx `^` rbx);
+    rcx <- (RORX_64 rcx (W8.of_int 28));
+    rsi <- e.[4];
+    rsi <- (rsi `^` r8);
+    r11 <- (RORX_64 rsi (W8.of_int 54));
+    rsi <- a.[17];
+    rsi <- (rsi `^` r15);
+    r14 <- (RORX_64 rsi (W8.of_int 49));
+    rsi <- a.[15];
+    rsi <- (rsi `^` r9);
+    r12 <- (RORX_64 rsi (W8.of_int 8));
+    r10 <- ((invw r12) `&` rax);
+    r10 <- (r10 `^` r14);
+    rsi <- ((invw r11) `&` r14);
+    r14 <- ((invw r14) `&` r12);
+    r14 <- (r14 `^` r11);
+    a.[17] <- r14;
+    r11 <- ((invw rcx) `&` r11);
+    r11 <- (r11 `^` rax);
+    a.[15] <- r11;
+    rsi <- (rsi `^` rcx);
+    a.[16] <- rsi;
+    r11 <- ((invw rax) `&` rcx);
+    r11 <- (r11 `^` r12);
+    r15 <- (r15 `^` e.[8]);
+    r9 <- (r9 `^` e.[1]);
+    rdx <- (rdx `^` e.[0]);
+    rbx <- (rbx `^` a.[23]);
+    r8 <- (r8 `^` e.[2]);
+    rax <- (RORX_64 r15 (W8.of_int 2));
+    rcx <- (RORX_64 r9 (W8.of_int 9));
+    rdx <- (RORX_64 rdx (W8.of_int 25));
+    r9 <- (RORX_64 rbx (W8.of_int 23));
+    r14 <- (RORX_64 r8 (W8.of_int 62));
+    r8 <- ((invw r14) `&` rax);
+    r8 <- (r8 `^` r9);
+    a.[23] <- r8;
+    rsi <- ((invw rdx) `&` r9);
+    r15 <- ((invw r9) `&` r14);
+    r15 <- (r15 `^` rdx);
+    r8 <- ((invw rcx) `&` rdx);
+    r8 <- (r8 `^` rax);
+    rsi <- (rsi `^` rcx);
+    rbx <- ((invw rax) `&` rcx);
+    rbx <- (rbx `^` r14);
+    rcx <- cnt;
+    rcx <- (rcx + (W64.of_int 2));
+    rax <- rcx;
+    rbp <- e.[9];
+    return (rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e, st4, 
+           y10, y14, y8, y15, y9, y13, y3, y7, y2);
+  }
+  proc __keccakf1600_x4_x1_nat_opt (st4:W256.t Array25.t, a:W64.t Array25.t) : 
+  W256.t Array25.t * W64.t Array25.t = {
+    var y10:W256.t;
+    var y14:W256.t;
+    var y8:W256.t;
+    var y15:W256.t;
+    var y9:W256.t;
+    var y13:W256.t;
+    var y3:W256.t;
+    var y7:W256.t;
+    var y2:W256.t;
+    var rbp:W64.t;
+    var rdi:W64.t;
+    var r13:W64.t;
+    var r10:W64.t;
+    var r11:W64.t;
+    var r8:W64.t;
+    var rsi:W64.t;
+    var r15:W64.t;
+    var rbx:W64.t;
+    var rax:W64.t;
+    var e:W64.t Array25.t;
+    e <- witness;
+    (y10, y14, y8, y15, y9, y13, y3, y7, y2) <@ __regs_fetch (st4);
+    (rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx) <@ read_regs_opt (a);
+    rax <- (W64.of_int 0);
+    (rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e, st4, y10, 
+    y14, y8, y15, y9, y13, y3, y7, y2) <@ __keccakf1600_x4_x1_nat_opt_iteration (
+    rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e, st4, y10, 
+    y14, y8, y15, y9, y13, y3, y7, y2);
+    while ((rax \ult (W64.of_int 24))) {
+      (rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e, st4, y10, 
+      y14, y8, y15, y9, y13, y3, y7, y2) <@ __keccakf1600_x4_x1_nat_opt_iteration (
+      rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, e, st4, y10, 
+      y14, y8, y15, y9, y13, y3, y7, y2);
+    }
+    st4 <@ __regs_unfetch (st4, y10, y14, y8, y15, y9, y13, y3, y7, y2);
+    a <@ store_regs_opt (a, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx);
+    return (st4, a);
+  }
+  proc _keccakf1600_x4_x1_nat_opt (p4:W256.t Array25.t, p1:W64.t Array25.t) : 
+  W256.t Array25.t * W64.t Array25.t = {
+    var j:int;
+    var t4:W256.t;
+    var s4:W256.t Array25.t;
+    var t1:W64.t;
+    var s1:W64.t Array25.t;
+    var q4:W256.t Array25.t;
+    var q1:W64.t Array25.t;
+    q1 <- witness;
+    q4 <- witness;
+    s1 <- witness;
+    s4 <- witness;
+    j <- 0;
+    while ((j < 25)) {
+      t4 <- p4.[j];
+      s4.[j] <- t4;
+      t1 <- p1.[j];
+      s1.[j] <- t1;
+      j <- (j + 1);
+    }
+    q4 <- p4;
+    q1 <- p1;
+    (s4, s1) <@ __keccakf1600_x4_x1_nat_opt (s4, s1);
+    p4 <- q4;
+    p1 <- q1;
+    j <- 0;
+    while ((j < 25)) {
+      t4 <- s4.[j];
+      p4.[j] <- t4;
+      t1 <- s1.[j];
+      p1.[j] <- t1;
+      j <- (j + 1);
+    }
+    return (p4, p1);
+  }
+  proc _keccakf1600_x4_x1 (a4:W256.t Array25.t, a1:W64.t Array25.t) : 
+  W256.t Array25.t * W64.t Array25.t = {
+    var kECCAK_F4:int;
+    var kECCAK_F1:int;
+    kECCAK_F4 <@ __KECCAK_Fx4 ((2 + 512));
+    kECCAK_F1 <@ __KECCAK_F ((2 + 512));
+    if (((kECCAK_F4 = 512) /\ (kECCAK_F1 = 2))) {
+      (a4, a1) <@ _keccakf1600_x4_x1_nat_opt (a4, a1);
+    } else {
+      a4 <@ _keccakf1600_avx2x4 (a4);
+      a1 <@ _keccakf1600 (a1);
+    }
+    return (a4, a1);
+  }
   proc __state_init_avx2x4 (st:W256.t Array25.t) : W256.t Array25.t = {
     var z256:W256.t;
     var i:int;
@@ -14371,6 +15154,23 @@ module M = {
     offset, 168, state);
     return (state, h0, h1, h2, h3);
   }
+  proc __shake128_squeezeblock4x_x1 (state:W256.t Array25.t,
+                                     h0:W8.t Array168.t, h1:W8.t Array168.t,
+                                     h2:W8.t Array168.t, h3:W8.t Array168.t,
+                                     lanes:W64.t Array25.t) : W256.t Array25.t *
+                                                              W8.t Array168.t *
+                                                              W8.t Array168.t *
+                                                              W8.t Array168.t *
+                                                              W8.t Array168.t *
+                                                              W64.t Array25.t = {
+    var offset:int;
+    var  _0:int;
+    (state, lanes) <@ _keccakf1600_x4_x1 (state, lanes);
+    offset <- 0;
+    (h0, h1, h2, h3,  _0) <@ a168____dumpstate_avx2x4 (h0, h1, h2, h3,
+    offset, 168, state);
+    return (state, h0, h1, h2, h3, lanes);
+  }
   proc shake256_squeezeblock4x (state:W256.t Array25.t, h0:W8.t Array136.t,
                                 h1:W8.t Array136.t, h2:W8.t Array136.t,
                                 h3:W8.t Array136.t) : W256.t Array25.t *
@@ -14671,8 +15471,11 @@ module M = {
     zero)));
     return (state, b0, b1, b2, b3);
   }
-  proc matrix_A____sample_4_polynomials (rho:W8.t Array32.t,
-                                         domain_separators:W16.t Array4.t) : 
+  proc matrix_A____sample_4_polynomials_from_blocks (xof_state:W256.t Array25.t,
+                                                     buf0:W8.t Array848.t,
+                                                     buf1:W8.t Array848.t,
+                                                     buf2:W8.t Array848.t,
+                                                     buf3:W8.t Array848.t) : 
   W32.t Array256.t * W32.t Array256.t * W32.t Array256.t * W32.t Array256.t = {
     var aux:W256.t Array25.t;
     var aux_0:W8.t Array168.t;
@@ -14683,29 +15486,16 @@ module M = {
     var polynomial1:W32.t Array256.t;
     var polynomial2:W32.t Array256.t;
     var polynomial3:W32.t Array256.t;
-    var xof_state:W256.t Array25.t;
-    var buf0:W8.t Array848.t;
-    var buf1:W8.t Array848.t;
-    var buf2:W8.t Array848.t;
-    var buf3:W8.t Array848.t;
     var filled:W64.t;
     var filled0:W64.t;
     var filled1:W64.t;
     var filled2:W64.t;
     var filled3:W64.t;
     var stop_sampling:W32.t;
-    buf0 <- witness;
-    buf1 <- witness;
-    buf2 <- witness;
-    buf3 <- witness;
     polynomial0 <- witness;
     polynomial1 <- witness;
     polynomial2 <- witness;
     polynomial3 <- witness;
-    xof_state <- witness;
-    xof_state <@ shake128_absorb_34_4x (xof_state, rho, domain_separators);
-    (xof_state, buf0, buf1, buf2, buf3) <@ matrix_A____shake128_squeeze_multiple_blocks_4x (
-    xof_state, buf0, buf1, buf2, buf3);
     (polynomial0, filled) <@ matrix_A__rejection_sample_multiple_blocks (
     polynomial0, buf0);
     filled0 <- filled;
@@ -14797,6 +15587,219 @@ module M = {
       }
     }
     return (polynomial0, polynomial1, polynomial2, polynomial3);
+  }
+  proc matrix_A____sample_4_polynomials (rho:W8.t Array32.t,
+                                         domain_separators:W16.t Array4.t) : 
+  W32.t Array256.t * W32.t Array256.t * W32.t Array256.t * W32.t Array256.t = {
+    var polynomial0:W32.t Array256.t;
+    var polynomial1:W32.t Array256.t;
+    var polynomial2:W32.t Array256.t;
+    var polynomial3:W32.t Array256.t;
+    var xof_state:W256.t Array25.t;
+    var buf0:W8.t Array848.t;
+    var buf1:W8.t Array848.t;
+    var buf2:W8.t Array848.t;
+    var buf3:W8.t Array848.t;
+    buf0 <- witness;
+    buf1 <- witness;
+    buf2 <- witness;
+    buf3 <- witness;
+    polynomial0 <- witness;
+    polynomial1 <- witness;
+    polynomial2 <- witness;
+    polynomial3 <- witness;
+    xof_state <- witness;
+    xof_state <@ shake128_absorb_34_4x (xof_state, rho, domain_separators);
+    (xof_state, buf0, buf1, buf2, buf3) <@ matrix_A____shake128_squeeze_multiple_blocks_4x (
+    xof_state, buf0, buf1, buf2, buf3);
+    (polynomial0, polynomial1, polynomial2, polynomial3) <@ matrix_A____sample_4_polynomials_from_blocks (
+    xof_state, buf0, buf1, buf2, buf3);
+    return (polynomial0, polynomial1, polynomial2, polynomial3);
+  }
+  proc matrix_A____vk_hash_absorb_block (lanes:W64.t Array25.t,
+                                         vk:W8.t Array1952.t, k:int) : 
+  W64.t Array25.t = {
+    var offset:int;
+    var  _0:int;
+    var  _1:int;
+    var  _2:int;
+    var  _3:int;
+    offset <- (136 * k);
+    if ((k < ((((32 + (6 * (((23 - 13) * 256) %/ 8))) %/ 136) + 1) - 1))) {
+      (lanes,  _2,  _3) <@ a_VERIFICATION_KEY____addstate (lanes, 0, 
+      vk, offset, 136, 0);
+    } else {
+      (lanes,  _0,  _1) <@ a_VERIFICATION_KEY____addstate (lanes, 0, 
+      vk, offset, ((32 + (6 * (((23 - 13) * 256) %/ 8))) %% 136), 31);
+      lanes <@ __addratebit (lanes, 136);
+    }
+    return lanes;
+  }
+  proc matrix_A____shake128_squeeze_multiple_blocks_4x_vk (state:W256.t Array25.t,
+                                                           b0:W8.t Array848.t,
+                                                           b1:W8.t Array848.t,
+                                                           b2:W8.t Array848.t,
+                                                           b3:W8.t Array848.t,
+                                                           lanes:W64.t Array25.t,
+                                                           vk:W8.t Array1952.t,
+                                                           first_slot:int) : 
+  W256.t Array25.t * W8.t Array848.t * W8.t Array848.t * W8.t Array848.t *
+  W8.t Array848.t * W64.t Array25.t = {
+    var aux:W256.t Array25.t;
+    var aux_4:W64.t Array25.t;
+    var aux_0:W8.t Array168.t;
+    var aux_1:W8.t Array168.t;
+    var aux_2:W8.t Array168.t;
+    var aux_3:W8.t Array168.t;
+    var vkm:W8.t Array1952.t;
+    var i:int;
+    var zero:W64.t;
+    vkm <- witness;
+    vkm <- vk;
+    i <- 0;
+    while ((i < 5)) {
+      if (((first_slot + i) <
+          (((32 + (6 * (((23 - 13) * 256) %/ 8))) %/ 136) + 1))) {
+        vk <- vkm;
+        lanes <@ matrix_A____vk_hash_absorb_block (lanes, vk,
+        (first_slot + i));
+        (aux, aux_0, aux_1, aux_2, aux_3, aux_4) <@ __shake128_squeezeblock4x_x1 (
+        state, (Array168.init (fun i_0 => b0.[((i * 168) + i_0)])),
+        (Array168.init (fun i_0 => b1.[((i * 168) + i_0)])),
+        (Array168.init (fun i_0 => b2.[((i * 168) + i_0)])),
+        (Array168.init (fun i_0 => b3.[((i * 168) + i_0)])), lanes);
+        state <- aux;
+        b0 <-
+        (Array848.init
+        (fun i_0 => (if ((i * 168) <= i_0 < ((i * 168) + 168)) then aux_0.[
+                                                                    (
+                                                                    i_0 -
+                                                                    (i * 168))] else 
+                    b0.[i_0]))
+        );
+        b1 <-
+        (Array848.init
+        (fun i_0 => (if ((i * 168) <= i_0 < ((i * 168) + 168)) then aux_1.[
+                                                                    (
+                                                                    i_0 -
+                                                                    (i * 168))] else 
+                    b1.[i_0]))
+        );
+        b2 <-
+        (Array848.init
+        (fun i_0 => (if ((i * 168) <= i_0 < ((i * 168) + 168)) then aux_2.[
+                                                                    (
+                                                                    i_0 -
+                                                                    (i * 168))] else 
+                    b2.[i_0]))
+        );
+        b3 <-
+        (Array848.init
+        (fun i_0 => (if ((i * 168) <= i_0 < ((i * 168) + 168)) then aux_3.[
+                                                                    (
+                                                                    i_0 -
+                                                                    (i * 168))] else 
+                    b3.[i_0]))
+        );
+        lanes <- aux_4;
+      } else {
+        (aux, aux_0, aux_1, aux_2, aux_3) <@ shake128_squeezeblock4x (
+        state, (Array168.init (fun i_0 => b0.[((i * 168) + i_0)])),
+        (Array168.init (fun i_0 => b1.[((i * 168) + i_0)])),
+        (Array168.init (fun i_0 => b2.[((i * 168) + i_0)])),
+        (Array168.init (fun i_0 => b3.[((i * 168) + i_0)])));
+        state <- aux;
+        b0 <-
+        (Array848.init
+        (fun i_0 => (if ((i * 168) <= i_0 < ((i * 168) + 168)) then aux_0.[
+                                                                    (
+                                                                    i_0 -
+                                                                    (i * 168))] else 
+                    b0.[i_0]))
+        );
+        b1 <-
+        (Array848.init
+        (fun i_0 => (if ((i * 168) <= i_0 < ((i * 168) + 168)) then aux_1.[
+                                                                    (
+                                                                    i_0 -
+                                                                    (i * 168))] else 
+                    b1.[i_0]))
+        );
+        b2 <-
+        (Array848.init
+        (fun i_0 => (if ((i * 168) <= i_0 < ((i * 168) + 168)) then aux_2.[
+                                                                    (
+                                                                    i_0 -
+                                                                    (i * 168))] else 
+                    b2.[i_0]))
+        );
+        b3 <-
+        (Array848.init
+        (fun i_0 => (if ((i * 168) <= i_0 < ((i * 168) + 168)) then aux_3.[
+                                                                    (
+                                                                    i_0 -
+                                                                    (i * 168))] else 
+                    b3.[i_0]))
+        );
+      }
+      i <- (i + 1);
+    }
+    zero <- (W64.of_int 0);
+    b0 <-
+    (Array848.init
+    (WArray848.get8
+    (WArray848.set64_direct (WArray848.init8 (fun i_0 => b0.[i_0])) (5 * 168)
+    zero)));
+    b1 <-
+    (Array848.init
+    (WArray848.get8
+    (WArray848.set64_direct (WArray848.init8 (fun i_0 => b1.[i_0])) (5 * 168)
+    zero)));
+    b2 <-
+    (Array848.init
+    (WArray848.get8
+    (WArray848.set64_direct (WArray848.init8 (fun i_0 => b2.[i_0])) (5 * 168)
+    zero)));
+    b3 <-
+    (Array848.init
+    (WArray848.get8
+    (WArray848.set64_direct (WArray848.init8 (fun i_0 => b3.[i_0])) (5 * 168)
+    zero)));
+    return (state, b0, b1, b2, b3, lanes);
+  }
+  proc matrix_A____sample_4_polynomials_vk (rho:W8.t Array32.t,
+                                            domain_separators:W16.t Array4.t,
+                                            lanes:W64.t Array25.t,
+                                            vk:W8.t Array1952.t,
+                                            first_slot:int) : W32.t Array256.t *
+                                                              W32.t Array256.t *
+                                                              W32.t Array256.t *
+                                                              W32.t Array256.t *
+                                                              W64.t Array25.t = {
+    var polynomial0:W32.t Array256.t;
+    var polynomial1:W32.t Array256.t;
+    var polynomial2:W32.t Array256.t;
+    var polynomial3:W32.t Array256.t;
+    var xof_state:W256.t Array25.t;
+    var buf0:W8.t Array848.t;
+    var buf1:W8.t Array848.t;
+    var buf2:W8.t Array848.t;
+    var buf3:W8.t Array848.t;
+    buf0 <- witness;
+    buf1 <- witness;
+    buf2 <- witness;
+    buf3 <- witness;
+    polynomial0 <- witness;
+    polynomial1 <- witness;
+    polynomial2 <- witness;
+    polynomial3 <- witness;
+    xof_state <- witness;
+    xof_state <@ shake128_absorb_34_4x (xof_state, rho, domain_separators);
+    (xof_state, buf0, buf1, buf2, buf3, lanes) <@ matrix_A____shake128_squeeze_multiple_blocks_4x_vk (
+    xof_state, buf0, buf1, buf2, buf3, lanes, vk, first_slot);
+    (polynomial0, polynomial1, polynomial2, polynomial3) <@ matrix_A____sample_4_polynomials_from_blocks (
+    xof_state, buf0, buf1, buf2, buf3);
+    return (polynomial0, polynomial1, polynomial2, polynomial3, lanes);
   }
   proc sample____challenge (output_challenge:W32.t Array256.t,
                             seed:W8.t Array48.t) : W32.t Array256.t = {
@@ -17129,6 +18132,110 @@ module M = {
     }
     return matrix_A;
   }
+  proc sample____matrix_A_vk (vk:W8.t Array1952.t) : W32.t Array7680.t *
+                                                     W64.t Array25.t = {
+    var aux:W32.t Array256.t;
+    var aux_0:W32.t Array256.t;
+    var aux_1:W32.t Array256.t;
+    var aux_2:W32.t Array256.t;
+    var aux_3:W64.t Array25.t;
+    var inc:int;
+    var matrix_A:W32.t Array7680.t;
+    var lanes:W64.t Array25.t;
+    var copied_32_bytes:W256.t;
+    var seed:W8.t Array32.t;
+    var vkm:W8.t Array1952.t;
+    var chunk:int;
+    var index:int;
+    var lane:int;
+    var row:int;
+    var column:int;
+    var domain_separators:W16.t Array4.t;
+    var  _0:W32.t Array256.t;
+    var  _1:W32.t Array256.t;
+     _0 <- witness;
+     _1 <- witness;
+    domain_separators <- witness;
+    lanes <- witness;
+    matrix_A <- witness;
+    seed <- witness;
+    vkm <- witness;
+    copied_32_bytes <-
+    (get256_direct (WArray1952.init8 (fun i => vk.[i])) 0);
+    seed <-
+    (Array32.init
+    (WArray32.get8
+    (WArray32.set256_direct (WArray32.init8 (fun i => seed.[i])) 0
+    copied_32_bytes)));
+    lanes <@ __state_init (lanes);
+    vkm <- vk;
+    inc <- ((6 * 5) %/ 4);
+    chunk <- 0;
+    while ((chunk < inc)) {
+      index <- (4 * chunk);
+      lane <- 0;
+      while ((lane < 4)) {
+        row <- ((index + lane) %/ 5);
+        column <- ((index + lane) %% 5);
+        domain_separators.[lane] <-
+        (truncateu16 ((W256.of_int (row `<<` 8)) `|` (W256.of_int column)));
+        lane <- (lane + 1);
+      }
+      vk <- vkm;
+      (aux, aux_0, aux_1, aux_2, aux_3) <@ matrix_A____sample_4_polynomials_vk (
+      seed, domain_separators, lanes, vk, (5 * chunk));
+      matrix_A <-
+      (Array7680.init
+      (fun i => (if (((index + 0) * 256) <= i < (((index + 0) * 256) + 256)) then 
+                aux.[(i - ((index + 0) * 256))] else matrix_A.[i]))
+      );
+      matrix_A <-
+      (Array7680.init
+      (fun i => (if (((index + 1) * 256) <= i < (((index + 1) * 256) + 256)) then 
+                aux_0.[(i - ((index + 1) * 256))] else matrix_A.[i]))
+      );
+      matrix_A <-
+      (Array7680.init
+      (fun i => (if (((index + 2) * 256) <= i < (((index + 2) * 256) + 256)) then 
+                aux_1.[(i - ((index + 2) * 256))] else matrix_A.[i]))
+      );
+      matrix_A <-
+      (Array7680.init
+      (fun i => (if (((index + 3) * 256) <= i < (((index + 3) * 256) + 256)) then 
+                aux_2.[(i - ((index + 3) * 256))] else matrix_A.[i]))
+      );
+      lanes <- aux_3;
+      chunk <- (chunk + 1);
+    }
+    if ((((6 * 5) %% 4) = 2)) {
+      index <- ((6 * 5) - 2);
+      lane <- 0;
+      while ((lane < 2)) {
+        row <- ((index + lane) %/ 5);
+        column <- ((index + lane) %% 5);
+        domain_separators.[lane] <-
+        (truncateu16 ((W256.of_int (row `<<` 8)) `|` (W256.of_int column)));
+        lane <- (lane + 1);
+      }
+      (aux, aux_0, aux_1, aux_2) <@ matrix_A____sample_4_polynomials (
+      seed, domain_separators);
+      matrix_A <-
+      (Array7680.init
+      (fun i => (if (((index + 0) * 256) <= i < (((index + 0) * 256) + 256)) then 
+                aux.[(i - ((index + 0) * 256))] else matrix_A.[i]))
+      );
+      matrix_A <-
+      (Array7680.init
+      (fun i => (if (((index + 1) * 256) <= i < (((index + 1) * 256) + 256)) then 
+                aux_0.[(i - ((index + 1) * 256))] else matrix_A.[i]))
+      );
+       _0 <- aux_1;
+       _1 <- aux_2;
+    } else {
+      
+    }
+    return (matrix_A, lanes);
+  }
   proc __keygen_prf (prf_output:W8.t Array128.t, randomness:W8.t Array32.t) : 
   W8.t Array128.t = {
     var extra:W8.t Array2.t;
@@ -18167,10 +19274,10 @@ module M = {
     var result1:W64.t;
     var result2:W64.t;
     var matrix_A:W32.t Array7680.t;
+    var verification_key_hash_lanes:W64.t Array25.t;
     var a_times_signer_response:W32.t Array1536.t;
     var challenge:W32.t Array256.t;
     var reconstructed_signer_commitment:W8.t Array768.t;
-    var verification_key_hash:W8.t Array64.t;
     var message_representative:W8.t Array64.t;
     var expected_commitment_hash:W8.t Array48.t;
     var  _0:W64.t;
@@ -18178,7 +19285,6 @@ module M = {
     var  _2:W64.t;
     var  _3:W64.t;
     var  _4:W64.t;
-    var  _5:W64.t;
     a_times_signer_response <- witness;
     challenge <- witness;
     expected_commitment_hash <- witness;
@@ -18187,7 +19293,7 @@ module M = {
     message_representative <- witness;
     reconstructed_signer_commitment <- witness;
     signer_response <- witness;
-    verification_key_hash <- witness;
+    verification_key_hash_lanes <- witness;
     (* Erased call to spill *)
     (signer_response, hints, result1) <@ signature____decode (signer_response,
     hints, signature_encoded);
@@ -18198,8 +19304,8 @@ module M = {
      _0 <- (init_msf);
     if ((result = (W64.of_int 0))) {
       (* Erased call to spill *)
-      matrix_A <@ sample____matrix_A ((Array32.init
-                                      (fun i => verification_key.[(0 + i)])));
+      (matrix_A, verification_key_hash_lanes) <@ sample____matrix_A_vk (
+      verification_key);
       signer_response <@ row_vector__ntt (signer_response);
       a_times_signer_response <@ row_vector____multiply_with_matrix_A (
       matrix_A, signer_response);
@@ -18215,17 +19321,16 @@ module M = {
       a_times_signer_response, hints);
       (* Erased call to unspill *)
        _3 <- (init_msf);
-      verification_key_hash <@ hash_verification_key (verification_key_hash,
-      verification_key);
-      (* Erased call to unspill *)
-       _4 <- (init_msf);
       message_representative <@ __derive_message_representative (message_representative,
-      verification_key_hash, context_pointer, context_size, message_pointer,
-      message_size);
+      (Array64.init
+      (fun i => (get8
+                (WArray200.init64 (fun i => verification_key_hash_lanes.[i]))
+                (0 + i)))
+      ), context_pointer, context_size, message_pointer, message_size);
       expected_commitment_hash <@ __derive_commitment_hash (expected_commitment_hash,
       message_representative, reconstructed_signer_commitment);
       (* Erased call to unspill *)
-       _5 <- (init_msf);
+       _4 <- (init_msf);
       result <@ __compare_commitment_hashes (expected_commitment_hash,
       (Array48.init (fun i => signature_encoded.[(0 + i)])));
     } else {

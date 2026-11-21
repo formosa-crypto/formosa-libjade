@@ -20,8 +20,8 @@ BArray66 BArray96 BArray128 BArray136 BArray160 BArray168 BArray192 BArray200
 BArray224 BArray256 BArray272 BArray320 BArray416 BArray512 BArray640
 BArray680 BArray768 BArray800 BArray848 BArray1024 BArray1920 BArray1952
 BArray2048 BArray2496 BArray3200 BArray3309 BArray4032 BArray5120 BArray6144
-BArray12288 BArray30720 SBArray128_32 SBArray1952_32 SBArray4032_32
-SBArray3309_48 SBArray3309_61 SBArray128_64 SBArray4032_64 SBArray640_128
+BArray12288 BArray30720 SBArray128_32 SBArray4032_32 SBArray3309_48
+SBArray3309_61 SBArray128_64 SBArray200_64 SBArray4032_64 SBArray640_128
 SBArray768_128 SBArray272_136 SBArray680_136 SBArray848_168 SBArray224_200
 SBArray1920_320 SBArray2496_416 SBArray680_640 SBArray3200_640
 SBArray4032_640 SBArray4032_768 SBArray5120_1024 SBArray6144_1024
@@ -17128,6 +17128,1775 @@ module M = {
     }
     b_a <- (BArray800.init_arr (W8.of_int 255));
     return (a, b_a, trace__keccakf1600_avx2x4);
+  }
+  proc __f1600_x4_round (st:BArray800.t, b_st:BArray800.t, i:int, y10:W256.t,
+                         y14:W256.t, y8:W256.t, y15:W256.t, y9:W256.t,
+                         y13:W256.t, y3:W256.t, y7:W256.t, y2:W256.t) : 
+  BArray800.t * BArray800.t * W256.t * W256.t * W256.t * W256.t * W256.t *
+  W256.t * W256.t * W256.t * W256.t * trace = {
+    var i0:int;
+    var i1:int;
+    var i2:int;
+    var i3:int;
+    var i4:int;
+    var i5:int;
+    var i6:int;
+    var i7:int;
+    var i8:int;
+    var i9:int;
+    var i10:int;
+    var i11:int;
+    var i12:int;
+    var i13:int;
+    var i14:int;
+    var i15:int;
+    var i16:int;
+    var i17:int;
+    var i18:int;
+    var i19:int;
+    var i20:int;
+    var i21:int;
+    var i22:int;
+    var i23:int;
+    var y4:W256.t;
+    var y0:W256.t;
+    var y11:W256.t;
+    var y12:W256.t;
+    var y1:W256.t;
+    var y6:W256.t;
+    var y5:W256.t;
+    var rcp:BArray192.t;
+    var trace___f1600_x4_round:trace;
+    rcp <- witness;
+    trace___f1600_x4_round <- [];
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, (((BArray800.is_init b_st 0 800) /\ (0 <= i)) /\ (i < 24)))]);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= i) /\ (i <= 18446744073709551615)))]);
+    i0 <- 0;
+    i1 <- 1;
+    i2 <- 2;
+    i3 <- 3;
+    i4 <- 4;
+    i5 <- 5;
+    i6 <- 6;
+    i7 <- 9;
+    i8 <- 10;
+    i9 <- 13;
+    i10 <- 14;
+    i11 <- 16;
+    i12 <- 17;
+    i13 <- 19;
+    i14 <- 20;
+    i15 <- 23;
+    i16 <- 7;
+    i17 <- 8;
+    i18 <- 11;
+    i19 <- 12;
+    i20 <- 15;
+    i21 <- 18;
+    i22 <- 21;
+    i23 <- 22;
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i5 * 32)) /\ (((i5 * 32) + 32) <= 800)))]);
+    y4 <- (BArray800.get256 st i5);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i14 * 32)) /\ (((i14 * 32) + 32) <= 800)))]);
+    y0 <- (y9 `^` (BArray800.get256 st i14));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i16 * 32)) /\ (((i16 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i16 y9);
+    y9 <- y10;
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i6 * 32)) /\ (((i6 * 32) + 32) <= 800)))]);
+    y11 <- (BArray800.get256 st i6);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i11 * 32)) /\ (((i11 * 32) + 32) <= 800)))]);
+    y12 <- (BArray800.get256 st i11);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i18 * 32)) /\ (((i18 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i18 y3);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i8 * 32)) /\ (((i8 * 32) + 32) <= 800)))]);
+    y1 <- (y4 `^` (BArray800.get256 st i8));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i2 * 32)) /\ (((i2 * 32) + 32) <= 800)))]);
+    y10 <- (BArray800.get256 st i2);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i17 * 32)) /\ (((i17 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i17 y4);
+    y12 <- (y12 `^` y3);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i1 * 32)) /\ (((i1 * 32) + 32) <= 800)))]);
+    y6 <- (BArray800.get256 st i1);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i10 * 32)) /\ (((i10 * 32) + 32) <= 800)))]);
+    y4 <- (BArray800.get256 st i10);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i21 * 32)) /\ (((i21 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i21 y14);
+    y0 <- (y0 `^` y1);
+    y1 <- (y11 `^` y8);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i12 * 32)) /\ (((i12 * 32) + 32) <= 800)))]);
+    y11 <- (y7 `^` (BArray800.get256 st i12));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i20 * 32)) /\ (((i20 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i20 y10);
+    y12 <- (y12 `^` y1);
+    y1 <- (y9 `^` y15);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i7 * 32)) /\ (((i7 * 32) + 32) <= 800)))]);
+    y3 <- (BArray800.get256 st i7);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i19 * 32)) /\ (((i19 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i19 y8);
+    y11 <- (y11 `^` y1);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i9 * 32)) /\ (((i9 * 32) + 32) <= 800)))]);
+    y1 <- (y14 `^` (BArray800.get256 st i9));
+    y12 <- (y12 `^` y6);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i3 * 32)) /\ (((i3 * 32) + 32) <= 800)))]);
+    y8 <- (BArray800.get256 st i3);
+    y11 <- (y11 `^` y10);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i15 * 32)) /\ (((i15 * 32) + 32) <= 800)))]);
+    y10 <- (y13 `^` (BArray800.get256 st i15));
+    y3 <- (y3 `^` y4);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i22 * 32)) /\ (((i22 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i22 y4);
+    y4 <- (VPSRL_4u64 y12 (W128.of_int 63));
+    y5 <- (VPSRL_4u64 y11 (W128.of_int 63));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i0 * 32)) /\ (((i0 * 32) + 32) <= 800)))]);
+    y0 <- (y0 `^` (BArray800.get256 st i0));
+    y10 <- (y10 `^` y1);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i4 * 32)) /\ (((i4 * 32) + 32) <= 800)))]);
+    y1 <- (BArray800.get256 st i4);
+    y10 <- (y10 `^` y8);
+    y14 <- y1;
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i13 * 32)) /\ (((i13 * 32) + 32) <= 800)))]);
+    y1 <- (y2 `^` (BArray800.get256 st i13));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i23 * 32)) /\ (((i23 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i23 y14);
+    y1 <- (y1 `^` y3);
+    y3 <- (VPSLL_4u64 y12 (W128.of_int 1));
+    y3 <- (y3 `|` y4);
+    y4 <- (VPSLL_4u64 y11 (W128.of_int 1));
+    y1 <- (y1 `^` y14);
+    y4 <- (y4 `|` y5);
+    y14 <- (VPSRL_4u64 y10 (W128.of_int 63));
+    y3 <- (y3 `^` y1);
+    y5 <- (VPSLL_4u64 y10 (W128.of_int 1));
+    y4 <- (y4 `^` y0);
+    y5 <- (y5 `|` y14);
+    y6 <- (y4 `^` y6);
+    y5 <- (y5 `^` y12);
+    y12 <- (VPSRL_4u64 y1 (W128.of_int 63));
+    y1 <- (VPSLL_4u64 y1 (W128.of_int 1));
+    y7 <- (y5 `^` y7);
+    y9 <- (y5 `^` y9);
+    y1 <- (y1 `|` y12);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i0 * 32)) /\ (((i0 * 32) + 32) <= 800)))]);
+    y12 <- (y3 `^` (BArray800.get256 st i0));
+    y1 <- (y1 `^` y11);
+    y11 <- (VPSRL_4u64 y0 (W128.of_int 63));
+    y0 <- (VPSLL_4u64 y0 (W128.of_int 1));
+    y13 <- (y1 `^` y13);
+    y8 <- (y1 `^` y8);
+    y0 <- (y0 `|` y11);
+    y0 <- (y0 `^` y10);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i6 * 32)) /\ (((i6 * 32) + 32) <= 800)))]);
+    y10 <- (y4 `^` (BArray800.get256 st i6));
+    y2 <- (y0 `^` y2);
+    y11 <- (VPSRL_4u64 y10 (W128.of_int 20));
+    y10 <- (VPSLL_4u64 y10 (W128.of_int 44));
+    y10 <- (y10 `|` y11);
+    y11 <- (y5 `^` y15);
+    rcp <- kECCAK1600_RC;
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= i) /\ (i <= 18446744073709551615)))]);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert,
+     ((0 <= ((W64.to_uint (W64.of_int i)) * 8)) /\
+     ((((W64.to_uint (W64.of_int i)) * 8) + 8) <= 192)))]);
+    y15 <-
+    (VPBROADCAST_4u64 (BArray192.get64 rcp (W64.to_uint (W64.of_int i))));
+    y14 <- (VPSRL_4u64 y11 (W128.of_int 21));
+    y11 <- (VPSLL_4u64 y11 (W128.of_int 43));
+    y11 <- (y11 `|` y14);
+    y14 <- ((invw y10) `&` y11);
+    y14 <- (y14 `^` y15);
+    y15 <- (y14 `^` y12);
+    y14 <- (VPSRL_4u64 y13 (W128.of_int 43));
+    y13 <- (VPSLL_4u64 y13 (W128.of_int 21));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i0 * 32)) /\ (((i0 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i0 y15);
+    y13 <- (y13 `|` y14);
+    y14 <- ((invw y11) `&` y13);
+    y15 <- (y14 `^` y10);
+    y14 <- (VPSRL_4u64 y2 (W128.of_int 50));
+    y2 <- (VPSLL_4u64 y2 (W128.of_int 14));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i1 * 32)) /\ (((i1 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i1 y15);
+    y2 <- (y2 `|` y14);
+    y14 <- ((invw y13) `&` y2);
+    y11 <- (y14 `^` y11);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i2 * 32)) /\ (((i2 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i2 y11);
+    y11 <- ((invw y2) `&` y12);
+    y12 <- ((invw y12) `&` y10);
+    y11 <- (y11 `^` y13);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i3 * 32)) /\ (((i3 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i3 y11);
+    y11 <- (y12 `^` y2);
+    y2 <- (VPSRL_4u64 y8 (W128.of_int 36));
+    y8 <- (VPSLL_4u64 y8 (W128.of_int 28));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i4 * 32)) /\ (((i4 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i4 y11);
+    y8 <- (y8 `|` y2);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i7 * 32)) /\ (((i7 * 32) + 32) <= 800)))]);
+    y2 <- (y0 `^` (BArray800.get256 st i7));
+    y10 <- (VPSRL_4u64 y2 (W128.of_int 44));
+    y2 <- (VPSLL_4u64 y2 (W128.of_int 20));
+    y2 <- (y2 `|` y10);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i8 * 32)) /\ (((i8 * 32) + 32) <= 800)))]);
+    y10 <- (y3 `^` (BArray800.get256 st i8));
+    y11 <- (VPSRL_4u64 y10 (W128.of_int 61));
+    y10 <- (VPSLL_4u64 y10 (W128.of_int 3));
+    y10 <- (y10 `|` y11);
+    y11 <- ((invw y2) `&` y10);
+    y11 <- (y11 `^` y8);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i5 * 32)) /\ (((i5 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i5 y11);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i11 * 32)) /\ (((i11 * 32) + 32) <= 800)))]);
+    y11 <- (y4 `^` (BArray800.get256 st i11));
+    y12 <- (VPSRL_4u64 y11 (W128.of_int 19));
+    y11 <- (VPSLL_4u64 y11 (W128.of_int 45));
+    y11 <- (y11 `|` y12);
+    y12 <- ((invw y10) `&` y11);
+    y12 <- (y12 `^` y2);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i6 * 32)) /\ (((i6 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i6 y12);
+    y12 <- (VPSRL_4u64 y7 (W128.of_int 3));
+    y7 <- (VPSLL_4u64 y7 (W128.of_int 61));
+    y7 <- (y7 `|` y12);
+    y12 <- ((invw y11) `&` y7);
+    y10 <- (y12 `^` y10);
+    y12 <- ((invw y7) `&` y8);
+    y8 <- ((invw y8) `&` y2);
+    y2 <- (VPSRL_4u64 y6 (W128.of_int 63));
+    y6 <- (VPSLL_4u64 y6 (W128.of_int 1));
+    y14 <- (y12 `^` y11);
+    y6 <- (y6 `|` y2);
+    y2 <- (VPSRL_4u64 y9 (W128.of_int 58));
+    y12 <- (y8 `^` y7);
+    y9 <- (VPSLL_4u64 y9 (W128.of_int 6));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i7 * 32)) /\ (((i7 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i7 y12);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i13 * 32)) /\ (((i13 * 32) + 32) <= 800)))]);
+    y7 <- (y0 `^` (BArray800.get256 st i13));
+    y9 <- (y9 `|` y2);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i9 * 32)) /\ (((i9 * 32) + 32) <= 800)))]);
+    y2 <- (y1 `^` (BArray800.get256 st i9));
+    y7 <- (VPSHUFB_256 y7 (BArray32.get256 rOL8 0));
+    y11 <- (VPSRL_4u64 y2 (W128.of_int 39));
+    y2 <- (VPSLL_4u64 y2 (W128.of_int 25));
+    y11 <- (y11 `|` y2);
+    y2 <- ((invw y9) `&` y11);
+    y8 <- ((invw y11) `&` y7);
+    y12 <- (y2 `^` y6);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i14 * 32)) /\ (((i14 * 32) + 32) <= 800)))]);
+    y2 <- (y3 `^` (BArray800.get256 st i14));
+    y8 <- (y8 `^` y9);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i8 * 32)) /\ (((i8 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i8 y12);
+    y12 <- (VPSRL_4u64 y2 (W128.of_int 46));
+    y2 <- (VPSLL_4u64 y2 (W128.of_int 18));
+    y2 <- (y12 `|` y2);
+    y12 <- ((invw y7) `&` y2);
+    y15 <- (y12 `^` y11);
+    y11 <- ((invw y2) `&` y6);
+    y6 <- ((invw y6) `&` y9);
+    y12 <- (y11 `^` y7);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i9 * 32)) /\ (((i9 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i9 y12);
+    y12 <- (y6 `^` y2);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i23 * 32)) /\ (((i23 * 32) + 32) <= 800)))]);
+    y6 <- (y0 `^` (BArray800.get256 st i23));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i22 * 32)) /\ (((i22 * 32) + 32) <= 800)))]);
+    y0 <- (y0 `^` (BArray800.get256 st i22));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i10 * 32)) /\ (((i10 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i10 y12);
+    y2 <- (VPSRL_4u64 y6 (W128.of_int 37));
+    y6 <- (VPSLL_4u64 y6 (W128.of_int 27));
+    y2 <- (y2 `|` y6);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i17 * 32)) /\ (((i17 * 32) + 32) <= 800)))]);
+    y6 <- (y3 `^` (BArray800.get256 st i17));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i16 * 32)) /\ (((i16 * 32) + 32) <= 800)))]);
+    y3 <- (y3 `^` (BArray800.get256 st i16));
+    y7 <- (VPSRL_4u64 y6 (W128.of_int 28));
+    y6 <- (VPSLL_4u64 y6 (W128.of_int 36));
+    y7 <- (y7 `|` y6);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i19 * 32)) /\ (((i19 * 32) + 32) <= 800)))]);
+    y6 <- (y4 `^` (BArray800.get256 st i19));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i18 * 32)) /\ (((i18 * 32) + 32) <= 800)))]);
+    y4 <- (y4 `^` (BArray800.get256 st i18));
+    y12 <- (VPSRL_4u64 y6 (W128.of_int 54));
+    y6 <- (VPSLL_4u64 y6 (W128.of_int 10));
+    y12 <- (y12 `|` y6);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i12 * 32)) /\ (((i12 * 32) + 32) <= 800)))]);
+    y6 <- (y5 `^` (BArray800.get256 st i12));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i20 * 32)) /\ (((i20 * 32) + 32) <= 800)))]);
+    y5 <- (y5 `^` (BArray800.get256 st i20));
+    y9 <- ((invw y7) `&` y12);
+    y11 <- (VPSRL_4u64 y6 (W128.of_int 49));
+    y6 <- (VPSLL_4u64 y6 (W128.of_int 15));
+    y9 <- (y9 `^` y2);
+    y11 <- (y11 `|` y6);
+    y6 <- ((invw y12) `&` y11);
+    y6 <- (y6 `^` y7);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i11 * 32)) /\ (((i11 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i11 y6);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i15 * 32)) /\ (((i15 * 32) + 32) <= 800)))]);
+    y6 <- (y1 `^` (BArray800.get256 st i15));
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i21 * 32)) /\ (((i21 * 32) + 32) <= 800)))]);
+    y1 <- (y1 `^` (BArray800.get256 st i21));
+    y6 <- (VPSHUFB_256 y6 (BArray32.get256 rOL56 0));
+    y13 <- ((invw y11) `&` y6);
+    y13 <- (y13 `^` y12);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i12 * 32)) /\ (((i12 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i12 y13);
+    y13 <- ((invw y6) `&` y2);
+    y2 <- ((invw y2) `&` y7);
+    y2 <- (y2 `^` y6);
+    y6 <- (VPSRL_4u64 y4 (W128.of_int 62));
+    y13 <- (y13 `^` y11);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i13 * 32)) /\ (((i13 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i13 y2);
+    y2 <- (VPSRL_4u64 y5 (W128.of_int 2));
+    y5 <- (VPSLL_4u64 y5 (W128.of_int 62));
+    y2 <- (y2 `|` y5);
+    y5 <- (VPSRL_4u64 y1 (W128.of_int 9));
+    y1 <- (VPSLL_4u64 y1 (W128.of_int 55));
+    y4 <- (VPSLL_4u64 y4 (W128.of_int 2));
+    y1 <- (y5 `|` y1);
+    y5 <- (VPSRL_4u64 y0 (W128.of_int 25));
+    y4 <- (y6 `|` y4);
+    y0 <- (VPSLL_4u64 y0 (W128.of_int 39));
+    y5 <- (y5 `|` y0);
+    y0 <- ((invw y1) `&` y5);
+    y0 <- (y0 `^` y2);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i14 * 32)) /\ (((i14 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i14 y0);
+    y0 <- (VPSRL_4u64 y3 (W128.of_int 23));
+    y3 <- (VPSLL_4u64 y3 (W128.of_int 41));
+    y0 <- (y0 `|` y3);
+    y7 <- ((invw y0) `&` y4);
+    y3 <- ((invw y5) `&` y0);
+    y7 <- (y7 `^` y5);
+    y5 <- ((invw y4) `&` y2);
+    y2 <- ((invw y2) `&` y1);
+    y5 <- (y5 `^` y0);
+    y3 <- (y3 `^` y1);
+    y2 <- (y2 `^` y4);
+    trace___f1600_x4_round <-
+    (trace___f1600_x4_round ++
+    [(Assert, ((0 <= (i15 * 32)) /\ (((i15 * 32) + 32) <= 800)))]);
+    st <- (BArray800.set256 st i15 y5);
+    b_st <- (BArray800.init_arr (W8.of_int 255));
+    return (st, b_st, y10, y14, y8, y15, y9, y13, y3, y7, y2,
+           trace___f1600_x4_round);
+  }
+  proc __keccakf1600_x4_x1_nat_opt_iteration (rax:W64.t, rbp:W64.t,
+                                              rdi:W64.t, r13:W64.t,
+                                              r10:W64.t, r11:W64.t, r8:W64.t,
+                                              rsi:W64.t, r15:W64.t,
+                                              rbx:W64.t, a:BArray200.t,
+                                              b_a:BArray200.t, e:BArray200.t,
+                                              b_e:BArray200.t,
+                                              st4:BArray800.t,
+                                              b_st4:BArray800.t, y10:W256.t,
+                                              y14:W256.t, y8:W256.t,
+                                              y15:W256.t, y9:W256.t,
+                                              y13:W256.t, y3:W256.t,
+                                              y7:W256.t, y2:W256.t) : 
+  W64.t * W64.t * W64.t * W64.t * W64.t * W64.t * W64.t * W64.t * W64.t *
+  W64.t * BArray200.t * BArray200.t * BArray200.t * BArray200.t *
+  BArray800.t * BArray800.t * W256.t * W256.t * W256.t * W256.t * W256.t *
+  W256.t * W256.t * W256.t * W256.t * trace = {
+    var aux:BArray800.t;
+    var aux_0:BArray800.t;
+    var aux_1:W256.t;
+    var aux_2:W256.t;
+    var aux_3:W256.t;
+    var aux_4:W256.t;
+    var aux_5:W256.t;
+    var aux_6:W256.t;
+    var aux_7:W256.t;
+    var aux_8:W256.t;
+    var aux_9:W256.t;
+    var cnt:W64.t;
+    var rcx:W64.t;
+    var rdx:W64.t;
+    var r9:W64.t;
+    var r12:W64.t;
+    var r14:W64.t;
+    var rC:BArray192.t;
+    var i:int;
+    var i2:int;
+    var param:W256.t;
+    var param_0:W256.t;
+    var param_1:W256.t;
+    var param_2:W256.t;
+    var param_3:W256.t;
+    var param_4:W256.t;
+    var param_5:W256.t;
+    var param_6:W256.t;
+    var param_7:W256.t;
+    var param_8:int;
+    var param_9:BArray800.t;
+    var result:W256.t;
+    var result_0:W256.t;
+    var result_1:W256.t;
+    var result_2:W256.t;
+    var result_3:W256.t;
+    var result_4:W256.t;
+    var result_5:W256.t;
+    var result_6:W256.t;
+    var result_7:W256.t;
+    var result_8:BArray800.t;
+    var param_10:W256.t;
+    var param_11:W256.t;
+    var param_12:W256.t;
+    var param_13:W256.t;
+    var param_14:W256.t;
+    var param_15:W256.t;
+    var param_16:W256.t;
+    var param_17:W256.t;
+    var param_18:W256.t;
+    var param_19:int;
+    var param_20:BArray800.t;
+    var result_9:W256.t;
+    var result_10:W256.t;
+    var result_11:W256.t;
+    var result_12:W256.t;
+    var result_13:W256.t;
+    var result_14:W256.t;
+    var result_15:W256.t;
+    var result_16:W256.t;
+    var result_17:W256.t;
+    var result_18:BArray800.t;
+    var b_result:BArray800.t;
+    var b_result_0:BArray800.t;
+    var trace___keccakf1600_x4_x1_nat_opt_iteration:trace;
+    rC <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    param_9 <- witness;
+    param_20 <- witness;
+    result_8 <- witness;
+    result_18 <- witness;
+    trace___keccakf1600_x4_x1_nat_opt_iteration <- [];
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert,
+     (((BArray200.is_init b_a 0 200) /\ (BArray800.is_init b_st4 0 800)) /\
+     (rax \ule (W64.of_int 22))))]);
+    i <- (W64.to_uint rax);
+    param_9 <- st4;
+    param_8 <- i;
+    param_7 <- y10;
+    param_6 <- y14;
+    param_5 <- y8;
+    param_4 <- y15;
+    param_3 <- y9;
+    param_2 <- y13;
+    param_1 <- y3;
+    param_0 <- y7;
+    param <- y2;
+    (aux, aux_0, aux_1, aux_2, aux_3, aux_4, aux_5, aux_6, aux_7, aux_8,
+    aux_9, tmp__trace) <@ __f1600_x4_round (param_9,
+    (BArray800.init_arr (W8.of_int 255)), param_8, param_7, param_6, 
+    param_5, param_4, param_3, param_2, param_1, param_0, param);
+    result_8 <- aux;
+    b_result_0 <- aux_0;
+    result_7 <- aux_1;
+    result_6 <- aux_2;
+    result_5 <- aux_3;
+    result_4 <- aux_4;
+    result_3 <- aux_5;
+    result_2 <- aux_6;
+    result_1 <- aux_7;
+    result_0 <- aux_8;
+    result <- aux_9;
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++ tmp__trace);
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray800.is_init b_result_0 0 800))]);
+    st4 <- result_8;
+    y10 <- result_7;
+    y14 <- result_6;
+    y8 <- result_5;
+    y15 <- result_4;
+    y9 <- result_3;
+    y13 <- result_2;
+    y3 <- result_1;
+    y7 <- result_0;
+    y2 <- result;
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, ((0 <= (i + 1)) /\ ((i + 1) <= 18446744073709551615)))]);
+    i <- (i + 1);
+    i2 <- i;
+    b_e <- (BArray200.set64d b_e 0 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 0 r11);
+    b_e <- (BArray200.set64d b_e 8 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 1 rdi);
+    cnt <- rax;
+    b_e <- (BArray200.set64d b_e 16 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 2 rsi);
+    rcx <- (BArray200.get64 a 15);
+    rcx <- (rcx `^` r8);
+    rax <- rdi;
+    rax <- (rax `^` (BArray200.get64 a 5));
+    rax <- (rax `^` rcx);
+    rdx <- (BArray200.get64 a 16);
+    rdx <- (rdx `^` rsi);
+    rcx <- (BArray200.get64 a 11);
+    rsi <- (BArray200.get64 a 6);
+    rcx <- (rcx `^` rsi);
+    rcx <- (rcx `^` rdx);
+    rdx <- (BArray200.get64 a 17);
+    rdx <- (rdx `^` r15);
+    r9 <- r13;
+    r9 <- (r9 `^` (BArray200.get64 a 7));
+    r9 <- (r9 `^` rdx);
+    rdx <- r10;
+    rdx <- (rdx `^` (BArray200.get64 a 23));
+    r12 <- (BArray200.get64 a 13);
+    r12 <- (r12 `^` (BArray200.get64 a 8));
+    r12 <- (r12 `^` rdx);
+    rdx <- r11;
+    rdx <- (rdx `^` rbx);
+    r14 <- (BArray200.get64 a 14);
+    r14 <- (r14 `^` (BArray200.get64 a 9));
+    r14 <- (r14 `^` rdx);
+    rax <- (rax `^` rbp);
+    rcx <- (rcx `^` (BArray200.get64 a 1));
+    r9 <- (r9 `^` (BArray200.get64 a 2));
+    rdi <- (BArray200.get64 a 3);
+    r12 <- (r12 `^` rdi);
+    r14 <- (r14 `^` (BArray200.get64 a 4));
+    rdx <- (RORX_64 r12 (W8.of_int 63));
+    rdx <- (rdx `^` rcx);
+    b_e <- (BArray200.set64d b_e 80 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 10 rdx);
+    r11 <- (RORX_64 rcx (W8.of_int 63));
+    r11 <- (r11 `^` r14);
+    b_e <- (BArray200.set64d b_e 72 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 9 r11);
+    rcx <- (RORX_64 r14 (W8.of_int 63));
+    rcx <- (rcx `^` r9);
+    r9 <- (RORX_64 r9 (W8.of_int 63));
+    r9 <- (r9 `^` rax);
+    rax <- (RORX_64 rax (W8.of_int 63));
+    rax <- (rax `^` r12);
+    rbp <- (rbp `^` r11);
+    rsi <- (rsi `^` r9);
+    r11 <- r9;
+    r9 <- (RORX_64 rsi (W8.of_int 20));
+    r13 <- (r13 `^` rdx);
+    r14 <- (RORX_64 r13 (W8.of_int 21));
+    r10 <- (r10 `^` rcx);
+    r10 <- (RORX_64 r10 (W8.of_int 43));
+    rbx <- (rbx `^` rax);
+    rbx <- (RORX_64 rbx (W8.of_int 50));
+    rsi <- ((invw rbx) `&` rbp);
+    rsi <- (rsi `^` r10);
+    a <- (BArray200.set64 a 6 rsi);
+    rsi <- ((invw r14) `&` r10);
+    r10 <- ((invw r10) `&` rbx);
+    r10 <- (r10 `^` r14);
+    b_e <- (BArray200.set64d b_e 64 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 8 r10);
+    r12 <- ((invw r9) `&` r14);
+    rC <- kECCAK1600_RC;
+    r14 <- cnt;
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert,
+     ((0 <= ((W64.to_uint r14) * 8)) /\
+     ((((W64.to_uint r14) * 8) + 8) <= 192)))]);
+    r12 <- (r12 `^` (BArray192.get64 rC (W64.to_uint r14)));
+    r12 <- (r12 `^` rbp);
+    rsi <- (rsi `^` r9);
+    b_e <- (BArray200.set64d b_e 48 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 6 rsi);
+    r9 <- ((invw rbp) `&` r9);
+    r9 <- (r9 `^` rbx);
+    b_e <- (BArray200.set64d b_e 56 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 7 r9);
+    rdi <- (rdi `^` rcx);
+    rdx <- rcx;
+    r9 <- (RORX_64 rdi (W8.of_int 36));
+    rsi <- (BArray200.get64 a 9);
+    rsi <- (rsi `^` rax);
+    r10 <- (RORX_64 rsi (W8.of_int 44));
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 8 8))]);
+    rsi <- (BArray200.get64 e 1);
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 72 8))]);
+    r13 <- (BArray200.get64 e 9);
+    rsi <- (rsi `^` r13);
+    rsi <- (RORX_64 rsi (W8.of_int 61));
+    rdi <- (BArray200.get64 a 16);
+    rcx <- r11;
+    rdi <- (rdi `^` r11);
+    rdi <- (RORX_64 rdi (W8.of_int 19));
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 80 8))]);
+    rbp <- (BArray200.get64 e 10);
+    r15 <- (r15 `^` rbp);
+    rbx <- (RORX_64 r15 (W8.of_int 3));
+    r15 <- ((invw rbx) `&` r9);
+    r15 <- (r15 `^` rdi);
+    b_e <- (BArray200.set64d b_e 8 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 1 r15);
+    r15 <- ((invw rsi) `&` rdi);
+    rdi <- ((invw rdi) `&` rbx);
+    rdi <- (rdi `^` rsi);
+    b_e <- (BArray200.set64d b_e 40 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 5 rdi);
+    rsi <- ((invw r10) `&` rsi);
+    rsi <- (rsi `^` r9);
+    a <- (BArray200.set64 a 16 rsi);
+    r15 <- (r15 `^` r10);
+    a <- (BArray200.set64 a 3 r15);
+    rsi <- ((invw r9) `&` r10);
+    rsi <- (rsi `^` rbx);
+    a <- (BArray200.set64 a 9 rsi);
+    rsi <- (BArray200.get64 a 1);
+    rsi <- (rsi `^` r11);
+    rsi <- (RORX_64 rsi (W8.of_int 63));
+    rdi <- (BArray200.get64 a 7);
+    rdi <- (rdi `^` rbp);
+    rdi <- (RORX_64 rdi (W8.of_int 58));
+    r9 <- (BArray200.get64 a 13);
+    r9 <- (r9 `^` rdx);
+    r9 <- (RORX_64 r9 (W8.of_int 39));
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 0 8))]);
+    r10 <- (BArray200.get64 e 0);
+    r10 <- (r10 `^` rax);
+    r10 <- (RORX_64 r10 (W8.of_int 56));
+    r14 <- r13;
+    r8 <- (r8 `^` r13);
+    r8 <- (RORX_64 r8 (W8.of_int 46));
+    r11 <- ((invw r8) `&` rsi);
+    r11 <- (r11 `^` r10);
+    a <- (BArray200.set64 a 13 r11);
+    r11 <- ((invw r9) `&` r10);
+    r13 <- ((invw r10) `&` r8);
+    r13 <- (r13 `^` r9);
+    r9 <- ((invw rdi) `&` r9);
+    r9 <- (r9 `^` rsi);
+    a <- (BArray200.set64 a 7 r9);
+    r11 <- (r11 `^` rdi);
+    b_e <- (BArray200.set64d b_e 32 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 4 r11);
+    rsi <- ((invw rsi) `&` rdi);
+    rsi <- (rsi `^` r8);
+    b_e <- (BArray200.set64d b_e 0 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 0 rsi);
+    rsi <- (BArray200.get64 a 4);
+    rsi <- (rsi `^` rax);
+    rsi <- (RORX_64 rsi (W8.of_int 37));
+    rdi <- (BArray200.get64 a 5);
+    rdi <- (rdi `^` r14);
+    rdi <- (RORX_64 rdi (W8.of_int 28));
+    r8 <- (BArray200.get64 a 11);
+    r8 <- (r8 `^` rcx);
+    r8 <- (RORX_64 r8 (W8.of_int 54));
+    r9 <- (BArray200.get64 a 17);
+    r9 <- (r9 `^` rbp);
+    r11 <- (RORX_64 r9 (W8.of_int 49));
+    r9 <- (BArray200.get64 a 23);
+    r9 <- (r9 `^` rdx);
+    rbx <- (RORX_64 r9 (W8.of_int 8));
+    r10 <- ((invw rbx) `&` rsi);
+    r10 <- (r10 `^` r11);
+    r15 <- ((invw r8) `&` r11);
+    r11 <- ((invw r11) `&` rbx);
+    r11 <- (r11 `^` r8);
+    a <- (BArray200.set64 a 17 r11);
+    r8 <- ((invw rdi) `&` r8);
+    r8 <- (r8 `^` rsi);
+    a <- (BArray200.set64 a 23 r8);
+    r15 <- (r15 `^` rdi);
+    a <- (BArray200.set64 a 5 r15);
+    rsi <- ((invw rsi) `&` rdi);
+    rsi <- (rsi `^` rbx);
+    a <- (BArray200.set64 a 11 rsi);
+    rsi <- rbp;
+    rsi <- (rsi `^` (BArray200.get64 a 2));
+    rdx <- (rdx `^` (BArray200.get64 a 8));
+    rax <- (rax `^` (BArray200.get64 a 14));
+    rdi <- r14;
+    rdi <- (rdi `^` (BArray200.get64 a 15));
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 16 8))]);
+    rcx <- (rcx `^` (BArray200.get64 e 2));
+    rsi <- (RORX_64 rsi (W8.of_int 2));
+    rdx <- (RORX_64 rdx (W8.of_int 9));
+    rax <- (RORX_64 rax (W8.of_int 25));
+    rdi <- (RORX_64 rdi (W8.of_int 23));
+    rcx <- (RORX_64 rcx (W8.of_int 62));
+    r9 <- ((invw rcx) `&` rsi);
+    r9 <- (r9 `^` rdi);
+    a <- (BArray200.set64 a 15 r9);
+    r14 <- ((invw rax) `&` rdi);
+    r11 <- ((invw rdi) `&` rcx);
+    r11 <- (r11 `^` rax);
+    rax <- ((invw rdx) `&` rax);
+    rax <- (rax `^` rsi);
+    rbp <- rax;
+    a <- (BArray200.set64 a 14 rax);
+    r14 <- (r14 `^` rdx);
+    b_e <- (BArray200.set64d b_e 16 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 2 r14);
+    rdi <- ((invw rsi) `&` rdx);
+    rdi <- (rdi `^` rcx);
+    i <- i2;
+    param_20 <- st4;
+    param_19 <- i;
+    param_18 <- y10;
+    param_17 <- y14;
+    param_16 <- y8;
+    param_15 <- y15;
+    param_14 <- y9;
+    param_13 <- y13;
+    param_12 <- y3;
+    param_11 <- y7;
+    param_10 <- y2;
+    (aux, aux_0, aux_1, aux_2, aux_3, aux_4, aux_5, aux_6, aux_7, aux_8,
+    aux_9, tmp__trace) <@ __f1600_x4_round (param_20,
+    (BArray800.init_arr (W8.of_int 255)), param_19, param_18, param_17,
+    param_16, param_15, param_14, param_13, param_12, param_11, param_10);
+    result_18 <- aux;
+    b_result <- aux_0;
+    result_17 <- aux_1;
+    result_16 <- aux_2;
+    result_15 <- aux_3;
+    result_14 <- aux_4;
+    result_13 <- aux_5;
+    result_12 <- aux_6;
+    result_11 <- aux_7;
+    result_10 <- aux_8;
+    result_9 <- aux_9;
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++ tmp__trace);
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray800.is_init b_result 0 800))]);
+    st4 <- result_18;
+    y10 <- result_17;
+    y14 <- result_16;
+    y8 <- result_15;
+    y15 <- result_14;
+    y9 <- result_13;
+    y13 <- result_12;
+    y3 <- result_11;
+    y7 <- result_10;
+    y2 <- result_9;
+    rax <- r8;
+    rax <- (rax `^` (BArray200.get64 a 7));
+    rsi <- (BArray200.get64 a 16);
+    rsi <- (rsi `^` rbp);
+    rsi <- (rsi `^` rax);
+    rbp <- (BArray200.get64 a 3);
+    rax <- rbp;
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 48 8))]);
+    rax <- (rax `^` (BArray200.get64 e 6));
+    rdx <- r15;
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 32 8))]);
+    rdx <- (rdx `^` (BArray200.get64 e 4));
+    rdx <- (rdx `^` rax);
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 40 8))]);
+    rax <- (BArray200.get64 e 5);
+    rax <- (rax `^` (BArray200.get64 a 17));
+    r8 <- r11;
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 64 8))]);
+    r8 <- (r8 `^` (BArray200.get64 e 8));
+    r8 <- (r8 `^` rax);
+    rbx <- (BArray200.get64 a 13);
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 8 8))]);
+    rbx <- (rbx `^` (BArray200.get64 e 1));
+    rcx <- r9;
+    rcx <- (rcx `^` (BArray200.get64 a 6));
+    rcx <- (rcx `^` rbx);
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 56 8))]);
+    rbx <- (BArray200.get64 e 7);
+    rbx <- (rbx `^` rdi);
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 0 8))]);
+    rax <- (BArray200.get64 e 0);
+    rax <- (rax `^` (BArray200.get64 a 9));
+    rax <- (rax `^` rbx);
+    rsi <- (rsi `^` r12);
+    rdx <- (rdx `^` r14);
+    r8 <- (r8 `^` r13);
+    rcx <- (rcx `^` r10);
+    r14 <- (BArray200.get64 a 11);
+    rax <- (rax `^` r14);
+    r15 <- (RORX_64 rcx (W8.of_int 63));
+    r15 <- (r15 `^` rdx);
+    rbx <- (RORX_64 rdx (W8.of_int 63));
+    rbx <- (rbx `^` rax);
+    r9 <- (RORX_64 rax (W8.of_int 63));
+    r9 <- (r9 `^` r8);
+    r8 <- (RORX_64 r8 (W8.of_int 63));
+    r8 <- (r8 `^` rsi);
+    rdx <- (RORX_64 rsi (W8.of_int 63));
+    rdx <- (rdx `^` rcx);
+    r12 <- (r12 `^` rbx);
+    rbp <- (rbp `^` r8);
+    rax <- (RORX_64 rbp (W8.of_int 20));
+    r13 <- (r13 `^` r15);
+    rcx <- (RORX_64 r13 (W8.of_int 21));
+    r10 <- (r10 `^` r9);
+    rsi <- (RORX_64 r10 (W8.of_int 43));
+    rdi <- (rdi `^` rdx);
+    rdi <- (RORX_64 rdi (W8.of_int 50));
+    r10 <- ((invw rdi) `&` r12);
+    r10 <- (r10 `^` rsi);
+    a <- (BArray200.set64 a 3 r10);
+    r10 <- ((invw rcx) `&` rsi);
+    rsi <- ((invw rsi) `&` rdi);
+    rsi <- (rsi `^` rcx);
+    a <- (BArray200.set64 a 2 rsi);
+    rbp <- ((invw rax) `&` rcx);
+    rcx <- cnt;
+    rC <- kECCAK1600_RC;
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert,
+     ((0 <= ((W64.to_uint (rcx + (W64.of_int 1))) * 8)) /\
+     ((((W64.to_uint (rcx + (W64.of_int 1))) * 8) + 8) <= 192)))]);
+    rbp <-
+    (rbp `^` (BArray192.get64 rC (W64.to_uint (rcx + (W64.of_int 1)))));
+    rbp <- (rbp `^` r12);
+    b_e <- (BArray200.set64d b_e 72 (W64.of_int 18446744073709551615));
+    e <- (BArray200.set64 e 9 rbp);
+    r10 <- (r10 `^` rax);
+    a <- (BArray200.set64 a 1 r10);
+    rax <- ((invw r12) `&` rax);
+    rax <- (rax `^` rdi);
+    a <- (BArray200.set64 a 4 rax);
+    rax <- (BArray200.get64 a 6);
+    rax <- (rax `^` r9);
+    rax <- (RORX_64 rax (W8.of_int 36));
+    rcx <- (BArray200.get64 a 9);
+    rcx <- (rcx `^` rdx);
+    rcx <- (RORX_64 rcx (W8.of_int 44));
+    rsi <- (BArray200.get64 a 7);
+    rsi <- (rsi `^` rbx);
+    rsi <- (RORX_64 rsi (W8.of_int 61));
+    rdi <- (BArray200.get64 a 5);
+    rdi <- (rdi `^` r8);
+    rdi <- (RORX_64 rdi (W8.of_int 19));
+    r11 <- (r11 `^` r15);
+    r10 <- (RORX_64 r11 (W8.of_int 3));
+    r11 <- ((invw r10) `&` rax);
+    r11 <- (r11 `^` rdi);
+    a <- (BArray200.set64 a 8 r11);
+    r11 <- ((invw rsi) `&` rdi);
+    rdi <- ((invw rdi) `&` r10);
+    rdi <- (rdi `^` rsi);
+    a <- (BArray200.set64 a 7 rdi);
+    rsi <- ((invw rcx) `&` rsi);
+    rsi <- (rsi `^` rax);
+    a <- (BArray200.set64 a 5 rsi);
+    r11 <- (r11 `^` rcx);
+    a <- (BArray200.set64 a 6 r11);
+    rax <- ((invw rax) `&` rcx);
+    rax <- (rax `^` r10);
+    a <- (BArray200.set64 a 9 rax);
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 48 8))]);
+    rax <- (BArray200.get64 e 6);
+    rax <- (rax `^` r8);
+    rax <- (RORX_64 rax (W8.of_int 63));
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 40 8))]);
+    rcx <- (BArray200.get64 e 5);
+    rcx <- (rcx `^` r15);
+    rcx <- (RORX_64 rcx (W8.of_int 58));
+    rsi <- (BArray200.get64 a 13);
+    rsi <- (rsi `^` r9);
+    rsi <- (RORX_64 rsi (W8.of_int 39));
+    rdi <- r14;
+    rdi <- (rdi `^` rdx);
+    rdi <- (RORX_64 rdi (W8.of_int 56));
+    r10 <- (BArray200.get64 a 14);
+    r10 <- (r10 `^` rbx);
+    r10 <- (RORX_64 r10 (W8.of_int 46));
+    r11 <- ((invw r10) `&` rax);
+    r11 <- (r11 `^` rdi);
+    a <- (BArray200.set64 a 13 r11);
+    r11 <- ((invw rsi) `&` rdi);
+    r13 <- ((invw rdi) `&` r10);
+    r13 <- (r13 `^` rsi);
+    rdi <- ((invw rcx) `&` rsi);
+    rdi <- (rdi `^` rax);
+    r11 <- (r11 `^` rcx);
+    a <- (BArray200.set64 a 11 r11);
+    rax <- ((invw rax) `&` rcx);
+    rax <- (rax `^` r10);
+    a <- (BArray200.set64 a 14 rax);
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 56 8))]);
+    rax <- (BArray200.get64 e 7);
+    rax <- (rax `^` rdx);
+    rax <- (RORX_64 rax (W8.of_int 37));
+    rcx <- (BArray200.get64 a 16);
+    rcx <- (rcx `^` rbx);
+    rcx <- (RORX_64 rcx (W8.of_int 28));
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 32 8))]);
+    rsi <- (BArray200.get64 e 4);
+    rsi <- (rsi `^` r8);
+    r11 <- (RORX_64 rsi (W8.of_int 54));
+    rsi <- (BArray200.get64 a 17);
+    rsi <- (rsi `^` r15);
+    r14 <- (RORX_64 rsi (W8.of_int 49));
+    rsi <- (BArray200.get64 a 15);
+    rsi <- (rsi `^` r9);
+    r12 <- (RORX_64 rsi (W8.of_int 8));
+    r10 <- ((invw r12) `&` rax);
+    r10 <- (r10 `^` r14);
+    rsi <- ((invw r11) `&` r14);
+    r14 <- ((invw r14) `&` r12);
+    r14 <- (r14 `^` r11);
+    a <- (BArray200.set64 a 17 r14);
+    r11 <- ((invw rcx) `&` r11);
+    r11 <- (r11 `^` rax);
+    a <- (BArray200.set64 a 15 r11);
+    rsi <- (rsi `^` rcx);
+    a <- (BArray200.set64 a 16 rsi);
+    r11 <- ((invw rax) `&` rcx);
+    r11 <- (r11 `^` r12);
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 64 8))]);
+    r15 <- (r15 `^` (BArray200.get64 e 8));
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 8 8))]);
+    r9 <- (r9 `^` (BArray200.get64 e 1));
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 0 8))]);
+    rdx <- (rdx `^` (BArray200.get64 e 0));
+    rbx <- (rbx `^` (BArray200.get64 a 23));
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 16 8))]);
+    r8 <- (r8 `^` (BArray200.get64 e 2));
+    rax <- (RORX_64 r15 (W8.of_int 2));
+    rcx <- (RORX_64 r9 (W8.of_int 9));
+    rdx <- (RORX_64 rdx (W8.of_int 25));
+    r9 <- (RORX_64 rbx (W8.of_int 23));
+    r14 <- (RORX_64 r8 (W8.of_int 62));
+    r8 <- ((invw r14) `&` rax);
+    r8 <- (r8 `^` r9);
+    a <- (BArray200.set64 a 23 r8);
+    rsi <- ((invw rdx) `&` r9);
+    r15 <- ((invw r9) `&` r14);
+    r15 <- (r15 `^` rdx);
+    r8 <- ((invw rcx) `&` rdx);
+    r8 <- (r8 `^` rax);
+    rsi <- (rsi `^` rcx);
+    rbx <- ((invw rax) `&` rcx);
+    rbx <- (rbx `^` r14);
+    rcx <- cnt;
+    rcx <- (rcx + (W64.of_int 2));
+    rax <- rcx;
+    trace___keccakf1600_x4_x1_nat_opt_iteration <-
+    (trace___keccakf1600_x4_x1_nat_opt_iteration ++
+    [(Assert, (BArray200.is_init b_e 72 8))]);
+    rbp <- (BArray200.get64 e 9);
+    b_a <- (BArray200.init_arr (W8.of_int 255));
+    b_st4 <- (BArray800.init_arr (W8.of_int 255));
+    return (rax, rbp, rdi, r13, r10, r11, r8, rsi, r15, rbx, a, b_a, 
+           e, b_e, st4, b_st4, y10, y14, y8, y15, y9, y13, y3, y7, y2,
+           trace___keccakf1600_x4_x1_nat_opt_iteration);
+  }
+  proc __keccakf1600_x4_x1_nat_opt (st4:BArray800.t, b_st4:BArray800.t,
+                                    a:BArray200.t, b_a:BArray200.t) : 
+  BArray800.t * BArray800.t * BArray200.t * BArray200.t * trace = {
+    var aux_9:BArray200.t;
+    var aux_10:BArray200.t;
+    var aux_11:BArray200.t;
+    var aux_12:BArray200.t;
+    var aux_13:BArray800.t;
+    var aux_14:BArray800.t;
+    var aux_15:W256.t;
+    var aux_16:W256.t;
+    var aux_17:W256.t;
+    var aux_18:W256.t;
+    var aux_19:W256.t;
+    var aux_20:W256.t;
+    var aux_21:W256.t;
+    var aux_22:W256.t;
+    var aux_23:W256.t;
+    var aux:W64.t;
+    var aux_0:W64.t;
+    var aux_1:W64.t;
+    var aux_2:W64.t;
+    var aux_3:W64.t;
+    var aux_4:W64.t;
+    var aux_5:W64.t;
+    var aux_6:W64.t;
+    var aux_7:W64.t;
+    var aux_8:W64.t;
+    var y10:W256.t;
+    var y14:W256.t;
+    var y8:W256.t;
+    var y15:W256.t;
+    var y9:W256.t;
+    var y13:W256.t;
+    var y3:W256.t;
+    var y7:W256.t;
+    var y2:W256.t;
+    var rbp:W64.t;
+    var rdi:W64.t;
+    var r13:W64.t;
+    var r10:W64.t;
+    var r11:W64.t;
+    var r8:W64.t;
+    var rsi:W64.t;
+    var r15:W64.t;
+    var rbx:W64.t;
+    var rax:W64.t;
+    var e:BArray200.t;
+    var param:BArray800.t;
+    var result:W256.t;
+    var result_0:W256.t;
+    var result_1:W256.t;
+    var result_2:W256.t;
+    var result_3:W256.t;
+    var result_4:W256.t;
+    var result_5:W256.t;
+    var result_6:W256.t;
+    var result_7:W256.t;
+    var param_0:BArray200.t;
+    var result_8:W64.t;
+    var result_9:W64.t;
+    var result_10:W64.t;
+    var result_11:W64.t;
+    var result_12:W64.t;
+    var result_13:W64.t;
+    var result_14:W64.t;
+    var result_15:W64.t;
+    var result_16:W64.t;
+    var param_1:W256.t;
+    var param_2:W256.t;
+    var param_3:W256.t;
+    var param_4:W256.t;
+    var param_5:W256.t;
+    var param_6:W256.t;
+    var param_7:W256.t;
+    var param_8:W256.t;
+    var param_9:W256.t;
+    var param_10:BArray800.t;
+    var param_11:BArray200.t;
+    var param_12:BArray200.t;
+    var param_13:W64.t;
+    var param_14:W64.t;
+    var param_15:W64.t;
+    var param_16:W64.t;
+    var param_17:W64.t;
+    var param_18:W64.t;
+    var param_19:W64.t;
+    var param_20:W64.t;
+    var param_21:W64.t;
+    var param_22:W64.t;
+    var result_17:W256.t;
+    var result_18:W256.t;
+    var result_19:W256.t;
+    var result_20:W256.t;
+    var result_21:W256.t;
+    var result_22:W256.t;
+    var result_23:W256.t;
+    var result_24:W256.t;
+    var result_25:W256.t;
+    var result_26:BArray800.t;
+    var result_27:BArray200.t;
+    var result_28:BArray200.t;
+    var result_29:W64.t;
+    var result_30:W64.t;
+    var result_31:W64.t;
+    var result_32:W64.t;
+    var result_33:W64.t;
+    var result_34:W64.t;
+    var result_35:W64.t;
+    var result_36:W64.t;
+    var result_37:W64.t;
+    var result_38:W64.t;
+    var param_23:W256.t;
+    var param_24:W256.t;
+    var param_25:W256.t;
+    var param_26:W256.t;
+    var param_27:W256.t;
+    var param_28:W256.t;
+    var param_29:W256.t;
+    var param_30:W256.t;
+    var param_31:W256.t;
+    var param_32:BArray800.t;
+    var result_39:BArray800.t;
+    var param_33:W64.t;
+    var param_34:W64.t;
+    var param_35:W64.t;
+    var param_36:W64.t;
+    var param_37:W64.t;
+    var param_38:W64.t;
+    var param_39:W64.t;
+    var param_40:W64.t;
+    var param_41:W64.t;
+    var param_42:BArray200.t;
+    var result_40:BArray200.t;
+    var b_result:BArray200.t;
+    var b_result_0:BArray800.t;
+    var b_result_1:BArray800.t;
+    var b_e:BArray200.t;
+    var b_result_2:BArray200.t;
+    var b_result_3:BArray200.t;
+    var b_param:BArray200.t;
+    var trace___keccakf1600_x4_x1_nat_opt:trace;
+    b_e <- witness;
+    b_param <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    b_result_1 <- witness;
+    b_result_2 <- witness;
+    b_result_3 <- witness;
+    e <- witness;
+    param <- witness;
+    param_0 <- witness;
+    param_10 <- witness;
+    param_11 <- witness;
+    param_12 <- witness;
+    param_32 <- witness;
+    param_42 <- witness;
+    result_26 <- witness;
+    result_27 <- witness;
+    result_28 <- witness;
+    result_39 <- witness;
+    result_40 <- witness;
+    trace___keccakf1600_x4_x1_nat_opt <- [];
+    trace___keccakf1600_x4_x1_nat_opt <-
+    (trace___keccakf1600_x4_x1_nat_opt ++
+    [(Assert, (BArray800.is_init b_st4 0 800))]);
+    trace___keccakf1600_x4_x1_nat_opt <-
+    (trace___keccakf1600_x4_x1_nat_opt ++
+    [(Assert, (BArray200.is_init b_a 0 200))]);
+    b_e <- (BArray200.init_arr (W8.of_int 0));
+    param <- st4;
+    (result_7, result_6, result_5, result_4, result_3, result_2, result_1,
+    result_0, result, tmp__trace) <@ __regs_fetch (param,
+    (BArray800.init_arr (W8.of_int 255)));
+    trace___keccakf1600_x4_x1_nat_opt <-
+    (trace___keccakf1600_x4_x1_nat_opt ++ tmp__trace);
+    y10 <- result_7;
+    y14 <- result_6;
+    y8 <- result_5;
+    y15 <- result_4;
+    y9 <- result_3;
+    y13 <- result_2;
+    y3 <- result_1;
+    y7 <- result_0;
+    y2 <- result;
+    param_0 <- a;
+    (result_16, result_15, result_14, result_13, result_12, result_11,
+    result_10, result_9, result_8, tmp__trace) <@ read_regs_opt (param_0,
+    (BArray200.init_arr (W8.of_int 255)));
+    trace___keccakf1600_x4_x1_nat_opt <-
+    (trace___keccakf1600_x4_x1_nat_opt ++ tmp__trace);
+    rbp <- result_16;
+    rdi <- result_15;
+    r13 <- result_14;
+    r10 <- result_13;
+    r11 <- result_12;
+    r8 <- result_11;
+    rsi <- result_10;
+    r15 <- result_9;
+    rbx <- result_8;
+    rax <- (W64.of_int 0);
+    param_22 <- rax;
+    param_21 <- rbp;
+    param_20 <- rdi;
+    param_19 <- r13;
+    param_18 <- r10;
+    param_17 <- r11;
+    param_16 <- r8;
+    param_15 <- rsi;
+    param_14 <- r15;
+    param_13 <- rbx;
+    param_12 <- a;
+    b_param <- b_e;
+    param_11 <- e;
+    param_10 <- st4;
+    param_9 <- y10;
+    param_8 <- y14;
+    param_7 <- y8;
+    param_6 <- y15;
+    param_5 <- y9;
+    param_4 <- y13;
+    param_3 <- y3;
+    param_2 <- y7;
+    param_1 <- y2;
+    (aux, aux_0, aux_1, aux_2, aux_3, aux_4, aux_5, aux_6, aux_7, aux_8,
+    aux_9, aux_10, aux_11, aux_12, aux_13, aux_14, aux_15, aux_16, aux_17,
+    aux_18, aux_19, aux_20, aux_21, aux_22, aux_23, tmp__trace) <@ __keccakf1600_x4_x1_nat_opt_iteration (
+    param_22, param_21, param_20, param_19, param_18, param_17, param_16,
+    param_15, param_14, param_13, param_12,
+    (BArray200.init_arr (W8.of_int 255)), param_11, b_param, param_10,
+    (BArray800.init_arr (W8.of_int 255)), param_9, param_8, param_7, 
+    param_6, param_5, param_4, param_3, param_2, param_1);
+    result_38 <- aux;
+    result_37 <- aux_0;
+    result_36 <- aux_1;
+    result_35 <- aux_2;
+    result_34 <- aux_3;
+    result_33 <- aux_4;
+    result_32 <- aux_5;
+    result_31 <- aux_6;
+    result_30 <- aux_7;
+    result_29 <- aux_8;
+    result_28 <- aux_9;
+    b_result_3 <- aux_10;
+    result_27 <- aux_11;
+    b_result_2 <- aux_12;
+    result_26 <- aux_13;
+    b_result_1 <- aux_14;
+    result_25 <- aux_15;
+    result_24 <- aux_16;
+    result_23 <- aux_17;
+    result_22 <- aux_18;
+    result_21 <- aux_19;
+    result_20 <- aux_20;
+    result_19 <- aux_21;
+    result_18 <- aux_22;
+    result_17 <- aux_23;
+    trace___keccakf1600_x4_x1_nat_opt <-
+    (trace___keccakf1600_x4_x1_nat_opt ++ tmp__trace);
+    trace___keccakf1600_x4_x1_nat_opt <-
+    (trace___keccakf1600_x4_x1_nat_opt ++
+    [(Assert,
+     (((BArray200.is_init b_result_3 0 200) /\
+      (BArray800.is_init b_result_1 0 800)) /\
+     (result_38 = (param_22 + (W64.of_int 2)))))]);
+    rax <- result_38;
+    rbp <- result_37;
+    rdi <- result_36;
+    r13 <- result_35;
+    r10 <- result_34;
+    r11 <- result_33;
+    r8 <- result_32;
+    rsi <- result_31;
+    r15 <- result_30;
+    rbx <- result_29;
+    a <- result_28;
+    b_e <- b_result_2;
+    e <- result_27;
+    st4 <- result_26;
+    y10 <- result_25;
+    y14 <- result_24;
+    y8 <- result_23;
+    y15 <- result_22;
+    y9 <- result_21;
+    y13 <- result_20;
+    y3 <- result_19;
+    y7 <- result_18;
+    y2 <- result_17;
+    while ((rax \ult (W64.of_int 24))) {
+      param_22 <- rax;
+      param_21 <- rbp;
+      param_20 <- rdi;
+      param_19 <- r13;
+      param_18 <- r10;
+      param_17 <- r11;
+      param_16 <- r8;
+      param_15 <- rsi;
+      param_14 <- r15;
+      param_13 <- rbx;
+      param_12 <- a;
+      b_param <- b_e;
+      param_11 <- e;
+      param_10 <- st4;
+      param_9 <- y10;
+      param_8 <- y14;
+      param_7 <- y8;
+      param_6 <- y15;
+      param_5 <- y9;
+      param_4 <- y13;
+      param_3 <- y3;
+      param_2 <- y7;
+      param_1 <- y2;
+      (aux, aux_0, aux_1, aux_2, aux_3, aux_4, aux_5, aux_6, aux_7, aux_8,
+      aux_9, aux_10, aux_11, aux_12, aux_13, aux_14, aux_15, aux_16, 
+      aux_17, aux_18, aux_19, aux_20, aux_21, aux_22, aux_23, tmp__trace) <@ 
+      __keccakf1600_x4_x1_nat_opt_iteration (param_22, param_21, param_20,
+      param_19, param_18, param_17, param_16, param_15, param_14, param_13,
+      param_12, (BArray200.init_arr (W8.of_int 255)), param_11, b_param,
+      param_10, (BArray800.init_arr (W8.of_int 255)), param_9, param_8,
+      param_7, param_6, param_5, param_4, param_3, param_2, param_1);
+      result_38 <- aux;
+      result_37 <- aux_0;
+      result_36 <- aux_1;
+      result_35 <- aux_2;
+      result_34 <- aux_3;
+      result_33 <- aux_4;
+      result_32 <- aux_5;
+      result_31 <- aux_6;
+      result_30 <- aux_7;
+      result_29 <- aux_8;
+      result_28 <- aux_9;
+      b_result_3 <- aux_10;
+      result_27 <- aux_11;
+      b_result_2 <- aux_12;
+      result_26 <- aux_13;
+      b_result_1 <- aux_14;
+      result_25 <- aux_15;
+      result_24 <- aux_16;
+      result_23 <- aux_17;
+      result_22 <- aux_18;
+      result_21 <- aux_19;
+      result_20 <- aux_20;
+      result_19 <- aux_21;
+      result_18 <- aux_22;
+      result_17 <- aux_23;
+      trace___keccakf1600_x4_x1_nat_opt <-
+      (trace___keccakf1600_x4_x1_nat_opt ++ tmp__trace);
+      trace___keccakf1600_x4_x1_nat_opt <-
+      (trace___keccakf1600_x4_x1_nat_opt ++
+      [(Assert,
+       (((BArray200.is_init b_result_3 0 200) /\
+        (BArray800.is_init b_result_1 0 800)) /\
+       (result_38 = (param_22 + (W64.of_int 2)))))]);
+      rax <- result_38;
+      rbp <- result_37;
+      rdi <- result_36;
+      r13 <- result_35;
+      r10 <- result_34;
+      r11 <- result_33;
+      r8 <- result_32;
+      rsi <- result_31;
+      r15 <- result_30;
+      rbx <- result_29;
+      a <- result_28;
+      b_e <- b_result_2;
+      e <- result_27;
+      st4 <- result_26;
+      y10 <- result_25;
+      y14 <- result_24;
+      y8 <- result_23;
+      y15 <- result_22;
+      y9 <- result_21;
+      y13 <- result_20;
+      y3 <- result_19;
+      y7 <- result_18;
+      y2 <- result_17;
+    }
+    param_32 <- st4;
+    param_31 <- y10;
+    param_30 <- y14;
+    param_29 <- y8;
+    param_28 <- y15;
+    param_27 <- y9;
+    param_26 <- y13;
+    param_25 <- y3;
+    param_24 <- y7;
+    param_23 <- y2;
+    (aux_13, aux_14, tmp__trace) <@ __regs_unfetch (param_32,
+    (BArray800.init_arr (W8.of_int 255)), param_31, param_30, param_29,
+    param_28, param_27, param_26, param_25, param_24, param_23);
+    result_39 <- aux_13;
+    b_result_0 <- aux_14;
+    trace___keccakf1600_x4_x1_nat_opt <-
+    (trace___keccakf1600_x4_x1_nat_opt ++ tmp__trace);
+    trace___keccakf1600_x4_x1_nat_opt <-
+    (trace___keccakf1600_x4_x1_nat_opt ++
+    [(Assert, (BArray800.is_init b_result_0 0 800))]);
+    st4 <- result_39;
+    param_42 <- a;
+    param_41 <- rbp;
+    param_40 <- rdi;
+    param_39 <- r13;
+    param_38 <- r10;
+    param_37 <- r11;
+    param_36 <- r8;
+    param_35 <- rsi;
+    param_34 <- r15;
+    param_33 <- rbx;
+    (aux_9, aux_10, tmp__trace) <@ store_regs_opt (param_42,
+    (BArray200.init_arr (W8.of_int 255)), param_41, param_40, param_39,
+    param_38, param_37, param_36, param_35, param_34, param_33);
+    result_40 <- aux_9;
+    b_result <- aux_10;
+    trace___keccakf1600_x4_x1_nat_opt <-
+    (trace___keccakf1600_x4_x1_nat_opt ++ tmp__trace);
+    trace___keccakf1600_x4_x1_nat_opt <-
+    (trace___keccakf1600_x4_x1_nat_opt ++
+    [(Assert, (BArray200.is_init b_result 0 200))]);
+    a <- result_40;
+    b_a <- (BArray200.init_arr (W8.of_int 255));
+    b_st4 <- (BArray800.init_arr (W8.of_int 255));
+    return (st4, b_st4, a, b_a, trace___keccakf1600_x4_x1_nat_opt);
+  }
+  proc _keccakf1600_x4_x1_nat_opt (p4:BArray800.t, b_p4:BArray800.t,
+                                   p1:BArray200.t, b_p1:BArray200.t) : 
+  BArray800.t * BArray800.t * BArray200.t * BArray200.t * trace = {
+    var aux_1:BArray200.t;
+    var aux_2:BArray200.t;
+    var aux:BArray800.t;
+    var aux_0:BArray800.t;
+    var j:int;
+    var t4:W256.t;
+    var s4:BArray800.t;
+    var t1:W64.t;
+    var s1:BArray200.t;
+    var q4:BArray800.t;
+    var q1:BArray200.t;
+    var param:BArray200.t;
+    var param_0:BArray800.t;
+    var result:BArray200.t;
+    var result_0:BArray800.t;
+    var b_s1:BArray200.t;
+    var b_s4:BArray800.t;
+    var b_result:BArray200.t;
+    var b_result_0:BArray800.t;
+    var b_param:BArray200.t;
+    var b_param_0:BArray800.t;
+    var trace__keccakf1600_x4_x1_nat_opt:trace;
+    b_param <- witness;
+    b_param_0 <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    b_s1 <- witness;
+    b_s4 <- witness;
+    param <- witness;
+    param_0 <- witness;
+    q1 <- witness;
+    q4 <- witness;
+    result <- witness;
+    result_0 <- witness;
+    s1 <- witness;
+    s4 <- witness;
+    trace__keccakf1600_x4_x1_nat_opt <- [];
+    trace__keccakf1600_x4_x1_nat_opt <-
+    (trace__keccakf1600_x4_x1_nat_opt ++
+    [(Assert, (BArray800.is_init b_p4 0 800))]);
+    trace__keccakf1600_x4_x1_nat_opt <-
+    (trace__keccakf1600_x4_x1_nat_opt ++
+    [(Assert, (BArray200.is_init b_p1 0 200))]);
+    b_s1 <- (BArray200.init_arr (W8.of_int 0));
+    b_s4 <- (BArray800.init_arr (W8.of_int 0));
+    j <- 0;
+    while ((j < 25)) {
+      trace__keccakf1600_x4_x1_nat_opt <-
+      (trace__keccakf1600_x4_x1_nat_opt ++
+      [(Assert, ((0 <= (j * 32)) /\ (((j * 32) + 32) <= 800)))]);
+      t4 <- (BArray800.get256 p4 j);
+      trace__keccakf1600_x4_x1_nat_opt <-
+      (trace__keccakf1600_x4_x1_nat_opt ++
+      [(Assert, ((0 <= (j * 32)) /\ (((j * 32) + 32) <= 800)))]);
+      b_s4 <-
+      (BArray800.set256d b_s4 (j * 32)
+      (W256.of_int
+      115792089237316195423570985008687907853269984665640564039457584007913129639935
+      ));
+      s4 <- (BArray800.set256 s4 j t4);
+      trace__keccakf1600_x4_x1_nat_opt <-
+      (trace__keccakf1600_x4_x1_nat_opt ++
+      [(Assert, ((0 <= (j * 8)) /\ (((j * 8) + 8) <= 200)))]);
+      t1 <- (BArray200.get64 p1 j);
+      trace__keccakf1600_x4_x1_nat_opt <-
+      (trace__keccakf1600_x4_x1_nat_opt ++
+      [(Assert, ((0 <= (j * 8)) /\ (((j * 8) + 8) <= 200)))]);
+      b_s1 <-
+      (BArray200.set64d b_s1 (j * 8) (W64.of_int 18446744073709551615));
+      s1 <- (BArray200.set64 s1 j t1);
+      j <- (j + 1);
+    }
+    q4 <- p4;
+    q1 <- p1;
+    b_param_0 <- b_s4;
+    param_0 <- s4;
+    b_param <- b_s1;
+    param <- s1;
+    (aux, aux_0, aux_1, aux_2, tmp__trace) <@ __keccakf1600_x4_x1_nat_opt (
+    param_0, b_param_0, param, b_param);
+    result_0 <- aux;
+    b_result_0 <- aux_0;
+    result <- aux_1;
+    b_result <- aux_2;
+    trace__keccakf1600_x4_x1_nat_opt <-
+    (trace__keccakf1600_x4_x1_nat_opt ++ tmp__trace);
+    trace__keccakf1600_x4_x1_nat_opt <-
+    (trace__keccakf1600_x4_x1_nat_opt ++
+    [(Assert, (BArray800.is_init b_result_0 0 800))]);
+    trace__keccakf1600_x4_x1_nat_opt <-
+    (trace__keccakf1600_x4_x1_nat_opt ++
+    [(Assert, (BArray200.is_init b_result 0 200))]);
+    s4 <- result_0;
+    s1 <- result;
+    p4 <- q4;
+    p1 <- q1;
+    j <- 0;
+    while ((j < 25)) {
+      trace__keccakf1600_x4_x1_nat_opt <-
+      (trace__keccakf1600_x4_x1_nat_opt ++
+      [(Assert, ((0 <= (j * 32)) /\ (((j * 32) + 32) <= 800)))]);
+      t4 <- (BArray800.get256 s4 j);
+      trace__keccakf1600_x4_x1_nat_opt <-
+      (trace__keccakf1600_x4_x1_nat_opt ++
+      [(Assert, ((0 <= (j * 32)) /\ (((j * 32) + 32) <= 800)))]);
+      p4 <- (BArray800.set256 p4 j t4);
+      trace__keccakf1600_x4_x1_nat_opt <-
+      (trace__keccakf1600_x4_x1_nat_opt ++
+      [(Assert, ((0 <= (j * 8)) /\ (((j * 8) + 8) <= 200)))]);
+      t1 <- (BArray200.get64 s1 j);
+      trace__keccakf1600_x4_x1_nat_opt <-
+      (trace__keccakf1600_x4_x1_nat_opt ++
+      [(Assert, ((0 <= (j * 8)) /\ (((j * 8) + 8) <= 200)))]);
+      p1 <- (BArray200.set64 p1 j t1);
+      j <- (j + 1);
+    }
+    b_p1 <- (BArray200.init_arr (W8.of_int 255));
+    b_p4 <- (BArray800.init_arr (W8.of_int 255));
+    return (p4, b_p4, p1, b_p1, trace__keccakf1600_x4_x1_nat_opt);
+  }
+  proc _keccakf1600_x4_x1 (a4:BArray800.t, b_a4:BArray800.t, a1:BArray200.t,
+                           b_a1:BArray200.t) : BArray800.t * BArray800.t *
+                                               BArray200.t * BArray200.t *
+                                               trace = {
+    var aux_1:BArray200.t;
+    var aux_2:BArray200.t;
+    var aux:BArray800.t;
+    var aux_0:BArray800.t;
+    var kECCAK_F4:int;
+    var kECCAK_F1:int;
+    var param:int;
+    var result:int;
+    var param_0:int;
+    var result_0:int;
+    var param_1:BArray200.t;
+    var param_2:BArray800.t;
+    var result_1:BArray200.t;
+    var result_2:BArray800.t;
+    var param_3:BArray800.t;
+    var result_3:BArray800.t;
+    var param_4:BArray200.t;
+    var result_4:BArray200.t;
+    var b_result:BArray200.t;
+    var b_result_0:BArray800.t;
+    var b_result_1:BArray200.t;
+    var b_result_2:BArray800.t;
+    var trace__keccakf1600_x4_x1:trace;
+    b_result <- witness;
+    b_result_0 <- witness;
+    b_result_1 <- witness;
+    b_result_2 <- witness;
+    param_1 <- witness;
+    param_2 <- witness;
+    param_3 <- witness;
+    param_4 <- witness;
+    result_1 <- witness;
+    result_2 <- witness;
+    result_3 <- witness;
+    result_4 <- witness;
+    trace__keccakf1600_x4_x1 <- [];
+    trace__keccakf1600_x4_x1 <-
+    (trace__keccakf1600_x4_x1 ++ [(Assert, (BArray800.is_init b_a4 0 800))]);
+    trace__keccakf1600_x4_x1 <-
+    (trace__keccakf1600_x4_x1 ++ [(Assert, (BArray200.is_init b_a1 0 200))]);
+    param <- 514;
+    (result, tmp__trace) <@ __KECCAK_Fx4 (param);
+    trace__keccakf1600_x4_x1 <- (trace__keccakf1600_x4_x1 ++ tmp__trace);
+    kECCAK_F4 <- result;
+    param_0 <- 514;
+    (result_0, tmp__trace) <@ __KECCAK_F (param_0);
+    trace__keccakf1600_x4_x1 <- (trace__keccakf1600_x4_x1 ++ tmp__trace);
+    kECCAK_F1 <- result_0;
+    if (((kECCAK_F4 = 512) /\ (kECCAK_F1 = 2))) {
+      param_2 <- a4;
+      param_1 <- a1;
+      (aux, aux_0, aux_1, aux_2, tmp__trace) <@ _keccakf1600_x4_x1_nat_opt (
+      param_2, (BArray800.init_arr (W8.of_int 255)), param_1,
+      (BArray200.init_arr (W8.of_int 255)));
+      result_2 <- aux;
+      b_result_0 <- aux_0;
+      result_1 <- aux_1;
+      b_result <- aux_2;
+      trace__keccakf1600_x4_x1 <- (trace__keccakf1600_x4_x1 ++ tmp__trace);
+      trace__keccakf1600_x4_x1 <-
+      (trace__keccakf1600_x4_x1 ++
+      [(Assert, (BArray800.is_init b_result_0 0 800))]);
+      trace__keccakf1600_x4_x1 <-
+      (trace__keccakf1600_x4_x1 ++
+      [(Assert, (BArray200.is_init b_result 0 200))]);
+      a4 <- result_2;
+      a1 <- result_1;
+    } else {
+      param_3 <- a4;
+      (aux, aux_0, tmp__trace) <@ _keccakf1600_avx2x4 (param_3,
+      (BArray800.init_arr (W8.of_int 255)));
+      result_3 <- aux;
+      b_result_2 <- aux_0;
+      trace__keccakf1600_x4_x1 <- (trace__keccakf1600_x4_x1 ++ tmp__trace);
+      trace__keccakf1600_x4_x1 <-
+      (trace__keccakf1600_x4_x1 ++
+      [(Assert, (BArray800.is_init b_result_2 0 800))]);
+      a4 <- result_3;
+      param_4 <- a1;
+      (aux_1, aux_2, tmp__trace) <@ _keccakf1600 (param_4,
+      (BArray200.init_arr (W8.of_int 255)));
+      result_4 <- aux_1;
+      b_result_1 <- aux_2;
+      trace__keccakf1600_x4_x1 <- (trace__keccakf1600_x4_x1 ++ tmp__trace);
+      trace__keccakf1600_x4_x1 <-
+      (trace__keccakf1600_x4_x1 ++
+      [(Assert, (BArray200.is_init b_result_1 0 200))]);
+      a1 <- result_4;
+    }
+    b_a1 <- (BArray200.init_arr (W8.of_int 255));
+    b_a4 <- (BArray800.init_arr (W8.of_int 255));
+    return (a4, b_a4, a1, b_a1, trace__keccakf1600_x4_x1);
   }
   proc __state_init_avx2x4 (st:BArray800.t, b_st:BArray800.t) : BArray800.t *
                                                                 BArray800.t *
@@ -48886,6 +50655,155 @@ module M = {
     return (state, b_state, h0, b_h0, h1, b_h1, h2, b_h2, h3, b_h3,
            trace_shake128_squeezeblock4x);
   }
+  proc __shake128_squeezeblock4x_x1 (state:BArray800.t, b_state:BArray800.t,
+                                     h0:BArray168.t, b_h0:BArray168.t,
+                                     h1:BArray168.t, b_h1:BArray168.t,
+                                     h2:BArray168.t, b_h2:BArray168.t,
+                                     h3:BArray168.t, b_h3:BArray168.t,
+                                     lanes:BArray200.t, b_lanes:BArray200.t) : 
+  BArray800.t * BArray800.t * BArray168.t * BArray168.t * BArray168.t *
+  BArray168.t * BArray168.t * BArray168.t * BArray168.t * BArray168.t *
+  BArray200.t * BArray200.t * trace = {
+    var aux_1:BArray200.t;
+    var aux_2:BArray200.t;
+    var aux:BArray800.t;
+    var aux_0:BArray800.t;
+    var offset:int;
+    var param:BArray200.t;
+    var param_0:BArray800.t;
+    var result:BArray200.t;
+    var result_0:BArray800.t;
+    var param_1:BArray800.t;
+    var param_2:int;
+    var param_3:int;
+    var param_4:BArray168.t;
+    var param_5:BArray168.t;
+    var param_6:BArray168.t;
+    var param_7:BArray168.t;
+    var result_1:int;
+    var result_2:BArray168.t;
+    var result_3:BArray168.t;
+    var result_4:BArray168.t;
+    var result_5:BArray168.t;
+    var b_result:BArray168.t;
+    var b_result_0:BArray168.t;
+    var b_result_1:BArray168.t;
+    var b_result_2:BArray168.t;
+    var b_param:BArray168.t;
+    var b_param_0:BArray168.t;
+    var b_param_1:BArray168.t;
+    var b_param_2:BArray168.t;
+    var b_result_3:BArray200.t;
+    var b_result_4:BArray800.t;
+    var trace___shake128_squeezeblock4x_x1:trace;
+    b_param <- witness;
+    b_param_0 <- witness;
+    b_param_1 <- witness;
+    b_param_2 <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    b_result_1 <- witness;
+    b_result_2 <- witness;
+    b_result_3 <- witness;
+    b_result_4 <- witness;
+    param <- witness;
+    param_0 <- witness;
+    param_1 <- witness;
+    param_4 <- witness;
+    param_5 <- witness;
+    param_6 <- witness;
+    param_7 <- witness;
+    result <- witness;
+    result_0 <- witness;
+    result_2 <- witness;
+    result_3 <- witness;
+    result_4 <- witness;
+    result_5 <- witness;
+    trace___shake128_squeezeblock4x_x1 <- [];
+    trace___shake128_squeezeblock4x_x1 <-
+    (trace___shake128_squeezeblock4x_x1 ++
+    [(Assert,
+     ((BArray800.is_init b_state 0 800) /\ (BArray200.is_init b_lanes 0 200)))]);
+    param_0 <- state;
+    param <- lanes;
+    (aux, aux_0, aux_1, aux_2, tmp__trace) <@ _keccakf1600_x4_x1 (param_0,
+    (BArray800.init_arr (W8.of_int 255)), param,
+    (BArray200.init_arr (W8.of_int 255)));
+    result_0 <- aux;
+    b_result_4 <- aux_0;
+    result <- aux_1;
+    b_result_3 <- aux_2;
+    trace___shake128_squeezeblock4x_x1 <-
+    (trace___shake128_squeezeblock4x_x1 ++ tmp__trace);
+    trace___shake128_squeezeblock4x_x1 <-
+    (trace___shake128_squeezeblock4x_x1 ++
+    [(Assert, (BArray800.is_init b_result_4 0 800))]);
+    trace___shake128_squeezeblock4x_x1 <-
+    (trace___shake128_squeezeblock4x_x1 ++
+    [(Assert, (BArray200.is_init b_result_3 0 200))]);
+    state <- result_0;
+    lanes <- result;
+    offset <- 0;
+    b_param_2 <- b_h0;
+    param_7 <- h0;
+    b_param_1 <- b_h1;
+    param_6 <- h1;
+    b_param_0 <- b_h2;
+    param_5 <- h2;
+    b_param <- b_h3;
+    param_4 <- h3;
+    param_3 <- offset;
+    param_2 <- 168;
+    param_1 <- state;
+    (result_5, b_result_2, result_4, b_result_1, result_3, b_result_0,
+    result_2, b_result, result_1, tmp__trace) <@ a168____dumpstate_avx2x4 (
+    param_7, b_param_2, param_6, b_param_1, param_5, b_param_0, param_4,
+    b_param, param_3, param_2, param_1,
+    (BArray800.init_arr (W8.of_int 255)));
+    trace___shake128_squeezeblock4x_x1 <-
+    (trace___shake128_squeezeblock4x_x1 ++ tmp__trace);
+    trace___shake128_squeezeblock4x_x1 <-
+    (trace___shake128_squeezeblock4x_x1 ++
+    [(Assert,
+     (((0 <= param_2) /\ (param_2 <= 18446744073709551615)) /\
+     (((0 <= (param_3 + param_2)) /\
+      ((param_3 + param_2) <= 18446744073709551615)) /\
+     (result_1 = (param_3 + param_2)))))]);
+    trace___shake128_squeezeblock4x_x1 <-
+    (trace___shake128_squeezeblock4x_x1 ++
+    [(Assert,
+     (((0 <= param_2) /\ (param_2 <= 18446744073709551615)) /\
+     (((0 <= (param_3 + param_2)) /\
+      ((param_3 + param_2) <= 18446744073709551615)) /\
+     (((0 <= param_2) /\ (param_2 <= 18446744073709551615)) /\
+     (((0 <= (param_3 + param_2)) /\
+      ((param_3 + param_2) <= 18446744073709551615)) /\
+     (((0 <= param_2) /\ (param_2 <= 18446744073709551615)) /\
+     (((0 <= (param_3 + param_2)) /\
+      ((param_3 + param_2) <= 18446744073709551615)) /\
+     (((0 <= param_2) /\ (param_2 <= 18446744073709551615)) /\
+     (((0 <= (param_3 + param_2)) /\
+      ((param_3 + param_2) <= 18446744073709551615)) /\
+     ((((BArray168.is_init b_result_2 0 (param_3 + param_2)) /\
+       (BArray168.is_init b_result_1 0 (param_3 + param_2))) /\
+      (BArray168.is_init b_result_0 0 (param_3 + param_2))) /\
+     (BArray168.is_init b_result 0 (param_3 + param_2))))))))))))]);
+    trace___shake128_squeezeblock4x_x1 <-
+    (trace___shake128_squeezeblock4x_x1 ++
+    [(Assert, ((0 <= result_1) /\ (result_1 <= 18446744073709551615)))]);
+    b_h0 <- b_result_2;
+    h0 <- result_5;
+    b_h1 <- b_result_1;
+    h1 <- result_4;
+    b_h2 <- b_result_0;
+    h2 <- result_3;
+    b_h3 <- b_result;
+    h3 <- result_2;
+    b_lanes <- (BArray200.init_arr (W8.of_int 255));
+    b_state <- (BArray800.init_arr (W8.of_int 255));
+    return (state, b_state, h0, b_h0, h1, b_h1, h2, b_h2, h3, b_h3, lanes,
+           b_lanes, trace___shake128_squeezeblock4x_x1);
+  }
   proc shake256_squeezeblock4x (state:BArray800.t, b_state:BArray800.t,
                                 h0:BArray136.t, b_h0:BArray136.t,
                                 h1:BArray136.t, b_h1:BArray136.t,
@@ -49496,107 +51414,87 @@ module M = {
     return (state, b_state, b0, b_b0, b1, b_b1, b2, b_b2, b3, b_b3,
            trace_matrix_A____shake128_squeeze_multiple_blocks_4x);
   }
-  proc matrix_A____sample_4_polynomials (rho:BArray32.t, b_rho:BArray32.t,
-                                         domain_separators:BArray8.t,
-                                         b_domain_separators:BArray8.t) : 
+  proc matrix_A____sample_4_polynomials_from_blocks (xof_state:BArray800.t,
+                                                     b_xof_state:BArray800.t,
+                                                     buf0:BArray848.t,
+                                                     b_buf0:BArray848.t,
+                                                     buf1:BArray848.t,
+                                                     b_buf1:BArray848.t,
+                                                     buf2:BArray848.t,
+                                                     b_buf2:BArray848.t,
+                                                     buf3:BArray848.t,
+                                                     b_buf3:BArray848.t) : 
   BArray1024.t * BArray1024.t * BArray1024.t * BArray1024.t * BArray1024.t *
   BArray1024.t * BArray1024.t * BArray1024.t * trace = {
-    var aux_9:BArray1024.t;
-    var aux_10:BArray1024.t;
-    var aux_12:BArray168.t;
-    var aux_13:BArray168.t;
-    var aux_14:BArray168.t;
-    var aux_15:BArray168.t;
-    var aux_16:BArray168.t;
-    var aux_17:BArray168.t;
-    var aux_18:BArray168.t;
-    var aux_19:BArray168.t;
-    var aux:BArray800.t;
-    var aux_0:BArray800.t;
-    var aux_1:BArray848.t;
-    var aux_2:BArray848.t;
-    var aux_3:BArray848.t;
-    var aux_4:BArray848.t;
-    var aux_5:BArray848.t;
-    var aux_6:BArray848.t;
-    var aux_7:BArray848.t;
-    var aux_8:BArray848.t;
-    var aux_11:W64.t;
+    var aux:BArray1024.t;
+    var aux_0:BArray1024.t;
+    var aux_4:BArray168.t;
+    var aux_5:BArray168.t;
+    var aux_6:BArray168.t;
+    var aux_7:BArray168.t;
+    var aux_8:BArray168.t;
+    var aux_9:BArray168.t;
+    var aux_10:BArray168.t;
+    var aux_11:BArray168.t;
+    var aux_2:BArray800.t;
+    var aux_3:BArray800.t;
+    var aux_1:W64.t;
     var polynomial0:BArray1024.t;
     var polynomial1:BArray1024.t;
     var polynomial2:BArray1024.t;
     var polynomial3:BArray1024.t;
-    var xof_state:BArray800.t;
-    var buf0:BArray848.t;
-    var buf1:BArray848.t;
-    var buf2:BArray848.t;
-    var buf3:BArray848.t;
     var filled:W64.t;
     var filled0:W64.t;
     var filled1:W64.t;
     var filled2:W64.t;
     var filled3:W64.t;
     var stop_sampling:W32.t;
-    var param:BArray8.t;
-    var param_0:BArray32.t;
-    var param_1:BArray800.t;
-    var result:BArray800.t;
-    var param_2:BArray848.t;
+    var param:BArray848.t;
+    var param_0:BArray1024.t;
+    var result:W64.t;
+    var result_0:BArray1024.t;
+    var param_1:BArray848.t;
+    var param_2:BArray1024.t;
+    var result_1:W64.t;
+    var result_2:BArray1024.t;
     var param_3:BArray848.t;
-    var param_4:BArray848.t;
+    var param_4:BArray1024.t;
+    var result_3:W64.t;
+    var result_4:BArray1024.t;
     var param_5:BArray848.t;
-    var param_6:BArray800.t;
-    var result_0:BArray848.t;
-    var result_1:BArray848.t;
-    var result_2:BArray848.t;
-    var result_3:BArray848.t;
-    var result_4:BArray800.t;
-    var param_7:BArray848.t;
-    var param_8:BArray1024.t;
+    var param_6:BArray1024.t;
     var result_5:W64.t;
     var result_6:BArray1024.t;
-    var param_9:BArray848.t;
-    var param_10:BArray1024.t;
-    var result_7:W64.t;
-    var result_8:BArray1024.t;
-    var param_11:BArray848.t;
-    var param_12:BArray1024.t;
-    var result_9:W64.t;
-    var result_10:BArray1024.t;
-    var param_13:BArray848.t;
+    var param_7:BArray168.t;
+    var param_8:BArray168.t;
+    var param_9:BArray168.t;
+    var param_10:BArray168.t;
+    var param_11:BArray800.t;
+    var result_7:BArray168.t;
+    var result_8:BArray168.t;
+    var result_9:BArray168.t;
+    var result_10:BArray168.t;
+    var result_11:BArray800.t;
+    var param_12:BArray168.t;
+    var param_13:W64.t;
     var param_14:BArray1024.t;
-    var result_11:W64.t;
-    var result_12:BArray1024.t;
+    var result_12:W64.t;
+    var result_13:BArray1024.t;
     var param_15:BArray168.t;
-    var param_16:BArray168.t;
-    var param_17:BArray168.t;
+    var param_16:W64.t;
+    var param_17:BArray1024.t;
+    var result_14:W64.t;
+    var result_15:BArray1024.t;
     var param_18:BArray168.t;
-    var param_19:BArray800.t;
-    var result_13:BArray168.t;
-    var result_14:BArray168.t;
-    var result_15:BArray168.t;
-    var result_16:BArray168.t;
-    var result_17:BArray800.t;
-    var param_20:BArray168.t;
-    var param_21:W64.t;
-    var param_22:BArray1024.t;
+    var param_19:W64.t;
+    var param_20:BArray1024.t;
+    var result_16:W64.t;
+    var result_17:BArray1024.t;
+    var param_21:BArray168.t;
+    var param_22:W64.t;
+    var param_23:BArray1024.t;
     var result_18:W64.t;
     var result_19:BArray1024.t;
-    var param_23:BArray168.t;
-    var param_24:W64.t;
-    var param_25:BArray1024.t;
-    var result_20:W64.t;
-    var result_21:BArray1024.t;
-    var param_26:BArray168.t;
-    var param_27:W64.t;
-    var param_28:BArray1024.t;
-    var result_22:W64.t;
-    var result_23:BArray1024.t;
-    var param_29:BArray168.t;
-    var param_30:W64.t;
-    var param_31:BArray1024.t;
-    var result_24:W64.t;
-    var result_25:BArray1024.t;
     var b_polynomial3:BArray1024.t;
     var b_polynomial2:BArray1024.t;
     var b_polynomial1:BArray1024.t;
@@ -49604,24 +51502,19 @@ module M = {
     var b_result:BArray1024.t;
     var b_param:BArray168.t;
     var b_param_0:BArray1024.t;
-    var b_buf3:BArray848.t;
     var b_result_0:BArray1024.t;
     var b_param_1:BArray168.t;
     var b_param_2:BArray1024.t;
-    var b_buf2:BArray848.t;
     var b_result_1:BArray1024.t;
     var b_param_3:BArray168.t;
     var b_param_4:BArray1024.t;
-    var b_buf1:BArray848.t;
     var b_result_2:BArray1024.t;
     var b_param_5:BArray168.t;
     var b_param_6:BArray1024.t;
-    var b_buf0:BArray848.t;
     var b_result_3:BArray168.t;
     var b_result_4:BArray168.t;
     var b_result_5:BArray168.t;
     var b_result_6:BArray168.t;
-    var b_xof_state:BArray800.t;
     var b_result_7:BArray800.t;
     var b_param_7:BArray168.t;
     var b_param_8:BArray168.t;
@@ -49635,22 +51528,7 @@ module M = {
     var b_param_13:BArray1024.t;
     var b_result_11:BArray1024.t;
     var b_param_14:BArray1024.t;
-    var b_result_12:BArray848.t;
-    var b_result_13:BArray848.t;
-    var b_result_14:BArray848.t;
-    var b_result_15:BArray848.t;
-    var b_result_16:BArray800.t;
-    var b_param_15:BArray848.t;
-    var b_param_16:BArray848.t;
-    var b_param_17:BArray848.t;
-    var b_param_18:BArray848.t;
-    var b_result_17:BArray800.t;
-    var b_param_19:BArray800.t;
-    var trace_matrix_A____sample_4_polynomials:trace;
-    b_buf0 <- witness;
-    b_buf1 <- witness;
-    b_buf2 <- witness;
-    b_buf3 <- witness;
+    var trace_matrix_A____sample_4_polynomials_from_blocks:trace;
     b_param <- witness;
     b_param_0 <- witness;
     b_param_1 <- witness;
@@ -49667,11 +51545,6 @@ module M = {
     b_param_12 <- witness;
     b_param_13 <- witness;
     b_param_14 <- witness;
-    b_param_15 <- witness;
-    b_param_16 <- witness;
-    b_param_17 <- witness;
-    b_param_18 <- witness;
-    b_param_19 <- witness;
     b_polynomial0 <- witness;
     b_polynomial1 <- witness;
     b_polynomial2 <- witness;
@@ -49689,17 +51562,6 @@ module M = {
     b_result_9 <- witness;
     b_result_10 <- witness;
     b_result_11 <- witness;
-    b_result_12 <- witness;
-    b_result_13 <- witness;
-    b_result_14 <- witness;
-    b_result_15 <- witness;
-    b_result_16 <- witness;
-    b_result_17 <- witness;
-    b_xof_state <- witness;
-    buf0 <- witness;
-    buf1 <- witness;
-    buf2 <- witness;
-    buf3 <- witness;
     param <- witness;
     param_0 <- witness;
     param_1 <- witness;
@@ -49714,197 +51576,129 @@ module M = {
     param_10 <- witness;
     param_11 <- witness;
     param_12 <- witness;
-    param_13 <- witness;
     param_14 <- witness;
     param_15 <- witness;
-    param_16 <- witness;
     param_17 <- witness;
     param_18 <- witness;
-    param_19 <- witness;
     param_20 <- witness;
-    param_22 <- witness;
+    param_21 <- witness;
     param_23 <- witness;
-    param_25 <- witness;
-    param_26 <- witness;
-    param_28 <- witness;
-    param_29 <- witness;
-    param_31 <- witness;
     polynomial0 <- witness;
     polynomial1 <- witness;
     polynomial2 <- witness;
     polynomial3 <- witness;
-    result <- witness;
     result_0 <- witness;
-    result_1 <- witness;
     result_2 <- witness;
-    result_3 <- witness;
     result_4 <- witness;
     result_6 <- witness;
+    result_7 <- witness;
     result_8 <- witness;
+    result_9 <- witness;
     result_10 <- witness;
-    result_12 <- witness;
+    result_11 <- witness;
     result_13 <- witness;
-    result_14 <- witness;
     result_15 <- witness;
-    result_16 <- witness;
     result_17 <- witness;
     result_19 <- witness;
-    result_21 <- witness;
-    result_23 <- witness;
-    result_25 <- witness;
-    xof_state <- witness;
-    trace_matrix_A____sample_4_polynomials <- [];
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++
-    [(Assert, (BArray32.is_init b_rho 0 32))]);
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++
-    [(Assert, (BArray8.is_init b_domain_separators 0 8))]);
-    b_buf0 <- (BArray848.init_arr (W8.of_int 0));
-    b_buf1 <- (BArray848.init_arr (W8.of_int 0));
-    b_buf2 <- (BArray848.init_arr (W8.of_int 0));
-    b_buf3 <- (BArray848.init_arr (W8.of_int 0));
+    trace_matrix_A____sample_4_polynomials_from_blocks <- [];
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++
+    [(Assert, (BArray800.is_init b_xof_state 0 800))]);
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++
+    [(Assert, (BArray848.is_init b_buf0 0 848))]);
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++
+    [(Assert, (BArray848.is_init b_buf1 0 848))]);
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++
+    [(Assert, (BArray848.is_init b_buf2 0 848))]);
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++
+    [(Assert, (BArray848.is_init b_buf3 0 848))]);
     b_polynomial0 <- (BArray1024.init_arr (W8.of_int 0));
     b_polynomial1 <- (BArray1024.init_arr (W8.of_int 0));
     b_polynomial2 <- (BArray1024.init_arr (W8.of_int 0));
     b_polynomial3 <- (BArray1024.init_arr (W8.of_int 0));
-    b_xof_state <- (BArray800.init_arr (W8.of_int 0));
-    b_param_19 <- b_xof_state;
-    param_1 <- xof_state;
-    param_0 <- rho;
-    param <- domain_separators;
-    (aux, aux_0, tmp__trace) <@ shake128_absorb_34_4x (param_1, b_param_19,
-    param_0, (BArray32.init_arr (W8.of_int 255)), param,
-    (BArray8.init_arr (W8.of_int 255)));
-    result <- aux;
-    b_result_17 <- aux_0;
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++
-    [(Assert, (BArray800.is_init b_result_17 0 800))]);
-    xof_state <- result;
-    param_6 <- xof_state;
-    b_param_18 <- b_buf0;
-    param_5 <- buf0;
-    b_param_17 <- b_buf1;
-    param_4 <- buf1;
-    b_param_16 <- b_buf2;
-    param_3 <- buf2;
-    b_param_15 <- b_buf3;
-    param_2 <- buf3;
-    (aux, aux_0, aux_1, aux_2, aux_3, aux_4, aux_5, aux_6, aux_7, aux_8,
-    tmp__trace) <@ matrix_A____shake128_squeeze_multiple_blocks_4x (param_6,
-    (BArray800.init_arr (W8.of_int 255)), param_5, b_param_18, param_4,
-    b_param_17, param_3, b_param_16, param_2, b_param_15);
-    result_4 <- aux;
-    b_result_16 <- aux_0;
-    result_3 <- aux_1;
-    b_result_15 <- aux_2;
-    result_2 <- aux_3;
-    b_result_14 <- aux_4;
-    result_1 <- aux_5;
-    b_result_13 <- aux_6;
-    result_0 <- aux_7;
-    b_result_12 <- aux_8;
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++
-    [(Assert,
-     (((((BArray800.is_init b_result_16 0 800) /\
-        (BArray848.is_init b_result_15 0 848)) /\
-       (BArray848.is_init b_result_14 0 848)) /\
-      (BArray848.is_init b_result_13 0 848)) /\
-     (BArray848.is_init b_result_12 0 848)))]);
-    xof_state <- result_4;
-    b_buf0 <- (BArray848.init_arr (W8.of_int 255));
-    buf0 <- result_3;
-    b_buf1 <- (BArray848.init_arr (W8.of_int 255));
-    buf1 <- result_2;
-    b_buf2 <- (BArray848.init_arr (W8.of_int 255));
-    buf2 <- result_1;
-    b_buf3 <- (BArray848.init_arr (W8.of_int 255));
-    buf3 <- result_0;
     b_param_14 <- b_polynomial0;
-    param_8 <- polynomial0;
-    param_7 <- buf0;
-    (aux_9, aux_10, aux_11, tmp__trace) <@ matrix_A__rejection_sample_multiple_blocks (
-    param_8, b_param_14, param_7, (BArray848.init_arr (W8.of_int 255)));
-    result_6 <- aux_9;
-    b_result_11 <- aux_10;
-    result_5 <- aux_11;
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++
+    param_0 <- polynomial0;
+    param <- buf0;
+    (aux, aux_0, aux_1, tmp__trace) <@ matrix_A__rejection_sample_multiple_blocks (
+    param_0, b_param_14, param, (BArray848.init_arr (W8.of_int 255)));
+    result_0 <- aux;
+    b_result_11 <- aux_0;
+    result <- aux_1;
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++ tmp__trace);
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++
     [(Assert,
      ((BArray1024.is_init b_result_11 0
-      (W64.to_uint ((W64.of_int 4) * result_5))) /\
-     (result_5 \ule (W64.of_int 256))))]);
+      (W64.to_uint ((W64.of_int 4) * result))) /\
+     (result \ule (W64.of_int 256))))]);
     b_polynomial0 <- b_result_11;
-    polynomial0 <- result_6;
-    filled <- result_5;
+    polynomial0 <- result_0;
+    filled <- result;
     filled0 <- filled;
     b_param_13 <- b_polynomial1;
-    param_10 <- polynomial1;
-    param_9 <- buf1;
-    (aux_9, aux_10, aux_11, tmp__trace) <@ matrix_A__rejection_sample_multiple_blocks (
-    param_10, b_param_13, param_9, (BArray848.init_arr (W8.of_int 255)));
-    result_8 <- aux_9;
-    b_result_10 <- aux_10;
-    result_7 <- aux_11;
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++
+    param_2 <- polynomial1;
+    param_1 <- buf1;
+    (aux, aux_0, aux_1, tmp__trace) <@ matrix_A__rejection_sample_multiple_blocks (
+    param_2, b_param_13, param_1, (BArray848.init_arr (W8.of_int 255)));
+    result_2 <- aux;
+    b_result_10 <- aux_0;
+    result_1 <- aux_1;
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++ tmp__trace);
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++
     [(Assert,
      ((BArray1024.is_init b_result_10 0
-      (W64.to_uint ((W64.of_int 4) * result_7))) /\
-     (result_7 \ule (W64.of_int 256))))]);
+      (W64.to_uint ((W64.of_int 4) * result_1))) /\
+     (result_1 \ule (W64.of_int 256))))]);
     b_polynomial1 <- b_result_10;
-    polynomial1 <- result_8;
-    filled <- result_7;
+    polynomial1 <- result_2;
+    filled <- result_1;
     filled1 <- filled;
     b_param_12 <- b_polynomial2;
-    param_12 <- polynomial2;
-    param_11 <- buf2;
-    (aux_9, aux_10, aux_11, tmp__trace) <@ matrix_A__rejection_sample_multiple_blocks (
-    param_12, b_param_12, param_11, (BArray848.init_arr (W8.of_int 255)));
-    result_10 <- aux_9;
-    b_result_9 <- aux_10;
-    result_9 <- aux_11;
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++
+    param_4 <- polynomial2;
+    param_3 <- buf2;
+    (aux, aux_0, aux_1, tmp__trace) <@ matrix_A__rejection_sample_multiple_blocks (
+    param_4, b_param_12, param_3, (BArray848.init_arr (W8.of_int 255)));
+    result_4 <- aux;
+    b_result_9 <- aux_0;
+    result_3 <- aux_1;
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++ tmp__trace);
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++
     [(Assert,
      ((BArray1024.is_init b_result_9 0
-      (W64.to_uint ((W64.of_int 4) * result_9))) /\
-     (result_9 \ule (W64.of_int 256))))]);
+      (W64.to_uint ((W64.of_int 4) * result_3))) /\
+     (result_3 \ule (W64.of_int 256))))]);
     b_polynomial2 <- b_result_9;
-    polynomial2 <- result_10;
-    filled <- result_9;
+    polynomial2 <- result_4;
+    filled <- result_3;
     filled2 <- filled;
     b_param_11 <- b_polynomial3;
-    param_14 <- polynomial3;
-    param_13 <- buf3;
-    (aux_9, aux_10, aux_11, tmp__trace) <@ matrix_A__rejection_sample_multiple_blocks (
-    param_14, b_param_11, param_13, (BArray848.init_arr (W8.of_int 255)));
-    result_12 <- aux_9;
-    b_result_8 <- aux_10;
-    result_11 <- aux_11;
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
-    trace_matrix_A____sample_4_polynomials <-
-    (trace_matrix_A____sample_4_polynomials ++
+    param_6 <- polynomial3;
+    param_5 <- buf3;
+    (aux, aux_0, aux_1, tmp__trace) <@ matrix_A__rejection_sample_multiple_blocks (
+    param_6, b_param_11, param_5, (BArray848.init_arr (W8.of_int 255)));
+    result_6 <- aux;
+    b_result_8 <- aux_0;
+    result_5 <- aux_1;
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++ tmp__trace);
+    trace_matrix_A____sample_4_polynomials_from_blocks <-
+    (trace_matrix_A____sample_4_polynomials_from_blocks ++
     [(Assert,
      ((BArray1024.is_init b_result_8 0
-      (W64.to_uint ((W64.of_int 4) * result_11))) /\
-     (result_11 \ule (W64.of_int 256))))]);
+      (W64.to_uint ((W64.of_int 4) * result_5))) /\
+     (result_5 \ule (W64.of_int 256))))]);
     b_polynomial3 <- b_result_8;
-    polynomial3 <- result_12;
-    filled <- result_11;
+    polynomial3 <- result_6;
+    filled <- result_5;
     filled3 <- filled;
     stop_sampling <- (W32.of_int 1);
     if ((filled0 \ult (W64.of_int 256))) {
@@ -49926,144 +51720,144 @@ module M = {
     }
     while ((stop_sampling <> (W32.of_int 1))) {
       (* Erased call to spill *)
-      param_19 <- xof_state;
+      param_11 <- xof_state;
       b_param_10 <- (SBArray848_168.get_sub8 b_buf0 0);
-      param_18 <- (SBArray848_168.get_sub8 buf0 0);
+      param_10 <- (SBArray848_168.get_sub8 buf0 0);
       b_param_9 <- (SBArray848_168.get_sub8 b_buf1 0);
-      param_17 <- (SBArray848_168.get_sub8 buf1 0);
+      param_9 <- (SBArray848_168.get_sub8 buf1 0);
       b_param_8 <- (SBArray848_168.get_sub8 b_buf2 0);
-      param_16 <- (SBArray848_168.get_sub8 buf2 0);
+      param_8 <- (SBArray848_168.get_sub8 buf2 0);
       b_param_7 <- (SBArray848_168.get_sub8 b_buf3 0);
-      param_15 <- (SBArray848_168.get_sub8 buf3 0);
-      (aux, aux_0, aux_12, aux_13, aux_14, aux_15, aux_16, aux_17, aux_18,
-      aux_19, tmp__trace) <@ shake128_squeezeblock4x (param_19,
-      (BArray800.init_arr (W8.of_int 255)), param_18, b_param_10, param_17,
-      b_param_9, param_16, b_param_8, param_15, b_param_7);
-      result_17 <- aux;
-      b_result_7 <- aux_0;
-      result_16 <- aux_12;
-      b_result_6 <- aux_13;
-      result_15 <- aux_14;
-      b_result_5 <- aux_15;
-      result_14 <- aux_16;
-      b_result_4 <- aux_17;
-      result_13 <- aux_18;
-      b_result_3 <- aux_19;
-      trace_matrix_A____sample_4_polynomials <-
-      (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
-      trace_matrix_A____sample_4_polynomials <-
-      (trace_matrix_A____sample_4_polynomials ++
+      param_7 <- (SBArray848_168.get_sub8 buf3 0);
+      (aux_2, aux_3, aux_4, aux_5, aux_6, aux_7, aux_8, aux_9, aux_10,
+      aux_11, tmp__trace) <@ shake128_squeezeblock4x (param_11,
+      (BArray800.init_arr (W8.of_int 255)), param_10, b_param_10, param_9,
+      b_param_9, param_8, b_param_8, param_7, b_param_7);
+      result_11 <- aux_2;
+      b_result_7 <- aux_3;
+      result_10 <- aux_4;
+      b_result_6 <- aux_5;
+      result_9 <- aux_6;
+      b_result_5 <- aux_7;
+      result_8 <- aux_8;
+      b_result_4 <- aux_9;
+      result_7 <- aux_10;
+      b_result_3 <- aux_11;
+      trace_matrix_A____sample_4_polynomials_from_blocks <-
+      (trace_matrix_A____sample_4_polynomials_from_blocks ++ tmp__trace);
+      trace_matrix_A____sample_4_polynomials_from_blocks <-
+      (trace_matrix_A____sample_4_polynomials_from_blocks ++
       [(Assert,
        (((((BArray800.is_init b_result_7 0 800) /\
           (BArray168.is_init b_result_6 0 168)) /\
          (BArray168.is_init b_result_5 0 168)) /\
         (BArray168.is_init b_result_4 0 168)) /\
        (BArray168.is_init b_result_3 0 168)))]);
-      xof_state <- result_17;
+      xof_state <- result_11;
       b_buf0 <-
       (SBArray848_168.set_sub8 b_buf0 0 (BArray168.init_arr (W8.of_int 255)));
-      buf0 <- (SBArray848_168.set_sub8 buf0 0 result_16);
+      buf0 <- (SBArray848_168.set_sub8 buf0 0 result_10);
       b_buf1 <-
       (SBArray848_168.set_sub8 b_buf1 0 (BArray168.init_arr (W8.of_int 255)));
-      buf1 <- (SBArray848_168.set_sub8 buf1 0 result_15);
+      buf1 <- (SBArray848_168.set_sub8 buf1 0 result_9);
       b_buf2 <-
       (SBArray848_168.set_sub8 b_buf2 0 (BArray168.init_arr (W8.of_int 255)));
-      buf2 <- (SBArray848_168.set_sub8 buf2 0 result_14);
+      buf2 <- (SBArray848_168.set_sub8 buf2 0 result_8);
       b_buf3 <-
       (SBArray848_168.set_sub8 b_buf3 0 (BArray168.init_arr (W8.of_int 255)));
-      buf3 <- (SBArray848_168.set_sub8 buf3 0 result_13);
+      buf3 <- (SBArray848_168.set_sub8 buf3 0 result_7);
       (* Erased call to unspill *)
       filled <- filled0;
       b_param_6 <- b_polynomial0;
-      param_22 <- polynomial0;
-      param_21 <- filled;
+      param_14 <- polynomial0;
+      param_13 <- filled;
       b_param_5 <- (SBArray848_168.get_sub8 b_buf0 0);
-      param_20 <- (SBArray848_168.get_sub8 buf0 0);
-      (aux_9, aux_10, aux_11, tmp__trace) <@ matrix_A__rejection_sample_one_block (
-      param_22, b_param_6, param_21, param_20, b_param_5);
-      result_19 <- aux_9;
-      b_result_2 <- aux_10;
-      result_18 <- aux_11;
-      trace_matrix_A____sample_4_polynomials <-
-      (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
-      trace_matrix_A____sample_4_polynomials <-
-      (trace_matrix_A____sample_4_polynomials ++
+      param_12 <- (SBArray848_168.get_sub8 buf0 0);
+      (aux, aux_0, aux_1, tmp__trace) <@ matrix_A__rejection_sample_one_block (
+      param_14, b_param_6, param_13, param_12, b_param_5);
+      result_13 <- aux;
+      b_result_2 <- aux_0;
+      result_12 <- aux_1;
+      trace_matrix_A____sample_4_polynomials_from_blocks <-
+      (trace_matrix_A____sample_4_polynomials_from_blocks ++ tmp__trace);
+      trace_matrix_A____sample_4_polynomials_from_blocks <-
+      (trace_matrix_A____sample_4_polynomials_from_blocks ++
       [(Assert,
        ((BArray1024.is_init b_result_2 0
-        (W64.to_uint ((W64.of_int 4) * result_18))) /\
-       (result_18 \ule (W64.of_int 256))))]);
+        (W64.to_uint ((W64.of_int 4) * result_12))) /\
+       (result_12 \ule (W64.of_int 256))))]);
       b_polynomial0 <- b_result_2;
-      polynomial0 <- result_19;
-      filled <- result_18;
+      polynomial0 <- result_13;
+      filled <- result_12;
       filled0 <- filled;
       filled <- filled1;
       b_param_4 <- b_polynomial1;
-      param_25 <- polynomial1;
-      param_24 <- filled;
+      param_17 <- polynomial1;
+      param_16 <- filled;
       b_param_3 <- (SBArray848_168.get_sub8 b_buf1 0);
-      param_23 <- (SBArray848_168.get_sub8 buf1 0);
-      (aux_9, aux_10, aux_11, tmp__trace) <@ matrix_A__rejection_sample_one_block (
-      param_25, b_param_4, param_24, param_23, b_param_3);
-      result_21 <- aux_9;
-      b_result_1 <- aux_10;
-      result_20 <- aux_11;
-      trace_matrix_A____sample_4_polynomials <-
-      (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
-      trace_matrix_A____sample_4_polynomials <-
-      (trace_matrix_A____sample_4_polynomials ++
+      param_15 <- (SBArray848_168.get_sub8 buf1 0);
+      (aux, aux_0, aux_1, tmp__trace) <@ matrix_A__rejection_sample_one_block (
+      param_17, b_param_4, param_16, param_15, b_param_3);
+      result_15 <- aux;
+      b_result_1 <- aux_0;
+      result_14 <- aux_1;
+      trace_matrix_A____sample_4_polynomials_from_blocks <-
+      (trace_matrix_A____sample_4_polynomials_from_blocks ++ tmp__trace);
+      trace_matrix_A____sample_4_polynomials_from_blocks <-
+      (trace_matrix_A____sample_4_polynomials_from_blocks ++
       [(Assert,
        ((BArray1024.is_init b_result_1 0
-        (W64.to_uint ((W64.of_int 4) * result_20))) /\
-       (result_20 \ule (W64.of_int 256))))]);
+        (W64.to_uint ((W64.of_int 4) * result_14))) /\
+       (result_14 \ule (W64.of_int 256))))]);
       b_polynomial1 <- b_result_1;
-      polynomial1 <- result_21;
-      filled <- result_20;
+      polynomial1 <- result_15;
+      filled <- result_14;
       filled1 <- filled;
       filled <- filled2;
       b_param_2 <- b_polynomial2;
-      param_28 <- polynomial2;
-      param_27 <- filled;
+      param_20 <- polynomial2;
+      param_19 <- filled;
       b_param_1 <- (SBArray848_168.get_sub8 b_buf2 0);
-      param_26 <- (SBArray848_168.get_sub8 buf2 0);
-      (aux_9, aux_10, aux_11, tmp__trace) <@ matrix_A__rejection_sample_one_block (
-      param_28, b_param_2, param_27, param_26, b_param_1);
-      result_23 <- aux_9;
-      b_result_0 <- aux_10;
-      result_22 <- aux_11;
-      trace_matrix_A____sample_4_polynomials <-
-      (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
-      trace_matrix_A____sample_4_polynomials <-
-      (trace_matrix_A____sample_4_polynomials ++
+      param_18 <- (SBArray848_168.get_sub8 buf2 0);
+      (aux, aux_0, aux_1, tmp__trace) <@ matrix_A__rejection_sample_one_block (
+      param_20, b_param_2, param_19, param_18, b_param_1);
+      result_17 <- aux;
+      b_result_0 <- aux_0;
+      result_16 <- aux_1;
+      trace_matrix_A____sample_4_polynomials_from_blocks <-
+      (trace_matrix_A____sample_4_polynomials_from_blocks ++ tmp__trace);
+      trace_matrix_A____sample_4_polynomials_from_blocks <-
+      (trace_matrix_A____sample_4_polynomials_from_blocks ++
       [(Assert,
        ((BArray1024.is_init b_result_0 0
-        (W64.to_uint ((W64.of_int 4) * result_22))) /\
-       (result_22 \ule (W64.of_int 256))))]);
+        (W64.to_uint ((W64.of_int 4) * result_16))) /\
+       (result_16 \ule (W64.of_int 256))))]);
       b_polynomial2 <- b_result_0;
-      polynomial2 <- result_23;
-      filled <- result_22;
+      polynomial2 <- result_17;
+      filled <- result_16;
       filled2 <- filled;
       filled <- filled3;
       b_param_0 <- b_polynomial3;
-      param_31 <- polynomial3;
-      param_30 <- filled;
+      param_23 <- polynomial3;
+      param_22 <- filled;
       b_param <- (SBArray848_168.get_sub8 b_buf3 0);
-      param_29 <- (SBArray848_168.get_sub8 buf3 0);
-      (aux_9, aux_10, aux_11, tmp__trace) <@ matrix_A__rejection_sample_one_block (
-      param_31, b_param_0, param_30, param_29, b_param);
-      result_25 <- aux_9;
-      b_result <- aux_10;
-      result_24 <- aux_11;
-      trace_matrix_A____sample_4_polynomials <-
-      (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
-      trace_matrix_A____sample_4_polynomials <-
-      (trace_matrix_A____sample_4_polynomials ++
+      param_21 <- (SBArray848_168.get_sub8 buf3 0);
+      (aux, aux_0, aux_1, tmp__trace) <@ matrix_A__rejection_sample_one_block (
+      param_23, b_param_0, param_22, param_21, b_param);
+      result_19 <- aux;
+      b_result <- aux_0;
+      result_18 <- aux_1;
+      trace_matrix_A____sample_4_polynomials_from_blocks <-
+      (trace_matrix_A____sample_4_polynomials_from_blocks ++ tmp__trace);
+      trace_matrix_A____sample_4_polynomials_from_blocks <-
+      (trace_matrix_A____sample_4_polynomials_from_blocks ++
       [(Assert,
        ((BArray1024.is_init b_result 0
-        (W64.to_uint ((W64.of_int 4) * result_24))) /\
-       (result_24 \ule (W64.of_int 256))))]);
+        (W64.to_uint ((W64.of_int 4) * result_18))) /\
+       (result_18 \ule (W64.of_int 256))))]);
       b_polynomial3 <- b_result;
-      polynomial3 <- result_25;
-      filled <- result_24;
+      polynomial3 <- result_19;
+      filled <- result_18;
       filled3 <- filled;
       stop_sampling <- (W32.of_int 1);
       if ((filled0 \ult (W64.of_int 256))) {
@@ -50086,7 +51880,989 @@ module M = {
     }
     return (polynomial0, b_polynomial0, polynomial1, b_polynomial1,
            polynomial2, b_polynomial2, polynomial3, b_polynomial3,
+           trace_matrix_A____sample_4_polynomials_from_blocks);
+  }
+  proc matrix_A____sample_4_polynomials (rho:BArray32.t, b_rho:BArray32.t,
+                                         domain_separators:BArray8.t,
+                                         b_domain_separators:BArray8.t) : 
+  BArray1024.t * BArray1024.t * BArray1024.t * BArray1024.t * BArray1024.t *
+  BArray1024.t * BArray1024.t * BArray1024.t * trace = {
+    var aux_9:BArray1024.t;
+    var aux_10:BArray1024.t;
+    var aux_11:BArray1024.t;
+    var aux_12:BArray1024.t;
+    var aux_13:BArray1024.t;
+    var aux_14:BArray1024.t;
+    var aux_15:BArray1024.t;
+    var aux_16:BArray1024.t;
+    var aux:BArray800.t;
+    var aux_0:BArray800.t;
+    var aux_1:BArray848.t;
+    var aux_2:BArray848.t;
+    var aux_3:BArray848.t;
+    var aux_4:BArray848.t;
+    var aux_5:BArray848.t;
+    var aux_6:BArray848.t;
+    var aux_7:BArray848.t;
+    var aux_8:BArray848.t;
+    var polynomial0:BArray1024.t;
+    var polynomial1:BArray1024.t;
+    var polynomial2:BArray1024.t;
+    var polynomial3:BArray1024.t;
+    var xof_state:BArray800.t;
+    var buf0:BArray848.t;
+    var buf1:BArray848.t;
+    var buf2:BArray848.t;
+    var buf3:BArray848.t;
+    var param:BArray8.t;
+    var param_0:BArray32.t;
+    var param_1:BArray800.t;
+    var result:BArray800.t;
+    var param_2:BArray848.t;
+    var param_3:BArray848.t;
+    var param_4:BArray848.t;
+    var param_5:BArray848.t;
+    var param_6:BArray800.t;
+    var result_0:BArray848.t;
+    var result_1:BArray848.t;
+    var result_2:BArray848.t;
+    var result_3:BArray848.t;
+    var result_4:BArray800.t;
+    var param_7:BArray848.t;
+    var param_8:BArray848.t;
+    var param_9:BArray848.t;
+    var param_10:BArray848.t;
+    var param_11:BArray800.t;
+    var result_5:BArray1024.t;
+    var result_6:BArray1024.t;
+    var result_7:BArray1024.t;
+    var result_8:BArray1024.t;
+    var b_polynomial3:BArray1024.t;
+    var b_polynomial2:BArray1024.t;
+    var b_polynomial1:BArray1024.t;
+    var b_polynomial0:BArray1024.t;
+    var b_result:BArray1024.t;
+    var b_result_0:BArray1024.t;
+    var b_result_1:BArray1024.t;
+    var b_result_2:BArray1024.t;
+    var b_buf3:BArray848.t;
+    var b_buf2:BArray848.t;
+    var b_buf1:BArray848.t;
+    var b_buf0:BArray848.t;
+    var b_xof_state:BArray800.t;
+    var b_result_3:BArray848.t;
+    var b_result_4:BArray848.t;
+    var b_result_5:BArray848.t;
+    var b_result_6:BArray848.t;
+    var b_result_7:BArray800.t;
+    var b_param:BArray848.t;
+    var b_param_0:BArray848.t;
+    var b_param_1:BArray848.t;
+    var b_param_2:BArray848.t;
+    var b_result_8:BArray800.t;
+    var b_param_3:BArray800.t;
+    var trace_matrix_A____sample_4_polynomials:trace;
+    b_buf0 <- witness;
+    b_buf1 <- witness;
+    b_buf2 <- witness;
+    b_buf3 <- witness;
+    b_param <- witness;
+    b_param_0 <- witness;
+    b_param_1 <- witness;
+    b_param_2 <- witness;
+    b_param_3 <- witness;
+    b_polynomial0 <- witness;
+    b_polynomial1 <- witness;
+    b_polynomial2 <- witness;
+    b_polynomial3 <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    b_result_1 <- witness;
+    b_result_2 <- witness;
+    b_result_3 <- witness;
+    b_result_4 <- witness;
+    b_result_5 <- witness;
+    b_result_6 <- witness;
+    b_result_7 <- witness;
+    b_result_8 <- witness;
+    b_xof_state <- witness;
+    buf0 <- witness;
+    buf1 <- witness;
+    buf2 <- witness;
+    buf3 <- witness;
+    param <- witness;
+    param_0 <- witness;
+    param_1 <- witness;
+    param_2 <- witness;
+    param_3 <- witness;
+    param_4 <- witness;
+    param_5 <- witness;
+    param_6 <- witness;
+    param_7 <- witness;
+    param_8 <- witness;
+    param_9 <- witness;
+    param_10 <- witness;
+    param_11 <- witness;
+    polynomial0 <- witness;
+    polynomial1 <- witness;
+    polynomial2 <- witness;
+    polynomial3 <- witness;
+    result <- witness;
+    result_0 <- witness;
+    result_1 <- witness;
+    result_2 <- witness;
+    result_3 <- witness;
+    result_4 <- witness;
+    result_5 <- witness;
+    result_6 <- witness;
+    result_7 <- witness;
+    result_8 <- witness;
+    xof_state <- witness;
+    trace_matrix_A____sample_4_polynomials <- [];
+    trace_matrix_A____sample_4_polynomials <-
+    (trace_matrix_A____sample_4_polynomials ++
+    [(Assert, (BArray32.is_init b_rho 0 32))]);
+    trace_matrix_A____sample_4_polynomials <-
+    (trace_matrix_A____sample_4_polynomials ++
+    [(Assert, (BArray8.is_init b_domain_separators 0 8))]);
+    b_buf0 <- (BArray848.init_arr (W8.of_int 0));
+    b_buf1 <- (BArray848.init_arr (W8.of_int 0));
+    b_buf2 <- (BArray848.init_arr (W8.of_int 0));
+    b_buf3 <- (BArray848.init_arr (W8.of_int 0));
+    b_xof_state <- (BArray800.init_arr (W8.of_int 0));
+    b_param_3 <- b_xof_state;
+    param_1 <- xof_state;
+    param_0 <- rho;
+    param <- domain_separators;
+    (aux, aux_0, tmp__trace) <@ shake128_absorb_34_4x (param_1, b_param_3,
+    param_0, (BArray32.init_arr (W8.of_int 255)), param,
+    (BArray8.init_arr (W8.of_int 255)));
+    result <- aux;
+    b_result_8 <- aux_0;
+    trace_matrix_A____sample_4_polynomials <-
+    (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
+    trace_matrix_A____sample_4_polynomials <-
+    (trace_matrix_A____sample_4_polynomials ++
+    [(Assert, (BArray800.is_init b_result_8 0 800))]);
+    xof_state <- result;
+    param_6 <- xof_state;
+    b_param_2 <- b_buf0;
+    param_5 <- buf0;
+    b_param_1 <- b_buf1;
+    param_4 <- buf1;
+    b_param_0 <- b_buf2;
+    param_3 <- buf2;
+    b_param <- b_buf3;
+    param_2 <- buf3;
+    (aux, aux_0, aux_1, aux_2, aux_3, aux_4, aux_5, aux_6, aux_7, aux_8,
+    tmp__trace) <@ matrix_A____shake128_squeeze_multiple_blocks_4x (param_6,
+    (BArray800.init_arr (W8.of_int 255)), param_5, b_param_2, param_4,
+    b_param_1, param_3, b_param_0, param_2, b_param);
+    result_4 <- aux;
+    b_result_7 <- aux_0;
+    result_3 <- aux_1;
+    b_result_6 <- aux_2;
+    result_2 <- aux_3;
+    b_result_5 <- aux_4;
+    result_1 <- aux_5;
+    b_result_4 <- aux_6;
+    result_0 <- aux_7;
+    b_result_3 <- aux_8;
+    trace_matrix_A____sample_4_polynomials <-
+    (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
+    trace_matrix_A____sample_4_polynomials <-
+    (trace_matrix_A____sample_4_polynomials ++
+    [(Assert,
+     (((((BArray800.is_init b_result_7 0 800) /\
+        (BArray848.is_init b_result_6 0 848)) /\
+       (BArray848.is_init b_result_5 0 848)) /\
+      (BArray848.is_init b_result_4 0 848)) /\
+     (BArray848.is_init b_result_3 0 848)))]);
+    xof_state <- result_4;
+    buf0 <- result_3;
+    buf1 <- result_2;
+    buf2 <- result_1;
+    buf3 <- result_0;
+    param_11 <- xof_state;
+    param_10 <- buf0;
+    param_9 <- buf1;
+    param_8 <- buf2;
+    param_7 <- buf3;
+    (aux_9, aux_10, aux_11, aux_12, aux_13, aux_14, aux_15, aux_16,
+    tmp__trace) <@ matrix_A____sample_4_polynomials_from_blocks (param_11,
+    (BArray800.init_arr (W8.of_int 255)), param_10,
+    (BArray848.init_arr (W8.of_int 255)), param_9,
+    (BArray848.init_arr (W8.of_int 255)), param_8,
+    (BArray848.init_arr (W8.of_int 255)), param_7,
+    (BArray848.init_arr (W8.of_int 255)));
+    result_8 <- aux_9;
+    b_result_2 <- aux_10;
+    result_7 <- aux_11;
+    b_result_1 <- aux_12;
+    result_6 <- aux_13;
+    b_result_0 <- aux_14;
+    result_5 <- aux_15;
+    b_result <- aux_16;
+    trace_matrix_A____sample_4_polynomials <-
+    (trace_matrix_A____sample_4_polynomials ++ tmp__trace);
+    trace_matrix_A____sample_4_polynomials <-
+    (trace_matrix_A____sample_4_polynomials ++
+    [(Assert, (BArray1024.is_init b_result_2 0 1024))]);
+    trace_matrix_A____sample_4_polynomials <-
+    (trace_matrix_A____sample_4_polynomials ++
+    [(Assert, (BArray1024.is_init b_result_1 0 1024))]);
+    trace_matrix_A____sample_4_polynomials <-
+    (trace_matrix_A____sample_4_polynomials ++
+    [(Assert, (BArray1024.is_init b_result_0 0 1024))]);
+    trace_matrix_A____sample_4_polynomials <-
+    (trace_matrix_A____sample_4_polynomials ++
+    [(Assert, (BArray1024.is_init b_result 0 1024))]);
+    polynomial0 <- result_8;
+    polynomial1 <- result_7;
+    polynomial2 <- result_6;
+    polynomial3 <- result_5;
+    b_polynomial3 <- (BArray1024.init_arr (W8.of_int 255));
+    b_polynomial2 <- (BArray1024.init_arr (W8.of_int 255));
+    b_polynomial1 <- (BArray1024.init_arr (W8.of_int 255));
+    b_polynomial0 <- (BArray1024.init_arr (W8.of_int 255));
+    return (polynomial0, b_polynomial0, polynomial1, b_polynomial1,
+           polynomial2, b_polynomial2, polynomial3, b_polynomial3,
            trace_matrix_A____sample_4_polynomials);
+  }
+  proc matrix_A____vk_hash_absorb_block (lanes:BArray200.t,
+                                         b_lanes:BArray200.t,
+                                         vk:BArray1952.t, b_vk:BArray1952.t,
+                                         k:int) : BArray200.t * BArray200.t *
+                                                  trace = {
+    var aux:BArray200.t;
+    var aux_0:BArray200.t;
+    var aux_1:int;
+    var aux_2:int;
+    var offset:int;
+    var param:int;
+    var param_0:int;
+    var param_1:int;
+    var param_2:BArray1952.t;
+    var param_3:int;
+    var param_4:BArray200.t;
+    var result:int;
+    var result_0:int;
+    var result_1:BArray200.t;
+    var param_5:int;
+    var param_6:int;
+    var param_7:int;
+    var param_8:BArray1952.t;
+    var param_9:int;
+    var param_10:BArray200.t;
+    var result_2:int;
+    var result_3:int;
+    var result_4:BArray200.t;
+    var param_11:int;
+    var param_12:BArray200.t;
+    var result_5:BArray200.t;
+    var b_result:BArray200.t;
+    var b_result_0:BArray200.t;
+    var b_result_1:BArray200.t;
+    var trace_matrix_A____vk_hash_absorb_block:trace;
+    b_result <- witness;
+    b_result_0 <- witness;
+    b_result_1 <- witness;
+    param_2 <- witness;
+    param_4 <- witness;
+    param_8 <- witness;
+    param_10 <- witness;
+    param_12 <- witness;
+    result_1 <- witness;
+    result_4 <- witness;
+    result_5 <- witness;
+    trace_matrix_A____vk_hash_absorb_block <- [];
+    trace_matrix_A____vk_hash_absorb_block <-
+    (trace_matrix_A____vk_hash_absorb_block ++
+    [(Assert,
+     ((((BArray200.is_init b_lanes 0 200) /\
+       (BArray1952.is_init b_vk 0 1952)) /\
+      (0 <= k)) /\
+     (k < 15)))]);
+    trace_matrix_A____vk_hash_absorb_block <-
+    (trace_matrix_A____vk_hash_absorb_block ++
+    [(Assert, ((0 <= (136 * k)) /\ ((136 * k) <= 18446744073709551615)))]);
+    offset <- (136 * k);
+    if ((k < 14)) {
+      param_4 <- lanes;
+      param_3 <- 0;
+      param_2 <- vk;
+      param_1 <- offset;
+      param_0 <- 136;
+      param <- 0;
+      (aux, aux_0, aux_1, aux_2, tmp__trace) <@ a_VERIFICATION_KEY____addstate (
+      param_4, (BArray200.init_arr (W8.of_int 255)), param_3, param_2,
+      (BArray1952.init_arr (W8.of_int 255)), param_1, param_0, param);
+      result_1 <- aux;
+      b_result <- aux_0;
+      result_0 <- aux_1;
+      result <- aux_2;
+      trace_matrix_A____vk_hash_absorb_block <-
+      (trace_matrix_A____vk_hash_absorb_block ++ tmp__trace);
+      trace_matrix_A____vk_hash_absorb_block <-
+      (trace_matrix_A____vk_hash_absorb_block ++
+      [(Assert,
+       (((0 <= param_0) /\ (param_0 <= 18446744073709551615)) /\
+       (((0 <= (param_1 + param_0)) /\
+        ((param_1 + param_0) <= 18446744073709551615)) /\
+       (((BArray200.is_init b_result 0 200) /\
+        (result_0 = ((param_3 + param_0) + ((param <> 0) ? 1 : 0)))) /\
+       (result = (param_1 + param_0))))))]);
+      trace_matrix_A____vk_hash_absorb_block <-
+      (trace_matrix_A____vk_hash_absorb_block ++
+      [(Assert, ((0 <= result) /\ (result <= 18446744073709551615)))]);
+      lanes <- result_1;
+    } else {
+      param_10 <- lanes;
+      param_9 <- 0;
+      param_8 <- vk;
+      param_7 <- offset;
+      param_6 <- 48;
+      param_5 <- 31;
+      (aux, aux_0, aux_1, aux_2, tmp__trace) <@ a_VERIFICATION_KEY____addstate (
+      param_10, (BArray200.init_arr (W8.of_int 255)), param_9, param_8,
+      (BArray1952.init_arr (W8.of_int 255)), param_7, param_6, param_5);
+      result_4 <- aux;
+      b_result_1 <- aux_0;
+      result_3 <- aux_1;
+      result_2 <- aux_2;
+      trace_matrix_A____vk_hash_absorb_block <-
+      (trace_matrix_A____vk_hash_absorb_block ++ tmp__trace);
+      trace_matrix_A____vk_hash_absorb_block <-
+      (trace_matrix_A____vk_hash_absorb_block ++
+      [(Assert,
+       (((0 <= param_6) /\ (param_6 <= 18446744073709551615)) /\
+       (((0 <= (param_7 + param_6)) /\
+        ((param_7 + param_6) <= 18446744073709551615)) /\
+       (((BArray200.is_init b_result_1 0 200) /\
+        (result_3 = ((param_9 + param_6) + ((param_5 <> 0) ? 1 : 0)))) /\
+       (result_2 = (param_7 + param_6))))))]);
+      trace_matrix_A____vk_hash_absorb_block <-
+      (trace_matrix_A____vk_hash_absorb_block ++
+      [(Assert, ((0 <= result_2) /\ (result_2 <= 18446744073709551615)))]);
+      lanes <- result_4;
+      param_12 <- lanes;
+      param_11 <- 136;
+      (aux, aux_0, tmp__trace) <@ __addratebit (param_12,
+      (BArray200.init_arr (W8.of_int 255)), param_11);
+      result_5 <- aux;
+      b_result_0 <- aux_0;
+      trace_matrix_A____vk_hash_absorb_block <-
+      (trace_matrix_A____vk_hash_absorb_block ++ tmp__trace);
+      trace_matrix_A____vk_hash_absorb_block <-
+      (trace_matrix_A____vk_hash_absorb_block ++
+      [(Assert, (BArray200.is_init b_result_0 0 200))]);
+      lanes <- result_5;
+    }
+    b_lanes <- (BArray200.init_arr (W8.of_int 255));
+    return (lanes, b_lanes, trace_matrix_A____vk_hash_absorb_block);
+  }
+  proc matrix_A____shake128_squeeze_multiple_blocks_4x_vk (state:BArray800.t,
+                                                           b_state:BArray800.t,
+                                                           b0:BArray848.t,
+                                                           b_b0:BArray848.t,
+                                                           b1:BArray848.t,
+                                                           b_b1:BArray848.t,
+                                                           b2:BArray848.t,
+                                                           b_b2:BArray848.t,
+                                                           b3:BArray848.t,
+                                                           b_b3:BArray848.t,
+                                                           lanes:BArray200.t,
+                                                           b_lanes:BArray200.t,
+                                                           vk:BArray1952.t,
+                                                           b_vk:BArray1952.t,
+                                                           first_slot:int) : 
+  BArray800.t * BArray800.t * BArray848.t * BArray848.t * BArray848.t *
+  BArray848.t * BArray848.t * BArray848.t * BArray848.t * BArray848.t *
+  BArray200.t * BArray200.t * trace = {
+    var aux_1:BArray168.t;
+    var aux_2:BArray168.t;
+    var aux_3:BArray168.t;
+    var aux_4:BArray168.t;
+    var aux_5:BArray168.t;
+    var aux_6:BArray168.t;
+    var aux_7:BArray168.t;
+    var aux_8:BArray168.t;
+    var aux_9:BArray200.t;
+    var aux_10:BArray200.t;
+    var aux:BArray800.t;
+    var aux_0:BArray800.t;
+    var vkm:BArray1952.t;
+    var i:int;
+    var zero:W64.t;
+    var param:int;
+    var param_0:BArray1952.t;
+    var param_1:BArray200.t;
+    var result:BArray200.t;
+    var param_2:BArray200.t;
+    var param_3:BArray168.t;
+    var param_4:BArray168.t;
+    var param_5:BArray168.t;
+    var param_6:BArray168.t;
+    var param_7:BArray800.t;
+    var result_0:BArray200.t;
+    var result_1:BArray168.t;
+    var result_2:BArray168.t;
+    var result_3:BArray168.t;
+    var result_4:BArray168.t;
+    var result_5:BArray800.t;
+    var param_8:BArray168.t;
+    var param_9:BArray168.t;
+    var param_10:BArray168.t;
+    var param_11:BArray168.t;
+    var param_12:BArray800.t;
+    var result_6:BArray168.t;
+    var result_7:BArray168.t;
+    var result_8:BArray168.t;
+    var result_9:BArray168.t;
+    var result_10:BArray800.t;
+    var b_result:BArray200.t;
+    var b_result_0:BArray168.t;
+    var b_result_1:BArray168.t;
+    var b_result_2:BArray168.t;
+    var b_result_3:BArray168.t;
+    var b_result_4:BArray800.t;
+    var b_param:BArray168.t;
+    var b_param_0:BArray168.t;
+    var b_param_1:BArray168.t;
+    var b_param_2:BArray168.t;
+    var b_result_5:BArray200.t;
+    var b_result_6:BArray168.t;
+    var b_result_7:BArray168.t;
+    var b_result_8:BArray168.t;
+    var b_result_9:BArray168.t;
+    var b_result_10:BArray800.t;
+    var b_param_3:BArray168.t;
+    var b_param_4:BArray168.t;
+    var b_param_5:BArray168.t;
+    var b_param_6:BArray168.t;
+    var trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk:trace;
+    b_param <- witness;
+    b_param_0 <- witness;
+    b_param_1 <- witness;
+    b_param_2 <- witness;
+    b_param_3 <- witness;
+    b_param_4 <- witness;
+    b_param_5 <- witness;
+    b_param_6 <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    b_result_1 <- witness;
+    b_result_2 <- witness;
+    b_result_3 <- witness;
+    b_result_4 <- witness;
+    b_result_5 <- witness;
+    b_result_6 <- witness;
+    b_result_7 <- witness;
+    b_result_8 <- witness;
+    b_result_9 <- witness;
+    b_result_10 <- witness;
+    param_0 <- witness;
+    param_1 <- witness;
+    param_2 <- witness;
+    param_3 <- witness;
+    param_4 <- witness;
+    param_5 <- witness;
+    param_6 <- witness;
+    param_7 <- witness;
+    param_8 <- witness;
+    param_9 <- witness;
+    param_10 <- witness;
+    param_11 <- witness;
+    param_12 <- witness;
+    result <- witness;
+    result_0 <- witness;
+    result_1 <- witness;
+    result_2 <- witness;
+    result_3 <- witness;
+    result_4 <- witness;
+    result_5 <- witness;
+    result_6 <- witness;
+    result_7 <- witness;
+    result_8 <- witness;
+    result_9 <- witness;
+    result_10 <- witness;
+    vkm <- witness;
+    trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <- [];
+    trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+    (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+    [(Assert,
+     ((((BArray800.is_init b_state 0 800) /\
+       (BArray200.is_init b_lanes 0 200)) /\
+      (BArray1952.is_init b_vk 0 1952)) /\
+     (0 <= first_slot)))]);
+    vkm <- vk;
+    i <- 0;
+    while ((i < 5)) {
+      if (((first_slot + i) < 15)) {
+        vk <- vkm;
+        param_1 <- lanes;
+        param_0 <- vk;
+        param <- (first_slot + i);
+        (aux_9, aux_10, tmp__trace) <@ matrix_A____vk_hash_absorb_block (
+        param_1, (BArray200.init_arr (W8.of_int 255)), param_0,
+        (BArray1952.init_arr (W8.of_int 255)), param);
+        result <- aux_9;
+        b_result_5 <- aux_10;
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        tmp__trace);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, (BArray200.is_init b_result_5 0 200))]);
+        lanes <- result;
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        param_7 <- state;
+        b_param_2 <- (SBArray848_168.get_sub8 b_b0 (i * 168));
+        param_6 <- (SBArray848_168.get_sub8 b0 (i * 168));
+        b_param_1 <- (SBArray848_168.get_sub8 b_b1 (i * 168));
+        param_5 <- (SBArray848_168.get_sub8 b1 (i * 168));
+        b_param_0 <- (SBArray848_168.get_sub8 b_b2 (i * 168));
+        param_4 <- (SBArray848_168.get_sub8 b2 (i * 168));
+        b_param <- (SBArray848_168.get_sub8 b_b3 (i * 168));
+        param_3 <- (SBArray848_168.get_sub8 b3 (i * 168));
+        param_2 <- lanes;
+        (aux, aux_0, aux_1, aux_2, aux_3, aux_4, aux_5, aux_6, aux_7, 
+        aux_8, aux_9, aux_10, tmp__trace) <@ __shake128_squeezeblock4x_x1 (
+        param_7, (BArray800.init_arr (W8.of_int 255)), param_6, b_param_2,
+        param_5, b_param_1, param_4, b_param_0, param_3, b_param, param_2,
+        (BArray200.init_arr (W8.of_int 255)));
+        result_5 <- aux;
+        b_result_4 <- aux_0;
+        result_4 <- aux_1;
+        b_result_3 <- aux_2;
+        result_3 <- aux_3;
+        b_result_2 <- aux_4;
+        result_2 <- aux_5;
+        b_result_1 <- aux_6;
+        result_1 <- aux_7;
+        b_result_0 <- aux_8;
+        result_0 <- aux_9;
+        b_result <- aux_10;
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        tmp__trace);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert,
+         ((((((BArray800.is_init b_result_4 0 800) /\
+             (BArray168.is_init b_result_3 0 168)) /\
+            (BArray168.is_init b_result_2 0 168)) /\
+           (BArray168.is_init b_result_1 0 168)) /\
+          (BArray168.is_init b_result_0 0 168)) /\
+         (BArray200.is_init b_result 0 200)))]);
+        state <- result_5;
+        b_b0 <-
+        (SBArray848_168.set_sub8 b_b0 (i * 168)
+        (BArray168.init_arr (W8.of_int 255)));
+        b0 <- (SBArray848_168.set_sub8 b0 (i * 168) result_4);
+        b_b1 <-
+        (SBArray848_168.set_sub8 b_b1 (i * 168)
+        (BArray168.init_arr (W8.of_int 255)));
+        b1 <- (SBArray848_168.set_sub8 b1 (i * 168) result_3);
+        b_b2 <-
+        (SBArray848_168.set_sub8 b_b2 (i * 168)
+        (BArray168.init_arr (W8.of_int 255)));
+        b2 <- (SBArray848_168.set_sub8 b2 (i * 168) result_2);
+        b_b3 <-
+        (SBArray848_168.set_sub8 b_b3 (i * 168)
+        (BArray168.init_arr (W8.of_int 255)));
+        b3 <- (SBArray848_168.set_sub8 b3 (i * 168) result_1);
+        lanes <- result_0;
+      } else {
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert, ((0 <= (i * 168)) /\ (((i * 168) + 168) <= 848)))]);
+        param_12 <- state;
+        b_param_6 <- (SBArray848_168.get_sub8 b_b0 (i * 168));
+        param_11 <- (SBArray848_168.get_sub8 b0 (i * 168));
+        b_param_5 <- (SBArray848_168.get_sub8 b_b1 (i * 168));
+        param_10 <- (SBArray848_168.get_sub8 b1 (i * 168));
+        b_param_4 <- (SBArray848_168.get_sub8 b_b2 (i * 168));
+        param_9 <- (SBArray848_168.get_sub8 b2 (i * 168));
+        b_param_3 <- (SBArray848_168.get_sub8 b_b3 (i * 168));
+        param_8 <- (SBArray848_168.get_sub8 b3 (i * 168));
+        (aux, aux_0, aux_1, aux_2, aux_3, aux_4, aux_5, aux_6, aux_7, 
+        aux_8, tmp__trace) <@ shake128_squeezeblock4x (param_12,
+        (BArray800.init_arr (W8.of_int 255)), param_11, b_param_6, param_10,
+        b_param_5, param_9, b_param_4, param_8, b_param_3);
+        result_10 <- aux;
+        b_result_10 <- aux_0;
+        result_9 <- aux_1;
+        b_result_9 <- aux_2;
+        result_8 <- aux_3;
+        b_result_8 <- aux_4;
+        result_7 <- aux_5;
+        b_result_7 <- aux_6;
+        result_6 <- aux_7;
+        b_result_6 <- aux_8;
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        tmp__trace);
+        trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk <-
+        (trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk ++
+        [(Assert,
+         (((((BArray800.is_init b_result_10 0 800) /\
+            (BArray168.is_init b_result_9 0 168)) /\
+           (BArray168.is_init b_result_8 0 168)) /\
+          (BArray168.is_init b_result_7 0 168)) /\
+         (BArray168.is_init b_result_6 0 168)))]);
+        state <- result_10;
+        b_b0 <-
+        (SBArray848_168.set_sub8 b_b0 (i * 168)
+        (BArray168.init_arr (W8.of_int 255)));
+        b0 <- (SBArray848_168.set_sub8 b0 (i * 168) result_9);
+        b_b1 <-
+        (SBArray848_168.set_sub8 b_b1 (i * 168)
+        (BArray168.init_arr (W8.of_int 255)));
+        b1 <- (SBArray848_168.set_sub8 b1 (i * 168) result_8);
+        b_b2 <-
+        (SBArray848_168.set_sub8 b_b2 (i * 168)
+        (BArray168.init_arr (W8.of_int 255)));
+        b2 <- (SBArray848_168.set_sub8 b2 (i * 168) result_7);
+        b_b3 <-
+        (SBArray848_168.set_sub8 b_b3 (i * 168)
+        (BArray168.init_arr (W8.of_int 255)));
+        b3 <- (SBArray848_168.set_sub8 b3 (i * 168) result_6);
+      }
+      i <- (i + 1);
+    }
+    zero <- (W64.of_int 0);
+    b_b0 <- (BArray848.set64d b_b0 840 (W64.of_int 18446744073709551615));
+    b0 <- (BArray848.set64d b0 840 zero);
+    b_b1 <- (BArray848.set64d b_b1 840 (W64.of_int 18446744073709551615));
+    b1 <- (BArray848.set64d b1 840 zero);
+    b_b2 <- (BArray848.set64d b_b2 840 (W64.of_int 18446744073709551615));
+    b2 <- (BArray848.set64d b2 840 zero);
+    b_b3 <- (BArray848.set64d b_b3 840 (W64.of_int 18446744073709551615));
+    b3 <- (BArray848.set64d b3 840 zero);
+    b_lanes <- (BArray200.init_arr (W8.of_int 255));
+    b_state <- (BArray800.init_arr (W8.of_int 255));
+    return (state, b_state, b0, b_b0, b1, b_b1, b2, b_b2, b3, b_b3, lanes,
+           b_lanes, trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk);
+  }
+  proc matrix_A____sample_4_polynomials_vk (rho:BArray32.t, b_rho:BArray32.t,
+                                            domain_separators:BArray8.t,
+                                            b_domain_separators:BArray8.t,
+                                            lanes:BArray200.t,
+                                            b_lanes:BArray200.t,
+                                            vk:BArray1952.t,
+                                            b_vk:BArray1952.t, first_slot:int) : 
+  BArray1024.t * BArray1024.t * BArray1024.t * BArray1024.t * BArray1024.t *
+  BArray1024.t * BArray1024.t * BArray1024.t * BArray200.t * BArray200.t *
+  trace = {
+    var aux_11:BArray1024.t;
+    var aux_12:BArray1024.t;
+    var aux_13:BArray1024.t;
+    var aux_14:BArray1024.t;
+    var aux_15:BArray1024.t;
+    var aux_16:BArray1024.t;
+    var aux_17:BArray1024.t;
+    var aux_18:BArray1024.t;
+    var aux_9:BArray200.t;
+    var aux_10:BArray200.t;
+    var aux:BArray800.t;
+    var aux_0:BArray800.t;
+    var aux_1:BArray848.t;
+    var aux_2:BArray848.t;
+    var aux_3:BArray848.t;
+    var aux_4:BArray848.t;
+    var aux_5:BArray848.t;
+    var aux_6:BArray848.t;
+    var aux_7:BArray848.t;
+    var aux_8:BArray848.t;
+    var polynomial0:BArray1024.t;
+    var polynomial1:BArray1024.t;
+    var polynomial2:BArray1024.t;
+    var polynomial3:BArray1024.t;
+    var xof_state:BArray800.t;
+    var buf0:BArray848.t;
+    var buf1:BArray848.t;
+    var buf2:BArray848.t;
+    var buf3:BArray848.t;
+    var param:BArray8.t;
+    var param_0:BArray32.t;
+    var param_1:BArray800.t;
+    var result:BArray800.t;
+    var param_2:int;
+    var param_3:BArray1952.t;
+    var param_4:BArray200.t;
+    var param_5:BArray848.t;
+    var param_6:BArray848.t;
+    var param_7:BArray848.t;
+    var param_8:BArray848.t;
+    var param_9:BArray800.t;
+    var result_0:BArray200.t;
+    var result_1:BArray848.t;
+    var result_2:BArray848.t;
+    var result_3:BArray848.t;
+    var result_4:BArray848.t;
+    var result_5:BArray800.t;
+    var param_10:BArray848.t;
+    var param_11:BArray848.t;
+    var param_12:BArray848.t;
+    var param_13:BArray848.t;
+    var param_14:BArray800.t;
+    var result_6:BArray1024.t;
+    var result_7:BArray1024.t;
+    var result_8:BArray1024.t;
+    var result_9:BArray1024.t;
+    var b_polynomial3:BArray1024.t;
+    var b_polynomial2:BArray1024.t;
+    var b_polynomial1:BArray1024.t;
+    var b_polynomial0:BArray1024.t;
+    var b_result:BArray1024.t;
+    var b_result_0:BArray1024.t;
+    var b_result_1:BArray1024.t;
+    var b_result_2:BArray1024.t;
+    var b_buf3:BArray848.t;
+    var b_buf2:BArray848.t;
+    var b_buf1:BArray848.t;
+    var b_buf0:BArray848.t;
+    var b_xof_state:BArray800.t;
+    var b_result_3:BArray200.t;
+    var b_result_4:BArray848.t;
+    var b_result_5:BArray848.t;
+    var b_result_6:BArray848.t;
+    var b_result_7:BArray848.t;
+    var b_result_8:BArray800.t;
+    var b_param:BArray848.t;
+    var b_param_0:BArray848.t;
+    var b_param_1:BArray848.t;
+    var b_param_2:BArray848.t;
+    var b_result_9:BArray800.t;
+    var b_param_3:BArray800.t;
+    var trace_matrix_A____sample_4_polynomials_vk:trace;
+    b_buf0 <- witness;
+    b_buf1 <- witness;
+    b_buf2 <- witness;
+    b_buf3 <- witness;
+    b_param <- witness;
+    b_param_0 <- witness;
+    b_param_1 <- witness;
+    b_param_2 <- witness;
+    b_param_3 <- witness;
+    b_polynomial0 <- witness;
+    b_polynomial1 <- witness;
+    b_polynomial2 <- witness;
+    b_polynomial3 <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    b_result_1 <- witness;
+    b_result_2 <- witness;
+    b_result_3 <- witness;
+    b_result_4 <- witness;
+    b_result_5 <- witness;
+    b_result_6 <- witness;
+    b_result_7 <- witness;
+    b_result_8 <- witness;
+    b_result_9 <- witness;
+    b_xof_state <- witness;
+    buf0 <- witness;
+    buf1 <- witness;
+    buf2 <- witness;
+    buf3 <- witness;
+    param <- witness;
+    param_0 <- witness;
+    param_1 <- witness;
+    param_3 <- witness;
+    param_4 <- witness;
+    param_5 <- witness;
+    param_6 <- witness;
+    param_7 <- witness;
+    param_8 <- witness;
+    param_9 <- witness;
+    param_10 <- witness;
+    param_11 <- witness;
+    param_12 <- witness;
+    param_13 <- witness;
+    param_14 <- witness;
+    polynomial0 <- witness;
+    polynomial1 <- witness;
+    polynomial2 <- witness;
+    polynomial3 <- witness;
+    result <- witness;
+    result_0 <- witness;
+    result_1 <- witness;
+    result_2 <- witness;
+    result_3 <- witness;
+    result_4 <- witness;
+    result_5 <- witness;
+    result_6 <- witness;
+    result_7 <- witness;
+    result_8 <- witness;
+    result_9 <- witness;
+    xof_state <- witness;
+    trace_matrix_A____sample_4_polynomials_vk <- [];
+    trace_matrix_A____sample_4_polynomials_vk <-
+    (trace_matrix_A____sample_4_polynomials_vk ++
+    [(Assert,
+     (((((BArray32.is_init b_rho 0 32) /\
+        (BArray8.is_init b_domain_separators 0 8)) /\
+       (BArray200.is_init b_lanes 0 200)) /\
+      (BArray1952.is_init b_vk 0 1952)) /\
+     (0 <= first_slot)))]);
+    b_buf0 <- (BArray848.init_arr (W8.of_int 0));
+    b_buf1 <- (BArray848.init_arr (W8.of_int 0));
+    b_buf2 <- (BArray848.init_arr (W8.of_int 0));
+    b_buf3 <- (BArray848.init_arr (W8.of_int 0));
+    b_xof_state <- (BArray800.init_arr (W8.of_int 0));
+    b_param_3 <- b_xof_state;
+    param_1 <- xof_state;
+    param_0 <- rho;
+    param <- domain_separators;
+    (aux, aux_0, tmp__trace) <@ shake128_absorb_34_4x (param_1, b_param_3,
+    param_0, (BArray32.init_arr (W8.of_int 255)), param,
+    (BArray8.init_arr (W8.of_int 255)));
+    result <- aux;
+    b_result_9 <- aux_0;
+    trace_matrix_A____sample_4_polynomials_vk <-
+    (trace_matrix_A____sample_4_polynomials_vk ++ tmp__trace);
+    trace_matrix_A____sample_4_polynomials_vk <-
+    (trace_matrix_A____sample_4_polynomials_vk ++
+    [(Assert, (BArray800.is_init b_result_9 0 800))]);
+    xof_state <- result;
+    param_9 <- xof_state;
+    b_param_2 <- b_buf0;
+    param_8 <- buf0;
+    b_param_1 <- b_buf1;
+    param_7 <- buf1;
+    b_param_0 <- b_buf2;
+    param_6 <- buf2;
+    b_param <- b_buf3;
+    param_5 <- buf3;
+    param_4 <- lanes;
+    param_3 <- vk;
+    param_2 <- first_slot;
+    (aux, aux_0, aux_1, aux_2, aux_3, aux_4, aux_5, aux_6, aux_7, aux_8,
+    aux_9, aux_10, tmp__trace) <@ matrix_A____shake128_squeeze_multiple_blocks_4x_vk (
+    param_9, (BArray800.init_arr (W8.of_int 255)), param_8, b_param_2,
+    param_7, b_param_1, param_6, b_param_0, param_5, b_param, param_4,
+    (BArray200.init_arr (W8.of_int 255)), param_3,
+    (BArray1952.init_arr (W8.of_int 255)), param_2);
+    result_5 <- aux;
+    b_result_8 <- aux_0;
+    result_4 <- aux_1;
+    b_result_7 <- aux_2;
+    result_3 <- aux_3;
+    b_result_6 <- aux_4;
+    result_2 <- aux_5;
+    b_result_5 <- aux_6;
+    result_1 <- aux_7;
+    b_result_4 <- aux_8;
+    result_0 <- aux_9;
+    b_result_3 <- aux_10;
+    trace_matrix_A____sample_4_polynomials_vk <-
+    (trace_matrix_A____sample_4_polynomials_vk ++ tmp__trace);
+    trace_matrix_A____sample_4_polynomials_vk <-
+    (trace_matrix_A____sample_4_polynomials_vk ++
+    [(Assert,
+     ((((((BArray800.is_init b_result_8 0 800) /\
+         (BArray848.is_init b_result_7 0 848)) /\
+        (BArray848.is_init b_result_6 0 848)) /\
+       (BArray848.is_init b_result_5 0 848)) /\
+      (BArray848.is_init b_result_4 0 848)) /\
+     (BArray200.is_init b_result_3 0 200)))]);
+    xof_state <- result_5;
+    buf0 <- result_4;
+    buf1 <- result_3;
+    buf2 <- result_2;
+    buf3 <- result_1;
+    lanes <- result_0;
+    param_14 <- xof_state;
+    param_13 <- buf0;
+    param_12 <- buf1;
+    param_11 <- buf2;
+    param_10 <- buf3;
+    (aux_11, aux_12, aux_13, aux_14, aux_15, aux_16, aux_17, aux_18,
+    tmp__trace) <@ matrix_A____sample_4_polynomials_from_blocks (param_14,
+    (BArray800.init_arr (W8.of_int 255)), param_13,
+    (BArray848.init_arr (W8.of_int 255)), param_12,
+    (BArray848.init_arr (W8.of_int 255)), param_11,
+    (BArray848.init_arr (W8.of_int 255)), param_10,
+    (BArray848.init_arr (W8.of_int 255)));
+    result_9 <- aux_11;
+    b_result_2 <- aux_12;
+    result_8 <- aux_13;
+    b_result_1 <- aux_14;
+    result_7 <- aux_15;
+    b_result_0 <- aux_16;
+    result_6 <- aux_17;
+    b_result <- aux_18;
+    trace_matrix_A____sample_4_polynomials_vk <-
+    (trace_matrix_A____sample_4_polynomials_vk ++ tmp__trace);
+    trace_matrix_A____sample_4_polynomials_vk <-
+    (trace_matrix_A____sample_4_polynomials_vk ++
+    [(Assert, (BArray1024.is_init b_result_2 0 1024))]);
+    trace_matrix_A____sample_4_polynomials_vk <-
+    (trace_matrix_A____sample_4_polynomials_vk ++
+    [(Assert, (BArray1024.is_init b_result_1 0 1024))]);
+    trace_matrix_A____sample_4_polynomials_vk <-
+    (trace_matrix_A____sample_4_polynomials_vk ++
+    [(Assert, (BArray1024.is_init b_result_0 0 1024))]);
+    trace_matrix_A____sample_4_polynomials_vk <-
+    (trace_matrix_A____sample_4_polynomials_vk ++
+    [(Assert, (BArray1024.is_init b_result 0 1024))]);
+    polynomial0 <- result_9;
+    polynomial1 <- result_8;
+    polynomial2 <- result_7;
+    polynomial3 <- result_6;
+    b_lanes <- (BArray200.init_arr (W8.of_int 255));
+    b_polynomial3 <- (BArray1024.init_arr (W8.of_int 255));
+    b_polynomial2 <- (BArray1024.init_arr (W8.of_int 255));
+    b_polynomial1 <- (BArray1024.init_arr (W8.of_int 255));
+    b_polynomial0 <- (BArray1024.init_arr (W8.of_int 255));
+    return (polynomial0, b_polynomial0, polynomial1, b_polynomial1,
+           polynomial2, b_polynomial2, polynomial3, b_polynomial3, lanes,
+           b_lanes, trace_matrix_A____sample_4_polynomials_vk);
   }
   proc sample____challenge (output_challenge:BArray1024.t,
                             b_output_challenge:BArray1024.t, seed:BArray48.t,
@@ -55077,6 +57853,296 @@ module M = {
     (SBArray30720_1024.set_sub32 matrix_A ((index + 1) * 256) result_5);
     return (matrix_A, b_matrix_A, trace_sample____matrix_A);
   }
+  proc sample____matrix_A_vk (vk:BArray1952.t, b_vk:BArray1952.t) : BArray30720.t *
+                                                                    BArray30720.t *
+                                                                    BArray200.t *
+                                                                    BArray200.t *
+                                                                    trace = {
+    var aux_1:BArray1024.t;
+    var aux_2:BArray1024.t;
+    var aux_3:BArray1024.t;
+    var aux_4:BArray1024.t;
+    var aux_5:BArray1024.t;
+    var aux_6:BArray1024.t;
+    var aux_7:BArray1024.t;
+    var aux_8:BArray1024.t;
+    var aux:BArray200.t;
+    var aux_0:BArray200.t;
+    var matrix_A:BArray30720.t;
+    var lanes:BArray200.t;
+    var copied_32_bytes:W256.t;
+    var seed:BArray32.t;
+    var vkm:BArray1952.t;
+    var chunk:int;
+    var index:int;
+    var lane:int;
+    var row:int;
+    var column:int;
+    var domain_separators:BArray8.t;
+    var param:BArray200.t;
+    var result:BArray200.t;
+    var param_0:int;
+    var param_1:BArray1952.t;
+    var param_2:BArray200.t;
+    var param_3:BArray8.t;
+    var param_4:BArray32.t;
+    var result_0:BArray200.t;
+    var result_1:BArray1024.t;
+    var result_2:BArray1024.t;
+    var result_3:BArray1024.t;
+    var result_4:BArray1024.t;
+    var param_5:BArray8.t;
+    var param_6:BArray32.t;
+    var result_5:BArray1024.t;
+    var result_6:BArray1024.t;
+    var result_7:BArray1024.t;
+    var result_8:BArray1024.t;
+    var b_lanes:BArray200.t;
+    var b_matrix_A:BArray30720.t;
+    var b_result:BArray1024.t;
+    var b_result_0:BArray1024.t;
+    var b_result_1:BArray1024.t;
+    var b_result_2:BArray1024.t;
+    var b_param:BArray8.t;
+    var b_param_0:BArray32.t;
+    var b_domain_separators:BArray8.t;
+    var b_seed:BArray32.t;
+    var b_result_3:BArray200.t;
+    var b_result_4:BArray1024.t;
+    var b_result_5:BArray1024.t;
+    var b_result_6:BArray1024.t;
+    var b_result_7:BArray1024.t;
+    var b_param_1:BArray8.t;
+    var b_param_2:BArray32.t;
+    var b_result_8:BArray200.t;
+    var b_param_3:BArray200.t;
+    var trace_sample____matrix_A_vk:trace;
+    b_domain_separators <- witness;
+    b_lanes <- witness;
+    b_matrix_A <- witness;
+    b_param <- witness;
+    b_param_0 <- witness;
+    b_param_1 <- witness;
+    b_param_2 <- witness;
+    b_param_3 <- witness;
+    b_result <- witness;
+    b_result_0 <- witness;
+    b_result_1 <- witness;
+    b_result_2 <- witness;
+    b_result_3 <- witness;
+    b_result_4 <- witness;
+    b_result_5 <- witness;
+    b_result_6 <- witness;
+    b_result_7 <- witness;
+    b_result_8 <- witness;
+    b_seed <- witness;
+    domain_separators <- witness;
+    lanes <- witness;
+    matrix_A <- witness;
+    param <- witness;
+    param_1 <- witness;
+    param_2 <- witness;
+    param_3 <- witness;
+    param_4 <- witness;
+    param_5 <- witness;
+    param_6 <- witness;
+    result <- witness;
+    result_0 <- witness;
+    result_1 <- witness;
+    result_2 <- witness;
+    result_3 <- witness;
+    result_4 <- witness;
+    result_5 <- witness;
+    result_6 <- witness;
+    result_7 <- witness;
+    result_8 <- witness;
+    seed <- witness;
+    vkm <- witness;
+    trace_sample____matrix_A_vk <- [];
+    trace_sample____matrix_A_vk <-
+    (trace_sample____matrix_A_vk ++
+    [(Assert, (BArray1952.is_init b_vk 0 1952))]);
+    b_seed <- (BArray32.init_arr (W8.of_int 0));
+    b_domain_separators <- (BArray8.init_arr (W8.of_int 0));
+    b_matrix_A <- (BArray30720.init_arr (W8.of_int 0));
+    b_lanes <- (BArray200.init_arr (W8.of_int 0));
+    copied_32_bytes <- (BArray1952.get256d vk 0);
+    b_seed <-
+    (BArray32.set256d b_seed 0
+    (W256.of_int
+    115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ));
+    seed <- (BArray32.set256d seed 0 copied_32_bytes);
+    b_param_3 <- b_lanes;
+    param <- lanes;
+    (aux, aux_0, tmp__trace) <@ __state_init (param, b_param_3);
+    result <- aux;
+    b_result_8 <- aux_0;
+    trace_sample____matrix_A_vk <-
+    (trace_sample____matrix_A_vk ++ tmp__trace);
+    trace_sample____matrix_A_vk <-
+    (trace_sample____matrix_A_vk ++
+    [(Assert, (BArray200.is_init b_result_8 0 200))]);
+    lanes <- result;
+    vkm <- vk;
+    chunk <- 0;
+    while ((chunk < 7)) {
+      index <- (4 * chunk);
+      lane <- 0;
+      while ((lane < 4)) {
+        row <- ((index + lane) %/ 5);
+        column <- ((index + lane) %% 5);
+        trace_sample____matrix_A_vk <-
+        (trace_sample____matrix_A_vk ++
+        [(Assert, ((0 <= (lane * 2)) /\ (((lane * 2) + 2) <= 8)))]);
+        b_domain_separators <-
+        (BArray8.set16d b_domain_separators (lane * 2) (W16.of_int 65535));
+        domain_separators <-
+        (BArray8.set16 domain_separators lane
+        (truncateu16 ((W256.of_int (row `<<` 8)) `|` (W256.of_int column))));
+        lane <- (lane + 1);
+      }
+      vk <- vkm;
+      trace_sample____matrix_A_vk <-
+      (trace_sample____matrix_A_vk ++
+      [(Assert,
+       ((0 <= ((index * 256) * 4)) /\
+       ((((index * 256) * 4) + 1024) <= 30720)))]);
+      trace_sample____matrix_A_vk <-
+      (trace_sample____matrix_A_vk ++
+      [(Assert,
+       ((0 <= (((index + 1) * 256) * 4)) /\
+       (((((index + 1) * 256) * 4) + 1024) <= 30720)))]);
+      trace_sample____matrix_A_vk <-
+      (trace_sample____matrix_A_vk ++
+      [(Assert,
+       ((0 <= (((index + 2) * 256) * 4)) /\
+       (((((index + 2) * 256) * 4) + 1024) <= 30720)))]);
+      trace_sample____matrix_A_vk <-
+      (trace_sample____matrix_A_vk ++
+      [(Assert,
+       ((0 <= (((index + 3) * 256) * 4)) /\
+       (((((index + 3) * 256) * 4) + 1024) <= 30720)))]);
+      b_param_2 <- b_seed;
+      param_4 <- seed;
+      b_param_1 <- b_domain_separators;
+      param_3 <- domain_separators;
+      param_2 <- lanes;
+      param_1 <- vk;
+      param_0 <- (5 * chunk);
+      (aux_1, aux_2, aux_3, aux_4, aux_5, aux_6, aux_7, aux_8, aux, aux_0,
+      tmp__trace) <@ matrix_A____sample_4_polynomials_vk (param_4, b_param_2,
+      param_3, b_param_1, param_2, (BArray200.init_arr (W8.of_int 255)),
+      param_1, (BArray1952.init_arr (W8.of_int 255)), param_0);
+      result_4 <- aux_1;
+      b_result_7 <- aux_2;
+      result_3 <- aux_3;
+      b_result_6 <- aux_4;
+      result_2 <- aux_5;
+      b_result_5 <- aux_6;
+      result_1 <- aux_7;
+      b_result_4 <- aux_8;
+      result_0 <- aux;
+      b_result_3 <- aux_0;
+      trace_sample____matrix_A_vk <-
+      (trace_sample____matrix_A_vk ++ tmp__trace);
+      trace_sample____matrix_A_vk <-
+      (trace_sample____matrix_A_vk ++
+      [(Assert,
+       (((((BArray1024.is_init b_result_7 0 1024) /\
+          (BArray1024.is_init b_result_6 0 1024)) /\
+         (BArray1024.is_init b_result_5 0 1024)) /\
+        (BArray1024.is_init b_result_4 0 1024)) /\
+       (BArray200.is_init b_result_3 0 200)))]);
+      b_matrix_A <-
+      (SBArray30720_1024.set_sub32 b_matrix_A (index * 256)
+      (BArray1024.init_arr (W8.of_int 255)));
+      matrix_A <-
+      (SBArray30720_1024.set_sub32 matrix_A (index * 256) result_4);
+      b_matrix_A <-
+      (SBArray30720_1024.set_sub32 b_matrix_A ((index + 1) * 256)
+      (BArray1024.init_arr (W8.of_int 255)));
+      matrix_A <-
+      (SBArray30720_1024.set_sub32 matrix_A ((index + 1) * 256) result_3);
+      b_matrix_A <-
+      (SBArray30720_1024.set_sub32 b_matrix_A ((index + 2) * 256)
+      (BArray1024.init_arr (W8.of_int 255)));
+      matrix_A <-
+      (SBArray30720_1024.set_sub32 matrix_A ((index + 2) * 256) result_2);
+      b_matrix_A <-
+      (SBArray30720_1024.set_sub32 b_matrix_A ((index + 3) * 256)
+      (BArray1024.init_arr (W8.of_int 255)));
+      matrix_A <-
+      (SBArray30720_1024.set_sub32 matrix_A ((index + 3) * 256) result_1);
+      lanes <- result_0;
+      chunk <- (chunk + 1);
+    }
+    index <- 28;
+    lane <- 0;
+    while ((lane < 2)) {
+      row <- ((index + lane) %/ 5);
+      column <- ((index + lane) %% 5);
+      trace_sample____matrix_A_vk <-
+      (trace_sample____matrix_A_vk ++
+      [(Assert, ((0 <= (lane * 2)) /\ (((lane * 2) + 2) <= 8)))]);
+      b_domain_separators <-
+      (BArray8.set16d b_domain_separators (lane * 2) (W16.of_int 65535));
+      domain_separators <-
+      (BArray8.set16 domain_separators lane
+      (truncateu16 ((W256.of_int (row `<<` 8)) `|` (W256.of_int column))));
+      lane <- (lane + 1);
+    }
+    trace_sample____matrix_A_vk <-
+    (trace_sample____matrix_A_vk ++
+    [(Assert,
+     ((0 <= ((index * 256) * 4)) /\ ((((index * 256) * 4) + 1024) <= 30720)))]);
+    trace_sample____matrix_A_vk <-
+    (trace_sample____matrix_A_vk ++
+    [(Assert,
+     ((0 <= (((index + 1) * 256) * 4)) /\
+     (((((index + 1) * 256) * 4) + 1024) <= 30720)))]);
+    b_param_0 <- b_seed;
+    param_6 <- seed;
+    b_param <- b_domain_separators;
+    param_5 <- domain_separators;
+    (aux_1, aux_2, aux_3, aux_4, aux_5, aux_6, aux_7, aux_8, tmp__trace) <@ 
+    matrix_A____sample_4_polynomials (param_6, b_param_0, param_5, b_param);
+    result_8 <- aux_1;
+    b_result_0 <- aux_2;
+    result_7 <- aux_3;
+    b_result <- aux_4;
+    result_6 <- aux_5;
+    b_result_2 <- aux_6;
+    result_5 <- aux_7;
+    b_result_1 <- aux_8;
+    trace_sample____matrix_A_vk <-
+    (trace_sample____matrix_A_vk ++ tmp__trace);
+    trace_sample____matrix_A_vk <-
+    (trace_sample____matrix_A_vk ++
+    [(Assert, (BArray1024.is_init b_result_0 0 1024))]);
+    trace_sample____matrix_A_vk <-
+    (trace_sample____matrix_A_vk ++
+    [(Assert, (BArray1024.is_init b_result 0 1024))]);
+    trace_sample____matrix_A_vk <-
+    (trace_sample____matrix_A_vk ++
+    [(Assert, (BArray1024.is_init b_result_2 0 1024))]);
+    trace_sample____matrix_A_vk <-
+    (trace_sample____matrix_A_vk ++
+    [(Assert, (BArray1024.is_init b_result_1 0 1024))]);
+    b_matrix_A <-
+    (SBArray30720_1024.set_sub32 b_matrix_A (index * 256)
+    (BArray1024.init_arr (W8.of_int 255)));
+    matrix_A <-
+    (SBArray30720_1024.set_sub32 matrix_A (index * 256) result_8);
+    b_matrix_A <-
+    (SBArray30720_1024.set_sub32 b_matrix_A ((index + 1) * 256)
+    (BArray1024.init_arr (W8.of_int 255)));
+    matrix_A <-
+    (SBArray30720_1024.set_sub32 matrix_A ((index + 1) * 256) result_7);
+    b_lanes <- (BArray200.init_arr (W8.of_int 255));
+    return (matrix_A, b_matrix_A, lanes, b_lanes,
+           trace_sample____matrix_A_vk);
+  }
   proc __keygen_prf (prf_output:BArray128.t, b_prf_output:BArray128.t,
                      randomness:BArray32.t, b_randomness:BArray32.t) : 
   BArray128.t * BArray128.t * trace = {
@@ -57979,8 +61045,10 @@ module M = {
                           message_pointer:int, message_size:int,
                           signature_encoded:BArray3309.t,
                           b_signature_encoded:BArray3309.t) : W64.t * trace = {
-    var aux_6:BArray1024.t;
-    var aux_7:BArray1024.t;
+    var aux_8:BArray1024.t;
+    var aux_9:BArray1024.t;
+    var aux_6:BArray200.t;
+    var aux_7:BArray200.t;
     var aux_4:BArray30720.t;
     var aux_5:BArray30720.t;
     var aux:BArray5120.t;
@@ -57994,10 +61062,10 @@ module M = {
     var result1:W64.t;
     var result2:W64.t;
     var matrix_A:BArray30720.t;
+    var verification_key_hash_lanes:BArray200.t;
     var a_times_signer_response:BArray6144.t;
     var challenge:BArray1024.t;
     var reconstructed_signer_commitment:BArray768.t;
-    var verification_key_hash:BArray64.t;
     var message_representative:BArray64.t;
     var expected_commitment_hash:BArray48.t;
     var param:BArray3309.t;
@@ -58009,39 +61077,37 @@ module M = {
     var param_2:int;
     var param_3:BArray5120.t;
     var result_3:W64.t;
-    var param_4:BArray32.t;
-    var result_4:BArray30720.t;
+    var param_4:BArray1952.t;
+    var result_4:BArray200.t;
+    var result_5:BArray30720.t;
     var param_5:BArray5120.t;
-    var result_5:BArray5120.t;
+    var result_6:BArray5120.t;
     var param_6:BArray5120.t;
     var param_7:BArray30720.t;
-    var result_6:BArray6144.t;
+    var result_7:BArray6144.t;
     var param_8:BArray48.t;
     var param_9:BArray1024.t;
-    var result_7:BArray1024.t;
-    var param_10:BArray1024.t;
     var result_8:BArray1024.t;
+    var param_10:BArray1024.t;
+    var result_9:BArray1024.t;
     var param_11:BArray6144.t;
     var param_12:BArray6144.t;
     var param_13:BArray1024.t;
     var param_14:BArray1920.t;
-    var result_9:BArray768.t;
-    var param_15:BArray1952.t;
-    var param_16:BArray64.t;
-    var result_10:BArray64.t;
+    var result_10:BArray768.t;
+    var param_15:int;
+    var param_16:int;
     var param_17:int;
     var param_18:int;
-    var param_19:int;
-    var param_20:int;
-    var param_21:BArray64.t;
-    var param_22:BArray64.t;
+    var param_19:BArray64.t;
+    var param_20:BArray64.t;
     var result_11:BArray64.t;
-    var param_23:BArray768.t;
-    var param_24:BArray64.t;
-    var param_25:BArray48.t;
+    var param_21:BArray768.t;
+    var param_22:BArray64.t;
+    var param_23:BArray48.t;
     var result_12:BArray48.t;
-    var param_26:BArray48.t;
-    var param_27:BArray48.t;
+    var param_24:BArray48.t;
+    var param_25:BArray48.t;
     var result_13:W64.t;
     var b_param:BArray48.t;
     var b_expected_commitment_hash:BArray48.t;
@@ -58050,33 +61116,31 @@ module M = {
     var b_message_representative:BArray64.t;
     var b_result_0:BArray64.t;
     var b_param_1:BArray64.t;
-    var b_verification_key_hash:BArray64.t;
-    var b_result_1:BArray64.t;
     var b_param_2:BArray64.t;
-    var b_result_2:BArray768.t;
+    var b_verification_key_hash_lanes:BArray200.t;
+    var b_result_1:BArray768.t;
     var b_param_3:BArray6144.t;
     var b_param_4:BArray1920.t;
     var b_hints:BArray6144.t;
     var b_challenge:BArray1024.t;
+    var b_result_2:BArray1024.t;
     var b_result_3:BArray1024.t;
-    var b_result_4:BArray1024.t;
     var b_param_5:BArray48.t;
     var b_param_6:BArray1024.t;
-    var b_result_5:BArray6144.t;
+    var b_result_4:BArray6144.t;
     var b_signer_response:BArray5120.t;
-    var b_result_6:BArray5120.t;
+    var b_result_5:BArray5120.t;
+    var b_result_6:BArray200.t;
     var b_result_7:BArray30720.t;
-    var b_param_7:BArray32.t;
     var b_result_8:BArray6144.t;
     var b_result_9:BArray5120.t;
-    var b_param_8:BArray6144.t;
-    var b_param_9:BArray5120.t;
+    var b_param_7:BArray6144.t;
+    var b_param_8:BArray5120.t;
     var  _0:W64.t;
     var  _1:W64.t;
     var  _2:W64.t;
     var  _3:W64.t;
     var  _4:W64.t;
-    var  _5:W64.t;
     var trace___verify_internal:trace;
     a_times_signer_response <- witness;
     b_challenge <- witness;
@@ -58093,7 +61157,6 @@ module M = {
     b_param_6 <- witness;
     b_param_7 <- witness;
     b_param_8 <- witness;
-    b_param_9 <- witness;
     b_result <- witness;
     b_result_0 <- witness;
     b_result_1 <- witness;
@@ -58106,7 +61169,7 @@ module M = {
     b_result_8 <- witness;
     b_result_9 <- witness;
     b_signer_response <- witness;
-    b_verification_key_hash <- witness;
+    b_verification_key_hash_lanes <- witness;
     challenge <- witness;
     expected_commitment_hash <- witness;
     hints <- witness;
@@ -58127,15 +61190,13 @@ module M = {
     param_12 <- witness;
     param_13 <- witness;
     param_14 <- witness;
-    param_15 <- witness;
-    param_16 <- witness;
+    param_19 <- witness;
+    param_20 <- witness;
     param_21 <- witness;
     param_22 <- witness;
     param_23 <- witness;
     param_24 <- witness;
     param_25 <- witness;
-    param_26 <- witness;
-    param_27 <- witness;
     reconstructed_signer_commitment <- witness;
     result_1 <- witness;
     result_2 <- witness;
@@ -58149,7 +61210,7 @@ module M = {
     result_11 <- witness;
     result_12 <- witness;
     signer_response <- witness;
-    verification_key_hash <- witness;
+    verification_key_hash_lanes <- witness;
     trace___verify_internal <- [];
     trace___verify_internal <-
     (trace___verify_internal ++
@@ -58187,19 +61248,18 @@ module M = {
     [(Assert,
      ((0 <= message_size) /\ (message_size <= 18446744073709551615)))]);
     b_expected_commitment_hash <- (BArray48.init_arr (W8.of_int 0));
-    b_verification_key_hash <- (BArray64.init_arr (W8.of_int 0));
     b_message_representative <- (BArray64.init_arr (W8.of_int 0));
     b_challenge <- (BArray1024.init_arr (W8.of_int 0));
     b_signer_response <- (BArray5120.init_arr (W8.of_int 0));
     b_hints <- (BArray6144.init_arr (W8.of_int 0));
     (* Erased call to spill *)
-    b_param_9 <- b_signer_response;
+    b_param_8 <- b_signer_response;
     param_1 <- signer_response;
-    b_param_8 <- b_hints;
+    b_param_7 <- b_hints;
     param_0 <- hints;
     param <- signature_encoded;
     (aux, aux_0, aux_1, aux_2, aux_3, tmp__trace) <@ signature____decode (
-    param_1, b_param_9, param_0, b_param_8, param,
+    param_1, b_param_8, param_0, b_param_7, param,
     (BArray3309.init_arr (W8.of_int 255)));
     result_2 <- aux;
     b_result_9 <- aux_0;
@@ -58228,63 +61288,70 @@ module M = {
      _0 <- (init_msf);
     if ((result = (W64.of_int 0))) {
       (* Erased call to spill *)
-      b_param_7 <- (SBArray1952_32.get_sub8 b_verification_key 0);
-      param_4 <- (SBArray1952_32.get_sub8 verification_key 0);
-      (aux_4, aux_5, tmp__trace) <@ sample____matrix_A (param_4, b_param_7);
-      result_4 <- aux_4;
+      param_4 <- verification_key;
+      (aux_4, aux_5, aux_6, aux_7, tmp__trace) <@ sample____matrix_A_vk (
+      param_4, (BArray1952.init_arr (W8.of_int 255)));
+      result_5 <- aux_4;
       b_result_7 <- aux_5;
+      result_4 <- aux_6;
+      b_result_6 <- aux_7;
       trace___verify_internal <- (trace___verify_internal ++ tmp__trace);
       trace___verify_internal <-
       (trace___verify_internal ++
       [(Assert, (BArray30720.is_init b_result_7 0 30720))]);
-      matrix_A <- result_4;
+      trace___verify_internal <-
+      (trace___verify_internal ++
+      [(Assert, (BArray200.is_init b_result_6 0 200))]);
+      matrix_A <- result_5;
+      b_verification_key_hash_lanes <- (BArray200.init_arr (W8.of_int 255));
+      verification_key_hash_lanes <- result_4;
       param_5 <- signer_response;
       (aux, aux_0, tmp__trace) <@ row_vector__ntt (param_5,
       (BArray5120.init_arr (W8.of_int 255)));
-      result_5 <- aux;
-      b_result_6 <- aux_0;
+      result_6 <- aux;
+      b_result_5 <- aux_0;
       trace___verify_internal <- (trace___verify_internal ++ tmp__trace);
       trace___verify_internal <-
       (trace___verify_internal ++
-      [(Assert, (BArray5120.is_init b_result_6 0 5120))]);
-      signer_response <- result_5;
+      [(Assert, (BArray5120.is_init b_result_5 0 5120))]);
+      signer_response <- result_6;
       param_7 <- matrix_A;
       param_6 <- signer_response;
       (aux_1, aux_2, tmp__trace) <@ row_vector____multiply_with_matrix_A (
       param_7, (BArray30720.init_arr (W8.of_int 255)), param_6,
       (BArray5120.init_arr (W8.of_int 255)));
-      result_6 <- aux_1;
-      b_result_5 <- aux_2;
+      result_7 <- aux_1;
+      b_result_4 <- aux_2;
       trace___verify_internal <- (trace___verify_internal ++ tmp__trace);
       trace___verify_internal <-
       (trace___verify_internal ++
-      [(Assert, (BArray6144.is_init b_result_5 0 6144))]);
-      a_times_signer_response <- result_6;
+      [(Assert, (BArray6144.is_init b_result_4 0 6144))]);
+      a_times_signer_response <- result_7;
       (* Erased call to unspill *)
        _1 <- (init_msf);
       b_param_6 <- b_challenge;
       param_9 <- challenge;
       b_param_5 <- (SBArray3309_48.get_sub8 b_signature_encoded 0);
       param_8 <- (SBArray3309_48.get_sub8 signature_encoded 0);
-      (aux_6, aux_7, tmp__trace) <@ sample____challenge (param_9, b_param_6,
+      (aux_8, aux_9, tmp__trace) <@ sample____challenge (param_9, b_param_6,
       param_8, b_param_5);
-      result_7 <- aux_6;
-      b_result_4 <- aux_7;
-      trace___verify_internal <- (trace___verify_internal ++ tmp__trace);
-      trace___verify_internal <-
-      (trace___verify_internal ++
-      [(Assert, (BArray1024.is_init b_result_4 0 1024))]);
-      challenge <- result_7;
-      param_10 <- challenge;
-      (aux_6, aux_7, tmp__trace) <@ polynomial__ntt (param_10,
-      (BArray1024.init_arr (W8.of_int 255)));
-      result_8 <- aux_6;
-      b_result_3 <- aux_7;
+      result_8 <- aux_8;
+      b_result_3 <- aux_9;
       trace___verify_internal <- (trace___verify_internal ++ tmp__trace);
       trace___verify_internal <-
       (trace___verify_internal ++
       [(Assert, (BArray1024.is_init b_result_3 0 1024))]);
       challenge <- result_8;
+      param_10 <- challenge;
+      (aux_8, aux_9, tmp__trace) <@ polynomial__ntt (param_10,
+      (BArray1024.init_arr (W8.of_int 255)));
+      result_9 <- aux_8;
+      b_result_2 <- aux_9;
+      trace___verify_internal <- (trace___verify_internal ++ tmp__trace);
+      trace___verify_internal <-
+      (trace___verify_internal ++
+      [(Assert, (BArray1024.is_init b_result_2 0 1024))]);
+      challenge <- result_9;
       (* Erased call to unspill *)
        _2 <- (init_msf);
       b_param_4 <- (SBArray1952_1920.get_sub8 b_verification_key 32);
@@ -58293,62 +61360,51 @@ module M = {
       param_12 <- a_times_signer_response;
       b_param_3 <- b_hints;
       param_11 <- hints;
-      (result_9, b_result_2, tmp__trace) <@ reconstruct_signer_commitment (
+      (result_10, b_result_1, tmp__trace) <@ reconstruct_signer_commitment (
       param_14, b_param_4, param_13, (BArray1024.init_arr (W8.of_int 255)),
       param_12, (BArray6144.init_arr (W8.of_int 255)), param_11, b_param_3);
       trace___verify_internal <- (trace___verify_internal ++ tmp__trace);
       trace___verify_internal <-
       (trace___verify_internal ++
-      [(Assert, (BArray768.is_init b_result_2 0 768))]);
-      reconstructed_signer_commitment <- result_9;
+      [(Assert, (BArray768.is_init b_result_1 0 768))]);
+      reconstructed_signer_commitment <- result_10;
       (* Erased call to unspill *)
        _3 <- (init_msf);
-      b_param_2 <- b_verification_key_hash;
-      param_16 <- verification_key_hash;
-      param_15 <- verification_key;
-      (result_10, b_result_1, tmp__trace) <@ hash_verification_key (param_16,
-      b_param_2, param_15, (BArray1952.init_arr (W8.of_int 255)));
-      trace___verify_internal <- (trace___verify_internal ++ tmp__trace);
-      trace___verify_internal <-
-      (trace___verify_internal ++
-      [(Assert, (BArray64.is_init b_result_1 0 64))]);
-      verification_key_hash <- result_10;
-      (* Erased call to unspill *)
-       _4 <- (init_msf);
-      b_param_1 <- b_message_representative;
-      param_22 <- message_representative;
-      param_21 <- verification_key_hash;
-      param_20 <- context_pointer;
-      param_19 <- context_size;
-      param_18 <- message_pointer;
-      param_17 <- message_size;
+      b_param_2 <- b_message_representative;
+      param_20 <- message_representative;
+      b_param_1 <- (SBArray200_64.get_sub8 b_verification_key_hash_lanes 0);
+      param_19 <- (SBArray200_64.get_sub8 verification_key_hash_lanes 0);
+      param_18 <- context_pointer;
+      param_17 <- context_size;
+      param_16 <- message_pointer;
+      param_15 <- message_size;
       (result_11, b_result_0, tmp__trace) <@ __derive_message_representative (
-      param_22, b_param_1, param_21, (BArray64.init_arr (W8.of_int 255)),
-      param_20, param_19, param_18, param_17);
+      param_20, b_param_2, param_19, b_param_1, param_18, param_17, param_16,
+      param_15);
       trace___verify_internal <- (trace___verify_internal ++ tmp__trace);
       trace___verify_internal <-
       (trace___verify_internal ++
       [(Assert, (BArray64.is_init b_result_0 0 64))]);
       message_representative <- result_11;
       b_param_0 <- b_expected_commitment_hash;
-      param_25 <- expected_commitment_hash;
-      param_24 <- message_representative;
-      param_23 <- reconstructed_signer_commitment;
+      param_23 <- expected_commitment_hash;
+      param_22 <- message_representative;
+      param_21 <- reconstructed_signer_commitment;
       (result_12, b_result, tmp__trace) <@ __derive_commitment_hash (
-      param_25, b_param_0, param_24, (BArray64.init_arr (W8.of_int 255)),
-      param_23, (BArray768.init_arr (W8.of_int 255)));
+      param_23, b_param_0, param_22, (BArray64.init_arr (W8.of_int 255)),
+      param_21, (BArray768.init_arr (W8.of_int 255)));
       trace___verify_internal <- (trace___verify_internal ++ tmp__trace);
       trace___verify_internal <-
       (trace___verify_internal ++
       [(Assert, (BArray48.is_init b_result 0 48))]);
       expected_commitment_hash <- result_12;
       (* Erased call to unspill *)
-       _5 <- (init_msf);
-      param_27 <- expected_commitment_hash;
+       _4 <- (init_msf);
+      param_25 <- expected_commitment_hash;
       b_param <- (SBArray3309_48.get_sub8 b_signature_encoded 0);
-      param_26 <- (SBArray3309_48.get_sub8 signature_encoded 0);
-      (result_13, tmp__trace) <@ __compare_commitment_hashes (param_27,
-      (BArray48.init_arr (W8.of_int 255)), param_26, b_param);
+      param_24 <- (SBArray3309_48.get_sub8 signature_encoded 0);
+      (result_13, tmp__trace) <@ __compare_commitment_hashes (param_25,
+      (BArray48.init_arr (W8.of_int 255)), param_24, b_param);
       trace___verify_internal <- (trace___verify_internal ++ tmp__trace);
       result <- result_13;
     } else {
@@ -59611,6 +62667,79 @@ op _keccakf1600_avx2x4_spec _a _b_a =
    hoare [M._keccakf1600_avx2x4 :
    (((_b_a = b_a) /\ (_a = a)) /\ (BArray800.is_init _b_a 0 800)) ==>
    ((BArray800.is_init res.`2 0 800) /\ (valid res.`3))].
+
+op __f1600_x4_round_spec _st _b_st _i _y10 _y14 _y8 _y15 _y9 _y13 _y3 _y7 _y2 =
+   hoare [M.__f1600_x4_round :
+   (((_y2 = y2) /\
+    ((_y7 = y7) /\
+    ((_y3 = y3) /\
+    ((_y13 = y13) /\
+    ((_y9 = y9) /\
+    ((_y15 = y15) /\
+    ((_y8 = y8) /\
+    ((_y14 = y14) /\
+    ((_y10 = y10) /\ ((_i = i) /\ ((_b_st = b_st) /\ (_st = st)))))))))))) /\
+   ((true /\ (true /\ ((0 <= _i) /\ (_i <= 18446744073709551615)))) /\
+   (true /\
+   (true /\
+   (((0 <= 0) /\ (0 <= 18446744073709551615)) /\
+   (((0 <= 24) /\ (24 <= 18446744073709551615)) /\
+   (((BArray800.is_init _b_st 0 800) /\ (0 <= _i)) /\ (_i < 24)))))))) ==>
+   ((BArray800.is_init res.`2 0 800) /\ (valid res.`12))].
+
+op __keccakf1600_x4_x1_nat_opt_iteration_spec _rax _rbp _rdi _r13 _r10 _r11 _r8 _rsi _r15 _rbx _a _b_a _e _b_e _st4 _b_st4 _y10 _y14 _y8 _y15 _y9 _y13 _y3 _y7 _y2 =
+   hoare [M.__keccakf1600_x4_x1_nat_opt_iteration :
+   (((_y2 = y2) /\
+    ((_y7 = y7) /\
+    ((_y3 = y3) /\
+    ((_y13 = y13) /\
+    ((_y9 = y9) /\
+    ((_y15 = y15) /\
+    ((_y8 = y8) /\
+    ((_y14 = y14) /\
+    ((_y10 = y10) /\
+    ((_b_st4 = b_st4) /\
+    ((_st4 = st4) /\
+    ((_b_e = b_e) /\
+    ((_e = e) /\
+    ((_b_a = b_a) /\
+    ((_a = a) /\
+    ((_rbx = rbx) /\
+    ((_r15 = r15) /\
+    ((_rsi = rsi) /\
+    ((_r8 = r8) /\
+    ((_r11 = r11) /\
+    ((_r10 = r10) /\
+    ((_r13 = r13) /\ ((_rdi = rdi) /\ ((_rbp = rbp) /\ (_rax = rax))))))))))))))))))))))))) /\
+   (true /\
+   (((BArray200.is_init _b_a 0 200) /\ (BArray800.is_init _b_st4 0 800)) /\
+   (_rax \ule (W64.of_int 22))))) ==>
+   ((true /\
+    (true /\
+    (((BArray200.is_init res.`12 0 200) /\ (BArray800.is_init res.`16 0 800)) /\
+    (res.`1 = (_rax + (W64.of_int 2)))))) /\
+   (valid res.`26))].
+
+op __keccakf1600_x4_x1_nat_opt_spec _st4 _b_st4 _a _b_a =
+   hoare [M.__keccakf1600_x4_x1_nat_opt :
+   (((_b_a = b_a) /\ ((_a = a) /\ ((_b_st4 = b_st4) /\ (_st4 = st4)))) /\
+   ((BArray200.is_init _b_a 0 200) /\ (BArray800.is_init _b_st4 0 800))) ==>
+   (((BArray200.is_init res.`4 0 200) /\ (BArray800.is_init res.`2 0 800)) /\
+   (valid res.`5))].
+
+op _keccakf1600_x4_x1_nat_opt_spec _p4 _b_p4 _p1 _b_p1 =
+   hoare [M._keccakf1600_x4_x1_nat_opt :
+   (((_b_p1 = b_p1) /\ ((_p1 = p1) /\ ((_b_p4 = b_p4) /\ (_p4 = p4)))) /\
+   ((BArray200.is_init _b_p1 0 200) /\ (BArray800.is_init _b_p4 0 800))) ==>
+   (((BArray200.is_init res.`4 0 200) /\ (BArray800.is_init res.`2 0 800)) /\
+   (valid res.`5))].
+
+op _keccakf1600_x4_x1_spec _a4 _b_a4 _a1 _b_a1 =
+   hoare [M._keccakf1600_x4_x1 :
+   (((_b_a1 = b_a1) /\ ((_a1 = a1) /\ ((_b_a4 = b_a4) /\ (_a4 = a4)))) /\
+   ((BArray200.is_init _b_a1 0 200) /\ (BArray800.is_init _b_a4 0 800))) ==>
+   (((BArray200.is_init res.`4 0 200) /\ (BArray800.is_init res.`2 0 800)) /\
+   (valid res.`5))].
 
 op __state_init_avx2x4_spec _st _b_st =
    hoare [M.__state_init_avx2x4 :
@@ -67371,6 +70500,28 @@ op shake128_squeezeblock4x_spec _state _b_state _h0 _b_h0 _h1 _b_h1 _h2 _b_h2 _h
     (BArray168.is_init res.`10 0 168)) /\
    (valid res.`11))].
 
+op __shake128_squeezeblock4x_x1_spec _state _b_state _h0 _b_h0 _h1 _b_h1 _h2 _b_h2 _h3 _b_h3 _lanes _b_lanes =
+   hoare [M.__shake128_squeezeblock4x_x1 :
+   (((_b_lanes = b_lanes) /\
+    ((_lanes = lanes) /\
+    ((_b_h3 = b_h3) /\
+    ((_h3 = h3) /\
+    ((_b_h2 = b_h2) /\
+    ((_h2 = h2) /\
+    ((_b_h1 = b_h1) /\
+    ((_h1 = h1) /\
+    ((_b_h0 = b_h0) /\
+    ((_h0 = h0) /\ ((_b_state = b_state) /\ (_state = state)))))))))))) /\
+   ((BArray800.is_init _b_state 0 (32 * 25)) /\
+   (BArray200.is_init _b_lanes 0 (8 * 25)))) ==>
+   (((((((BArray800.is_init res.`2 0 (32 * 25)) /\
+        (BArray168.is_init res.`4 0 168)) /\
+       (BArray168.is_init res.`6 0 168)) /\
+      (BArray168.is_init res.`8 0 168)) /\
+     (BArray168.is_init res.`10 0 168)) /\
+    (BArray200.is_init res.`12 0 (8 * 25))) /\
+   (valid res.`13))].
+
 op shake256_squeezeblock4x_spec _state _b_state _h0 _b_h0 _h1 _b_h1 _h2 _b_h2 _h3 _b_h3 =
    hoare [M.shake256_squeezeblock4x :
    (((_b_h3 = b_h3) /\
@@ -67443,6 +70594,28 @@ op matrix_A____shake128_squeeze_multiple_blocks_4x_spec _state _b_state _b0 _b_b
     (BArray848.is_init res.`10 0 ((5 * 168) + 8))) /\
    (valid res.`11))].
 
+op matrix_A____sample_4_polynomials_from_blocks_spec _xof_state _b_xof_state _buf0 _b_buf0 _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3 =
+   hoare [M.matrix_A____sample_4_polynomials_from_blocks :
+   (((_b_buf3 = b_buf3) /\
+    ((_buf3 = buf3) /\
+    ((_b_buf2 = b_buf2) /\
+    ((_buf2 = buf2) /\
+    ((_b_buf1 = b_buf1) /\
+    ((_buf1 = buf1) /\
+    ((_b_buf0 = b_buf0) /\
+    ((_buf0 = buf0) /\
+    ((_b_xof_state = b_xof_state) /\ (_xof_state = xof_state)))))))))) /\
+   ((BArray848.is_init _b_buf3 0 848) /\
+   ((BArray848.is_init _b_buf2 0 848) /\
+   ((BArray848.is_init _b_buf1 0 848) /\
+   ((BArray848.is_init _b_buf0 0 848) /\
+   (BArray800.is_init _b_xof_state 0 800)))))) ==>
+   (((BArray1024.is_init res.`8 0 1024) /\
+    ((BArray1024.is_init res.`6 0 1024) /\
+    ((BArray1024.is_init res.`4 0 1024) /\
+    (BArray1024.is_init res.`2 0 1024)))) /\
+   (valid res.`9))].
+
 op matrix_A____sample_4_polynomials_spec _rho _b_rho _domain_separators _b_domain_separators =
    hoare [M.matrix_A____sample_4_polynomials :
    (((_b_domain_separators = b_domain_separators) /\
@@ -67455,6 +70628,70 @@ op matrix_A____sample_4_polynomials_spec _rho _b_rho _domain_separators _b_domai
     ((BArray1024.is_init res.`4 0 1024) /\
     (BArray1024.is_init res.`2 0 1024)))) /\
    (valid res.`9))].
+
+op matrix_A____vk_hash_absorb_block_spec _lanes _b_lanes _vk _b_vk _k =
+   hoare [M.matrix_A____vk_hash_absorb_block :
+   (((_k = k) /\
+    ((_b_vk = b_vk) /\
+    ((_vk = vk) /\ ((_b_lanes = b_lanes) /\ (_lanes = lanes))))) /\
+   (true /\
+   (true /\
+   ((((BArray200.is_init _b_lanes 0 (8 * 25)) /\
+     (BArray1952.is_init _b_vk 0 (32 + (6 * (((23 - 13) * 256) %/ 8))))) /\
+    (0 <= _k)) /\
+   (_k < (((32 + (6 * (((23 - 13) * 256) %/ 8))) %/ 136) + 1)))))) ==>
+   ((BArray200.is_init res.`2 0 (8 * 25)) /\ (valid res.`3))].
+
+op matrix_A____shake128_squeeze_multiple_blocks_4x_vk_spec _state _b_state _b0 _b_b0 _b1 _b_b1 _b2 _b_b2 _b3 _b_b3 _lanes _b_lanes _vk _b_vk _first_slot =
+   hoare [M.matrix_A____shake128_squeeze_multiple_blocks_4x_vk :
+   (((_first_slot = first_slot) /\
+    ((_b_vk = b_vk) /\
+    ((_vk = vk) /\
+    ((_b_lanes = b_lanes) /\
+    ((_lanes = lanes) /\
+    ((_b_b3 = b_b3) /\
+    ((_b3 = b3) /\
+    ((_b_b2 = b_b2) /\
+    ((_b2 = b2) /\
+    ((_b_b1 = b_b1) /\
+    ((_b1 = b1) /\
+    ((_b_b0 = b_b0) /\
+    ((_b0 = b0) /\ ((_b_state = b_state) /\ (_state = state))))))))))))))) /\
+   (true /\
+   ((((BArray800.is_init _b_state 0 (32 * 25)) /\
+     (BArray200.is_init _b_lanes 0 (8 * 25))) /\
+    (BArray1952.is_init _b_vk 0 (32 + (6 * (((23 - 13) * 256) %/ 8))))) /\
+   (0 <= _first_slot)))) ==>
+   (((((((BArray800.is_init res.`2 0 (32 * 25)) /\
+        (BArray848.is_init res.`4 0 ((5 * 168) + 8))) /\
+       (BArray848.is_init res.`6 0 ((5 * 168) + 8))) /\
+      (BArray848.is_init res.`8 0 ((5 * 168) + 8))) /\
+     (BArray848.is_init res.`10 0 ((5 * 168) + 8))) /\
+    (BArray200.is_init res.`12 0 (8 * 25))) /\
+   (valid res.`13))].
+
+op matrix_A____sample_4_polynomials_vk_spec _rho _b_rho _domain_separators _b_domain_separators _lanes _b_lanes _vk _b_vk _first_slot =
+   hoare [M.matrix_A____sample_4_polynomials_vk :
+   (((_first_slot = first_slot) /\
+    ((_b_vk = b_vk) /\
+    ((_vk = vk) /\
+    ((_b_lanes = b_lanes) /\
+    ((_lanes = lanes) /\
+    ((_b_domain_separators = b_domain_separators) /\
+    ((_domain_separators = domain_separators) /\
+    ((_b_rho = b_rho) /\ (_rho = rho))))))))) /\
+   (true /\
+   (((((BArray32.is_init _b_rho 0 32) /\
+      (BArray8.is_init _b_domain_separators 0 (2 * 4))) /\
+     (BArray200.is_init _b_lanes 0 (8 * 25))) /\
+    (BArray1952.is_init _b_vk 0 (32 + (6 * (((23 - 13) * 256) %/ 8))))) /\
+   (0 <= _first_slot)))) ==>
+   ((((((BArray1024.is_init res.`2 0 (4 * 256)) /\
+       (BArray1024.is_init res.`4 0 (4 * 256))) /\
+      (BArray1024.is_init res.`6 0 (4 * 256))) /\
+     (BArray1024.is_init res.`8 0 (4 * 256))) /\
+    (BArray200.is_init res.`10 0 (8 * 25))) /\
+   (valid res.`11))].
 
 op sample____challenge_spec _output_challenge _b_output_challenge _seed _b_seed =
    hoare [M.sample____challenge :
@@ -67890,6 +71127,13 @@ op sample____matrix_A_spec _rho _b_rho =
    hoare [M.sample____matrix_A :
    (((_b_rho = b_rho) /\ (_rho = rho)) /\ (BArray32.is_init _b_rho 0 32)) ==>
    ((BArray30720.is_init res.`2 0 30720) /\ (valid res.`3))].
+
+op sample____matrix_A_vk_spec _vk _b_vk =
+   hoare [M.sample____matrix_A_vk :
+   (((_b_vk = b_vk) /\ (_vk = vk)) /\ (BArray1952.is_init _b_vk 0 1952)) ==>
+   (((BArray200.is_init res.`4 0 200) /\
+    (BArray30720.is_init res.`2 0 30720)) /\
+   (valid res.`5))].
 
 op __keygen_prf_spec _prf_output _b_prf_output _randomness _b_randomness =
    hoare [M.__keygen_prf :

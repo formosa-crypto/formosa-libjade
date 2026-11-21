@@ -525,6 +525,24 @@ proof.
 by conseq hash_verification_key_eq (hash_verification_key_ph' _vk) => // /#.
 qed.
 
+(* ---------- the hash of the key, by the sponge of the matrix sampler ---------- *)
+
+(* the first 64 bytes of the state once the key is absorbed and permuted *)
+lemma H_tr_lanesE (vk : W8.t Array_pk_enc.t) (h : W8.t Array64.t) :
+  (forall j, 0 <= j < 64 =>
+     h.[j] = (keccak_f1600_op (ABSORB1600 SHAKE_DS_BYTE 136 (to_list vk))).[j %/ 8]
+             \bits8 (j %% 8)) =>
+  h = Array64.of_list witness (Bytes64.to_list (H_tr (BytesPK.of_list (to_list vk)))).
+proof.
+move=> hh; rewrite /H_tr BytesPK.of_listK 1:Array_pk_enc.size_to_list /= 1:pk_encE //.
+have hsz : size (SHAKE256 (to_list vk) 64) = 64 by rewrite size_SHAKE256.
+rewrite Bytes64.of_listK //; apply Array64.tP => j hj.
+rewrite Array64.get_of_list 1:/# hh 1:/# (nth_change_dfl W8.zero) 1:/#.
+rewrite /SHAKE256 /KECCAK1600 /c512_r8 nth_SQUEEZE1600 //.
+rewrite (pdiv_small j 136) 1:/# (pmod_small j 136) 1:/# /FIPS202_SHA3_Spec.st_i iter1.
+by rewrite /init64 WArray200.initiE 1:/#.
+qed.
+
 (* ---------- __derive_commitment_hash ---------- *)
 
 hoare derive_commitment_hash_h' _mu _w1 :

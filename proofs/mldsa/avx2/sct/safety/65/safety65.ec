@@ -33,8 +33,8 @@ require import BArray2 BArray8 BArray16 BArray32 BArray40 BArray48 BArray61 BArr
   BArray256 BArray272 BArray320 BArray416 BArray512 BArray640 BArray680 BArray768
   BArray800 BArray848 BArray1024 BArray1920 BArray1952 BArray2048 BArray2496 BArray3200
   BArray3309 BArray4032 BArray5120 BArray6144 BArray12288 BArray30720.
-require import SBArray128_32 SBArray128_64 SBArray224_200 SBArray272_136 SBArray640_128
-  SBArray680_136 SBArray680_640 SBArray768_128 SBArray848_168 SBArray1920_320
+require import SBArray128_32 SBArray128_64 SBArray200_64 SBArray224_200 SBArray272_136
+  SBArray640_128 SBArray680_136 SBArray680_640 SBArray768_128 SBArray848_168 SBArray1920_320
   SBArray1952_32 SBArray1952_1920 SBArray2496_416 SBArray3200_640 SBArray3309_48
   SBArray3309_61 SBArray3309_3200 SBArray4032_32 SBArray4032_64 SBArray4032_640
   SBArray4032_768 SBArray4032_2496 SBArray5120_1024 SBArray6144_1024 SBArray30720_1024
@@ -80,6 +80,7 @@ clone ByteArrayInit as BI12288 with theory A <- BArray12288.
 clone ByteArrayInit as BI30720 with theory A <- BArray30720.
 clone SubByteArrayInit as SBI128_32 with theory SB <- SBArray128_32.
 clone SubByteArrayInit as SBI128_64 with theory SB <- SBArray128_64.
+clone SubByteArrayInit as SBI200_64 with theory SB <- SBArray200_64.
 clone SubByteArrayInit as SBI224_200 with theory SB <- SBArray224_200.
 clone SubByteArrayInit as SBI272_136 with theory SB <- SBArray272_136.
 clone SubByteArrayInit as SBI640_128 with theory SB <- SBArray640_128.
@@ -108,7 +109,7 @@ clone SubByteArrayInit as SBI12288_2048 with theory SB <- SBArray12288_2048.
 
 (* ---- the Keccak procedures, from the safety proofs of fips202 ---- *)
 require Keccak1600_Jazz_safety Keccak1600_common_safety Keccakf1600_safety Keccak1600_safety
-  Keccak1600_avx2_safety Keccakf1600x4_safety Keccak1600x4_safety.
+  Keccak1600_avx2_safety Keccakf1600x4_safety Keccak1600x4_safety Keccakf1600x4_x1_safety.
 require import BArray2 BArray32 BArray48 BArray64 BArray66 BArray128 BArray136 BArray168 BArray768
   BArray1952.
 clone Keccak1600_safety.KeccakArrayRefSafety as KR64
@@ -292,6 +293,26 @@ rewrite /a_VERIFICATION_KEY____absorb_spec; rewrite /KR1952.__absorb_spec in h.
 by conseq e h => /> /#.
 qed.
 
+lemma a_VERIFICATION_KEY____addstate_proof _st _b_st _aT _buf _b_buf _offset __LEN __TRAILB :
+  a_VERIFICATION_KEY____addstate_spec _st _b_st _aT _buf _b_buf _offset __LEN __TRAILB.
+proof.
+have h := KR1952.__addstate_proof _st _b_st _aT _buf _b_buf _offset __LEN __TRAILB.
+have e : equiv [Jmldsa65_safety.M.a_VERIFICATION_KEY____addstate ~ KR1952.MM.__addstate :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /a_VERIFICATION_KEY____addstate_spec; rewrite /KR1952.__addstate_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma __addratebit_proof _st _b_st __RATE8 :
+  __addratebit_spec _st _b_st __RATE8.
+proof.
+have h := Keccak1600_safety.__addratebit_proof _st _b_st __RATE8.
+have e : equiv [Jmldsa65_safety.M.__addratebit ~ Keccak1600_Jazz_safety.M.__addratebit :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /__addratebit_spec; rewrite /Keccak1600_Jazz_safety.__addratebit_spec in h.
+by conseq e h => /> /#.
+qed.
+
 lemma __state_init_avx2x4_proof _st _b_st :
   __state_init_avx2x4_spec _st _b_st.
 proof.
@@ -334,6 +355,18 @@ have e : equiv [Jmldsa65_safety.M._keccakf1600_avx2x4
   ~ Keccak1600_Jazz_safety.M._keccakf1600_avx2x4 :
   ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
 rewrite /_keccakf1600_avx2x4_spec; rewrite /Keccak1600_Jazz_safety._keccakf1600_avx2x4_spec in h.
+by conseq e h => /> /#.
+qed.
+
+lemma _keccakf1600_x4_x1_proof _a4 _b_a4 _a1 _b_a1 :
+  _keccakf1600_x4_x1_spec _a4 _b_a4 _a1 _b_a1.
+proof.
+have h := Keccakf1600x4_x1_safety._keccakf1600_x4_x1_proof _a4 _b_a4 _a1 _b_a1.
+have e : equiv [Jmldsa65_safety.M._keccakf1600_x4_x1
+  ~ Keccak1600_Jazz_safety.M._keccakf1600_x4_x1 :
+  ={arg, Glob.mem, Glob.mem_v} ==> ={res}] by sim.
+rewrite /_keccakf1600_x4_x1_spec.
+rewrite /Keccak1600_Jazz_safety._keccakf1600_x4_x1_spec in h.
 by conseq e h => /> /#.
 qed.
 
@@ -529,6 +562,20 @@ rewrite /shake128_squeezeblock4x_spec; proc.
 auto; ecall (a168____dumpstate_avx2x4_proof param_6 b_param_2 param_5 b_param_1 param_4 b_param_0
                 param_3 b_param param_2 param_1 param_0 (BArray800.init_arr (W8.of_int 255))).
 auto; ecall (_keccakf1600_avx2x4_proof param (BArray800.init_arr (W8.of_int 255))).
+by auto => /> /#.
+qed.
+
+lemma __shake128_squeezeblock4x_x1_proof _state _b_state _h0 _b_h0 _h1 _b_h1 _h2 _b_h2 _h3 _b_h3
+    _lanes _b_lanes :
+  __shake128_squeezeblock4x_x1_spec _state _b_state _h0 _b_h0 _h1 _b_h1 _h2 _b_h2 _h3 _b_h3
+    _lanes _b_lanes.
+proof.
+hint +safety.
+rewrite /__shake128_squeezeblock4x_x1_spec; proc.
+auto; ecall (a168____dumpstate_avx2x4_proof param_7 b_param_2 param_6 b_param_1 param_5 b_param_0
+                param_4 b_param param_3 param_2 param_1 (BArray800.init_arr (W8.of_int 255))).
+auto; ecall (_keccakf1600_x4_x1_proof param_0 (BArray800.init_arr (W8.of_int 255))
+                param (BArray200.init_arr (W8.of_int 255))).
 by auto => /> /#.
 qed.
 
@@ -1524,11 +1571,13 @@ auto; ecall (shake128_squeezeblock4x_proof param_3 ((BArray800.init_arr (W8.of_i
 by auto => /> *.
 qed.
 
-lemma matrix_A____sample_4_polynomials_proof _rho _b_rho _domain_separators _b_domain_separators :
-  matrix_A____sample_4_polynomials_spec _rho _b_rho _domain_separators _b_domain_separators.
+lemma matrix_A____sample_4_polynomials_from_blocks_proof _xof_state _b_xof_state _buf0 _b_buf0
+    _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3 :
+  matrix_A____sample_4_polynomials_from_blocks_spec _xof_state _b_xof_state _buf0 _b_buf0
+    _buf1 _b_buf1 _buf2 _b_buf2 _buf3 _b_buf3.
 proof.
 hint +safety.
-rewrite /matrix_A____sample_4_polynomials_spec; proc.
+rewrite /matrix_A____sample_4_polynomials_from_blocks_spec; proc.
 have h01 : W32.zero <> W32.one by rewrite W32.to_uint_eq.
 (* a polynomial is complete once its count of coefficients reaches 256 *)
 have hfull : forall (b : BArray1024.t) (f : W64.t),
@@ -1536,20 +1585,13 @@ have hfull : forall (b : BArray1024.t) (f : W64.t),
     !(f \ult W64.of_int 256) => BArray1024.is_init b 0 1024.
 + move=> b f hb; rewrite W64.uleE W64.ultE /= => hle hlt.
   by move: hb; rewrite to_uint_mul4 1:/# => hb; smt().
-(* the first five blocks of each buffer are squeezed at once *)
-seq 159 : (b_buf0 = BArray848.init_arr (W8.of_int 255) /\ b_buf1 = BArray848.init_arr (W8.of_int 255)
-    /\ b_buf2 = BArray848.init_arr (W8.of_int 255) /\ b_buf3 = BArray848.init_arr (W8.of_int 255)
-    /\ valid trace_matrix_A____sample_4_polynomials).
-+ conseq (_ : _ ==> BArray848.is_init b_buf0 0 848 /\ BArray848.is_init b_buf1 0 848
-             /\ BArray848.is_init b_buf2 0 848 /\ BArray848.is_init b_buf3 0 848
-             /\ valid trace_matrix_A____sample_4_polynomials).
-  + by move=> /> *; rewrite -!(BI848.is_init_full _ 848) //.
-  auto; ecall (matrix_A____shake128_squeeze_multiple_blocks_4x_proof param_6
-                (BArray800.init_arr (W8.of_int 255)) param_5 b_param_18 param_4 b_param_17
-                param_3 b_param_16 param_2 b_param_15).
-  auto; ecall (shake128_absorb_34_4x_proof param_1 b_param_19 param_0
-                (BArray32.init_arr (W8.of_int 255)) param (BArray8.init_arr (W8.of_int 255))).
-  by auto => /> *; smt().
+(* the four buffers are initialised in full *)
+conseq (_ : b_buf0 = BArray848.init_arr (W8.of_int 255)
+    /\ b_buf1 = BArray848.init_arr (W8.of_int 255)
+    /\ b_buf2 = BArray848.init_arr (W8.of_int 255)
+    /\ b_buf3 = BArray848.init_arr (W8.of_int 255)
+    /\ BArray800.is_init b_xof_state 0 800 ==> _).
++ by move=> &hr />; rewrite -!(BI848.is_init_full _ 848).
 (* the loop squeezes one more block per polynomial and extends each one; it
    stops when the four are complete *)
 while (b_buf0 = BArray848.init_arr (W8.of_int 255) /\ b_buf1 = BArray848.init_arr (W8.of_int 255)
@@ -1566,7 +1608,7 @@ while (b_buf0 = BArray848.init_arr (W8.of_int 255) /\ b_buf1 = BArray848.init_ar
     /\ (stop_sampling = W32.one =>
           !(filled0 \ult W64.of_int 256) /\ !(filled1 \ult W64.of_int 256)
           /\ !(filled2 \ult W64.of_int 256) /\ !(filled3 \ult W64.of_int 256))
-    /\ valid trace_matrix_A____sample_4_polynomials).
+    /\ valid trace_matrix_A____sample_4_polynomials_from_blocks).
 + seq 31 : (b_buf0 = BArray848.init_arr (W8.of_int 255) /\ b_buf1 = BArray848.init_arr (W8.of_int 255)
       /\ b_buf2 = BArray848.init_arr (W8.of_int 255) /\ b_buf3 = BArray848.init_arr (W8.of_int 255)
       /\ BArray1024.is_init b_polynomial0 0 (to_uint (W64.of_int 4 * filled0))
@@ -1577,9 +1619,9 @@ while (b_buf0 = BArray848.init_arr (W8.of_int 255) /\ b_buf1 = BArray848.init_ar
       /\ filled2 \ule W64.of_int 256
       /\ BArray1024.is_init b_polynomial3 0 (to_uint (W64.of_int 4 * filled3))
       /\ filled3 \ule W64.of_int 256
-      /\ valid trace_matrix_A____sample_4_polynomials).
-  + auto; ecall (shake128_squeezeblock4x_proof param_19 (BArray800.init_arr (W8.of_int 255))
-                   param_18 b_param_10 param_17 b_param_9 param_16 b_param_8 param_15 b_param_7).
+      /\ valid trace_matrix_A____sample_4_polynomials_from_blocks).
+  + auto; ecall (shake128_squeezeblock4x_proof param_11 (BArray800.init_arr (W8.of_int 255))
+                   param_10 b_param_10 param_9 b_param_9 param_8 b_param_8 param_7 b_param_7).
     by auto => /> *; smt().
   seq 16 : (b_buf0 = BArray848.init_arr (W8.of_int 255) /\ b_buf1 = BArray848.init_arr (W8.of_int 255)
       /\ b_buf2 = BArray848.init_arr (W8.of_int 255) /\ b_buf3 = BArray848.init_arr (W8.of_int 255)
@@ -1591,8 +1633,9 @@ while (b_buf0 = BArray848.init_arr (W8.of_int 255) /\ b_buf1 = BArray848.init_ar
       /\ filled2 \ule W64.of_int 256
       /\ BArray1024.is_init b_polynomial3 0 (to_uint (W64.of_int 4 * filled3))
       /\ filled3 \ule W64.of_int 256
-      /\ valid trace_matrix_A____sample_4_polynomials).
-  + auto; ecall (matrix_A__rejection_sample_one_block_proof param_22 b_param_6 param_21 param_20 b_param_5).
+      /\ valid trace_matrix_A____sample_4_polynomials_from_blocks).
+  + auto; ecall (matrix_A__rejection_sample_one_block_proof
+                   param_14 b_param_6 param_13 param_12 b_param_5).
     by auto => /> *; rewrite SBI848_168.get_sub_init_arr //=; smt().
   seq 16 : (b_buf0 = BArray848.init_arr (W8.of_int 255) /\ b_buf1 = BArray848.init_arr (W8.of_int 255)
       /\ b_buf2 = BArray848.init_arr (W8.of_int 255) /\ b_buf3 = BArray848.init_arr (W8.of_int 255)
@@ -1604,8 +1647,9 @@ while (b_buf0 = BArray848.init_arr (W8.of_int 255) /\ b_buf1 = BArray848.init_ar
       /\ filled2 \ule W64.of_int 256
       /\ BArray1024.is_init b_polynomial3 0 (to_uint (W64.of_int 4 * filled3))
       /\ filled3 \ule W64.of_int 256
-      /\ valid trace_matrix_A____sample_4_polynomials).
-  + auto; ecall (matrix_A__rejection_sample_one_block_proof param_25 b_param_4 param_24 param_23 b_param_3).
+      /\ valid trace_matrix_A____sample_4_polynomials_from_blocks).
+  + auto; ecall (matrix_A__rejection_sample_one_block_proof
+                   param_17 b_param_4 param_16 param_15 b_param_3).
     by auto => /> *; rewrite SBI848_168.get_sub_init_arr //=; smt().
   seq 16 : (b_buf0 = BArray848.init_arr (W8.of_int 255) /\ b_buf1 = BArray848.init_arr (W8.of_int 255)
       /\ b_buf2 = BArray848.init_arr (W8.of_int 255) /\ b_buf3 = BArray848.init_arr (W8.of_int 255)
@@ -1617,20 +1661,114 @@ while (b_buf0 = BArray848.init_arr (W8.of_int 255) /\ b_buf1 = BArray848.init_ar
       /\ filled2 \ule W64.of_int 256
       /\ BArray1024.is_init b_polynomial3 0 (to_uint (W64.of_int 4 * filled3))
       /\ filled3 \ule W64.of_int 256
-      /\ valid trace_matrix_A____sample_4_polynomials).
-  + auto; ecall (matrix_A__rejection_sample_one_block_proof param_28 b_param_2 param_27 param_26 b_param_1).
+      /\ valid trace_matrix_A____sample_4_polynomials_from_blocks).
+  + auto; ecall (matrix_A__rejection_sample_one_block_proof
+                   param_20 b_param_2 param_19 param_18 b_param_1).
     by auto => /> *; rewrite SBI848_168.get_sub_init_arr //=; smt().
-  auto; ecall (matrix_A__rejection_sample_one_block_proof param_31 b_param_0 param_30 param_29 b_param).
+  auto; ecall (matrix_A__rejection_sample_one_block_proof
+                 param_23 b_param_0 param_22 param_21 b_param).
   by auto => /> *; rewrite SBI848_168.get_sub_init_arr //=; smt().
 (* the first blocks are consumed in full *)
-auto; ecall (matrix_A__rejection_sample_multiple_blocks_proof param_14 b_param_11 param_13
+auto; ecall (matrix_A__rejection_sample_multiple_blocks_proof param_6 b_param_11 param_5
                (BArray848.init_arr (W8.of_int 255))).
-auto; ecall (matrix_A__rejection_sample_multiple_blocks_proof param_12 b_param_12 param_11
+auto; ecall (matrix_A__rejection_sample_multiple_blocks_proof param_4 b_param_12 param_3
                (BArray848.init_arr (W8.of_int 255))).
-auto; ecall (matrix_A__rejection_sample_multiple_blocks_proof param_10 b_param_13 param_9
+auto; ecall (matrix_A__rejection_sample_multiple_blocks_proof param_2 b_param_13 param_1
                (BArray848.init_arr (W8.of_int 255))).
-auto; ecall (matrix_A__rejection_sample_multiple_blocks_proof param_8 b_param_14 param_7
+auto; ecall (matrix_A__rejection_sample_multiple_blocks_proof param_0 b_param_14 param
                (BArray848.init_arr (W8.of_int 255))).
+by auto => /> *; smt().
+qed.
+
+lemma matrix_A____sample_4_polynomials_proof _rho _b_rho _domain_separators _b_domain_separators :
+  matrix_A____sample_4_polynomials_spec _rho _b_rho _domain_separators _b_domain_separators.
+proof.
+hint +safety.
+rewrite /matrix_A____sample_4_polynomials_spec; proc.
+auto; ecall (matrix_A____sample_4_polynomials_from_blocks_proof param_11
+               (BArray800.init_arr (W8.of_int 255)) param_10 (BArray848.init_arr (W8.of_int 255))
+               param_9 (BArray848.init_arr (W8.of_int 255))
+               param_8 (BArray848.init_arr (W8.of_int 255))
+               param_7 (BArray848.init_arr (W8.of_int 255))).
+auto; ecall (matrix_A____shake128_squeeze_multiple_blocks_4x_proof param_6
+               (BArray800.init_arr (W8.of_int 255)) param_5 b_param_2 param_4 b_param_1
+               param_3 b_param_0 param_2 b_param).
+auto; ecall (shake128_absorb_34_4x_proof param_1 b_param_3 param_0
+               (BArray32.init_arr (W8.of_int 255)) param (BArray8.init_arr (W8.of_int 255))).
+by auto => /> *; smt().
+qed.
+
+lemma matrix_A____vk_hash_absorb_block_proof _lanes _b_lanes _vk _b_vk _k :
+  matrix_A____vk_hash_absorb_block_spec _lanes _b_lanes _vk _b_vk _k.
+proof.
+hint +safety.
+rewrite /matrix_A____vk_hash_absorb_block_spec; proc; sp; if.
++ auto; ecall (a_VERIFICATION_KEY____addstate_proof param_4 (BArray200.init_arr (W8.of_int 255))
+                 param_3 param_2 (BArray1952.init_arr (W8.of_int 255)) param_1 param_0 param).
+  by auto => /> /#.
+auto; ecall (__addratebit_proof param_12 (BArray200.init_arr (W8.of_int 255)) param_11).
+auto; ecall (a_VERIFICATION_KEY____addstate_proof param_10 (BArray200.init_arr (W8.of_int 255))
+               param_9 param_8 (BArray1952.init_arr (W8.of_int 255)) param_7 param_6 param_5).
+by auto => /> /#.
+qed.
+
+(* block i of a buffer of 848 bytes, once squeezed, extends its prefix *)
+lemma init_window_848 (t : BArray848.t) (i : int) :
+  0 <= i < 5 => BArray848.is_init t 0 (168 * i) =>
+  BArray848.is_init (SBArray848_168.set_sub8 t (i * 168) (BArray168.init_arr (W8.of_int 255)))
+    0 (168 * (i + 1)).
+proof.
+hint +safety.
+move=> rgi ht; rewrite SBI848_168.is_init_set_sub_in 1..6:/# /=.
+by rewrite (mulzC i) ht /= BI848.is_init_le0 /#.
+qed.
+
+lemma matrix_A____shake128_squeeze_multiple_blocks_4x_vk_proof _state _b_state _b0 _b_b0 _b1 _b_b1
+    _b2 _b_b2 _b3 _b_b3 _lanes _b_lanes _vk _b_vk _first_slot :
+  matrix_A____shake128_squeeze_multiple_blocks_4x_vk_spec _state _b_state _b0 _b_b0 _b1 _b_b1
+    _b2 _b_b2 _b3 _b_b3 _lanes _b_lanes _vk _b_vk _first_slot.
+proof.
+hint +safety.
+rewrite /matrix_A____shake128_squeeze_multiple_blocks_4x_vk_spec; proc; wp.
+(* block i of each buffer is squeezed at iteration i *)
+while (0 <= i <= 5 /\ 0 <= first_slot
+    /\ BArray848.is_init b_b0 0 (168 * i) /\ BArray848.is_init b_b1 0 (168 * i)
+    /\ BArray848.is_init b_b2 0 (168 * i) /\ BArray848.is_init b_b3 0 (168 * i)
+    /\ valid trace_matrix_A____shake128_squeeze_multiple_blocks_4x_vk).
++ if.
+  + auto; ecall (__shake128_squeezeblock4x_x1_proof param_7 (BArray800.init_arr (W8.of_int 255))
+                   param_6 b_param_2 param_5 b_param_1 param_4 b_param_0 param_3 b_param
+                   param_2 (BArray200.init_arr (W8.of_int 255))).
+    auto; ecall (matrix_A____vk_hash_absorb_block_proof param_1
+                   (BArray200.init_arr (W8.of_int 255)) param_0
+                   (BArray1952.init_arr (W8.of_int 255)) param).
+    auto => /> &hr *; split; 1: smt().
+    by move=> *; rewrite !init_window_848 //; smt().
+  auto; ecall (shake128_squeezeblock4x_proof param_12 (BArray800.init_arr (W8.of_int 255))
+                 param_11 b_param_6 param_10 b_param_5 param_9 b_param_4 param_8 b_param_3).
+  by auto => /> &hr *; rewrite !init_window_848 //; smt().
+auto => /> 4? b0 b1 b2 b3 i *; have ->> : i = 5 by smt().
+by do! split.
+qed.
+
+lemma matrix_A____sample_4_polynomials_vk_proof _rho _b_rho _domain_separators
+    _b_domain_separators _lanes _b_lanes _vk _b_vk _first_slot :
+  matrix_A____sample_4_polynomials_vk_spec _rho _b_rho _domain_separators
+    _b_domain_separators _lanes _b_lanes _vk _b_vk _first_slot.
+proof.
+hint +safety.
+rewrite /matrix_A____sample_4_polynomials_vk_spec; proc.
+auto; ecall (matrix_A____sample_4_polynomials_from_blocks_proof param_14
+               (BArray800.init_arr (W8.of_int 255)) param_13 (BArray848.init_arr (W8.of_int 255))
+               param_12 (BArray848.init_arr (W8.of_int 255))
+               param_11 (BArray848.init_arr (W8.of_int 255))
+               param_10 (BArray848.init_arr (W8.of_int 255))).
+auto; ecall (matrix_A____shake128_squeeze_multiple_blocks_4x_vk_proof param_9
+               (BArray800.init_arr (W8.of_int 255)) param_8 b_param_2 param_7 b_param_1
+               param_6 b_param_0 param_5 b_param param_4 (BArray200.init_arr (W8.of_int 255))
+               param_3 (BArray1952.init_arr (W8.of_int 255)) param_2).
+auto; ecall (shake128_absorb_34_4x_proof param_1 b_param_3 param_0
+               (BArray32.init_arr (W8.of_int 255)) param (BArray8.init_arr (W8.of_int 255))).
 by auto => /> *; smt().
 qed.
 
@@ -3477,6 +3615,27 @@ auto; ecall (matrix_A____sample_4_polynomials_proof param_0 b_param_2 param b_pa
 by auto => /> *.
 qed.
 
+lemma sample____matrix_A_vk_proof _vk _b_vk :
+  sample____matrix_A_vk_spec _vk _b_vk.
+proof.
+hint +safety.
+rewrite /sample____matrix_A_vk_spec; proc.
+conseq (_ :
+     b_vk = BArray1952.init_arr (W8.of_int 255)
+  ==> BArray200.is_init b_lanes 0 200 /\ BArray30720.is_init b_matrix_A 0 30720
+   /\ valid trace_sample____matrix_A_vk).
++ by move=> &hr />; rewrite -!(BI1952.is_init_full _ 1952) //.
++ by move=> />.
+do 9! (unroll for ^while).
+cfold* ^index<-.
+auto; ecall (matrix_A____sample_4_polynomials_proof param_6 b_param_0 param_5 b_param).
+do 7! (auto; ecall (matrix_A____sample_4_polynomials_vk_proof param_4 b_param_2 param_3 b_param_1
+                      param_2 (BArray200.init_arr (W8.of_int 255))
+                      param_1 (BArray1952.init_arr (W8.of_int 255)) param_0)).
+auto; ecall (__state_init_proof param b_param_3).
+by auto => /> *; smt().
+qed.
+
 lemma __keygen_prf_proof _prf_output _b_prf_output _randomness _b_randomness :
       (__keygen_prf_spec _prf_output _b_prf_output _randomness _b_randomness).
 proof.
@@ -4104,7 +4263,7 @@ rewrite /__verify_internal_spec; proc.
 have hz : W64.zero = W64.of_int 0 by done.
 (* the signature is decoded and the norm of the response checked; the
    commitment is reconstructed only when both succeed *)
-seq 108 : (b_verification_key = BArray1952.init_arr (W8.of_int 255)
+seq 104 : (b_verification_key = BArray1952.init_arr (W8.of_int 255)
     /\ b_signature_encoded = BArray3309.init_arr (W8.of_int 255)
     /\ 0 <= context_pointer <= 18446744073709551615 /\ 0 <= context_size <= 18446744073709551615
     /\ 0 <= message_pointer <= 18446744073709551615 /\ 0 <= message_size <= 18446744073709551615
@@ -4116,20 +4275,18 @@ seq 108 : (b_verification_key = BArray1952.init_arr (W8.of_int 255)
     /\ valid trace___verify_internal).
 + auto; ecall (row_vector____check_infinity_norm_proof param_3 (BArray5120.init_arr (W8.of_int 255))
                 param_2).
-  auto; ecall (signature____decode_proof param_1 b_param_9 param_0 b_param_8 param
+  auto; ecall (signature____decode_proof param_1 b_param_8 param_0 b_param_7 param
                 (BArray3309.init_arr (W8.of_int 255))).
   auto => />.
   rewrite -!(BI1952.is_init_full _ 1952) // -!(BI3309.is_init_full _ 3309) //.
   by move=> *; smt(orw_eq0).
 if; last by auto => /> /#.
-auto; ecall (__compare_commitment_hashes_proof param_27 (BArray48.init_arr (W8.of_int 255))
-              param_26 b_param).
-auto; ecall (__derive_commitment_hash_proof param_25 b_param_0 param_24
-              (BArray64.init_arr (W8.of_int 255)) param_23 (BArray768.init_arr (W8.of_int 255))).
-auto; ecall (__derive_message_representative_proof param_22 b_param_1 param_21
-              (BArray64.init_arr (W8.of_int 255)) param_20 param_19 param_18 param_17).
-auto; ecall (hash_verification_key_proof param_16 b_param_2 param_15
-              (BArray1952.init_arr (W8.of_int 255))).
+auto; ecall (__compare_commitment_hashes_proof param_25 (BArray48.init_arr (W8.of_int 255))
+              param_24 b_param).
+auto; ecall (__derive_commitment_hash_proof param_23 b_param_0 param_22
+              (BArray64.init_arr (W8.of_int 255)) param_21 (BArray768.init_arr (W8.of_int 255))).
+auto; ecall (__derive_message_representative_proof param_20 b_param_2 param_19 b_param_1
+              param_18 param_17 param_16 param_15).
 auto; ecall (reconstruct_signer_commitment_proof param_14 b_param_4 param_13
               (BArray1024.init_arr (W8.of_int 255)) param_12 (BArray6144.init_arr (W8.of_int 255))
               param_11 b_param_3).
@@ -4138,7 +4295,7 @@ auto; ecall (sample____challenge_proof param_9 b_param_6 param_8 b_param_5).
 auto; ecall (row_vector____multiply_with_matrix_A_proof param_7
               (BArray30720.init_arr (W8.of_int 255)) param_6 (BArray5120.init_arr (W8.of_int 255))).
 auto; ecall (row_vector__ntt_proof param_5 (BArray5120.init_arr (W8.of_int 255))).
-auto; ecall (sample____matrix_A_proof param_4 b_param_7).
+auto; ecall (sample____matrix_A_vk_proof param_4 (BArray1952.init_arr (W8.of_int 255))).
 by auto => /> *; smt().
 qed.
 

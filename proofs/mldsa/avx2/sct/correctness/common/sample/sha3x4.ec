@@ -33,6 +33,7 @@ require import Avx2red.
 from Keccak require import Keccakf1600 Keccak1600_ref Keccak1600_fixedsizes_ref.
 from Keccak require import Keccakf1600_avx2 Keccak1600_avx2 Keccak1600_fixedsizes_avx2.
 from Keccak require import Keccak1600_fixedsizes_avx2x4.
+from Keccak require Keccakf1600_x4_x1.
 require import Keccak1600_statebytes.
 
 abstract theory Sha3x4T.
@@ -197,6 +198,10 @@ equiv keccakf1600_avx2x4_fips202 :
   M._keccakf1600_avx2x4 ~ Keccak1600_Jazz.M._keccakf1600_avx2x4 : ={arg} ==> ={res}
 by sim.
 
+equiv keccakf1600_x4_x1_fips202 :
+  M._keccakf1600_x4_x1 ~ Keccak1600_Jazz.M._keccakf1600_x4_x1 : ={arg} ==> ={res}
+by sim.
+
 equiv a2_absorb_fips202 :
   M.a2____absorb ~ Ref2.MM.__absorb : ={arg} ==> ={res}
 by sim.
@@ -263,6 +268,15 @@ rewrite Array4.initiE //= /sha3_lane /mk_absorbing /= (_ : 0 < r8) 1:/#.
 by have := h k rgk; rewrite nth4_const.
 qed.
 
+(* the four-way permutation advances every lane by one block *)
+lemma sha3_lanes_perm (r8 : int) (data : W8.t list Array4.t) (k : int) (a : sha3x4) :
+  0 < r8 => 0 <= k => sha3_lanes r8 a (Array4.map (mk_read (r8 * k)) data) =>
+  sha3_lanes r8 (st4x_map keccak_f1600_op a) (Array4.map (mk_read (r8 * (k + 1))) data).
+proof.
+move=> hr hk h i rgi; rewrite st4x_get_map //; have := h i rgi.
+by rewrite /sha3_lane !Array4.mapiE //= /mk_read /= !(mulzC r8) !mulzK 1,2:/# iterS // => ->.
+qed.
+
 lemma keccakf1600_avx2x4P (r8 : int) (data : W8.t list Array4.t) (k : int) :
   0 < r8 =>
   hoare[ M._keccakf1600_avx2x4 :
@@ -274,8 +288,7 @@ case: (0 <= k /\ sha3_lanes r8 a0 (Array4.map (mk_read (r8 * k)) data))
   => [[hk h] | hn]; last by conseq (_ : false ==> _) => // /#.
 conseq keccakf1600_avx2x4_fips202 (keccakf1600_avx2x4_h a0)
   => [&1 [<- _] | &1 &2 -> ->]; 1: by exists a0.
-move=> i rgi; rewrite st4x_get_map //; have := h i rgi.
-by rewrite /sha3_lane !Array4.mapiE //= /mk_read /= !(mulzC r8) !mulzK 1,2:/# iterS // => ->.
+by apply sha3_lanes_perm.
 qed.
 
 lemma absorb_2_final_avx2x4P (r8 : int) (pre_ : W8.t list) (ds_ : W16.t Array4.t) :
@@ -500,6 +513,50 @@ seq 1 : (0 <= k /\ state \sha3for Array4.map (mk_read (168 * (k + 1))) data).
 - by call (keccakf1600_avx2x4_128P data k); auto.
 (* the fresh block is read off the rate part of the state *)
 by sp; call (dumpstate_avx2x4_128P data k); auto.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* the four-way permutation run together with a one-way one             *)
+hoare _keccakf1600_x4_x1_h (s4 : sha3x4) (s1 : W64.t Array25.t) :
+  M._keccakf1600_x4_x1 : a4 = s4 /\ a1 = s1
+  ==> res = (st4x_map keccak_f1600_op s4, keccak_f1600_op s1).
+proof.
+conseq keccakf1600_x4_x1_fips202 (Keccakf1600_x4_x1.keccakf1600_x4_x1_h s4 s1) => /#.
+qed.
+
+phoare _keccakf1600_x4_x1_ph (s4 : sha3x4) (s1 : W64.t Array25.t) :
+  [ M._keccakf1600_x4_x1 : a4 = s4 /\ a1 = s1
+    ==> res = (st4x_map keccak_f1600_op s4, keccak_f1600_op s1) ] = 1%r.
+proof.
+conseq keccakf1600_x4_x1_fips202 (Keccakf1600_x4_x1.keccakf1600_x4_x1_ph s4 s1) => /#.
+qed.
+
+(* its four-way part is the four-way permutation *)
+equiv keccakf1600_x4_x1_avx2x4 :
+  M._keccakf1600_x4_x1 ~ M._keccakf1600_avx2x4 : a4{1} = a{2} ==> res{1}.`1 = res{2}.
+proof.
+proc*; exlim a4{1}, a1{1} => s4 s1.
+call{1} (_keccakf1600_x4_x1_ph s4 s1).
+call{2} (: a = s4 ==> res = st4x_map keccak_f1600_op s4).
+- by conseq keccakf1600_avx2x4_fips202 (keccakf1600_avx2x4_ph s4) => /#.
+by auto.
+qed.
+
+(* one block squeezed out of the four lanes, the one-way state permuted *)
+equiv shake128_squeezeblock4x_x1_4x :
+  M.__shake128_squeezeblock4x_x1 ~ M.shake128_squeezeblock4x :
+  ={state, h0, h1, h2, h3}
+  ==> (res{1}.`1, res{1}.`2, res{1}.`3, res{1}.`4, res{1}.`5) = res{2}.
+proof.
+proc; call (: ={arg} ==> ={res}); 1: by sim.
+by wp; call keccakf1600_x4_x1_avx2x4; auto.
+qed.
+
+lemma shake128_squeezeblock4x_x1_lanes (l : W64.t Array25.t) :
+  hoare[ M.__shake128_squeezeblock4x_x1 : lanes = l ==> res.`6 = keccak_f1600_op l ].
+proof.
+proc; call (: true); 1: by conseq (: _ ==> true).
+by wp; ecall (_keccakf1600_x4_x1_h state lanes); auto.
 qed.
 
 (* ==================================================================== *)

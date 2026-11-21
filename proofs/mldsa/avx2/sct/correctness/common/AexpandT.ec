@@ -17,6 +17,9 @@ require import Array2 Array4 Array25 Array32 Array168 Array256 Array848 Array204
 require import WArray2 WArray848 WArray1024 WArray2048.
 require import MldsaConstants Compaction.
 require BaseT Sha3x4.
+from CryptoSpecs require Keccak1600_Spec.
+require JWordList Keccak1600_statebytes.
+from Keccak require Keccak1600_fixedsizes_ref.
 
 (* -------------------------------------------------------------------- *)
 (* The sampling of the matrix A (ExpandA): the four-lane rejection
@@ -1022,68 +1025,55 @@ by rewrite /a_stop /= !W64.ultE /= => 4?; rewrite !ltzNge /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma matrix_A____sample_4_polynomialsP
-  (rho_ : rho) (rcs : (int * int) option list)
+(* the four XOF inputs: rho and the domain separators                  *)
+op a4_data (rho_ : rho) (ds_ : W16.t Array4.t) : W8.t list Array4.t =
+  Array4.init (fun i => to_list rho_ ++ W2u8.to_list ds_.[i]).
+
+(* the rejection sampling from the first five blocks of the four XOFs  *)
+lemma matrix_A____sample_4_polynomials_from_blocksP
+  (rho_ : rho) (ds_ : W16.t Array4.t) (rcs : (int * int) option list)
 : (forall ds, stream_ok (to_list rho_ ++ W2u8.to_list ds)) =>
+  (forall i, 0 <= i < 4 => ds_.[i] = odflt ds_.[i] (omap A_ds (nth None rcs i))) =>
   phoare[
-  M.matrix_A____sample_4_polynomials :
-         rho = rho_
+  M.matrix_A____sample_4_polynomials_from_blocks :
+         xof_state \sha3for Array4.map (mk_read (168 * 5)) (a4_data rho_ ds_)
       /\ (forall i, 0 <= i < 4 =>
-           domain_separators.[i] =
-             odflt domain_separators.[i] (omap A_ds (nth None rcs i)))
+            let b = nth witness [buf0; buf1; buf2; buf3] i in
+            Array848.sub b 0 840 = shake128_slice (a4_data rho_ ds_).[i] 0 840)
     ==>
          forall i, 0 <= i < 4 =>
            let resi = nth witness [res.`1; res.`2; res.`3; res.`4] i in
            odflt true (omap (fun rc => resi = Apoly rho_ rc) (nth None rcs i))
 ] = 1%r.
 proof.
-move=> hok.
+move=> hok hds_.
 hint +listred -delta nth.
 proc=> /=.
 proc change [^stop_sampling<- .. ^stop_sampling<- & +1] : {
   stop_sampling <- a_stop [filled0; filled1; filled2; filled3];
 }; first by auto=> &hr @/a_stop |> *.
 
-exlim domain_separators => ds_.
-proc change <1 : { rho<- rho_; domain_separators <- ds_; }; first by auto.
-do 2! (cfold 1); wp -2.
-pose Ads i := odflt ds_.[i] (omap A_ds (nth None rcs i)).
 pose nonce i := to_list rho_ ++ W2u8.to_list ds_.[i].
-case@[ambient]: (forall i, 0 <= i < 4 => ds_.[i] = Ads i) => hds_; last first.
-- conseq (_ : false ==> _) => //.
-  by move=> &hr [#] ->> _ h; apply: hds_ => i rgi; rewrite /Ads -h.
 pose data := Array4.init nonce.
+conseq (: xof_state \sha3for Array4.init (mk_read (168 * 5) \o nonce)
+       /\ (forall i, 0 <= i < 4 =>
+             let b = nth witness [buf0; buf1; buf2; buf3] i in
+             Array848.sub b 0 840 = shake128_slice data.[i] 0 840) ==> _).
+- move=> &hr [hxf hb]; split; 2: exact hb.
+  by move: hxf; apply/sha3for_eqR/Array4.ext_eq => i rgi; rewrite mapiE // !initiE.
 
-(* up to the loop: partial correctness, then losslessness              *)
+(* the first blocks: partial correctness, then losslessness            *)
 seq ^while : (true) 1%r 1%r 0%r 0%r
   (a_inv nonce 5 xof_state [polynomial0; polynomial1; polynomial2; polynomial3]
                            [filled0; filled1; filled2; filled3]
    /\ stop_sampling = a_stop [filled0; filled1; filled2; filled3]).
-- (* Initial absorption *)
-  sp; seq 1 : (xof_state \sha3for Array4.init (mk_absorbed \o nonce)).
-  - ecall (matrix_A__shake128_absorb_34_4xP rho_ ds_) => /=.
-    auto=> &hr _ rst; apply/sha3for_eqR/Array4.ext_eq=> i ?.
-    by rewrite mapiE -1:initiE.
-
-  (* Squeeze first blocks *)
-  seq 1: (
-       xof_state \sha3for Array4.init (mk_read (168 * 5) \o nonce)
-    /\ (forall i, 0 <= i < 4 =>
-          let b = nth witness [buf0; buf1; buf2; buf3] i in
-          Array848.sub b 0 840 = shake128_slice data.[i] 0 840)).
-  - ecall ->> (matrix_A____shake128_squeeze_multiple_blocks_4xP data) => /=.
-    - move=> &hr |>; apply: sha3for_eqR.
-      by apply: Array4.ext_eq; smt(Array4.mapiE Array4.initiE).
-    auto=> |> &hr + ?; apply/sha3for_eqR/Array4.ext_eq.
-    by move=> i rgi; rewrite mapiE // !initiE.
-
-  seq ^stop_sampling<- : (#{/~{buf0, buf1, buf2, buf3}}pre /\
+- seq ^stop_sampling<- : (#{/~{buf0, buf1, buf2, buf3}}pre /\
     (forall i, 0 <= i < 4 =>
        let p = nth witness [polynomial0; polynomial1; polynomial2; polynomial3] i in
        let f = nth witness [filled0; filled1; filled2; filled3] i in
           reject_ok data.[i] 840 p (to_uint f))).
   - hoare split; last by conseq |>.
-    exlim buf0, buf1, buf2, buf3 => buf0_ buf1_ buf2_ buf3_. (* FIXME *)
+    sp; exlim buf0, buf1, buf2, buf3 => buf0_ buf1_ buf2_ buf3_. (* FIXME *)
     ecall ->> (matrix_A__rejection_sample_multiple_blocksP buf0_) => /= [|>|]; sp.
     seq 0 : (#{/~{filled}}pre /\ to_uint filled0 = min 256 (size (reject (sub buf0_ 0 840)))). (* FIXME *)
     - by auto.
@@ -1100,9 +1090,7 @@ seq ^while : (true) 1%r 1%r 0%r 0%r
     move=> {ile ilt}; apply: allP_range i => /=.
     by with hint +listred (rewrite /= /reject_ok -!h /=).
   by auto=> &hr |> hxf h; rewrite /a_inv hxf /=.
-- wp; do 4! (call matrix_A__rejection_sample_multiple_blocks_ll; wp).
-  call matrix_A____shake128_squeeze_multiple_blocks_4x_ll.
-  by call matrix_A__shake128_absorb_34_4x_ll; auto.
+- by wp; do 4! (call matrix_A__rejection_sample_multiple_blocks_ll; wp); auto.
 
 (* the sampling loop                                                    *)
 - pose K := max 5 (max (max (stream_fuel (nonce 0)) (stream_fuel (nonce 1)))
@@ -1145,7 +1133,7 @@ seq ^while : (true) 1%r 1%r 0%r 0%r
     - move=> p f i rgi hag hf hf256.
       case _: (nth None rcs i) => //= rc E.
       have hds : ds_.[i] = A_ds rc.
-      - by rewrite hds_ // /Ads E.
+      - by rewrite hds_ // E.
       have hdata : data.[i] = to_list rho_ ++ W2u8.to_list (A_ds rc).
       - by rewrite /data initiE ~-1://= /nonce hds.
       have hsz : 256 <= size (reject (shake128_slice data.[i] 0 (168 * k))) by smt().
@@ -1350,6 +1338,44 @@ by [].
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma matrix_A____sample_4_polynomialsP
+  (rho_ : rho) (rcs : (int * int) option list)
+: (forall ds, stream_ok (to_list rho_ ++ W2u8.to_list ds)) =>
+  phoare[
+  M.matrix_A____sample_4_polynomials :
+         rho = rho_
+      /\ (forall i, 0 <= i < 4 =>
+           domain_separators.[i] =
+             odflt domain_separators.[i] (omap A_ds (nth None rcs i)))
+    ==>
+         forall i, 0 <= i < 4 =>
+           let resi = nth witness [res.`1; res.`2; res.`3; res.`4] i in
+           odflt true (omap (fun rc => resi = Apoly rho_ rc) (nth None rcs i))
+] = 1%r.
+proof.
+move=> hok; proc=> /=.
+exlim domain_separators => ds_.
+case@[ambient]: (forall i, 0 <= i < 4 =>
+  ds_.[i] = odflt ds_.[i] (omap A_ds (nth None rcs i))) => hds_; last first.
+- conseq (_ : false ==> _) => //.
+  by move=> &hr [#] ->> _ h; apply: hds_ => i rgi; rewrite -h.
+(* the absorption and the first squeezes, then the sampling *)
+seq 11 : (true) 1%r 1%r 0%r 0%r
+  (xof_state \sha3for Array4.map (mk_read (168 * 5)) (a4_data rho_ ds_)
+   /\ (forall i, 0 <= i < 4 =>
+         let b = nth witness [buf0; buf1; buf2; buf3] i in
+         Array848.sub b 0 840 = shake128_slice (a4_data rho_ ds_).[i] 0 840)).
+- ecall (matrix_A____shake128_squeeze_multiple_blocks_4xP (a4_data rho_ ds_)).
+  ecall (matrix_A__shake128_absorb_34_4xP rho_ ds_); auto=> &hr |> 2? st.
+  by move: st; apply/sha3for_eqR/Array4.ext_eq => i rgi; rewrite !mapiE // /a4_data initiE.
+- call matrix_A____shake128_squeeze_multiple_blocks_4x_ll.
+  by call matrix_A__shake128_absorb_34_4x_ll; auto.
+- by call (matrix_A____sample_4_polynomials_from_blocksP rho_ ds_ rcs hok hds_).
+- by hoare; conseq (: _ ==> true).
+by [].
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma matrix_A____sample_4_polynomialsH
   (rho_ : rho) (rcs : (int * int) option list)
 : (forall ds, stream_ok (to_list rho_ ++ W2u8.to_list ds)) =>
@@ -1526,6 +1552,259 @@ wp; while true (inc - chunk).
 - move=> z; wp; call hll.
   by while true (4 - lane); [move=> z'; auto=> /# | auto=> /#].
 by auto=> /#.
+qed.
+
+(* ==================================================================== *)
+(* The hash of the verification key (SHAKE256, rate 136): the matrix    *)
+(* sampler of the verification absorbs one block of the key per        *)
+(* squeeze of the first blocks of its full chunks, and runs the         *)
+(* permutation of the hash as the one-way part of _keccakf1600_x4_x1.   *)
+import Keccak1600_Spec JWordList Keccak1600_statebytes Array_pk_enc.
+
+(* the state of the hash once the whole key is absorbed and permuted    *)
+op vk_hashed (m : W8.t list) : W64.t Array25.t =
+  keccak_f1600_op (ABSORB1600 SHAKE_DS_BYTE 136 m).
+
+(* the state after k permutations: the first full blocks, then the      *)
+(* padded last one                                                      *)
+op vk_lanes (m : W8.t list) (k : int) : W64.t Array25.t =
+  if k <= size m %/ 136 then stateabsorb_iblocks (take k (chunk 136 m)) st0
+  else vk_hashed m.
+
+(* -------------------------------------------------------------------- *)
+(* the sizes of the key: its blocks fit in the first squeezes of the   *)
+(* full chunks                                                          *)
+lemma kl_cases :
+  kvec = 4 /\ lvec = 4 \/ kvec = 6 /\ lvec = 5 \/ kvec = 8 /\ lvec = 7.
+proof. smt(param_sets). qed.
+
+lemma vk_sizeE : 32 + kvec * 320 = pk_enc.
+proof. by rewrite /pk_enc /t1_enc. qed.
+
+lemma vk_blocks_fit : pk_enc %/ 136 < 5 * (kvec * lvec %/ 4).
+proof. by rewrite /pk_enc /t1_enc; case: kl_cases => [|[|]] [-> ->]. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma vk_lanes0 (m : W8.t list) : vk_lanes m 0 = st0.
+proof. by rewrite /vk_lanes ifT 1:divz_ge0 // take0. qed.
+
+lemma vk_lanes_out (m : W8.t list) (k : int) :
+  size m %/ 136 < k => vk_lanes m k = vk_hashed m.
+proof. by move=> hk; rewrite /vk_lanes ifF 1:/#. qed.
+
+(* a full block absorbed and permuted *)
+lemma vk_lanesS (m : W8.t list) (k : int) : 0 <= k < size m %/ 136 =>
+  vk_lanes m (k + 1)
+  = keccak_f1600_op (addstate (vk_lanes m k) (bytes2state (take 136 (drop (136 * k) m)))).
+proof.
+move=> hk; have hsz : 136 * k + 136 <= size m.
+- by have := divz_eq (size m) 136; have := modz_ge0 (size m) 136; smt().
+have hc : 0 <= k < size (chunk 136 m) by rewrite size_chunk.
+rewrite /vk_lanes ifT 1:/# ifT 1:/# (take_nth [] _ _ hc) stateabsorb_iblocks_rcons.
+by rewrite /stateabsorb nth_chunk // /#.
+qed.
+
+(* the padded last block absorbed and permuted *)
+lemma vk_lanes_last (m : W8.t list) :
+  vk_lanes m (size m %/ 136 + 1)
+  = keccak_f1600_op (addratebit 136 (addstate (vk_lanes m (size m %/ 136))
+      (bytes2state (rcons (chunkremains 136 m) SHAKE_DS_BYTE)))).
+proof.
+rewrite /vk_lanes ifF 1:/# ifT // /vk_hashed /ABSORB1600 /stateabsorb_last /stateabsorb.
+by rewrite take_oversize // size_chunk.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* the absorption routines of fips202, on the key                       *)
+clone Keccak1600_fixedsizes_ref.KeccakArrayRef as APKref
+  with op _ASIZE <- pk_enc,
+    theory A <- Array_pk_enc,
+    theory WA <- WArray_pk_enc
+    proof _ASIZE_ge0 by exact ge0_pk_enc
+    proof _ASIZE_u64 by smt(param_sets).
+
+equiv vk_addstate_eq :
+  M.a_VERIFICATION_KEY____addstate ~ APKref.MM.__addstate : ={arg} ==> ={res}.
+proof. by sim. qed.
+
+(* n bytes of the key from offset o, then the byte tb unless it is zero *)
+hoare vk_addstate_h (st0 : W64.t Array25.t) (vk0 : W8.t Array_pk_enc.t) (o n tb : int) :
+  M.a_VERIFICATION_KEY____addstate :
+  arg = (st0, 0, vk0, o, n, tb) /\ 0 <= n /\ n + b2i (tb <> 0) <= 200
+  /\ 0 <= o /\ o + n <= pk_enc /\ 0 <= tb < 256
+  ==> res.`1 = addstate st0
+                 (bytes2state (sub vk0 o n ++ if tb <> 0 then [W8.of_int tb] else [])).
+proof.
+conseq vk_addstate_eq (APKref.addstate_h st0 0 vk0 o n tb).
+- by move=> &1 [-> *]; exists (st0, 0, vk0, o, n, tb) => /#.
+by move=> &1 &2 -> /= [-> _]; rewrite addstate_atE // /u8zeros nseq0.
+qed.
+
+lemma vk_addstate_ll : islossless M.a_VERIFICATION_KEY____addstate.
+proof. by conseq vk_addstate_eq APKref.addstate_ll => /#. qed.
+
+hoare addratebit_h (st0 : W64.t Array25.t) (r8 : int) :
+  M.__addratebit : st = st0 /\ _RATE8 = r8 ==> res = addratebit r8 st0.
+proof. by proc; auto => />. qed.
+
+(* -------------------------------------------------------------------- *)
+(* the absorption of block k: added to the state, the last one padded   *)
+lemma matrix_A____vk_hash_absorb_blockP (vk0 : W8.t Array_pk_enc.t) (k0 : int) :
+  hoare[ M.matrix_A____vk_hash_absorb_block :
+       vk = vk0 /\ k = k0 /\ 0 <= k0 <= pk_enc %/ 136 /\ lanes = vk_lanes (to_list vk0) k0
+    ==> keccak_f1600_op res = vk_lanes (to_list vk0) (k0 + 1) ].
+proof.
+have hsz : size (to_list vk0) = pk_enc by rewrite Array_pk_enc.size_to_list.
+have hpk := divz_eq pk_enc 136.
+proc; exlim lanes => l0.
+seq 1 : (#pre /\ offset = 136 * k0); 1: by auto.
+if.
+(* a full block *)
+- ecall (vk_addstate_h l0 vk0 (136 * k0) 136 0).
+  auto=> &hr /> 2? hk; rewrite vk_sizeE in hk; split=> [/# | 2? r ->].
+  by rewrite vk_lanesS 1:/# cats0 APKref.RW.slice_to_list // /#.
+(* the last block, then the padding *)
+ecall (addratebit_h lanes 136).
+ecall (vk_addstate_h l0 vk0 (136 * k0) (pk_enc %% 136) 31).
+auto=> &hr />; rewrite !vk_sizeE => 2? hk.
+have ->> : k{hr} = pk_enc %/ 136 by smt().
+split=> [| 5? r ->]; 1: smt(modz_ge0 ltz_pmod).
+rewrite -hsz vk_lanes_last hsz cats1 /chunkremains.
+by rewrite hsz APKref.RW.drop_to_list 1:/# /SHAKE_DS_BYTE -modzE mulzC.
+qed.
+
+lemma matrix_A____vk_hash_absorb_block_ll : islossless M.matrix_A____vk_hash_absorb_block.
+proof.
+proc; inline M.__addratebit; seq 1 : true => //; 1: by auto.
+by if; wp; call vk_addstate_ll; auto.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* the first squeezes of a chunk absorb the blocks first_slot + i of    *)
+(* the key, while there are some left                                   *)
+lemma matrix_A____shake128_squeeze_multiple_blocks_4x_vk_lanes
+  (vk0 : W8.t Array_pk_enc.t) (fs : int) :
+  hoare[ M.matrix_A____shake128_squeeze_multiple_blocks_4x_vk :
+       vk = vk0 /\ first_slot = fs /\ 0 <= fs /\ lanes = vk_lanes (to_list vk0) fs
+    ==> res.`6 = vk_lanes (to_list vk0) (fs + 5) ].
+proof.
+have hsz : size (to_list vk0) = pk_enc by rewrite Array_pk_enc.size_to_list.
+proc; wp.
+while (0 <= i <= 5 /\ vk = vk0 /\ vkm = vk0 /\ first_slot = fs /\ 0 <= fs
+       /\ lanes = vk_lanes (to_list vk0) (fs + i)).
+- if.
+  (* a block of the key absorbed, then permuted with the four lanes *)
+  + wp; ecall (shake128_squeezeblock4x_x1_lanes lanes).
+    ecall (matrix_A____vk_hash_absorb_blockP vk0 (fs + i)).
+    by auto=> &hr |>; rewrite vk_sizeE; smt().
+  (* the key is absorbed: the state is left as it is *)
+  wp; call (: true); 1: by conseq (: _ ==> true).
+  by auto=> &hr |>; rewrite vk_sizeE -hsz => *; rewrite !vk_lanes_out /#.
+by auto=> /#.
+qed.
+
+lemma matrix_A____sample_4_polynomials_vk_lanes (vk0 : W8.t Array_pk_enc.t) (fs : int) :
+  hoare[ M.matrix_A____sample_4_polynomials_vk :
+       vk = vk0 /\ first_slot = fs /\ 0 <= fs /\ lanes = vk_lanes (to_list vk0) fs
+    ==> res.`5 = vk_lanes (to_list vk0) (fs + 5) ].
+proof.
+proc; call (: true); 1: by conseq (: _ ==> true).
+ecall (matrix_A____shake128_squeeze_multiple_blocks_4x_vk_lanes vk0 fs).
+call (: true); 1: by conseq (: _ ==> true).
+by auto.
+qed.
+
+(* the state of the hash starts at zero                                 *)
+equiv vk_state_init_eq :
+  M.__state_init ~ Keccak1600_Jazz.M.__state_init : ={arg} ==> ={res}.
+proof. by sim. qed.
+
+hoare vk_state_init_h : M.__state_init : true ==> res = st0.
+proof.
+conseq vk_state_init_eq (Keccak1600_ref.state_init_h 136).
+- by move=> &1 _; exists st{1}.
+move=> &1 &2 ->; have := Keccak1600_ref.pabsorb_spec_ref_nil 136 _ => //.
+by rewrite /pabsorb_spec_ref /= => <- ->.
+qed.
+
+lemma vk_state_init_ll : islossless M.__state_init.
+proof. by conseq vk_state_init_eq Keccak1600_ref.state_init_ll => /#. qed.
+
+(* the full chunks absorb the whole key                                 *)
+lemma sample____matrix_A_vk_lanes (vk0 : W8.t Array_pk_enc.t) :
+  hoare[ M.sample____matrix_A_vk : vk = vk0 ==> res.`2 = vk_hashed (to_list vk0) ].
+proof.
+have hsz : size (to_list vk0) = pk_enc by rewrite Array_pk_enc.size_to_list.
+proc.
+seq > ^lanes<@ : (vk = vk0 /\ lanes = st0).
+- by call vk_state_init_h; auto.
+(* each full chunk absorbs the five next blocks *)
+seq > ^while : (vk = vk0 /\ lanes = vk_hashed (to_list vk0)).
+- while (vk = vkm /\ vkm = vk0 /\ inc = kvec * lvec %/ 4 /\ 0 <= chunk <= inc
+         /\ lanes = vk_lanes (to_list vk0) (5 * chunk)).
+  + wp; ecall (matrix_A____sample_4_polynomials_vk_lanes vk0 (5 * chunk)).
+    wp; while (vk = vkm /\ vkm = vk0 /\ inc = kvec * lvec %/ 4 /\ 0 <= chunk < inc
+               /\ lanes = vk_lanes (to_list vk0) (5 * chunk)); 1: by auto.
+    by auto=> /#.
+  auto=> &hr |>; rewrite vk_lanes0 /=; split=> [| c 3?].
+  + by case: kl_cases => [|[|]] [-> ->].
+  by rewrite vk_lanes_out // hsz (_ : c = kvec * lvec %/ 4) 1:/# vk_blocks_fit.
+(* the two last polynomials leave it as it is *)
+if; last by auto.
+wp; call (: true); 1: by conseq (: _ ==> true).
+by while (lanes = vk_hashed (to_list vk0)); auto.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* the matrix is the one of __matrix_A on the first 32 bytes of the key *)
+equiv matrix_A____shake128_squeeze_multiple_blocks_4x_vk_eq :
+  M.matrix_A____shake128_squeeze_multiple_blocks_4x_vk
+  ~ M.matrix_A____shake128_squeeze_multiple_blocks_4x :
+  ={state, b0, b1, b2, b3}
+  ==> (res{1}.`1, res{1}.`2, res{1}.`3, res{1}.`4, res{1}.`5) = res{2}.
+proof.
+proc; wp; while (={i, state, b0, b1, b2, b3}).
+- if{1}.
+  + wp; call shake128_squeezeblock4x_x1_4x; wp.
+    by call{1} matrix_A____vk_hash_absorb_block_ll; auto.
+  by wp; call (: ={arg} ==> ={res}); [sim | auto].
+by auto.
+qed.
+
+equiv matrix_A____sample_4_polynomials_vk_eq :
+  M.matrix_A____sample_4_polynomials_vk ~ M.matrix_A____sample_4_polynomials :
+  ={rho, domain_separators}
+  ==> (res{1}.`1, res{1}.`2, res{1}.`3, res{1}.`4) = res{2}.
+proof.
+proc; call (: ={arg} ==> ={res}); 1: by sim.
+call matrix_A____shake128_squeeze_multiple_blocks_4x_vk_eq.
+by call (: ={arg} ==> ={res}); [sim | auto].
+qed.
+
+lemma vk_seedE (vk : W8.t Array_pk_enc.t) :
+  WArray_pk_enc.get256_direct (WArray_pk_enc.init8 ("_.[_]" vk)) 0
+  = WArray32.WArray32.get256_direct
+      (WArray32.WArray32.init8 ("_.[_]" (Array32.init ("_.[_]" vk)))) 0.
+proof.
+rewrite /WArray_pk_enc.get256_direct /WArray32.WArray32.get256_direct; congr.
+apply W32u8.Pack.ext_eq => j hj; rewrite !W32u8.Pack.initiE //=.
+rewrite WArray_pk_enc.initiE 1:#smt:(ge0_t1_enc) WArray32.WArray32.initiE 1:/#.
+by rewrite /= Array32.initiE 1:/#.
+qed.
+
+equiv sample____matrix_A_vk_eq :
+  M.sample____matrix_A_vk ~ M.sample____matrix_A :
+  rho{2} = Array32.init (fun i => vk{1}.[i]) ==> res{1}.`1 = res{2}.
+proof.
+proc.
+seq 13 9 : (={seed, domain_separators, matrix_A, inc, chunk}).
+- wp; call{1} vk_state_init_ll.
+  by auto=> &1 &2 ->; rewrite -vk_seedE.
+seq 1 1 : (={seed, domain_separators, matrix_A}).
+- while (={seed, domain_separators, matrix_A, inc, chunk}); last by auto.
+  wp; call matrix_A____sample_4_polynomials_vk_eq; wp.
+  by while (={lane, index, domain_separators}); auto.
+by conseq (: ={matrix_A}) => //; sim.
 qed.
 
 end AexpandT.

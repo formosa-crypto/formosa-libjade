@@ -12,6 +12,8 @@ from Keccak require "ref/common/keccak1600.jinc"
 
 from Keccak require "avx2/common/keccakf1600x4.jinc"
 
+from Keccak require "avx2/common/keccakf1600x4_x1.jinc"
+
 from Keccak require "avx2/common/keccak1600_fixedsizes.jinc"
 
 from Keccak require "avx2/common/keccak1600x4_fixedsizes.jinc"

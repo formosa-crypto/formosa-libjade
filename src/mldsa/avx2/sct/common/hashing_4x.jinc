@@ -82,6 +82,40 @@ fn shake128_squeezeblock4x(
     return state, h0, h1, h2, h3;
 }
 
+// shake128_squeezeblock4x, with the one-way permutation of lanes run alongside
+// the four-way one (keccakf1600x4_x1.jinc)
+#[safety =
+   { requires = is_arr_init(state,0,32 * 25) && is_arr_init(lanes,0,8 * 25)
+   , ensures = is_arr_init(state,0,32 * 25)
+            && is_arr_init(h0,0,SHAKE128_RATE)
+            && is_arr_init(h1,0,SHAKE128_RATE)
+            && is_arr_init(h2,0,SHAKE128_RATE)
+            && is_arr_init(h3,0,SHAKE128_RATE)
+            && is_arr_init(lanes,0,8 * 25)
+   }
+ ]
+inline
+fn __shake128_squeezeblock4x_x1(
+    stack shakex4_state state,
+    stack u8[SHAKE128_RATE] h0 h1 h2 h3,
+    stack u64[25] lanes
+) ->
+    stack shakex4_state,
+    stack u8[SHAKE128_RATE],
+    stack u8[SHAKE128_RATE],
+    stack u8[SHAKE128_RATE],
+    stack u8[SHAKE128_RATE],
+    stack u64[25]
+{
+    reg ui64 offset;
+
+    state, lanes = _keccakf1600_x4_x1(state, lanes);
+    offset = 0;
+    h0, h1, h2, h3, _ = A168::__dumpstate_avx2x4(h0, h1, h2, h3, offset, SHAKE128_RATE, state);
+
+    return state, h0, h1, h2, h3, lanes;
+}
+
 #[safety =
    { requires = is_arr_init(state,0,32 * 25)
    , ensures = is_arr_init(state,0,32 * 25)
