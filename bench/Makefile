@@ -267,13 +267,22 @@ bench-all: libs $(BUILD)/bench
 # and its JSON counterpart (REPORT_JSON).
 # Versions are read from the pinned submodule revisions and the jasmin compiler.
 gitver = $$(git -C $(1) describe --tags --always --dirty 2>/dev/null || echo '?')
+# turbo (frequency above the base clock, which varies with the load): off, on or
+# unknown, from intel_pstate (no_turbo) or the cpufreq boost switch
+SYSCPU ?= /sys/devices/system/cpu
+turbo = $$(if [ -r $(SYSCPU)/intel_pstate/no_turbo ]; then \
+	     [ "$$(cat $(SYSCPU)/intel_pstate/no_turbo)" = 1 ] && echo off || echo on; \
+	   elif [ -r $(SYSCPU)/cpufreq/boost ]; then \
+	     [ "$$(cat $(SYSCPU)/cpufreq/boost)" = 0 ] && echo off || echo on; \
+	   else echo unknown; fi)
 report: libs $(BUILD)/bench
 	@$(MAKE) --no-print-directory -s bench-all > $(BUILD)/bench.csv
 	@$(PYTHON) report.py $(if $(EXCLUDE),$(addprefix --exclude ,$(EXCLUDE))) \
 	        --require '$(REQUIRE)' \
 	        --version "CPU=$$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | sed 's/^ *//')" \
 	        --version "pinned core=$(if $(PIN),$(CPU),none)" \
-	        --version "freq governor=$$(cat /sys/devices/system/cpu/cpu$(if $(PIN),$(CPU),0)/cpufreq/scaling_governor 2>/dev/null || echo unknown)" \
+	        --version "freq governor=$$(cat $(SYSCPU)/cpu$(if $(PIN),$(CPU),0)/cpufreq/scaling_governor 2>/dev/null || echo unknown)" \
+	        --version "turbo=$(turbo)" \
 	        --version "jasminc=$$(jasminc -version 2>/dev/null | head -1)" \
 	        --version "cc=$$($(CC) --version 2>/dev/null | head -1)" \
 	        --version "mlkem-native=$(call gitver,$(MLKN)/..)" \
