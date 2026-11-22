@@ -238,7 +238,7 @@ echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo   # lock to base clock
 ```
 
 Make it persistent with a `systemd` unit or `tuned` so the report's Environment
-block reads `freq governor: performance` across reboots.
+block reads `freq governor: performance` and `turbo: off` across reboots.
 
 ## What the bench workflow runs
 
