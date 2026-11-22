@@ -75,7 +75,8 @@ fn __indcpa_keypair
 
   for i = 0 to MLKEM_K
   {
-    pkpv[i*MLKEM_N:MLKEM_N] = __polyvec_pointwise_acc(pkpv[i*MLKEM_N:MLKEM_N], aa[i*MLKEM_VECN:MLKEM_VECN], skpv);
+    pkpv[i*MLKEM_N:MLKEM_N] = __polyvec_pointwise_acc(pkpv[i*MLKEM_N:MLKEM_N],
+                                                      aa[i*MLKEM_VECN:MLKEM_VECN], skpv, 0);
     pkpv[i*MLKEM_N:MLKEM_N] = _poly_frommont(pkpv[i*MLKEM_N:MLKEM_N]);
   }
 
@@ -179,10 +180,11 @@ fn __indcpa_enc(
 
   for w=0 to MLKEM_K
   {
-    bp[w*MLKEM_N:MLKEM_N] = __polyvec_pointwise_acc(bp[w*MLKEM_N:MLKEM_N], aat[w*MLKEM_VECN:MLKEM_VECN], sp);
+    bp[w*MLKEM_N:MLKEM_N] = __polyvec_pointwise_acc(bp[w*MLKEM_N:MLKEM_N],
+                                                    aat[w*MLKEM_VECN:MLKEM_VECN], sp, 1);
   }
 
-  v = __polyvec_pointwise_acc(v, pkpv, sp);
+  v = __polyvec_pointwise_acc(v, pkpv, sp, 1);
 
   bp = __polyvec_invntt(bp);
   v = _poly_invntt(v);
@@ -222,7 +224,7 @@ fn __indcpa_dec
   skpv = __i_polyvec_frombytes(sk);
 
   bp = __polyvec_ntt(bp);
-  t = __polyvec_pointwise_acc(t, skpv, bp);
+  t = __polyvec_pointwise_acc(t, skpv, bp, 1);
   t = _poly_invntt(t);
 
   mp = _poly_sub(mp, v, t);

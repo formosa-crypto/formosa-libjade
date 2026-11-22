@@ -126,6 +126,10 @@ qed.
 hint simplify in safety : is_init_set_in, is_init_set_out, is_init_set_sub,
               is_init_set_left, is_init_set_right.
 
+(* a write keeps a range initialised *)
+lemma is_init_set_mono t i k l : is_init t k l => is_init (set t i m_one) k l.
+proof. by rewrite /is_init => h j ??; rewrite is_init_cell_w; right; apply h. qed.
+
 (* a write at the end of an initialised range extends it, up to the end of
    the written word *)
 lemma is_init_set_grow t i k l :
