@@ -344,8 +344,20 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 (* The base multiplication, from MLKEM_basemul_avx2                     *)
+lemma poly_basemul_body_ll : islossless M.__poly_basemul_body.
+proof.
+proc; while (0 <= i <= 8) (8 - i); first by move=> z; inline *; auto => /#.
+by auto => /#.
+qed.
+
 lemma poly_basemul_ll : islossless M._poly_basemul.
-proof. by proc; inline *; auto. qed.
+proof. by proc; call poly_basemul_body_ll. qed.
+
+lemma poly_basemul_acc_ll : islossless M._poly_basemul_acc.
+proof. by proc; call poly_basemul_body_ll. qed.
+
+lemma poly_basemul_acc_red_ll : islossless M._poly_basemul_acc_red.
+proof. by proc; call poly_basemul_body_ll. qed.
 
 (* the pairs of the code, in the order of the specification *)
 lemma bmiE (i : int) : 0 <= i < 256 =>
@@ -367,22 +379,18 @@ move=> rgi; exists (i %/ 32) (i %% 16) (i %% 32 %/ 16).
 by rewrite bmiE //; smt().
 qed.
 
-phoare poly_basemul_avx2_ph _a _b:
- [M._poly_basemul:
-    (lift_array256 ap) = nttunpack _a /\ signed_bound_cxq ap 0 256 2
-    /\ (lift_array256 bp) = nttunpack _b /\ signed_bound_cxq bp 0 256 2
-   ==>
-    (lift_array256 res)
-    = nttunpack (scale (basemul (_a) (_b)) (incoeff 169))
-    /\ signed_bound_cxq res 0 256 1 ] = 1%r.
+(* the product of two polynomials of magnitude at most 2 q, coefficient
+   by coefficient *)
+lemma bmres_lift (a b : W16.t Array256.t) (_a _b : poly) :
+  lift_array256 a = nttunpack _a => signed_bound_cxq a 0 256 2 =>
+  lift_array256 b = nttunpack _b => signed_bound_cxq b 0 256 2 =>
+  forall i, 0 <= i < 256 =>
+       incoeff (W16.to_sint (MLKEM_basemul_avx2.bmres a b).[i])
+         = (nttunpack (scale (basemul _a _b) (incoeff 169))).[i]
+    /\ `|W16.to_sint (MLKEM_basemul_avx2.bmres a b).[i]| < 2 * 3329.
 proof.
-conseq poly_basemul_ll (_ : lift_array256 ap = nttunpack _a /\ signed_bound_cxq ap 0 256 2
-    /\ lift_array256 bp = nttunpack _b /\ signed_bound_cxq bp 0 256 2
-   ==> lift_array256 res = nttunpack (scale (basemul _a _b) (incoeff 169))
-    /\ signed_bound_cxq res 0 256 1) => //.
-exlim ap, bp => a0 b0; conseq (MLKEM_basemul_avx2.poly_basemul_h a0 b0) => //.
-move=> &m [#] -> -> hla hba hlb hbb r ->.
-have hv := MLKEM_basemul_avx2.bmres_val ap{m} bp{m} _a _b _ _.
+move=> hla hba hlb hbb.
+have hv := MLKEM_basemul_avx2.bmres_val a b _a _b _ _.
 - move=> i rgi; have := hba i rgi; have := hbb i rgi; rewrite !b16E qE /#.
 - move=> k l t rgk rgl rgt; have rgi : 0 <= 32 * k + l + 16 * t < 256 by smt().
   pose j := 32 * k + l + 16 * t.
@@ -390,12 +398,81 @@ have hv := MLKEM_basemul_avx2.bmres_val ap{m} bp{m} _a _b _ _.
   have -> : j %% 16 = l by smt().
   have -> : j %% 32 %/ 16 = t by smt().
   by move=> <-; rewrite -!nttunpack_get // -hla -hlb /lift_array256 !mapiE.
+move=> i rgi; have [k l t [rgk [rgl [rgt [-> eu]]]]] := bmi_split _ rgi.
+rewrite nttunpack_get 1:/# eu /scale mapiE 1:/# /=.
+by have [-> hr] := hv k l t _ _ _.
+qed.
+
+hoare poly_basemul_avx2_h _a _b :
+  M._poly_basemul :
+    lift_array256 ap = nttunpack _a /\ signed_bound_cxq ap 0 256 2
+    /\ lift_array256 bp = nttunpack _b /\ signed_bound_cxq bp 0 256 2
+   ==>
+    lift_array256 res = nttunpack (scale (basemul _a _b) (incoeff 169))
+    /\ signed_bound_cxq res 0 256 2.
+proof.
+exlim ap, bp => a0 b0; conseq (MLKEM_basemul_avx2.poly_basemul_h a0 b0) => //.
+move=> &m [#] -> -> hla hba hlb hbb r ->.
+have hv := bmres_lift ap{m} bp{m} _a _b hla hba hlb hbb.
 split.
-- apply Array256.ext_eq => i rgi; have [k l t [rgk [rgl [rgt [-> eu]]]]] := bmi_split _ rgi.
-  rewrite /lift_array256 mapiE 1:/# /= nttunpack_get 1:/# eu /scale mapiE 1:/# /=.
-  by have [-> _] := hv k l t _ _ _.
-move=> i rgi; rewrite b16E qE; have [k l t [rgk [rgl [rgt [-> _]]]]] := bmi_split _ rgi.
-by have [_ hr] := hv k l t _ _ _; smt().
+- by apply Array256.ext_eq => i rgi; rewrite /lift_array256 mapiE //=; have [-> _] := hv i rgi.
+by move=> i rgi; rewrite b16E qE; have [_ hr] := hv i rgi; smt().
+qed.
+
+(* the accumulation on a destination of magnitude at most c q *)
+hoare poly_basemul_acc_avx2_h (c : int) _r _a _b :
+  M._poly_basemul_acc :
+    0 <= c <= 6 /\ lift_array256 rp = _r /\ signed_bound_cxq rp 0 256 c
+    /\ lift_array256 ap = nttunpack _a /\ signed_bound_cxq ap 0 256 2
+    /\ lift_array256 bp = nttunpack _b /\ signed_bound_cxq bp 0 256 2
+   ==>
+    lift_array256 res = _r &+ nttunpack (scale (basemul _a _b) (incoeff 169))
+    /\ signed_bound_cxq res 0 256 (c + 2).
+proof.
+exlim rp, ap, bp => r0 a0 b0.
+conseq (MLKEM_basemul_avx2.poly_basemul_acc_h r0 a0 b0) => //.
+move=> &m [#] -> -> -> ge0c le6c hlr hbr hla hba hlb hbb r ->.
+have hv := bmres_lift ap{m} bp{m} _a _b hla hba hlb hbb.
+have hf : forall i, 0 <= i < 256 =>
+       incoeff (W16.to_sint (MLKEM_basemul_avx2.bmacc 1 rp{m} ap{m} bp{m}).[i])
+         = _r.[i] + (nttunpack (scale (basemul _a _b) (incoeff 169))).[i]
+    /\ - (c + 2) * 3329 <= W16.to_sint (MLKEM_basemul_avx2.bmacc 1 rp{m} ap{m} bp{m}).[i]
+         < (c + 2) * 3329.
+- move=> i rgi; have [e hr] := hv i rgi; rewrite /MLKEM_basemul_avx2.bmacc initiE //=.
+  have [-> hb] := MLKEM_basemul_avx2.fin1P c _ rp{m}.[i] _ hr _; first smt().
+  + by have := hbr i rgi; rewrite b16E qE /#.
+  by rewrite e -hlr /lift_array256 mapiE //= ZqRing.addrC.
+split.
+- apply Array256.ext_eq => i rgi; rewrite /lift_array256 mapiE //= /(&+) map2iE //.
+  by have [-> _] := hf i rgi.
+by move=> i rgi; rewrite b16E qE; have [_ hb] := hf i rgi; smt().
+qed.
+
+hoare poly_basemul_acc_red_avx2_h (c : int) _r _a _b :
+  M._poly_basemul_acc_red :
+    0 <= c <= 6 /\ lift_array256 rp = _r /\ signed_bound_cxq rp 0 256 c
+    /\ lift_array256 ap = nttunpack _a /\ signed_bound_cxq ap 0 256 2
+    /\ lift_array256 bp = nttunpack _b /\ signed_bound_cxq bp 0 256 2
+   ==>
+    lift_array256 res = _r &+ nttunpack (scale (basemul _a _b) (incoeff 169))
+    /\ signed_bound_cxq res 0 256 2.
+proof.
+exlim rp, ap, bp => r0 a0 b0.
+conseq (MLKEM_basemul_avx2.poly_basemul_acc_red_h r0 a0 b0) => //.
+move=> &m [#] -> -> -> ge0c le6c hlr hbr hla hba hlb hbb r ->.
+have hv := bmres_lift ap{m} bp{m} _a _b hla hba hlb hbb.
+have hf : forall i, 0 <= i < 256 =>
+       incoeff (W16.to_sint (MLKEM_basemul_avx2.bmacc 2 rp{m} ap{m} bp{m}).[i])
+         = _r.[i] + (nttunpack (scale (basemul _a _b) (incoeff 169))).[i]
+    /\ 0 <= W16.to_sint (MLKEM_basemul_avx2.bmacc 2 rp{m} ap{m} bp{m}).[i] < 2 * 3329.
+- move=> i rgi; have [e hr] := hv i rgi; rewrite /MLKEM_basemul_avx2.bmacc initiE //=.
+  have [-> hb] := MLKEM_basemul_avx2.fin2P c _ rp{m}.[i] _ hr _; first smt().
+  + by have := hbr i rgi; rewrite b16E qE /#.
+  by rewrite e -hlr /lift_array256 mapiE //= ZqRing.addrC.
+split.
+- apply Array256.ext_eq => i rgi; rewrite /lift_array256 mapiE //= /(&+) map2iE //.
+  by have [-> _] := hf i rgi.
+by move=> i rgi; rewrite b16E qE; have [_ hb] := hf i rgi; smt().
 qed.
 
 (* -------------------------------------------------------------------- *)

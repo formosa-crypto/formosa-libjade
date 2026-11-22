@@ -62,130 +62,100 @@ fn _poly_csubq(reg ptr u16[MLKEM_N] rp) -> reg ptr u16[MLKEM_N]
   return rp;
 }
 
-/* __w256_interleave_u16
-  joins 32-bit values whose low and high halves
-  are stored in al and ah respectively
-   a0 -> [0,1,2,3,8,9,10,11]
-   a1 ->[4,5,6,7,12,13,14,15]
-  */
+/* 16 products (a + b X) (c + d X) mod (X^2 - zeta) (X^2 + zeta if sign is 1),
+   each coefficient as the sum of two Montgomery products. */
 inline
-fn __w256_interleave_u16(reg u256 al ah) -> reg u256, reg u256 {
-  reg u256 a0 a1;
+fn __basemul16x(reg u256 a b c d zeta zetaqinv qx16 qinvx16, inline int sign)
+  -> reg u256, reg u256
+{
+  reg u256 dz alo blo r0 r1 s0 s1 t;
 
-  a0  = #VPUNPCKL_16u16(al, ah);
-  a1  = #VPUNPCKH_16u16(al, ah);
+  dz = __fqmulprecomp16x(d, zetaqinv, zeta, qx16);
 
-  return a0, a1;
-}
+  alo = #VPMULL_16u16(a, qinvx16);
+  blo = #VPMULL_16u16(b, qinvx16);
 
-/* __w256_deinterleave_u16
-  inverts the __w256_interleave_u16 operation
-  */
+  r0 = #VPMULL_16u16(alo, c);
+  s0 = #VPMULL_16u16(alo, d);
+  r1 = #VPMULL_16u16(blo, dz);
+  s1 = #VPMULL_16u16(blo, c);
 
-inline
-fn __w256_deinterleave_u16(reg u256 _zero a0 a1) -> reg u256, reg u256 {
-  reg u256 al ah;
+  r0 = #VPMULH_16u16(r0, qx16);
+  s0 = #VPMULH_16u16(s0, qx16);
+  r1 = #VPMULH_16u16(r1, qx16);
+  s1 = #VPMULH_16u16(s1, qx16);
 
-  al = #VPBLEND_16u16(a0,_zero,0xAA);
-  ah = #VPBLEND_16u16(a1,_zero,0xAA);
-  al = #VPACKUS_8u32(al, ah);
-  a0 = #VPSRL_8u32(a0,16);
-  a1 = #VPSRL_8u32(a1,16);
-  ah = #VPACKUS_8u32(a0, a1);
-
-  return al, ah;
-}
-
-/* __mont_red: montgomery reduction step with R = 2^16
-  gets 32-bit values in de-interleaved form, each value
-  in the range [-88657928,88657928).
-  Requires qx16 to contain 16 copies of q
-  Requires qinvx16 to contain 16 copies of 62209
-  returns each input value multiplied by R^-1 % q
-  and reduced to the range [-q,q)
-*/
-
-inline
-fn __mont_red(reg u256 lo hi qx16 qinvx16) -> reg u256 {
-  reg u256 m;
-
-  m  = #VPMULL_16u16(lo, qinvx16);
-  m  = #VPMULH_16u16(m, qx16);
-  lo = #VPSUB_16u16(hi, m);
-
-  return lo;
-}
-
-/* Wide multiplication of two 16x16 bit registers, resulting
-   in 16 32-bit values. Packed as
-
-   xy0 -> [0,1,2,3,8,9,10,11]
-   xy1 ->[4,5,6,7,12,13,14,15] */
-inline
-fn __wmul_16u16(reg u256 x y) -> reg u256, reg u256 {
-  reg u256 xyL xyH xy0 xy1;
-  xyL = #VPMULL_16u16(x, y);
-  xyH = #VPMULH_16u16(x, y);
-  xy0, xy1 = __w256_interleave_u16(xyL, xyH);
-
-  return xy0, xy1;
-}
-
-/*
-__schoolbook16x: complex multiplication are*bre+(-1)^sign*zeta*aim*bim of 16x2 zp x zp values
-requires:
-     are,aim: real/imag parts of a in the range [-2q,2q)
-     bre,bim: real/imag parts of b in the range [-2q,2q)
-     zeta contains 16 zetas in the range [0,q)
-     zetaqinv constains zetas x qinv
-     qx16 containts 16x q
-     qinvx16 contains 16x qinv
-ensures:
-     output coefficients are in the range [-q,q)
-     they represent the coefficients of complex multiplication with an extra montgomery
-     factor R^-1 % q.
-*/
-
-inline
-fn __schoolbook16x(reg u256 are aim bre bim zeta zetaqinv qx16 qinvx16, inline int sign) -> reg u256, reg u256
-{ reg u256 zaim ac0 ac1 zbd0 zbd1 ad0 ad1 bc0 bc1 x0 x1 y0 y1 _zero;
-
-  zaim = __fqmulprecomp16x(aim, zetaqinv, zeta, qx16);
-
-  ac0, ac1 = __wmul_16u16(are, bre);
-  ad0, ad1 = __wmul_16u16(are, bim);
-  bc0, bc1 = __wmul_16u16(aim, bre);
-  zbd0, zbd1 = __wmul_16u16(zaim, bim);
+  t = #VPMULH_16u16(a, c);
+  r0 = #VPSUB_16u16(t, r0);
+  t = #VPMULH_16u16(a, d);
+  s0 = #VPSUB_16u16(t, s0);
+  t = #VPMULH_16u16(b, dz);
+  r1 = #VPSUB_16u16(t, r1);
+  t = #VPMULH_16u16(b, c);
+  s1 = #VPSUB_16u16(t, s1);
 
   if (sign == 0) {
-    x0 = #VPADD_8u32(ac0, zbd0);
-    x1 = #VPADD_8u32(ac1, zbd1);
+    r0 = #VPADD_16u16(r0, r1);
   } else {
-    x0 = #VPSUB_8u32(ac0, zbd0);
-    x1 = #VPSUB_8u32(ac1, zbd1);
+    r0 = #VPSUB_16u16(r0, r1);
   }
-  y0 = #VPADD_8u32(bc0, ad0);
-  y1 = #VPADD_8u32(bc1, ad1);
+  s0 = #VPADD_16u16(s0, s1);
 
-  _zero = #set0_256();
-  x0, x1 = __w256_deinterleave_u16(_zero, x0, x1);
-  y0, y1 = __w256_deinterleave_u16(_zero, y0, y1);
-  x0 = __mont_red(x0, x1, qx16, qinvx16);
-  y0 = __mont_red(y0, y1, qx16, qinvx16);
-  return x0, y0;
+  return r0, s0;
+}
+
+/* The base multiplication of ap and bp, 8 blocks of 16 pairs (a + b X, c + d X), with
+   the factor R^-1 % q.
+   acc = 0: rp = ap * bp; acc = 1: rp += ap * bp; acc = 2: rp += ap * bp, reduced. */
+#[safety =
+   { requires = is_arr_init(ap,0,32*16) && is_arr_init(bp,0,32*16) &&
+                is_arr_init(rp,0,(acc != 0 ? 32*16 : 0))
+   , ensures = is_arr_init(rp,0,32*16)
+   }
+ ]
+inline
+fn __poly_basemul_body(reg ptr u16[MLKEM_N] rp ap bp, inline int acc) -> reg ptr u16[MLKEM_N]
+{
+  inline int i zo;
+  reg u256 zeta zetaqinv qx16 qinvx16 vx16 a b c d r s;
+
+  qx16    = jqx16.[:u256 0];
+  qinvx16 = jqinvx16.[:u256 0];
+  if (acc == 2) { vx16 = jvx16.[:u256 0]; }
+
+  for i = 0 to 8 {
+    zo = 272 + 392*(i/4) + 64*((i/2)%2);
+    zetaqinv = jzetas_exp.[:u256 zo];
+    zeta = jzetas_exp.[:u256 zo + 32];
+    a = ap.[:u256 32*(2*i)];
+    b = ap.[:u256 32*(2*i+1)];
+    c = bp.[:u256 32*(2*i)];
+    d = bp.[:u256 32*(2*i+1)];
+    r, s = __basemul16x(a, b, c, d, zeta, zetaqinv, qx16, qinvx16, i%2);
+    if (acc != 0) {
+      r = #VPADD_16u16(r, rp.[:u256 32*(2*i)]);
+      s = #VPADD_16u16(s, rp.[:u256 32*(2*i+1)]);
+    }
+    if (acc == 2) {
+      r = __red16x(r, qx16, vx16);
+      s = __red16x(s, qx16, vx16);
+    }
+    rp.[:u256 32*(2*i)] = r;
+    rp.[:u256 32*(2*i+1)] = s;
+  }
+
+  return rp;
 }
 
 /*
-_poly_basemul: complex multiplication are*bre+zeta*aim*bim of 128x2 zp x zp values
+_poly_basemul: rp = ap * bp
 requires:
-     ap: 8*(16x16-bit real,16x16-bit imag), all in the range [-2q,2q)
-     bp: 8*(16x16-bit real,16x16-bit imag), all in the range [-2q,2q)
+     ap, bp: coefficients in the range [-2q,2q)
 ensures:
-     output coefficients are in the range [-q,q)
-     they represent the coefficients of complex multiplication with an extra montgomery
+     output coefficients are in the range [-2q,2q)
+     they represent the coefficients of the base multiplication with an extra montgomery
      factor R^-1 % q.
 */
-
 #[safety =
    { requires = is_arr_init(ap,0,32*16) && is_arr_init(bp,0,32*16)
    , ensures = is_arr_init(rp,0,32*16)
@@ -193,87 +163,47 @@ ensures:
  ]
 fn _poly_basemul(reg ptr u16[MLKEM_N] rp ap bp) -> reg ptr u16[MLKEM_N]
 {
-  reg u256 zeta zetaqinv qx16 qinvx16 are aim bre bim;
+  rp = __poly_basemul_body(rp, ap, bp, 0);
+  return rp;
+}
 
-  qx16    = jqx16.[:u256 0];
-  qinvx16 = jqinvx16.[:u256 0];
+/*
+_poly_basemul_acc: rp += ap * bp
+requires:
+     ap, bp: coefficients in the range [-2q,2q)
+     rp: coefficients in the range [-6q,6q)
+ensures:
+     the range of the output coefficients is that of rp, 2q wider on each side
+*/
+#[safety =
+   { requires = is_arr_init(ap,0,32*16) && is_arr_init(bp,0,32*16) &&
+                is_arr_init(rp,0,32*16)
+   , ensures = is_arr_init(rp,0,32*16)
+   }
+ ]
+fn _poly_basemul_acc(reg ptr u16[MLKEM_N] rp ap bp) -> reg ptr u16[MLKEM_N]
+{
+  rp = __poly_basemul_body(rp, ap, bp, 1);
+  return rp;
+}
 
-  zetaqinv = jzetas_exp.[:u256 272];
-  zeta = jzetas_exp.[:u256 304];
-
-  are = ap.[:u256 32*0];
-  aim = ap.[:u256 32*1];
-  bre = bp.[:u256 32*0];
-  bim = bp.[:u256 32*1];
-  are, aim = __schoolbook16x(are, aim, bre, bim, zeta, zetaqinv, qx16, qinvx16, 0);
-  rp.[:u256 32*0] = are;
-  rp.[:u256 32*1] = aim;
-
-  are = ap.[:u256 32*2];
-  aim = ap.[:u256 32*3];
-  bre = bp.[:u256 32*2];
-  bim = bp.[:u256 32*3];
-  are, aim = __schoolbook16x(are, aim, bre, bim, zeta, zetaqinv, qx16, qinvx16, 1);
-  rp.[:u256 32*2] = are;
-  rp.[:u256 32*3] = aim;
-
-  zetaqinv = jzetas_exp.[:u256 336];
-  zeta = jzetas_exp.[:u256 368];
-
-  are = ap.[:u256 32*4];
-  aim = ap.[:u256 32*5];
-  bre = bp.[:u256 32*4];
-  bim = bp.[:u256 32*5];
-  are, aim = __schoolbook16x(are, aim, bre, bim, zeta, zetaqinv, qx16, qinvx16, 0);
-  rp.[:u256 32*4] = are;
-  rp.[:u256 32*5] = aim;
-
-  are = ap.[:u256 32*6];
-  aim = ap.[:u256 32*7];
-  bre = bp.[:u256 32*6];
-  bim = bp.[:u256 32*7];
-  are, aim = __schoolbook16x(are, aim, bre, bim, zeta, zetaqinv, qx16, qinvx16, 1);
-  rp.[:u256 32*6] = are;
-  rp.[:u256 32*7] = aim;
-
-  zetaqinv = jzetas_exp.[:u256 664];
-  zeta = jzetas_exp.[:u256 696];
-
-  are = ap.[:u256 32*8];
-  aim = ap.[:u256 32*9];
-  bre = bp.[:u256 32*8];
-  bim = bp.[:u256 32*9];
-  are, aim = __schoolbook16x(are, aim, bre, bim, zeta, zetaqinv, qx16, qinvx16, 0);
-  rp.[:u256 32*8] = are;
-  rp.[:u256 32*9] = aim;
-
-  are = ap.[:u256 32*10];
-  aim = ap.[:u256 32*11];
-  bre = bp.[:u256 32*10];
-  bim = bp.[:u256 32*11];
-  are, aim = __schoolbook16x(are, aim, bre, bim, zeta, zetaqinv, qx16, qinvx16, 1);
-  rp.[:u256 32*10] = are;
-  rp.[:u256 32*11] = aim;
-
-  zetaqinv = jzetas_exp.[:u256 728];
-  zeta = jzetas_exp.[:u256 760];
-
-  are = ap.[:u256 32*12];
-  aim = ap.[:u256 32*13];
-  bre = bp.[:u256 32*12];
-  bim = bp.[:u256 32*13];
-  are, aim = __schoolbook16x(are, aim, bre, bim, zeta, zetaqinv, qx16, qinvx16, 0);
-  rp.[:u256 32*12] = are;
-  rp.[:u256 32*13] = aim;
-
-  are = ap.[:u256 32*14];
-  aim = ap.[:u256 32*15];
-  bre = bp.[:u256 32*14];
-  bim = bp.[:u256 32*15];
-  are, aim = __schoolbook16x(are, aim, bre, bim, zeta, zetaqinv, qx16, qinvx16, 1);
-  rp.[:u256 32*14] = are;
-  rp.[:u256 32*15] = aim;
-
+/*
+_poly_basemul_acc_red: rp += ap * bp, reduced
+requires:
+     ap, bp: coefficients in the range [-2q,2q)
+     rp: coefficients in the range [-6q,6q)
+ensures:
+     output coefficients are in the range [0,2q)
+*/
+#[safety =
+   { requires = is_arr_init(ap,0,32*16) && is_arr_init(bp,0,32*16) &&
+                is_arr_init(rp,0,32*16)
+   , ensures = is_arr_init(rp,0,32*16)
+   }
+ ]
+fn _poly_basemul_acc_red(reg ptr u16[MLKEM_N] rp ap bp) -> reg ptr u16[MLKEM_N]
+{
+  rp = __poly_basemul_body(rp, ap, bp, 2);
   return rp;
 }
 

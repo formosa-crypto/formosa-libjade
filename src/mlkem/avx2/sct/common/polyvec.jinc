@@ -202,7 +202,8 @@ __polyvec_pointwise_acc : computes the inner product of the two
 
  requires: input coefficients in the range [-2q,2q)
 
- ensures: output coefficients in the range [-4q,4q]
+ ensures: output coefficients in the range [0,2q) if red is 1, and in the range
+    [-2 MLKEM_K q, 2 MLKEM_K q) otherwise,
     and affected by spurious R^-1 mod q factor
 */
 
@@ -212,16 +213,21 @@ __polyvec_pointwise_acc : computes the inner product of the two
    }
  ]
 inline
-fn __polyvec_pointwise_acc(stack u16[MLKEM_N] r, stack u16[MLKEM_VECN] a b) -> stack u16[MLKEM_N]
+fn __polyvec_pointwise_acc(stack u16[MLKEM_N] r, stack u16[MLKEM_VECN] a b, inline int red)
+  -> stack u16[MLKEM_N]
 {
-  stack u16[MLKEM_N] t;
   inline int i;
 
   r = _poly_basemul(r, a[0:MLKEM_N], b[0:MLKEM_N]);
-  for i = 1 to MLKEM_K
+  for i = 1 to MLKEM_K - 1
   {
-    t = _poly_basemul(t, a[MLKEM_N*i:MLKEM_N], b[MLKEM_N*i:MLKEM_N]);
-    r = _poly_add2(r, t);
+    r = _poly_basemul_acc(r, a[MLKEM_N*i:MLKEM_N], b[MLKEM_N*i:MLKEM_N]);
+  }
+  i = MLKEM_K - 1;
+  if (red == 1) {
+    r = _poly_basemul_acc_red(r, a[MLKEM_N*i:MLKEM_N], b[MLKEM_N*i:MLKEM_N]);
+  } else {
+    r = _poly_basemul_acc(r, a[MLKEM_N*i:MLKEM_N], b[MLKEM_N*i:MLKEM_N]);
   }
   return r;
 }

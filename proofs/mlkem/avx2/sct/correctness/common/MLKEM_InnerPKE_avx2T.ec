@@ -122,56 +122,115 @@ move=> jb h; rewrite lift_subarray256 // h subarray256_nttunpackv //.
 by rewrite lift_polyvecE // lift_subarray256.
 qed.
 
-lemma polyvec_pointwise_acc_corr (a_ref b_ref : W16.t Array_vecn.t) :
-  phoare [M.__polyvec_pointwise_acc :
+lemma slice_pre (x xr : W16.t Array_vecn.t) j : 0 <= j < kvec =>
+  lift_arrayvecn x = nttunpackv (lift_arrayvecn xr) => signed_boundvecn_cxq x 0 vecn 2 =>
+     lift_array256 (subarray256 x j) = nttunpack (lift_polyvec xr).[j]
+  /\ signed_bound_cxq (subarray256 x j) 0 256 2.
+proof.
+move=> jb h hb; split; first by apply lift_slice.
+by move/signed_boundvecnP: hb; apply.
+qed.
+
+lemma kvec_rg : 2 <= kvec <= 4.
+proof. by smt(param_sets). qed.
+
+lemma pacc_step (A B : polyvec) (i : int) : 0 <= i =>
+    nttunpack (pacc A B i) &+ nttunpack (scale (basemul A.[i] B.[i]) (incoeff 169))
+  = nttunpack (pacc A B (i + 1)).
+proof. by move=> ge0i; rewrite /pacc (Big.BAdd.big_int_recr i) 1:// /= nttunpack_add. qed.
+
+(* the products are accumulated: 2 q more on the magnitude at each one,
+   and the last one is reduced if red is 1 *)
+hoare polyvec_pointwise_acc_h (a_ref b_ref : W16.t Array_vecn.t) (red_ : int) :
+  M.__polyvec_pointwise_acc :
+    red = red_ /\
     lift_arrayvecn a = nttunpackv (lift_arrayvecn a_ref) /\
     lift_arrayvecn b = nttunpackv (lift_arrayvecn b_ref) /\
     signed_boundvecn_cxq a 0 vecn 2 /\ signed_boundvecn_cxq b 0 vecn 2 ==>
     lift_array256 res = nttunpack (pacc (lift_polyvec a_ref) (lift_polyvec b_ref) kvec) /\
-    signed_bound_cxq res 0 256 kvec] = 1%r.
+    signed_bound_cxq res 0 256 (if red_ = 1 then 2 else 2 * kvec).
 proof.
-pose A := lift_polyvec a_ref; pose B := lift_polyvec b_ref.
+have rgk := kvec_rg.
 proc.
-while (1 <= i <= kvec /\ lift_array256 r = nttunpack (pacc A B i) /\
-       signed_bound_cxq r 0 256 i /\
-       lift_arrayvecn a = nttunpackv (lift_arrayvecn a_ref) /\
-       lift_arrayvecn b = nttunpackv (lift_arrayvecn b_ref) /\
-       signed_boundvecn_cxq a 0 vecn 2 /\ signed_boundvecn_cxq b 0 vecn 2) (kvec - i).
-+ move=> z; exlim i => i0.
-  have h0 : (0 <= i0 <= 6) \/ !(0 <= i0 <= 6) by smt().
-  move: h0 => [hi|hi]; last by exfalso => &hr; smt(param_sets).
-  have hadd := poly_add_corr_avx i0 1 hi _; 1: done.
-  wp; call (hadd (nttunpack (pacc A B i0))
-                 (nttunpack (scale (basemul A.[i0] B.[i0]) (incoeff 169)))).
-  ecall (poly_basemul_avx2_ph A.[i0] B.[i0]).
-  auto => &hr [#] <- i1 ik hr hrb ha hb hab hbb ilt vz.
-  rewrite -/(subarray256 a{hr} i0) -/(subarray256 b{hr} i0) /=.
-  have [sa sb] : signed_bound_cxq (subarray256 a{hr} i0) 0 256 2 /\
-                 signed_bound_cxq (subarray256 b{hr} i0) 0 256 2.
-  + move/signed_boundvecnP: hab => ha'; move/signed_boundvecnP: hbb => hb'.
-    by split; [apply ha' | apply hb']; smt().
-  have hla := lift_slice a{hr} a_ref i0 _ ha; 1: smt().
-  have hlb := lift_slice b{hr} b_ref i0 _ hb; 1: smt().
-  split; 1: by rewrite hla hlb sa sb.
-  move=> _ t [ht htb]; split; 1: by rewrite hr ht hrb htb.
-  move=> _ r' [hr'b hr']; do split; 1,2,4..9: smt().
-  apply Array256.tP => k kb; rewrite /lift_array256 Array256.mapiE //= hr' //.
-  by rewrite /pacc (Big.BAdd.big_int_recr i0) 1:/# /= nttunpack_add /(&+) Array256.map2iE.
-wp; ecall (poly_basemul_avx2_ph A.[0] B.[0]); auto => &hr [#] ha hb hab hbb.
-have e0 : forall (x : W16.t Array_vecn.t), Array256.init (fun i_0 => x.[i_0]) = subarray256 x 0.
-+ by move=> x; apply Array256.tP => k kb; rewrite subarray256E // !Array256.initiE.
-rewrite !e0.
-have hla := lift_slice a{hr} a_ref 0 _ ha; 1: smt(gt0_k).
-have hlb := lift_slice b{hr} b_ref 0 _ hb; 1: smt(gt0_k).
-move/signed_boundvecnP: (hab) => ha'; move/signed_boundvecnP: (hbb) => hb'.
-rewrite hla hlb ha' 1:#smt:(gt0_k) hb' 1:#smt:(gt0_k) /=.
-split; 1: done.
-move=> _ r [hr hrb]; split.
-+ rewrite hr hrb /=; split; 1: smt(gt0_k).
-  by rewrite /pacc Big.BAdd.big_int1.
-move=> i0 r0; split; 1: smt().
-move=> ige [#] i1 ik hr0 hr0b _ _ _ _; have ? : i0 = kvec by smt(). subst i0.
-by rewrite hr0 hr0b.
+seq 3 : (inc = kvec - 1 /\ i = 1 /\ red = red_ /\
+         lift_array256 r = nttunpack (pacc (lift_polyvec a_ref) (lift_polyvec b_ref) 1) /\
+         signed_bound_cxq r 0 256 2 /\
+         lift_arrayvecn a = nttunpackv (lift_arrayvecn a_ref) /\
+         lift_arrayvecn b = nttunpackv (lift_arrayvecn b_ref) /\
+         signed_boundvecn_cxq a 0 vecn 2 /\ signed_boundvecn_cxq b 0 vecn 2).
+- wp; ecall (poly_basemul_avx2_h (lift_polyvec a_ref).[0] (lift_polyvec b_ref).[0]).
+  auto => &hr [#] -> ha hb hab hbb.
+  have e0 : forall (x : W16.t Array_vecn.t),
+    Array256.init (fun i_0 => x.[i_0]) = subarray256 x 0.
+  + by move=> x; apply Array256.tP => k kb; rewrite subarray256E // !Array256.initiE.
+  rewrite !e0; have [-> ->] := slice_pre a{hr} a_ref 0 _ ha hab; first smt().
+  have [-> ->] := slice_pre b{hr} b_ref 0 _ hb hbb; first smt().
+  by move=> /= r [-> ->]; rewrite /pacc Big.BAdd.big_int1.
+seq 2 : (i = kvec - 1 /\ red = red_ /\
+         lift_array256 r
+           = nttunpack (pacc (lift_polyvec a_ref) (lift_polyvec b_ref) (kvec - 1)) /\
+         signed_bound_cxq r 0 256 (2 * (kvec - 1)) /\
+         lift_arrayvecn a = nttunpackv (lift_arrayvecn a_ref) /\
+         lift_arrayvecn b = nttunpackv (lift_arrayvecn b_ref) /\
+         signed_boundvecn_cxq a 0 vecn 2 /\ signed_boundvecn_cxq b 0 vecn 2).
+- wp; while (1 <= i <= kvec - 1 /\ inc = kvec - 1 /\ red = red_ /\
+         lift_array256 r = nttunpack (pacc (lift_polyvec a_ref) (lift_polyvec b_ref) i) /\
+         signed_bound_cxq r 0 256 (2 * i) /\
+         lift_arrayvecn a = nttunpackv (lift_arrayvecn a_ref) /\
+         lift_arrayvecn b = nttunpackv (lift_arrayvecn b_ref) /\
+         signed_boundvecn_cxq a 0 vecn 2 /\ signed_boundvecn_cxq b 0 vecn 2); last first.
+  + by auto => &hr [#] -> -> -> -> -> -> -> -> -> /= /#.
+  wp; ecall (poly_basemul_acc_avx2_h (2 * i)
+           (nttunpack (pacc (lift_polyvec a_ref) (lift_polyvec b_ref) i))
+           (lift_polyvec a_ref).[i] (lift_polyvec b_ref).[i]).
+  auto => &hr [#] i1 ik -> -> hr hrb ha hb hab hbb ilt.
+  rewrite -/(subarray256 a{hr} i{hr}) -/(subarray256 b{hr} i{hr}).
+  have [-> ->] := slice_pre a{hr} a_ref i{hr} _ ha hab; first smt().
+  have [-> ->] := slice_pre b{hr} b_ref i{hr} _ hb hbb; first smt().
+  rewrite hr hrb /=; split; first smt().
+  move=> _ r' [-> hb'].
+  rewrite ha hb hab hbb /= (: 2 * (i{hr} + 1) = 2 * i{hr} + 2) 1:#ring hb' /=.
+  by split; [smt() | apply pacc_step => /#].
+if.
+- ecall (poly_basemul_acc_red_avx2_h (2 * i)
+           (nttunpack (pacc (lift_polyvec a_ref) (lift_polyvec b_ref) i))
+           (lift_polyvec a_ref).[i] (lift_polyvec b_ref).[i]).
+  auto => &hr [#] -> -> hr hrb ha hb hab hbb ->.
+  rewrite -/(subarray256 a{hr} (kvec - 1)) -/(subarray256 b{hr} (kvec - 1)).
+  have [-> ->] := slice_pre a{hr} a_ref (kvec - 1) _ ha hab; first smt().
+  have [-> ->] := slice_pre b{hr} b_ref (kvec - 1) _ hb hbb; first smt().
+  rewrite hr hrb /=; split; first smt().
+  by move=> _ r' [-> ->] /=; rewrite pacc_step 1:/#.
+ecall (poly_basemul_acc_avx2_h (2 * i)
+         (nttunpack (pacc (lift_polyvec a_ref) (lift_polyvec b_ref) i))
+         (lift_polyvec a_ref).[i] (lift_polyvec b_ref).[i]).
+auto => &hr [#] -> <- hr hrb ha hb hab hbb ne1.
+rewrite -/(subarray256 a{hr} (kvec - 1)) -/(subarray256 b{hr} (kvec - 1)).
+have [-> ->] := slice_pre a{hr} a_ref (kvec - 1) _ ha hab; first smt().
+have [-> ->] := slice_pre b{hr} b_ref (kvec - 1) _ hb hbb; first smt().
+rewrite hr hrb /=; split; first smt().
+move=> _ r' [-> hb']; rewrite ifF 1:// (: 2 * kvec = 2 * (kvec - 1) + 2) 1:#ring hb' /=.
+by rewrite pacc_step 1:/#.
+qed.
+
+lemma polyvec_pointwise_acc_avx_ll : islossless M.__polyvec_pointwise_acc.
+proof.
+proc; seq 5 : true => //; last by if; [call poly_basemul_acc_red_ll | call poly_basemul_acc_ll].
+wp; while (true) (inc - i).
++ by move=> z; wp; call poly_basemul_acc_ll; auto => /#.
+by wp; call poly_basemul_ll; auto => /#.
+qed.
+
+lemma polyvec_pointwise_acc_corr (a_ref b_ref : W16.t Array_vecn.t) (red_ : int) :
+  phoare [M.__polyvec_pointwise_acc :
+    red = red_ /\
+    lift_arrayvecn a = nttunpackv (lift_arrayvecn a_ref) /\
+    lift_arrayvecn b = nttunpackv (lift_arrayvecn b_ref) /\
+    signed_boundvecn_cxq a 0 vecn 2 /\ signed_boundvecn_cxq b 0 vecn 2 ==>
+    lift_array256 res = nttunpack (pacc (lift_polyvec a_ref) (lift_polyvec b_ref) kvec) /\
+    signed_bound_cxq res 0 256 (if red_ = 1 then 2 else 2 * kvec)] = 1%r.
+proof.
+by conseq polyvec_pointwise_acc_avx_ll (polyvec_pointwise_acc_h a_ref b_ref red_).
 qed.
 
 lemma scale_big (F : int -> poly) c n : 0 <= n =>
@@ -193,18 +252,20 @@ apply Big.BAdd.eq_big_seq => j /mem_iota jb /=.
 by rewrite !poly2algE 1,2:/# mul_comm_ntt !nttvE 1,2:/#.
 qed.
 
-lemma polyvec_pointwise_acc_corr_alg_avx (va vb : polyvec) (a_ref b_ref : W16.t Array_vecn.t) :
+lemma polyvec_pointwise_acc_corr_alg_avx (va vb : polyvec) (a_ref b_ref : W16.t Array_vecn.t)
+  (red_ : int) :
   phoare [M.__polyvec_pointwise_acc :
+    red = red_ /\
     nttv va = lift_polyvec a_ref /\ signed_boundvecn_cxq a_ref 0 vecn 2 /\
     nttv vb = lift_polyvec b_ref /\ signed_boundvecn_cxq b_ref 0 vecn 2 /\
     lift_arrayvecn a = nttunpackv (lift_arrayvecn a_ref) /\
     lift_arrayvecn b = nttunpackv (lift_arrayvecn b_ref) /\
     signed_boundvecn_cxq a 0 vecn 2 /\ signed_boundvecn_cxq b 0 vecn 2 ==>
-    signed_bound_cxq res 0 256 kvec /\
+    signed_bound_cxq res 0 256 (if red_ = 1 then 2 else 2 * kvec) /\
     lift_array256 res = nttunpack (scale (ntt (dotpw va vb)) (incoeff 169))] = 1%r.
 proof.
-conseq (polyvec_pointwise_acc_corr a_ref b_ref) => //.
-move=> &hr [#] hva _ hvb _ _ _ _ _ r.
+conseq (polyvec_pointwise_acc_corr a_ref b_ref red_) => //.
+move=> &hr [#] _ hva _ hvb _ _ _ _ _ r.
 rewrite ntt_dotpw scale_big 1:#smt:(gt0_k) /pacc hva hvb; smt().
 qed.
 
@@ -315,7 +376,7 @@ by smt(asintK rg_asint qE).
 qed.
 
 lemma frommont_cancels_at_slot (rr0 rr1 : W16.t Array256.t) (X : poly) :
-  signed_bound_cxq rr0 0 256 kvec =>
+  signed_bound_cxq rr0 0 256 (2 * kvec) =>
   (forall (k : int), 0 <= k < 256 =>
      to_sint rr1.[k]
      = SignedReductions_W16.SREDC
@@ -400,19 +461,6 @@ apply Big.BAdd.eq_big_seq => j /mem_iota jb /=.
 by rewrite (lift_polyvec_subarrayvecn_unlift_matrix a i j _ _); smt().
 qed.
 
-lemma poly_add2_avx_ll : islossless M._poly_add2.
-proof. proc; while (true) (16 - i); auto; smt(). qed.
-
-lemma poly_basemul_avx_ll : islossless M._poly_basemul.
-proof. proc; islossless. qed.
-
-lemma polyvec_pointwise_acc_avx_ll : islossless M.__polyvec_pointwise_acc.
-proof.
-proc; while (true) (kvec - i).
-+ move=> z; wp; call poly_add2_avx_ll; call poly_basemul_avx_ll; auto; smt().
-wp; call poly_basemul_avx_ll; auto; smt().
-qed.
-
 (* -------------------------------------------------------------------- *)
 (* the update of one polynomial of a vector, at any aligned offset      *)
 lemma subarray256_upd (r : 'a Array_vecn.t) (a : 'a Array256.t) o j :
@@ -479,7 +527,7 @@ exact (matn_idx _ _ ib kb).
 qed.
 
 lemma frommont_bnd (rr0 rr1 : W16.t Array256.t) :
-  signed_bound_cxq rr0 0 256 kvec =>
+  signed_bound_cxq rr0 0 256 (2 * kvec) =>
   (forall (k : int), 0 <= k < 256 =>
      to_sint rr1.[k]
      = SignedReductions_W16.SREDC
@@ -738,7 +786,7 @@ while {1} (0 <= i{1} <= kvec /\
                (invnttv (lift_polyvec (nttpackv (subarrayvecn aa i))))
                (invnttv (lift_polyvec (nttpackv skpv)))
                (nttpackv (subarrayvecn aa i))
-               (nttpackv skpv)).
+               (nttpackv skpv) 0).
   auto => /> &hr i0 ik hm hs he hj ilt.
   have hsub : Array_vecn.init (fun i_0 =>
       (nttunpackm (unlift_matrix a{m})).[i{hr} * (kvec * 256) + i_0]) =
@@ -850,9 +898,9 @@ seq 1 0 : (nttv u{2} = lift_polyvec (nttpackv bp{1}) /\ pos_boundvecn_cxq bp{1} 
 + by ecall {1} (polyvec_ntt_avx2_corr bp{1}); auto => /> /#.
 seq 1 0 : (v{2} = lift_array256 v{1} /\ signed_bound_cxq v{1} 0 256 1 /\
            lift_array256 t{1} = nttunpack (scale (ntt_dotp s{2} (nttv u{2})) (incoeff 169)) /\
-           signed_bound_cxq t{1} 0 256 kvec).
+           signed_bound_cxq t{1} 0 256 2).
 + ecall {1} (polyvec_pointwise_acc_corr_alg_avx (invnttv s{2}) u{2}
-             (unlift_polyvec s{2}) (nttpackv bp{1})).
+             (unlift_polyvec s{2}) (nttpackv bp{1}) 1).
   auto => /> &1 &2 hu hb hv hs hsb.
   have [hl hlb] := vector_unlift (ofipolyvec (decode12_vec sk{2})).
   rewrite nttvK hl /=; split.
@@ -1044,19 +1092,19 @@ seq 2 0 : (#pre /\
   forall j, 0 <= j < kvec =>
     lift_array256 (subarray256 bp{1} j) =
       nttunpack (scale (ntt_mmul aT{2} rhat{2}).[j] (incoeff 169)) /\
-    signed_bound_cxq (subarray256 bp{1} j) 0 256 kvec).
+    signed_bound_cxq (subarray256 bp{1} j) 0 256 2).
 + sp 1 0; while {1} (0 <= w{1} <= kvec /\
     aat{1} = nttunpackm (unlift_matrix aT{2}) /\ pos_boundmatn_cxq aat{1} 0 matn 2 /\
     rhat{2} = lift_polyvec (nttpackv sp_0{1}) /\ pos_boundvecn_cxq sp_0{1} 0 vecn 2 /\
     forall j, 0 <= j < w{1} =>
       lift_array256 (subarray256 bp{1} j) =
         nttunpack (scale (ntt_mmul aT{2} rhat{2}).[j] (incoeff 169)) /\
-      signed_bound_cxq (subarray256 bp{1} j) 0 256 kvec) (kvec - w{1}).
+      signed_bound_cxq (subarray256 bp{1} j) 0 256 2) (kvec - w{1}).
   + move=> &m z; wp.
     ecall (polyvec_pointwise_acc_corr_alg_avx
              (invnttv (lift_polyvec (nttpackv (subarrayvecn aat w))))
              (invnttv (lift_polyvec (nttpackv sp_0)))
-             (nttpackv (subarrayvecn aat w)) (nttpackv sp_0)).
+             (nttpackv (subarrayvecn aat w)) (nttpackv sp_0) 1).
     auto => /> &hr w0 wk hm hs hj wlt.
     have hsub : Array_vecn.init (fun i_0 =>
         (nttunpackm (unlift_matrix aT{m})).[w{hr} * (kvec * 256) + i_0]) =
@@ -1081,9 +1129,9 @@ seq 2 0 : (#pre /\
 (* v = t . r, as the specification's dot product *)
 seq 1 0 : (#pre /\
   lift_array256 v{1} = nttunpack (scale (ntt_dotp that{2} rhat{2}) (incoeff 169)) /\
-  signed_bound_cxq v{1} 0 256 kvec).
+  signed_bound_cxq v{1} 0 256 2).
 + ecall {1} (polyvec_pointwise_acc_corr_alg_avx (invnttv that{2}) (invnttv rhat{2})
-             (unlift_polyvec that{2}) (nttpackv sp_0{1})).
+             (unlift_polyvec that{2}) (nttpackv sp_0{1}) 1).
   auto => /> &1 &2 hp hpb _ _ _ hs *.
   have [hl hlb] := vector_unlift (ofipolyvec (decode12_vec pk{2}.`1)).
   rewrite !nttvK hl /=; split.

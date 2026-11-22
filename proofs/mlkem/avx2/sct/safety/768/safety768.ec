@@ -630,61 +630,43 @@ auto; ecall (__csubq_proof param_0 param).
 by auto => /> *.
 qed.
 
-lemma __w256_interleave_u16_proof _al _ah :
-      (__w256_interleave_u16_spec _al _ah).
+lemma __basemul16x_proof _a _b _c _d _zeta _zetaqinv _qx16 _qinvx16 _sign :
+      (__basemul16x_spec _a _b _c _d _zeta _zetaqinv _qx16 _qinvx16 _sign).
 proof.
 hint +safety.
-rewrite /__w256_interleave_u16_spec; proc.
-conseq (_ : _ ==> valid trace___w256_interleave_u16).
-by auto => /> *.
-qed.
-
-lemma __w256_deinterleave_u16_proof __zero _a0 _a1 :
-      (__w256_deinterleave_u16_spec __zero _a0 _a1).
-proof.
-hint +safety.
-rewrite /__w256_deinterleave_u16_spec; proc.
-conseq (_ : _ ==> valid trace___w256_deinterleave_u16).
-by auto => /> *.
-qed.
-
-lemma __mont_red_proof _lo _hi _qx16 _qinvx16 :
-      (__mont_red_spec _lo _hi _qx16 _qinvx16).
-proof.
-hint +safety.
-rewrite /__mont_red_spec; proc.
-conseq (_ : _ ==> valid trace___mont_red).
-by auto => /> *.
-qed.
-
-lemma __wmul_16u16_proof _x _y : (__wmul_16u16_spec _x _y).
-proof.
-hint +safety.
-rewrite /__wmul_16u16_spec; proc.
-conseq (_ : _ ==> valid trace___wmul_16u16).
-auto; ecall (__w256_interleave_u16_proof param_0 param).
-by auto => /> *.
-qed.
-
-lemma __schoolbook16x_proof _are _aim _bre _bim _zeta _zetaqinv _qx16 _qinvx16 _sign :
-      (__schoolbook16x_spec _are _aim _bre _bim _zeta _zetaqinv _qx16
-      _qinvx16 _sign).
-proof.
-hint +safety.
-rewrite /__schoolbook16x_spec; proc.
-auto; ecall (__mont_red_proof param_24 param_23 param_22 param_21).
-auto; ecall (__mont_red_proof param_20 param_19 param_18 param_17).
-auto; ecall (__w256_deinterleave_u16_proof param_16 param_15 param_14).
-auto; ecall (__w256_deinterleave_u16_proof param_13 param_12 param_11).
-(* the if on sign leaves a side goal to this ecall *)
-auto; ecall (__wmul_16u16_proof param_10 param_9).
-auto; ecall (__wmul_16u16_proof param_8 param_7).
-auto; ecall (__wmul_16u16_proof param_6 param_5).
-auto; ecall (__wmul_16u16_proof param_4 param_3).
+rewrite /__basemul16x_spec; proc.
+conseq (_ : _ ==> valid trace___basemul16x).
 auto; ecall (__fqmulprecomp16x_proof param_2 param_1 param_0 param).
 by auto => /> *.
-move=> &hr /> h r0 v0 r1 v1 r2 v2 r3 v3 r4 v4; have := h r0 v0.
-by case: (sign{hr} = 0) => _ /= /(_ r1 v1 r2 v2 r3 v3 r4 v4) /#.
+qed.
+
+lemma __poly_basemul_body_proof _rp _b_rp _ap _b_ap _bp _b_bp _acc :
+      (__poly_basemul_body_spec _rp _b_rp _ap _b_ap _bp _b_bp _acc).
+proof.
+hint +safety.
+rewrite /__poly_basemul_body_spec; proc; auto.
+(* a store initialises its block of the destination, which is initialised
+   from the start when it is read *)
+while (valid trace___poly_basemul_body /\ 0 <= i <= 8 /\
+       BArray512.is_init b_rp 0 (64 * i) /\
+       (acc <> 0 => BArray512.is_init b_rp 0 512) /\ (acc = 2 => b_vx16)).
++ seq > ^if : (#pre).
+  - auto; ecall (__basemul16x_proof param_7 param_6 param_5 param_4 param_3 param_2 param_1
+      param_0 param).
+    auto => &hr /> hv ge0i le8i hi hacc hvx lt8i r0 hr0.
+    by split=> h; do! split; try smt(); apply (BI512.is_init_sub b_rp{hr} 0 512) => //; smt().
+  seq 1 : (#pre).
+  - if; last by auto.
+    auto; ecall (__red16x_proof param_13 param_12 param_11).
+    auto; ecall (__red16x_proof param_10 param_9 param_8).
+    by auto => &hr /> *.
+  auto => &hr /> hv ge0i le8i hi hacc hvx lt8i.
+  do! split; 1..6: smt().
+  + by do 2! (apply BI512.is_init_set256d_grow => /=; last smt()); smt().
+  by move=> /hacc h; do 2! apply BI512.is_init_set256d_mono.
+auto => &hr />; rewrite BI512.is_init_if /= => ha hb hr.
+move=> _; split; first smt().
+by move=> b i0 tr ge8 _ ge0 le8 h _; have <- // : 64 * i0 = 512 by smt().
 qed.
 
 lemma _poly_basemul_proof _rp _b_rp _ap _b_ap _bp _b_bp :
@@ -692,20 +674,28 @@ lemma _poly_basemul_proof _rp _b_rp _ap _b_ap _bp _b_bp :
 proof.
 hint +safety.
 rewrite /_poly_basemul_spec; proc.
-conseq (_ :
-     b_ap = BArray512.init_arr (W8.of_int 255)
-  /\ b_bp = BArray512.init_arr (W8.of_int 255)
-  ==> BArray512.is_init b_rp 0 (32 * 16)
-   /\ valid trace__poly_basemul).
-+ by move=> &hr />; rewrite -!(BI512.is_init_full _ 512) //.
-auto; ecall (__schoolbook16x_proof param_70 param_69 param_68 param_67 param_66 param_65 param_64 param_63 param_62).
-auto; ecall (__schoolbook16x_proof param_61 param_60 param_59 param_58 param_57 param_56 param_55 param_54 param_53).
-auto; ecall (__schoolbook16x_proof param_52 param_51 param_50 param_49 param_48 param_47 param_46 param_45 param_44).
-auto; ecall (__schoolbook16x_proof param_43 param_42 param_41 param_40 param_39 param_38 param_37 param_36 param_35).
-auto; ecall (__schoolbook16x_proof param_34 param_33 param_32 param_31 param_30 param_29 param_28 param_27 param_26).
-auto; ecall (__schoolbook16x_proof param_25 param_24 param_23 param_22 param_21 param_20 param_19 param_18 param_17).
-auto; ecall (__schoolbook16x_proof param_16 param_15 param_14 param_13 param_12 param_11 param_10 param_9 param_8).
-auto; ecall (__schoolbook16x_proof param_7 param_6 param_5 param_4 param_3 param_2 param_1 param_0 param).
+auto; ecall (__poly_basemul_body_proof param_2 b_param param_1
+  (BArray512.init_arr (W8.of_int 255)) param_0 (BArray512.init_arr (W8.of_int 255)) param).
+by auto => /> *.
+qed.
+
+lemma _poly_basemul_acc_proof _rp _b_rp _ap _b_ap _bp _b_bp :
+      (_poly_basemul_acc_spec _rp _b_rp _ap _b_ap _bp _b_bp).
+proof.
+hint +safety.
+rewrite /_poly_basemul_acc_spec; proc.
+auto; ecall (__poly_basemul_body_proof param_2 (BArray512.init_arr (W8.of_int 255)) param_1
+  (BArray512.init_arr (W8.of_int 255)) param_0 (BArray512.init_arr (W8.of_int 255)) param).
+by auto => /> *.
+qed.
+
+lemma _poly_basemul_acc_red_proof _rp _b_rp _ap _b_ap _bp _b_bp :
+      (_poly_basemul_acc_red_spec _rp _b_rp _ap _b_ap _bp _b_bp).
+proof.
+hint +safety.
+rewrite /_poly_basemul_acc_red_spec; proc.
+auto; ecall (__poly_basemul_body_proof param_2 (BArray512.init_arr (W8.of_int 255)) param_1
+  (BArray512.init_arr (W8.of_int 255)) param_0 (BArray512.init_arr (W8.of_int 255)) param).
 by auto => /> *.
 qed.
 
@@ -1268,8 +1258,8 @@ auto; ecall (_i_poly_tobytes_proof param_0 b_param_0 param b_param).
 by auto => /> *.
 qed.
 
-lemma __polyvec_pointwise_acc_proof _r _b_r _a _b_a _b _b_b :
-      (__polyvec_pointwise_acc_spec _r _b_r _a _b_a _b _b_b).
+lemma __polyvec_pointwise_acc_proof _r _b_r _a _b_a _b _b_b _red :
+      (__polyvec_pointwise_acc_spec _r _b_r _a _b_a _b _b_b _red).
 proof.
 hint +safety.
 rewrite /__polyvec_pointwise_acc_spec; proc.
@@ -1279,13 +1269,25 @@ conseq (_ :
   ==> BArray512.is_init b_r 0 (256 * 2)
    /\ valid trace___polyvec_pointwise_acc).
 + by move=> &hr />; rewrite -!(BI1536.is_init_full _ 1536) //.
-unroll for ^while.
-auto; ecall (_poly_add2_proof param_6 ((BArray512.init_arr (W8.of_int 255))) param_5 ((BArray512.init_arr (W8.of_int 255)))).
-auto; ecall (_poly_basemul_proof param_4 b_param_1 param_3 b_param_0 param_2 b_param).
-auto; ecall (_poly_add2_proof param_6 ((BArray512.init_arr (W8.of_int 255))) param_5 ((BArray512.init_arr (W8.of_int 255)))).
-auto; ecall (_poly_basemul_proof param_4 b_param_1 param_3 b_param_0 param_2 b_param).
-auto; ecall (_poly_basemul_proof param_1 b_param_4 param_0 b_param_3 param b_param_2).
-by auto => /> *.
+seq < ^if : (valid trace___polyvec_pointwise_acc /\ i = 2 /\
+             b_a = BArray1536.init_arr (W8.of_int 255) /\
+             b_b = BArray1536.init_arr (W8.of_int 255)).
+- wp; while (valid trace___polyvec_pointwise_acc /\ 1 <= i <= 2 /\
+             b_a = BArray1536.init_arr (W8.of_int 255) /\
+             b_b = BArray1536.init_arr (W8.of_int 255)).
+  + auto; ecall (_poly_basemul_acc_proof param_4 (BArray512.init_arr (W8.of_int 255)) param_3
+      b_param_4 param_2 b_param_3).
+    auto => &hr /> *.
+    by rewrite SBI1536_512.get_sub_init_arr 1,2:/# /= /#.
+  auto; ecall (_poly_basemul_proof param_1 b_param_7 param_0 b_param_6 param b_param_5).
+  by auto => &hr /> * /#.
+wp; if.
+- auto; ecall (_poly_basemul_acc_red_proof param_7 (BArray512.init_arr (W8.of_int 255)) param_6
+    b_param_0 param_5 b_param).
+  by auto => &hr /> *.
+auto; ecall (_poly_basemul_acc_proof param_10 (BArray512.init_arr (W8.of_int 255)) param_9
+  b_param_2 param_8 b_param_1).
+by auto => &hr /> *.
 qed.
 
 lemma _i_poly_compress_dv4_proof _rp _b_rp _a _b_a :
@@ -1672,16 +1674,16 @@ conseq (_ :
 + by move=> &hr />; rewrite -!(BI32.is_init_full _ 32) //.
 + by move=> />.
 do 4! (unroll for ^while).
-auto; ecall (__i_polyvec_tobytes_proof param_28 b_param param_27 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (__i_polyvec_tobytes_proof param_26 b_param_0 param_25 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (__polyvec_reduce_proof param_24 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (__polyvec_add2_proof param_23 b_param_1 param_22 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (_poly_frommont_proof param_21 b_param_2).
-auto; ecall (__polyvec_pointwise_acc_proof param_20 b_param_4 param_19 b_param_3 param_18 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (_poly_frommont_proof param_21 b_param_2).
-auto; ecall (__polyvec_pointwise_acc_proof param_20 b_param_4 param_19 b_param_3 param_18 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (_poly_frommont_proof param_21 b_param_2).
-auto; ecall (__polyvec_pointwise_acc_proof param_20 b_param_4 param_19 b_param_3 param_18 ((BArray1536.init_arr (W8.of_int 255)))).
+auto; ecall (__i_polyvec_tobytes_proof param_29 b_param param_28 (BArray1536.init_arr (W8.of_int 255))).
+auto; ecall (__i_polyvec_tobytes_proof param_27 b_param_0 param_26 (BArray1536.init_arr (W8.of_int 255))).
+auto; ecall (__polyvec_reduce_proof param_25 (BArray1536.init_arr (W8.of_int 255))).
+auto; ecall (__polyvec_add2_proof param_24 b_param_1 param_23 (BArray1536.init_arr (W8.of_int 255))).
+auto; ecall (_poly_frommont_proof param_22 b_param_2).
+auto; ecall (__polyvec_pointwise_acc_proof param_21 b_param_4 param_20 b_param_3 param_19 (BArray1536.init_arr (W8.of_int 255)) param_18).
+auto; ecall (_poly_frommont_proof param_22 b_param_2).
+auto; ecall (__polyvec_pointwise_acc_proof param_21 b_param_4 param_20 b_param_3 param_19 (BArray1536.init_arr (W8.of_int 255)) param_18).
+auto; ecall (_poly_frommont_proof param_22 b_param_2).
+auto; ecall (__polyvec_pointwise_acc_proof param_21 b_param_4 param_20 b_param_3 param_19 (BArray1536.init_arr (W8.of_int 255)) param_18).
 auto; ecall (__polyvec_ntt_proof param_17 b_param_5).
 auto; ecall (__polyvec_ntt_proof param_16 b_param_6).
 auto; ecall (_poly_getnoise_eta1_4x_proof param_15 b_param_11 param_14 b_param_10 param_13 b_param_9 param_12 b_param_8 param_11 b_param_7 param_10).
@@ -1705,24 +1707,24 @@ conseq (_ :
    /\ valid trace___indcpa_enc).
 + by move=> &hr />; rewrite -!(BI32.is_init_full _ 32) // -!(BI1184.is_init_full _ 1184) //.
 do 2! (unroll for ^while).
-auto; ecall (_i_poly_compress_proof param_37 b_param param_36 ((BArray512.init_arr (W8.of_int 255)))).
-auto; ecall (__i_polyvec_compress_proof param_35 b_param_0 param_34 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (__poly_reduce_proof param_33 ((BArray512.init_arr (W8.of_int 255)))).
-auto; ecall (__polyvec_reduce_proof param_32 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (_poly_add2_proof param_31 ((BArray512.init_arr (W8.of_int 255))) param_30 ((BArray512.init_arr (W8.of_int 255)))).
-auto; ecall (_poly_add2_proof param_29 ((BArray512.init_arr (W8.of_int 255))) param_28 ((BArray512.init_arr (W8.of_int 255)))).
-auto; ecall (__polyvec_add2_proof param_27 ((BArray1536.init_arr (W8.of_int 255))) param_26 b_param_1).
-auto; ecall (_poly_invntt_proof param_25 ((BArray512.init_arr (W8.of_int 255)))).
-auto; ecall (__polyvec_invntt_proof param_24 b_param_2).
-auto; ecall (__polyvec_pointwise_acc_proof param_23 b_param_3 param_22 ((BArray1536.init_arr (W8.of_int 255))) param_21 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (__polyvec_pointwise_acc_proof param_20 b_param_5 param_19 b_param_4 param_18 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (__polyvec_pointwise_acc_proof param_20 b_param_5 param_19 b_param_4 param_18 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (__polyvec_pointwise_acc_proof param_20 b_param_5 param_19 b_param_4 param_18 ((BArray1536.init_arr (W8.of_int 255)))).
+auto; ecall (_i_poly_compress_proof param_39 b_param param_38 (BArray512.init_arr (W8.of_int 255))).
+auto; ecall (__i_polyvec_compress_proof param_37 b_param_0 param_36 (BArray1536.init_arr (W8.of_int 255))).
+auto; ecall (__poly_reduce_proof param_35 (BArray512.init_arr (W8.of_int 255))).
+auto; ecall (__polyvec_reduce_proof param_34 (BArray1536.init_arr (W8.of_int 255))).
+auto; ecall (_poly_add2_proof param_33 (BArray512.init_arr (W8.of_int 255)) param_32 (BArray512.init_arr (W8.of_int 255))).
+auto; ecall (_poly_add2_proof param_31 (BArray512.init_arr (W8.of_int 255)) param_30 (BArray512.init_arr (W8.of_int 255))).
+auto; ecall (__polyvec_add2_proof param_29 (BArray1536.init_arr (W8.of_int 255)) param_28 b_param_1).
+auto; ecall (_poly_invntt_proof param_27 (BArray512.init_arr (W8.of_int 255))).
+auto; ecall (__polyvec_invntt_proof param_26 b_param_2).
+auto; ecall (__polyvec_pointwise_acc_proof param_25 b_param_3 param_24 (BArray1536.init_arr (W8.of_int 255)) param_23 (BArray1536.init_arr (W8.of_int 255)) param_22).
+auto; ecall (__polyvec_pointwise_acc_proof param_21 b_param_5 param_20 b_param_4 param_19 (BArray1536.init_arr (W8.of_int 255)) param_18).
+auto; ecall (__polyvec_pointwise_acc_proof param_21 b_param_5 param_20 b_param_4 param_19 (BArray1536.init_arr (W8.of_int 255)) param_18).
+auto; ecall (__polyvec_pointwise_acc_proof param_21 b_param_5 param_20 b_param_4 param_19 (BArray1536.init_arr (W8.of_int 255)) param_18).
 auto; ecall (__polyvec_ntt_proof param_17 b_param_6).
-auto; ecall (_poly_getnoise_eta1_4x_proof param_16 b_param_10 param_15 b_param_9 param_14 b_param_8 param_13 b_param_7 param_12 ((BArray32.init_arr (W8.of_int 255))) param_11).
-auto; ecall (_poly_getnoise_eta1_4x_proof param_10 b_param_14 param_9 b_param_13 param_8 b_param_12 param_7 b_param_11 param_6 ((BArray32.init_arr (W8.of_int 255))) param_5).
+auto; ecall (_poly_getnoise_eta1_4x_proof param_16 b_param_10 param_15 b_param_9 param_14 b_param_8 param_13 b_param_7 param_12 (BArray32.init_arr (W8.of_int 255)) param_11).
+auto; ecall (_poly_getnoise_eta1_4x_proof param_10 b_param_14 param_9 b_param_13 param_8 b_param_12 param_7 b_param_11 param_6 (BArray32.init_arr (W8.of_int 255)) param_5).
 auto; ecall (_gen_matrix_avx2_proof param_4 b_param_16 param_3 b_param_15 param_2).
-auto; ecall (_i_poly_frommsg_proof param_1 b_param_17 param_0 ((BArray32.init_arr (W8.of_int 255)))).
+auto; ecall (_i_poly_frommsg_proof param_1 b_param_17 param_0 (BArray32.init_arr (W8.of_int 255))).
 auto; ecall (__i_polyvec_frombytes_proof param b_param_18).
 by auto => /> *.
 qed.
@@ -1738,15 +1740,15 @@ conseq (_ :
   ==> BArray32.is_init b_msgp 0 32
    /\ valid trace___indcpa_dec).
 + by move=> &hr />; rewrite -!(BI1088.is_init_full _ 1088) // -!(BI1152.is_init_full _ 1152) //.
-auto; ecall (_i_poly_tomsg_proof param_14 b_param param_13 ((BArray512.init_arr (W8.of_int 255)))).
-auto; ecall (__poly_reduce_proof param_12 ((BArray512.init_arr (W8.of_int 255)))).
-auto; ecall (_poly_sub_proof param_11 b_param_0 param_10 ((BArray512.init_arr (W8.of_int 255))) param_9 ((BArray512.init_arr (W8.of_int 255)))).
-auto; ecall (_poly_invntt_proof param_8 ((BArray512.init_arr (W8.of_int 255)))).
-auto; ecall (__polyvec_pointwise_acc_proof param_7 b_param_1 param_6 ((BArray1536.init_arr (W8.of_int 255))) param_5 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (__polyvec_ntt_proof param_4 ((BArray1536.init_arr (W8.of_int 255)))).
-auto; ecall (__i_polyvec_frombytes_proof param_3 ((BArray1152.init_arr (W8.of_int 255)))).
+auto; ecall (_i_poly_tomsg_proof param_15 b_param param_14 (BArray512.init_arr (W8.of_int 255))).
+auto; ecall (__poly_reduce_proof param_13 (BArray512.init_arr (W8.of_int 255))).
+auto; ecall (_poly_sub_proof param_12 b_param_0 param_11 (BArray512.init_arr (W8.of_int 255)) param_10 (BArray512.init_arr (W8.of_int 255))).
+auto; ecall (_poly_invntt_proof param_9 (BArray512.init_arr (W8.of_int 255))).
+auto; ecall (__polyvec_pointwise_acc_proof param_8 b_param_1 param_7 (BArray1536.init_arr (W8.of_int 255)) param_6 (BArray1536.init_arr (W8.of_int 255)) param_5).
+auto; ecall (__polyvec_ntt_proof param_4 (BArray1536.init_arr (W8.of_int 255))).
+auto; ecall (__i_polyvec_frombytes_proof param_3 (BArray1152.init_arr (W8.of_int 255))).
 auto; ecall (_i_poly_decompress_proof param_2 b_param_3 param_1 b_param_2).
-auto; ecall (__i_polyvec_decompress_proof param_0 b_param_4 param ((BArray1088.init_arr (W8.of_int 255)))).
+auto; ecall (__i_polyvec_decompress_proof param_0 b_param_4 param (BArray1088.init_arr (W8.of_int 255))).
 by auto => /> *.
 qed.
 

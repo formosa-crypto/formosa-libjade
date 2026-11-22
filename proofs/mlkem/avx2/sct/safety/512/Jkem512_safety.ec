@@ -39799,207 +39799,75 @@ module M = {
     b_rp <- (BArray512.init_arr (W8.of_int 255));
     return (rp, b_rp, trace__poly_csubq);
   }
-  proc __w256_interleave_u16 (al:W256.t, ah:W256.t) : W256.t * W256.t * trace = {
-    var a0:W256.t;
-    var a1:W256.t;
-    var trace___w256_interleave_u16:trace;
-    trace___w256_interleave_u16 <- [];
-    a0 <- (VPUNPCKL_16u16 al ah);
-    a1 <- (VPUNPCKH_16u16 al ah);
-    return (a0, a1, trace___w256_interleave_u16);
-  }
-  proc __w256_deinterleave_u16 (_zero:W256.t, a0:W256.t, a1:W256.t) : 
+  proc __basemul16x (a:W256.t, b:W256.t, c:W256.t, d:W256.t, zeta_0:W256.t,
+                     zetaqinv:W256.t, qx16:W256.t, qinvx16:W256.t, sign:int) : 
   W256.t * W256.t * trace = {
-    var al:W256.t;
-    var ah:W256.t;
-    var trace___w256_deinterleave_u16:trace;
-    trace___w256_deinterleave_u16 <- [];
-    al <- (VPBLEND_16u16 a0 _zero (W8.of_int 170));
-    ah <- (VPBLEND_16u16 a1 _zero (W8.of_int 170));
-    al <- (VPACKUS_8u32 al ah);
-    a0 <- (VPSRL_8u32 a0 (W128.of_int 16));
-    a1 <- (VPSRL_8u32 a1 (W128.of_int 16));
-    ah <- (VPACKUS_8u32 a0 a1);
-    return (al, ah, trace___w256_deinterleave_u16);
-  }
-  proc __mont_red (lo:W256.t, hi:W256.t, qx16:W256.t, qinvx16:W256.t) : 
-  W256.t * trace = {
-    var m:W256.t;
-    var trace___mont_red:trace;
-    trace___mont_red <- [];
-    m <- (VPMULL_16u16 lo qinvx16);
-    m <- (VPMULH_16u16 m qx16);
-    lo <- (VPSUB_16u16 hi m);
-    return (lo, trace___mont_red);
-  }
-  proc __wmul_16u16 (x:W256.t, y:W256.t) : W256.t * W256.t * trace = {
-    var xy0:W256.t;
-    var xy1:W256.t;
-    var xyL:W256.t;
-    var xyH:W256.t;
-    var param:W256.t;
-    var param_0:W256.t;
-    var result:W256.t;
-    var result_0:W256.t;
-    var trace___wmul_16u16:trace;
-    trace___wmul_16u16 <- [];
-    xyL <- (VPMULL_16u16 x y);
-    xyH <- (VPMULH_16u16 x y);
-    param_0 <- xyL;
-    param <- xyH;
-    (result_0, result, tmp__trace) <@ __w256_interleave_u16 (param_0, param);
-    trace___wmul_16u16 <- (trace___wmul_16u16 ++ tmp__trace);
-    xy0 <- result_0;
-    xy1 <- result;
-    return (xy0, xy1, trace___wmul_16u16);
-  }
-  proc __schoolbook16x (are:W256.t, aim:W256.t, bre:W256.t, bim:W256.t,
-                        zeta_0:W256.t, zetaqinv:W256.t, qx16:W256.t,
-                        qinvx16:W256.t, sign:int) : W256.t * W256.t * trace = {
-    var x0:W256.t;
-    var y0:W256.t;
-    var zaim:W256.t;
-    var ac0:W256.t;
-    var ac1:W256.t;
-    var ad0:W256.t;
-    var ad1:W256.t;
-    var bc0:W256.t;
-    var bc1:W256.t;
-    var zbd0:W256.t;
-    var zbd1:W256.t;
-    var x1:W256.t;
-    var y1:W256.t;
-    var _zero:W256.t;
+    var r0:W256.t;
+    var s0:W256.t;
+    var dz:W256.t;
+    var alo:W256.t;
+    var blo:W256.t;
+    var r1:W256.t;
+    var s1:W256.t;
+    var t:W256.t;
     var param:W256.t;
     var param_0:W256.t;
     var param_1:W256.t;
     var param_2:W256.t;
     var result:W256.t;
-    var param_3:W256.t;
-    var param_4:W256.t;
-    var result_0:W256.t;
-    var result_1:W256.t;
-    var param_5:W256.t;
-    var param_6:W256.t;
-    var result_2:W256.t;
-    var result_3:W256.t;
-    var param_7:W256.t;
-    var param_8:W256.t;
-    var result_4:W256.t;
-    var result_5:W256.t;
-    var param_9:W256.t;
-    var param_10:W256.t;
-    var result_6:W256.t;
-    var result_7:W256.t;
-    var param_11:W256.t;
-    var param_12:W256.t;
-    var param_13:W256.t;
-    var result_8:W256.t;
-    var result_9:W256.t;
-    var param_14:W256.t;
-    var param_15:W256.t;
-    var param_16:W256.t;
-    var result_10:W256.t;
-    var result_11:W256.t;
-    var param_17:W256.t;
-    var param_18:W256.t;
-    var param_19:W256.t;
-    var param_20:W256.t;
-    var result_12:W256.t;
-    var param_21:W256.t;
-    var param_22:W256.t;
-    var param_23:W256.t;
-    var param_24:W256.t;
-    var result_13:W256.t;
-    var trace___schoolbook16x:trace;
-    trace___schoolbook16x <- [];
-    param_2 <- aim;
+    var trace___basemul16x:trace;
+    trace___basemul16x <- [];
+    param_2 <- d;
     param_1 <- zetaqinv;
     param_0 <- zeta_0;
     param <- qx16;
     (result, tmp__trace) <@ __fqmulprecomp16x (param_2, param_1, param_0,
     param);
-    trace___schoolbook16x <- (trace___schoolbook16x ++ tmp__trace);
-    zaim <- result;
-    param_4 <- are;
-    param_3 <- bre;
-    (result_1, result_0, tmp__trace) <@ __wmul_16u16 (param_4, param_3);
-    trace___schoolbook16x <- (trace___schoolbook16x ++ tmp__trace);
-    ac0 <- result_1;
-    ac1 <- result_0;
-    param_6 <- are;
-    param_5 <- bim;
-    (result_3, result_2, tmp__trace) <@ __wmul_16u16 (param_6, param_5);
-    trace___schoolbook16x <- (trace___schoolbook16x ++ tmp__trace);
-    ad0 <- result_3;
-    ad1 <- result_2;
-    param_8 <- aim;
-    param_7 <- bre;
-    (result_5, result_4, tmp__trace) <@ __wmul_16u16 (param_8, param_7);
-    trace___schoolbook16x <- (trace___schoolbook16x ++ tmp__trace);
-    bc0 <- result_5;
-    bc1 <- result_4;
-    param_10 <- zaim;
-    param_9 <- bim;
-    (result_7, result_6, tmp__trace) <@ __wmul_16u16 (param_10, param_9);
-    trace___schoolbook16x <- (trace___schoolbook16x ++ tmp__trace);
-    zbd0 <- result_7;
-    zbd1 <- result_6;
+    trace___basemul16x <- (trace___basemul16x ++ tmp__trace);
+    dz <- result;
+    alo <- (VPMULL_16u16 a qinvx16);
+    blo <- (VPMULL_16u16 b qinvx16);
+    r0 <- (VPMULL_16u16 alo c);
+    s0 <- (VPMULL_16u16 alo d);
+    r1 <- (VPMULL_16u16 blo dz);
+    s1 <- (VPMULL_16u16 blo c);
+    r0 <- (VPMULH_16u16 r0 qx16);
+    s0 <- (VPMULH_16u16 s0 qx16);
+    r1 <- (VPMULH_16u16 r1 qx16);
+    s1 <- (VPMULH_16u16 s1 qx16);
+    t <- (VPMULH_16u16 a c);
+    r0 <- (VPSUB_16u16 t r0);
+    t <- (VPMULH_16u16 a d);
+    s0 <- (VPSUB_16u16 t s0);
+    t <- (VPMULH_16u16 b dz);
+    r1 <- (VPSUB_16u16 t r1);
+    t <- (VPMULH_16u16 b c);
+    s1 <- (VPSUB_16u16 t s1);
     if ((sign = 0)) {
-      x0 <- (VPADD_8u32 ac0 zbd0);
-      x1 <- (VPADD_8u32 ac1 zbd1);
+      r0 <- (VPADD_16u16 r0 r1);
     } else {
-      x0 <- (VPSUB_8u32 ac0 zbd0);
-      x1 <- (VPSUB_8u32 ac1 zbd1);
+      r0 <- (VPSUB_16u16 r0 r1);
     }
-    y0 <- (VPADD_8u32 bc0 ad0);
-    y1 <- (VPADD_8u32 bc1 ad1);
-    _zero <- (set0_256);
-    param_13 <- _zero;
-    param_12 <- x0;
-    param_11 <- x1;
-    (result_9, result_8, tmp__trace) <@ __w256_deinterleave_u16 (param_13,
-    param_12, param_11);
-    trace___schoolbook16x <- (trace___schoolbook16x ++ tmp__trace);
-    x0 <- result_9;
-    x1 <- result_8;
-    param_16 <- _zero;
-    param_15 <- y0;
-    param_14 <- y1;
-    (result_11, result_10, tmp__trace) <@ __w256_deinterleave_u16 (param_16,
-    param_15, param_14);
-    trace___schoolbook16x <- (trace___schoolbook16x ++ tmp__trace);
-    y0 <- result_11;
-    y1 <- result_10;
-    param_20 <- x0;
-    param_19 <- x1;
-    param_18 <- qx16;
-    param_17 <- qinvx16;
-    (result_12, tmp__trace) <@ __mont_red (param_20, param_19, param_18,
-    param_17);
-    trace___schoolbook16x <- (trace___schoolbook16x ++ tmp__trace);
-    x0 <- result_12;
-    param_24 <- y0;
-    param_23 <- y1;
-    param_22 <- qx16;
-    param_21 <- qinvx16;
-    (result_13, tmp__trace) <@ __mont_red (param_24, param_23, param_22,
-    param_21);
-    trace___schoolbook16x <- (trace___schoolbook16x ++ tmp__trace);
-    y0 <- result_13;
-    return (x0, y0, trace___schoolbook16x);
+    s0 <- (VPADD_16u16 s0 s1);
+    return (r0, s0, trace___basemul16x);
   }
-  proc _poly_basemul (rp:BArray512.t, b_rp:BArray512.t, ap:BArray512.t,
-                      b_ap:BArray512.t, bp:BArray512.t, b_bp:BArray512.t) : 
-  BArray512.t * BArray512.t * trace = {
+  proc __poly_basemul_body (rp:BArray512.t, b_rp:BArray512.t, ap:BArray512.t,
+                            b_ap:BArray512.t, bp:BArray512.t,
+                            b_bp:BArray512.t, acc:int) : BArray512.t *
+                                                         BArray512.t * trace = {
     var qx16:W256.t;
     var qinvx16:W256.t;
+    var vx16:W256.t;
+    var i:int;
+    var zo:int;
     var zetaqinv:W256.t;
     var zeta_0:W256.t;
-    var are:W256.t;
-    var aim:W256.t;
-    var bre:W256.t;
-    var bim:W256.t;
+    var a:W256.t;
+    var b:W256.t;
+    var c:W256.t;
+    var d:W256.t;
+    var r:W256.t;
+    var s:W256.t;
     var param:int;
     var param_0:W256.t;
     var param_1:W256.t;
@@ -40011,342 +39879,262 @@ module M = {
     var param_7:W256.t;
     var result:W256.t;
     var result_0:W256.t;
-    var param_8:int;
+    var param_8:W256.t;
     var param_9:W256.t;
     var param_10:W256.t;
+    var result_1:W256.t;
     var param_11:W256.t;
     var param_12:W256.t;
     var param_13:W256.t;
-    var param_14:W256.t;
-    var param_15:W256.t;
-    var param_16:W256.t;
-    var result_1:W256.t;
     var result_2:W256.t;
-    var param_17:int;
-    var param_18:W256.t;
-    var param_19:W256.t;
-    var param_20:W256.t;
-    var param_21:W256.t;
-    var param_22:W256.t;
-    var param_23:W256.t;
-    var param_24:W256.t;
-    var param_25:W256.t;
-    var result_3:W256.t;
-    var result_4:W256.t;
-    var param_26:int;
-    var param_27:W256.t;
-    var param_28:W256.t;
-    var param_29:W256.t;
-    var param_30:W256.t;
-    var param_31:W256.t;
-    var param_32:W256.t;
-    var param_33:W256.t;
-    var param_34:W256.t;
-    var result_5:W256.t;
-    var result_6:W256.t;
-    var param_35:int;
-    var param_36:W256.t;
-    var param_37:W256.t;
-    var param_38:W256.t;
-    var param_39:W256.t;
-    var param_40:W256.t;
-    var param_41:W256.t;
-    var param_42:W256.t;
-    var param_43:W256.t;
-    var result_7:W256.t;
-    var result_8:W256.t;
-    var param_44:int;
-    var param_45:W256.t;
-    var param_46:W256.t;
-    var param_47:W256.t;
-    var param_48:W256.t;
-    var param_49:W256.t;
-    var param_50:W256.t;
-    var param_51:W256.t;
-    var param_52:W256.t;
-    var result_9:W256.t;
-    var result_10:W256.t;
-    var param_53:int;
-    var param_54:W256.t;
-    var param_55:W256.t;
-    var param_56:W256.t;
-    var param_57:W256.t;
-    var param_58:W256.t;
-    var param_59:W256.t;
-    var param_60:W256.t;
-    var param_61:W256.t;
-    var result_11:W256.t;
-    var result_12:W256.t;
-    var param_62:int;
-    var param_63:W256.t;
-    var param_64:W256.t;
-    var param_65:W256.t;
-    var param_66:W256.t;
-    var param_67:W256.t;
-    var param_68:W256.t;
-    var param_69:W256.t;
-    var param_70:W256.t;
-    var result_13:W256.t;
-    var result_14:W256.t;
+    var b_vx16:bool;
+    var trace___poly_basemul_body:trace;
+    trace___poly_basemul_body <- [];
+    trace___poly_basemul_body <-
+    (trace___poly_basemul_body ++
+    [(Assert,
+     (((BArray512.is_init b_ap 0 512) /\ (BArray512.is_init b_bp 0 512)) /\
+     (BArray512.is_init b_rp 0 ((acc <> 0) ? 512 : 0))))]);
+    b_vx16 <- false;
+    qx16 <- (BArray32.get256d jqx16 0);
+    qinvx16 <- (BArray32.get256d jqinvx16 0);
+    if ((acc = 2)) {
+      b_vx16 <- true;
+      vx16 <- (BArray32.get256d jvx16 0);
+    } else {
+      
+    }
+    i <- 0;
+    while ((i < 8)) {
+      zo <- ((272 + (392 * (i %/ 4))) + (64 * ((i %/ 2) %% 2)));
+      trace___poly_basemul_body <-
+      (trace___poly_basemul_body ++
+      [(Assert, ((0 <= zo) /\ ((zo + 32) <= 800)))]);
+      zetaqinv <- (BArray800.get256d jzetas_exp zo);
+      trace___poly_basemul_body <-
+      (trace___poly_basemul_body ++
+      [(Assert, ((0 <= (zo + 32)) /\ (((zo + 32) + 32) <= 800)))]);
+      zeta_0 <- (BArray800.get256d jzetas_exp (zo + 32));
+      trace___poly_basemul_body <-
+      (trace___poly_basemul_body ++
+      [(Assert, ((0 <= (32 * (2 * i))) /\ (((32 * (2 * i)) + 32) <= 512)))]);
+      a <- (BArray512.get256d ap (32 * (2 * i)));
+      trace___poly_basemul_body <-
+      (trace___poly_basemul_body ++
+      [(Assert,
+       ((0 <= (32 * ((2 * i) + 1))) /\ (((32 * ((2 * i) + 1)) + 32) <= 512)))]);
+      b <- (BArray512.get256d ap (32 * ((2 * i) + 1)));
+      trace___poly_basemul_body <-
+      (trace___poly_basemul_body ++
+      [(Assert, ((0 <= (32 * (2 * i))) /\ (((32 * (2 * i)) + 32) <= 512)))]);
+      c <- (BArray512.get256d bp (32 * (2 * i)));
+      trace___poly_basemul_body <-
+      (trace___poly_basemul_body ++
+      [(Assert,
+       ((0 <= (32 * ((2 * i) + 1))) /\ (((32 * ((2 * i) + 1)) + 32) <= 512)))]);
+      d <- (BArray512.get256d bp (32 * ((2 * i) + 1)));
+      param_7 <- a;
+      param_6 <- b;
+      param_5 <- c;
+      param_4 <- d;
+      param_3 <- zeta_0;
+      param_2 <- zetaqinv;
+      param_1 <- qx16;
+      param_0 <- qinvx16;
+      param <- (i %% 2);
+      (result_0, result, tmp__trace) <@ __basemul16x (param_7, param_6,
+      param_5, param_4, param_3, param_2, param_1, param_0, param);
+      trace___poly_basemul_body <- (trace___poly_basemul_body ++ tmp__trace);
+      r <- result_0;
+      s <- result;
+      if ((acc <> 0)) {
+        trace___poly_basemul_body <-
+        (trace___poly_basemul_body ++
+        [(Assert, ((0 <= (32 * (2 * i))) /\ (((32 * (2 * i)) + 32) <= 512)))]);
+        trace___poly_basemul_body <-
+        (trace___poly_basemul_body ++
+        [(Assert, (BArray512.is_init b_rp (32 * (2 * i)) 32))]);
+        r <- (VPADD_16u16 r (BArray512.get256d rp (32 * (2 * i))));
+        trace___poly_basemul_body <-
+        (trace___poly_basemul_body ++
+        [(Assert,
+         ((0 <= (32 * ((2 * i) + 1))) /\
+         (((32 * ((2 * i) + 1)) + 32) <= 512)))]);
+        trace___poly_basemul_body <-
+        (trace___poly_basemul_body ++
+        [(Assert, (BArray512.is_init b_rp (32 * ((2 * i) + 1)) 32))]);
+        s <- (VPADD_16u16 s (BArray512.get256d rp (32 * ((2 * i) + 1))));
+      } else {
+        
+      }
+      if ((acc = 2)) {
+        trace___poly_basemul_body <-
+        (trace___poly_basemul_body ++ [(Assert, b_vx16)]);
+        param_10 <- r;
+        param_9 <- qx16;
+        param_8 <- vx16;
+        (result_1, tmp__trace) <@ __red16x (param_10, param_9, param_8);
+        trace___poly_basemul_body <-
+        (trace___poly_basemul_body ++ tmp__trace);
+        r <- result_1;
+        param_13 <- s;
+        param_12 <- qx16;
+        param_11 <- vx16;
+        (result_2, tmp__trace) <@ __red16x (param_13, param_12, param_11);
+        trace___poly_basemul_body <-
+        (trace___poly_basemul_body ++ tmp__trace);
+        s <- result_2;
+      } else {
+        
+      }
+      trace___poly_basemul_body <-
+      (trace___poly_basemul_body ++
+      [(Assert, ((0 <= (32 * (2 * i))) /\ (((32 * (2 * i)) + 32) <= 512)))]);
+      b_rp <-
+      (BArray512.set256d b_rp (32 * (2 * i))
+      (W256.of_int
+      115792089237316195423570985008687907853269984665640564039457584007913129639935
+      ));
+      rp <- (BArray512.set256d rp (32 * (2 * i)) r);
+      trace___poly_basemul_body <-
+      (trace___poly_basemul_body ++
+      [(Assert,
+       ((0 <= (32 * ((2 * i) + 1))) /\ (((32 * ((2 * i) + 1)) + 32) <= 512)))]);
+      b_rp <-
+      (BArray512.set256d b_rp (32 * ((2 * i) + 1))
+      (W256.of_int
+      115792089237316195423570985008687907853269984665640564039457584007913129639935
+      ));
+      rp <- (BArray512.set256d rp (32 * ((2 * i) + 1)) s);
+      i <- (i + 1);
+    }
+    return (rp, b_rp, trace___poly_basemul_body);
+  }
+  proc _poly_basemul (rp:BArray512.t, b_rp:BArray512.t, ap:BArray512.t,
+                      b_ap:BArray512.t, bp:BArray512.t, b_bp:BArray512.t) : 
+  BArray512.t * BArray512.t * trace = {
+    var aux:BArray512.t;
+    var aux_0:BArray512.t;
+    var param:int;
+    var param_0:BArray512.t;
+    var param_1:BArray512.t;
+    var param_2:BArray512.t;
+    var result:BArray512.t;
+    var b_result:BArray512.t;
+    var b_param:BArray512.t;
     var trace__poly_basemul:trace;
+    b_param <- witness;
+    b_result <- witness;
+    param_0 <- witness;
+    param_1 <- witness;
+    param_2 <- witness;
+    result <- witness;
     trace__poly_basemul <- [];
     trace__poly_basemul <-
     (trace__poly_basemul ++
     [(Assert,
      ((BArray512.is_init b_ap 0 512) /\ (BArray512.is_init b_bp 0 512)))]);
-    qx16 <- (BArray32.get256d jqx16 0);
-    qinvx16 <- (BArray32.get256d jqinvx16 0);
-    zetaqinv <- (BArray800.get256d jzetas_exp 272);
-    zeta_0 <- (BArray800.get256d jzetas_exp 304);
-    are <- (BArray512.get256d ap 0);
-    aim <- (BArray512.get256d ap 32);
-    bre <- (BArray512.get256d bp 0);
-    bim <- (BArray512.get256d bp 32);
-    param_7 <- are;
-    param_6 <- aim;
-    param_5 <- bre;
-    param_4 <- bim;
-    param_3 <- zeta_0;
-    param_2 <- zetaqinv;
-    param_1 <- qx16;
-    param_0 <- qinvx16;
+    b_param <- b_rp;
+    param_2 <- rp;
+    param_1 <- ap;
+    param_0 <- bp;
     param <- 0;
-    (result_0, result, tmp__trace) <@ __schoolbook16x (param_7, param_6,
-    param_5, param_4, param_3, param_2, param_1, param_0, param);
+    (aux, aux_0, tmp__trace) <@ __poly_basemul_body (param_2, b_param,
+    param_1, (BArray512.init_arr (W8.of_int 255)), param_0,
+    (BArray512.init_arr (W8.of_int 255)), param);
+    result <- aux;
+    b_result <- aux_0;
     trace__poly_basemul <- (trace__poly_basemul ++ tmp__trace);
-    are <- result_0;
-    aim <- result;
-    b_rp <-
-    (BArray512.set256d b_rp 0
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 0 are);
-    b_rp <-
-    (BArray512.set256d b_rp 32
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 32 aim);
-    are <- (BArray512.get256d ap 64);
-    aim <- (BArray512.get256d ap 96);
-    bre <- (BArray512.get256d bp 64);
-    bim <- (BArray512.get256d bp 96);
-    param_16 <- are;
-    param_15 <- aim;
-    param_14 <- bre;
-    param_13 <- bim;
-    param_12 <- zeta_0;
-    param_11 <- zetaqinv;
-    param_10 <- qx16;
-    param_9 <- qinvx16;
-    param_8 <- 1;
-    (result_2, result_1, tmp__trace) <@ __schoolbook16x (param_16, param_15,
-    param_14, param_13, param_12, param_11, param_10, param_9, param_8);
-    trace__poly_basemul <- (trace__poly_basemul ++ tmp__trace);
-    are <- result_2;
-    aim <- result_1;
-    b_rp <-
-    (BArray512.set256d b_rp 64
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 64 are);
-    b_rp <-
-    (BArray512.set256d b_rp 96
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 96 aim);
-    zetaqinv <- (BArray800.get256d jzetas_exp 336);
-    zeta_0 <- (BArray800.get256d jzetas_exp 368);
-    are <- (BArray512.get256d ap 128);
-    aim <- (BArray512.get256d ap 160);
-    bre <- (BArray512.get256d bp 128);
-    bim <- (BArray512.get256d bp 160);
-    param_25 <- are;
-    param_24 <- aim;
-    param_23 <- bre;
-    param_22 <- bim;
-    param_21 <- zeta_0;
-    param_20 <- zetaqinv;
-    param_19 <- qx16;
-    param_18 <- qinvx16;
-    param_17 <- 0;
-    (result_4, result_3, tmp__trace) <@ __schoolbook16x (param_25, param_24,
-    param_23, param_22, param_21, param_20, param_19, param_18, param_17);
-    trace__poly_basemul <- (trace__poly_basemul ++ tmp__trace);
-    are <- result_4;
-    aim <- result_3;
-    b_rp <-
-    (BArray512.set256d b_rp 128
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 128 are);
-    b_rp <-
-    (BArray512.set256d b_rp 160
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 160 aim);
-    are <- (BArray512.get256d ap 192);
-    aim <- (BArray512.get256d ap 224);
-    bre <- (BArray512.get256d bp 192);
-    bim <- (BArray512.get256d bp 224);
-    param_34 <- are;
-    param_33 <- aim;
-    param_32 <- bre;
-    param_31 <- bim;
-    param_30 <- zeta_0;
-    param_29 <- zetaqinv;
-    param_28 <- qx16;
-    param_27 <- qinvx16;
-    param_26 <- 1;
-    (result_6, result_5, tmp__trace) <@ __schoolbook16x (param_34, param_33,
-    param_32, param_31, param_30, param_29, param_28, param_27, param_26);
-    trace__poly_basemul <- (trace__poly_basemul ++ tmp__trace);
-    are <- result_6;
-    aim <- result_5;
-    b_rp <-
-    (BArray512.set256d b_rp 192
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 192 are);
-    b_rp <-
-    (BArray512.set256d b_rp 224
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 224 aim);
-    zetaqinv <- (BArray800.get256d jzetas_exp 664);
-    zeta_0 <- (BArray800.get256d jzetas_exp 696);
-    are <- (BArray512.get256d ap 256);
-    aim <- (BArray512.get256d ap 288);
-    bre <- (BArray512.get256d bp 256);
-    bim <- (BArray512.get256d bp 288);
-    param_43 <- are;
-    param_42 <- aim;
-    param_41 <- bre;
-    param_40 <- bim;
-    param_39 <- zeta_0;
-    param_38 <- zetaqinv;
-    param_37 <- qx16;
-    param_36 <- qinvx16;
-    param_35 <- 0;
-    (result_8, result_7, tmp__trace) <@ __schoolbook16x (param_43, param_42,
-    param_41, param_40, param_39, param_38, param_37, param_36, param_35);
-    trace__poly_basemul <- (trace__poly_basemul ++ tmp__trace);
-    are <- result_8;
-    aim <- result_7;
-    b_rp <-
-    (BArray512.set256d b_rp 256
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 256 are);
-    b_rp <-
-    (BArray512.set256d b_rp 288
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 288 aim);
-    are <- (BArray512.get256d ap 320);
-    aim <- (BArray512.get256d ap 352);
-    bre <- (BArray512.get256d bp 320);
-    bim <- (BArray512.get256d bp 352);
-    param_52 <- are;
-    param_51 <- aim;
-    param_50 <- bre;
-    param_49 <- bim;
-    param_48 <- zeta_0;
-    param_47 <- zetaqinv;
-    param_46 <- qx16;
-    param_45 <- qinvx16;
-    param_44 <- 1;
-    (result_10, result_9, tmp__trace) <@ __schoolbook16x (param_52, param_51,
-    param_50, param_49, param_48, param_47, param_46, param_45, param_44);
-    trace__poly_basemul <- (trace__poly_basemul ++ tmp__trace);
-    are <- result_10;
-    aim <- result_9;
-    b_rp <-
-    (BArray512.set256d b_rp 320
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 320 are);
-    b_rp <-
-    (BArray512.set256d b_rp 352
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 352 aim);
-    zetaqinv <- (BArray800.get256d jzetas_exp 728);
-    zeta_0 <- (BArray800.get256d jzetas_exp 760);
-    are <- (BArray512.get256d ap 384);
-    aim <- (BArray512.get256d ap 416);
-    bre <- (BArray512.get256d bp 384);
-    bim <- (BArray512.get256d bp 416);
-    param_61 <- are;
-    param_60 <- aim;
-    param_59 <- bre;
-    param_58 <- bim;
-    param_57 <- zeta_0;
-    param_56 <- zetaqinv;
-    param_55 <- qx16;
-    param_54 <- qinvx16;
-    param_53 <- 0;
-    (result_12, result_11, tmp__trace) <@ __schoolbook16x (param_61,
-    param_60, param_59, param_58, param_57, param_56, param_55, param_54,
-    param_53);
-    trace__poly_basemul <- (trace__poly_basemul ++ tmp__trace);
-    are <- result_12;
-    aim <- result_11;
-    b_rp <-
-    (BArray512.set256d b_rp 384
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 384 are);
-    b_rp <-
-    (BArray512.set256d b_rp 416
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 416 aim);
-    are <- (BArray512.get256d ap 448);
-    aim <- (BArray512.get256d ap 480);
-    bre <- (BArray512.get256d bp 448);
-    bim <- (BArray512.get256d bp 480);
-    param_70 <- are;
-    param_69 <- aim;
-    param_68 <- bre;
-    param_67 <- bim;
-    param_66 <- zeta_0;
-    param_65 <- zetaqinv;
-    param_64 <- qx16;
-    param_63 <- qinvx16;
-    param_62 <- 1;
-    (result_14, result_13, tmp__trace) <@ __schoolbook16x (param_70,
-    param_69, param_68, param_67, param_66, param_65, param_64, param_63,
-    param_62);
-    trace__poly_basemul <- (trace__poly_basemul ++ tmp__trace);
-    are <- result_14;
-    aim <- result_13;
-    b_rp <-
-    (BArray512.set256d b_rp 448
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 448 are);
-    b_rp <-
-    (BArray512.set256d b_rp 480
-    (W256.of_int
-    115792089237316195423570985008687907853269984665640564039457584007913129639935
-    ));
-    rp <- (BArray512.set256d rp 480 aim);
+    trace__poly_basemul <-
+    (trace__poly_basemul ++ [(Assert, (BArray512.is_init b_result 0 512))]);
+    rp <- result;
+    b_rp <- (BArray512.init_arr (W8.of_int 255));
     return (rp, b_rp, trace__poly_basemul);
+  }
+  proc _poly_basemul_acc (rp:BArray512.t, b_rp:BArray512.t, ap:BArray512.t,
+                          b_ap:BArray512.t, bp:BArray512.t, b_bp:BArray512.t) : 
+  BArray512.t * BArray512.t * trace = {
+    var aux:BArray512.t;
+    var aux_0:BArray512.t;
+    var param:int;
+    var param_0:BArray512.t;
+    var param_1:BArray512.t;
+    var param_2:BArray512.t;
+    var result:BArray512.t;
+    var b_result:BArray512.t;
+    var trace__poly_basemul_acc:trace;
+    b_result <- witness;
+    param_0 <- witness;
+    param_1 <- witness;
+    param_2 <- witness;
+    result <- witness;
+    trace__poly_basemul_acc <- [];
+    trace__poly_basemul_acc <-
+    (trace__poly_basemul_acc ++
+    [(Assert,
+     (((BArray512.is_init b_ap 0 512) /\ (BArray512.is_init b_bp 0 512)) /\
+     (BArray512.is_init b_rp 0 512)))]);
+    param_2 <- rp;
+    param_1 <- ap;
+    param_0 <- bp;
+    param <- 1;
+    (aux, aux_0, tmp__trace) <@ __poly_basemul_body (param_2,
+    (BArray512.init_arr (W8.of_int 255)), param_1,
+    (BArray512.init_arr (W8.of_int 255)), param_0,
+    (BArray512.init_arr (W8.of_int 255)), param);
+    result <- aux;
+    b_result <- aux_0;
+    trace__poly_basemul_acc <- (trace__poly_basemul_acc ++ tmp__trace);
+    trace__poly_basemul_acc <-
+    (trace__poly_basemul_acc ++
+    [(Assert, (BArray512.is_init b_result 0 512))]);
+    rp <- result;
+    b_rp <- (BArray512.init_arr (W8.of_int 255));
+    return (rp, b_rp, trace__poly_basemul_acc);
+  }
+  proc _poly_basemul_acc_red (rp:BArray512.t, b_rp:BArray512.t,
+                              ap:BArray512.t, b_ap:BArray512.t,
+                              bp:BArray512.t, b_bp:BArray512.t) : BArray512.t *
+                                                                  BArray512.t *
+                                                                  trace = {
+    var aux:BArray512.t;
+    var aux_0:BArray512.t;
+    var param:int;
+    var param_0:BArray512.t;
+    var param_1:BArray512.t;
+    var param_2:BArray512.t;
+    var result:BArray512.t;
+    var b_result:BArray512.t;
+    var trace__poly_basemul_acc_red:trace;
+    b_result <- witness;
+    param_0 <- witness;
+    param_1 <- witness;
+    param_2 <- witness;
+    result <- witness;
+    trace__poly_basemul_acc_red <- [];
+    trace__poly_basemul_acc_red <-
+    (trace__poly_basemul_acc_red ++
+    [(Assert,
+     (((BArray512.is_init b_ap 0 512) /\ (BArray512.is_init b_bp 0 512)) /\
+     (BArray512.is_init b_rp 0 512)))]);
+    param_2 <- rp;
+    param_1 <- ap;
+    param_0 <- bp;
+    param <- 2;
+    (aux, aux_0, tmp__trace) <@ __poly_basemul_body (param_2,
+    (BArray512.init_arr (W8.of_int 255)), param_1,
+    (BArray512.init_arr (W8.of_int 255)), param_0,
+    (BArray512.init_arr (W8.of_int 255)), param);
+    result <- aux;
+    b_result <- aux_0;
+    trace__poly_basemul_acc_red <-
+    (trace__poly_basemul_acc_red ++ tmp__trace);
+    trace__poly_basemul_acc_red <-
+    (trace__poly_basemul_acc_red ++
+    [(Assert, (BArray512.is_init b_result 0 512))]);
+    rp <- result;
+    b_rp <- (BArray512.init_arr (W8.of_int 255));
+    return (rp, b_rp, trace__poly_basemul_acc_red);
   }
   proc _i_poly_frombytes (rp:BArray512.t, b_rp:BArray512.t, ap:BArray384.t,
                           b_ap:BArray384.t) : BArray512.t * BArray512.t *
@@ -44200,12 +43988,10 @@ module M = {
   }
   proc __polyvec_pointwise_acc (r:BArray512.t, b_r:BArray512.t,
                                 a:BArray1024.t, b_a:BArray1024.t,
-                                b:BArray1024.t, b_b:BArray1024.t) : BArray512.t *
-                                                                    BArray512.t *
-                                                                    trace = {
+                                b:BArray1024.t, b_b:BArray1024.t, red:int) : 
+  BArray512.t * BArray512.t * trace = {
     var aux:BArray512.t;
     var aux_0:BArray512.t;
-    var t:BArray512.t;
     var i:int;
     var param:BArray512.t;
     var param_0:BArray512.t;
@@ -44217,17 +44003,25 @@ module M = {
     var result_0:BArray512.t;
     var param_5:BArray512.t;
     var param_6:BArray512.t;
+    var param_7:BArray512.t;
     var result_1:BArray512.t;
+    var param_8:BArray512.t;
+    var param_9:BArray512.t;
+    var param_10:BArray512.t;
+    var result_2:BArray512.t;
     var b_result:BArray512.t;
-    var b_t:BArray512.t;
-    var b_result_0:BArray512.t;
     var b_param:BArray512.t;
     var b_param_0:BArray512.t;
+    var b_result_0:BArray512.t;
     var b_param_1:BArray512.t;
-    var b_result_1:BArray512.t;
     var b_param_2:BArray512.t;
+    var b_result_1:BArray512.t;
     var b_param_3:BArray512.t;
     var b_param_4:BArray512.t;
+    var b_result_2:BArray512.t;
+    var b_param_5:BArray512.t;
+    var b_param_6:BArray512.t;
+    var b_param_7:BArray512.t;
     var trace___polyvec_pointwise_acc:trace;
     b_param <- witness;
     b_param_0 <- witness;
@@ -44235,10 +44029,13 @@ module M = {
     b_param_2 <- witness;
     b_param_3 <- witness;
     b_param_4 <- witness;
+    b_param_5 <- witness;
+    b_param_6 <- witness;
+    b_param_7 <- witness;
     b_result <- witness;
     b_result_0 <- witness;
     b_result_1 <- witness;
-    b_t <- witness;
+    b_result_2 <- witness;
     param <- witness;
     param_0 <- witness;
     param_1 <- witness;
@@ -44247,34 +44044,37 @@ module M = {
     param_4 <- witness;
     param_5 <- witness;
     param_6 <- witness;
+    param_7 <- witness;
+    param_8 <- witness;
+    param_9 <- witness;
+    param_10 <- witness;
     result <- witness;
     result_0 <- witness;
     result_1 <- witness;
-    t <- witness;
+    result_2 <- witness;
     trace___polyvec_pointwise_acc <- [];
     trace___polyvec_pointwise_acc <-
     (trace___polyvec_pointwise_acc ++
     [(Assert,
      ((BArray1024.is_init b_a 0 1024) /\ (BArray1024.is_init b_b 0 1024)))]);
-    b_t <- (BArray512.init_arr (W8.of_int 0));
-    b_param_4 <- b_r;
+    b_param_7 <- b_r;
     param_1 <- r;
-    b_param_3 <- (SBArray1024_512.get_sub16 b_a 0);
+    b_param_6 <- (SBArray1024_512.get_sub16 b_a 0);
     param_0 <- (SBArray1024_512.get_sub16 a 0);
-    b_param_2 <- (SBArray1024_512.get_sub16 b_b 0);
+    b_param_5 <- (SBArray1024_512.get_sub16 b_b 0);
     param <- (SBArray1024_512.get_sub16 b 0);
-    (aux, aux_0, tmp__trace) <@ _poly_basemul (param_1, b_param_4, param_0,
-    b_param_3, param, b_param_2);
+    (aux, aux_0, tmp__trace) <@ _poly_basemul (param_1, b_param_7, param_0,
+    b_param_6, param, b_param_5);
     result <- aux;
-    b_result_1 <- aux_0;
+    b_result_2 <- aux_0;
     trace___polyvec_pointwise_acc <-
     (trace___polyvec_pointwise_acc ++ tmp__trace);
     trace___polyvec_pointwise_acc <-
     (trace___polyvec_pointwise_acc ++
-    [(Assert, (BArray512.is_init b_result_1 0 512))]);
+    [(Assert, (BArray512.is_init b_result_2 0 512))]);
     r <- result;
     i <- 1;
-    while ((i < 2)) {
+    while ((i < 1)) {
       trace___polyvec_pointwise_acc <-
       (trace___polyvec_pointwise_acc ++
       [(Assert,
@@ -44283,28 +44083,42 @@ module M = {
       (trace___polyvec_pointwise_acc ++
       [(Assert,
        ((0 <= ((256 * i) * 2)) /\ ((((256 * i) * 2) + 512) <= 1024)))]);
-      b_param_1 <- b_t;
-      param_4 <- t;
-      b_param_0 <- (SBArray1024_512.get_sub16 b_a (256 * i));
+      param_4 <- r;
+      b_param_4 <- (SBArray1024_512.get_sub16 b_a (256 * i));
       param_3 <- (SBArray1024_512.get_sub16 a (256 * i));
-      b_param <- (SBArray1024_512.get_sub16 b_b (256 * i));
+      b_param_3 <- (SBArray1024_512.get_sub16 b_b (256 * i));
       param_2 <- (SBArray1024_512.get_sub16 b (256 * i));
-      (aux, aux_0, tmp__trace) <@ _poly_basemul (param_4, b_param_1, 
-      param_3, b_param_0, param_2, b_param);
+      (aux, aux_0, tmp__trace) <@ _poly_basemul_acc (param_4,
+      (BArray512.init_arr (W8.of_int 255)), param_3, b_param_4, param_2,
+      b_param_3);
       result_0 <- aux;
-      b_result_0 <- aux_0;
+      b_result_1 <- aux_0;
       trace___polyvec_pointwise_acc <-
       (trace___polyvec_pointwise_acc ++ tmp__trace);
       trace___polyvec_pointwise_acc <-
       (trace___polyvec_pointwise_acc ++
-      [(Assert, (BArray512.is_init b_result_0 0 512))]);
-      b_t <- (BArray512.init_arr (W8.of_int 255));
-      t <- result_0;
-      param_6 <- r;
-      param_5 <- t;
-      (aux, aux_0, tmp__trace) <@ _poly_add2 (param_6,
-      (BArray512.init_arr (W8.of_int 255)), param_5,
-      (BArray512.init_arr (W8.of_int 255)));
+      [(Assert, (BArray512.is_init b_result_1 0 512))]);
+      r <- result_0;
+      i <- (i + 1);
+    }
+    i <- 1;
+    if ((red = 1)) {
+      trace___polyvec_pointwise_acc <-
+      (trace___polyvec_pointwise_acc ++
+      [(Assert,
+       ((0 <= ((256 * i) * 2)) /\ ((((256 * i) * 2) + 512) <= 1024)))]);
+      trace___polyvec_pointwise_acc <-
+      (trace___polyvec_pointwise_acc ++
+      [(Assert,
+       ((0 <= ((256 * i) * 2)) /\ ((((256 * i) * 2) + 512) <= 1024)))]);
+      param_7 <- r;
+      b_param_0 <- (SBArray1024_512.get_sub16 b_a (256 * i));
+      param_6 <- (SBArray1024_512.get_sub16 a (256 * i));
+      b_param <- (SBArray1024_512.get_sub16 b_b (256 * i));
+      param_5 <- (SBArray1024_512.get_sub16 b (256 * i));
+      (aux, aux_0, tmp__trace) <@ _poly_basemul_acc_red (param_7,
+      (BArray512.init_arr (W8.of_int 255)), param_6, b_param_0, param_5,
+      b_param);
       result_1 <- aux;
       b_result <- aux_0;
       trace___polyvec_pointwise_acc <-
@@ -44313,7 +44127,31 @@ module M = {
       (trace___polyvec_pointwise_acc ++
       [(Assert, (BArray512.is_init b_result 0 512))]);
       r <- result_1;
-      i <- (i + 1);
+    } else {
+      trace___polyvec_pointwise_acc <-
+      (trace___polyvec_pointwise_acc ++
+      [(Assert,
+       ((0 <= ((256 * i) * 2)) /\ ((((256 * i) * 2) + 512) <= 1024)))]);
+      trace___polyvec_pointwise_acc <-
+      (trace___polyvec_pointwise_acc ++
+      [(Assert,
+       ((0 <= ((256 * i) * 2)) /\ ((((256 * i) * 2) + 512) <= 1024)))]);
+      param_10 <- r;
+      b_param_2 <- (SBArray1024_512.get_sub16 b_a (256 * i));
+      param_9 <- (SBArray1024_512.get_sub16 a (256 * i));
+      b_param_1 <- (SBArray1024_512.get_sub16 b_b (256 * i));
+      param_8 <- (SBArray1024_512.get_sub16 b (256 * i));
+      (aux, aux_0, tmp__trace) <@ _poly_basemul_acc (param_10,
+      (BArray512.init_arr (W8.of_int 255)), param_9, b_param_2, param_8,
+      b_param_1);
+      result_2 <- aux;
+      b_result_0 <- aux_0;
+      trace___polyvec_pointwise_acc <-
+      (trace___polyvec_pointwise_acc ++ tmp__trace);
+      trace___polyvec_pointwise_acc <-
+      (trace___polyvec_pointwise_acc ++
+      [(Assert, (BArray512.is_init b_result_0 0 512))]);
+      r <- result_2;
     }
     b_r <- (BArray512.init_arr (W8.of_int 255));
     return (r, b_r, trace___polyvec_pointwise_acc);
@@ -45936,22 +45774,23 @@ module M = {
     var result_5:BArray1024.t;
     var param_11:BArray1024.t;
     var result_6:BArray1024.t;
-    var param_12:BArray1024.t;
+    var param_12:int;
     var param_13:BArray1024.t;
-    var param_14:BArray512.t;
-    var result_7:BArray512.t;
+    var param_14:BArray1024.t;
     var param_15:BArray512.t;
+    var result_7:BArray512.t;
+    var param_16:BArray512.t;
     var result_8:BArray512.t;
-    var param_16:BArray1024.t;
     var param_17:BArray1024.t;
-    var result_9:BArray1024.t;
     var param_18:BArray1024.t;
-    var result_10:BArray1024.t;
+    var result_9:BArray1024.t;
     var param_19:BArray1024.t;
-    var param_20:BArray768.t;
+    var result_10:BArray1024.t;
+    var param_20:BArray1024.t;
+    var param_21:BArray768.t;
     var result_11:BArray768.t;
-    var param_21:BArray1024.t;
-    var param_22:BArray768.t;
+    var param_22:BArray1024.t;
+    var param_23:BArray768.t;
     var result_12:BArray768.t;
     var b_publicseed:BArray32.t;
     var b_result:BArray768.t;
@@ -46048,7 +45887,6 @@ module M = {
     param_9 <- witness;
     param_10 <- witness;
     param_11 <- witness;
-    param_12 <- witness;
     param_13 <- witness;
     param_14 <- witness;
     param_15 <- witness;
@@ -46059,6 +45897,7 @@ module M = {
     param_20 <- witness;
     param_21 <- witness;
     param_22 <- witness;
+    param_23 <- witness;
     pkpv <- witness;
     publicseed <- witness;
     result <- witness;
@@ -46237,13 +46076,14 @@ module M = {
       [(Assert,
        ((0 <= ((i * 512) * 2)) /\ ((((i * 512) * 2) + 1024) <= 2048)))]);
       b_param_4 <- (SBArray1024_512.get_sub16 b_pkpv (i * 256));
-      param_14 <- (SBArray1024_512.get_sub16 pkpv (i * 256));
+      param_15 <- (SBArray1024_512.get_sub16 pkpv (i * 256));
       b_param_3 <- (SBArray2048_1024.get_sub16 b_aa (i * 512));
-      param_13 <- (SBArray2048_1024.get_sub16 aa (i * 512));
-      param_12 <- skpv;
-      (aux_1, aux_2, tmp__trace) <@ __polyvec_pointwise_acc (param_14,
-      b_param_4, param_13, b_param_3, param_12,
-      (BArray1024.init_arr (W8.of_int 255)));
+      param_14 <- (SBArray2048_1024.get_sub16 aa (i * 512));
+      param_13 <- skpv;
+      param_12 <- 0;
+      (aux_1, aux_2, tmp__trace) <@ __polyvec_pointwise_acc (param_15,
+      b_param_4, param_14, b_param_3, param_13,
+      (BArray1024.init_arr (W8.of_int 255)), param_12);
       result_7 <- aux_1;
       b_result_4 <- aux_2;
       trace___indcpa_keypair <- (trace___indcpa_keypair ++ tmp__trace);
@@ -46263,8 +46103,8 @@ module M = {
       [(Assert,
        ((0 <= ((i * 256) * 2)) /\ ((((i * 256) * 2) + 512) <= 1024)))]);
       b_param_2 <- (SBArray1024_512.get_sub16 b_pkpv (i * 256));
-      param_15 <- (SBArray1024_512.get_sub16 pkpv (i * 256));
-      (aux_1, aux_2, tmp__trace) <@ _poly_frommont (param_15, b_param_2);
+      param_16 <- (SBArray1024_512.get_sub16 pkpv (i * 256));
+      (aux_1, aux_2, tmp__trace) <@ _poly_frommont (param_16, b_param_2);
       result_8 <- aux_1;
       b_result_3 <- aux_2;
       trace___indcpa_keypair <- (trace___indcpa_keypair ++ tmp__trace);
@@ -46278,10 +46118,10 @@ module M = {
       i <- (i + 1);
     }
     b_param_1 <- b_pkpv;
-    param_17 <- pkpv;
-    param_16 <- e;
-    (aux_9, aux_10, tmp__trace) <@ __polyvec_add2 (param_17, b_param_1,
-    param_16, (BArray1024.init_arr (W8.of_int 255)));
+    param_18 <- pkpv;
+    param_17 <- e;
+    (aux_9, aux_10, tmp__trace) <@ __polyvec_add2 (param_18, b_param_1,
+    param_17, (BArray1024.init_arr (W8.of_int 255)));
     result_9 <- aux_9;
     b_result_2 <- aux_10;
     trace___indcpa_keypair <- (trace___indcpa_keypair ++ tmp__trace);
@@ -46289,8 +46129,8 @@ module M = {
     (trace___indcpa_keypair ++
     [(Assert, (BArray1024.is_init b_result_2 0 1024))]);
     pkpv <- result_9;
-    param_18 <- pkpv;
-    (aux_9, aux_10, tmp__trace) <@ __polyvec_reduce (param_18,
+    param_19 <- pkpv;
+    (aux_9, aux_10, tmp__trace) <@ __polyvec_reduce (param_19,
     (BArray1024.init_arr (W8.of_int 255)));
     result_10 <- aux_9;
     b_result_1 <- aux_10;
@@ -46302,20 +46142,20 @@ module M = {
     (* Erased call to unspill *)
     ms <- (init_msf);
     b_param_0 <- b_sk;
-    param_20 <- sk;
-    param_19 <- skpv;
-    (result_11, b_result_0, tmp__trace) <@ __i_polyvec_tobytes (param_20,
-    b_param_0, param_19, (BArray1024.init_arr (W8.of_int 255)));
+    param_21 <- sk;
+    param_20 <- skpv;
+    (result_11, b_result_0, tmp__trace) <@ __i_polyvec_tobytes (param_21,
+    b_param_0, param_20, (BArray1024.init_arr (W8.of_int 255)));
     trace___indcpa_keypair <- (trace___indcpa_keypair ++ tmp__trace);
     trace___indcpa_keypair <-
     (trace___indcpa_keypair ++
     [(Assert, (BArray768.is_init b_result_0 0 768))]);
     sk <- result_11;
     b_param <- (SBArray800_768.get_sub8 b_pk 0);
-    param_22 <- (SBArray800_768.get_sub8 pk 0);
-    param_21 <- pkpv;
-    (result_12, b_result, tmp__trace) <@ __i_polyvec_tobytes (param_22,
-    b_param, param_21, (BArray1024.init_arr (W8.of_int 255)));
+    param_23 <- (SBArray800_768.get_sub8 pk 0);
+    param_22 <- pkpv;
+    (result_12, b_result, tmp__trace) <@ __i_polyvec_tobytes (param_23,
+    b_param, param_22, (BArray1024.init_arr (W8.of_int 255)));
     trace___indcpa_keypair <- (trace___indcpa_keypair ++ tmp__trace);
     trace___indcpa_keypair <-
     (trace___indcpa_keypair ++
@@ -46401,36 +46241,38 @@ module M = {
     var result_6:BArray512.t;
     var param_14:BArray1024.t;
     var result_7:BArray1024.t;
-    var param_15:BArray1024.t;
+    var param_15:int;
     var param_16:BArray1024.t;
-    var param_17:BArray512.t;
+    var param_17:BArray1024.t;
+    var param_18:BArray512.t;
     var result_8:BArray512.t;
-    var param_18:BArray1024.t;
-    var param_19:BArray1024.t;
-    var param_20:BArray512.t;
-    var result_9:BArray512.t;
+    var param_19:int;
+    var param_20:BArray1024.t;
     var param_21:BArray1024.t;
-    var result_10:BArray1024.t;
     var param_22:BArray512.t;
-    var result_11:BArray512.t;
+    var result_9:BArray512.t;
     var param_23:BArray1024.t;
-    var param_24:BArray1024.t;
+    var result_10:BArray1024.t;
+    var param_24:BArray512.t;
+    var result_11:BArray512.t;
+    var param_25:BArray1024.t;
+    var param_26:BArray1024.t;
     var result_12:BArray1024.t;
-    var param_25:BArray512.t;
-    var param_26:BArray512.t;
-    var result_13:BArray512.t;
     var param_27:BArray512.t;
     var param_28:BArray512.t;
-    var result_14:BArray512.t;
-    var param_29:BArray1024.t;
-    var result_15:BArray1024.t;
+    var result_13:BArray512.t;
+    var param_29:BArray512.t;
     var param_30:BArray512.t;
-    var result_16:BArray512.t;
+    var result_14:BArray512.t;
     var param_31:BArray1024.t;
-    var param_32:BArray640.t;
+    var result_15:BArray1024.t;
+    var param_32:BArray512.t;
+    var result_16:BArray512.t;
+    var param_33:BArray1024.t;
+    var param_34:BArray640.t;
     var result_17:BArray640.t;
-    var param_33:BArray512.t;
-    var param_34:BArray128.t;
+    var param_35:BArray512.t;
+    var param_36:BArray128.t;
     var result_18:BArray512.t;
     var result_19:BArray128.t;
     var b_v:BArray512.t;
@@ -46544,11 +46386,9 @@ module M = {
     param_12 <- witness;
     param_13 <- witness;
     param_14 <- witness;
-    param_15 <- witness;
     param_16 <- witness;
     param_17 <- witness;
     param_18 <- witness;
-    param_19 <- witness;
     param_20 <- witness;
     param_21 <- witness;
     param_22 <- witness;
@@ -46564,6 +46404,8 @@ module M = {
     param_32 <- witness;
     param_33 <- witness;
     param_34 <- witness;
+    param_35 <- witness;
+    param_36 <- witness;
     pkpv <- witness;
     publicseed <- witness;
     result <- witness;
@@ -46742,13 +46584,14 @@ module M = {
       [(Assert,
        ((0 <= ((w * 512) * 2)) /\ ((((w * 512) * 2) + 1024) <= 2048)))]);
       b_param_5 <- (SBArray1024_512.get_sub16 b_bp (w * 256));
-      param_17 <- (SBArray1024_512.get_sub16 bp (w * 256));
+      param_18 <- (SBArray1024_512.get_sub16 bp (w * 256));
       b_param_4 <- (SBArray2048_1024.get_sub16 b_aat (w * 512));
-      param_16 <- (SBArray2048_1024.get_sub16 aat (w * 512));
-      param_15 <- sp_0;
-      (aux_1, aux_2, tmp__trace) <@ __polyvec_pointwise_acc (param_17,
-      b_param_5, param_16, b_param_4, param_15,
-      (BArray1024.init_arr (W8.of_int 255)));
+      param_17 <- (SBArray2048_1024.get_sub16 aat (w * 512));
+      param_16 <- sp_0;
+      param_15 <- 1;
+      (aux_1, aux_2, tmp__trace) <@ __polyvec_pointwise_acc (param_18,
+      b_param_5, param_17, b_param_4, param_16,
+      (BArray1024.init_arr (W8.of_int 255)), param_15);
       result_8 <- aux_1;
       b_result_10 <- aux_2;
       trace___indcpa_enc <- (trace___indcpa_enc ++ tmp__trace);
@@ -46762,12 +46605,13 @@ module M = {
       w <- (w + 1);
     }
     b_param_3 <- b_v;
-    param_20 <- v;
-    param_19 <- pkpv;
-    param_18 <- sp_0;
-    (aux_1, aux_2, tmp__trace) <@ __polyvec_pointwise_acc (param_20,
-    b_param_3, param_19, (BArray1024.init_arr (W8.of_int 255)), param_18,
-    (BArray1024.init_arr (W8.of_int 255)));
+    param_22 <- v;
+    param_21 <- pkpv;
+    param_20 <- sp_0;
+    param_19 <- 1;
+    (aux_1, aux_2, tmp__trace) <@ __polyvec_pointwise_acc (param_22,
+    b_param_3, param_21, (BArray1024.init_arr (W8.of_int 255)), param_20,
+    (BArray1024.init_arr (W8.of_int 255)), param_19);
     result_9 <- aux_1;
     b_result_9 <- aux_2;
     trace___indcpa_enc <- (trace___indcpa_enc ++ tmp__trace);
@@ -46775,8 +46619,8 @@ module M = {
     (trace___indcpa_enc ++ [(Assert, (BArray512.is_init b_result_9 0 512))]);
     v <- result_9;
     b_param_2 <- b_bp;
-    param_21 <- bp;
-    (aux, aux_0, tmp__trace) <@ __polyvec_invntt (param_21, b_param_2);
+    param_23 <- bp;
+    (aux, aux_0, tmp__trace) <@ __polyvec_invntt (param_23, b_param_2);
     result_10 <- aux;
     b_result_8 <- aux_0;
     trace___indcpa_enc <- (trace___indcpa_enc ++ tmp__trace);
@@ -46784,8 +46628,8 @@ module M = {
     (trace___indcpa_enc ++
     [(Assert, (BArray1024.is_init b_result_8 0 1024))]);
     bp <- result_10;
-    param_22 <- v;
-    (aux_1, aux_2, tmp__trace) <@ _poly_invntt (param_22,
+    param_24 <- v;
+    (aux_1, aux_2, tmp__trace) <@ _poly_invntt (param_24,
     (BArray512.init_arr (W8.of_int 255)));
     result_11 <- aux_1;
     b_result_7 <- aux_2;
@@ -46793,11 +46637,11 @@ module M = {
     trace___indcpa_enc <-
     (trace___indcpa_enc ++ [(Assert, (BArray512.is_init b_result_7 0 512))]);
     v <- result_11;
-    param_24 <- bp;
+    param_26 <- bp;
     b_param_1 <- b_ep;
-    param_23 <- ep;
-    (aux, aux_0, tmp__trace) <@ __polyvec_add2 (param_24,
-    (BArray1024.init_arr (W8.of_int 255)), param_23, b_param_1);
+    param_25 <- ep;
+    (aux, aux_0, tmp__trace) <@ __polyvec_add2 (param_26,
+    (BArray1024.init_arr (W8.of_int 255)), param_25, b_param_1);
     result_12 <- aux;
     b_result_6 <- aux_0;
     trace___indcpa_enc <- (trace___indcpa_enc ++ tmp__trace);
@@ -46805,10 +46649,10 @@ module M = {
     (trace___indcpa_enc ++
     [(Assert, (BArray1024.is_init b_result_6 0 1024))]);
     bp <- result_12;
-    param_26 <- v;
-    param_25 <- epp;
-    (aux_1, aux_2, tmp__trace) <@ _poly_add2 (param_26,
-    (BArray512.init_arr (W8.of_int 255)), param_25,
+    param_28 <- v;
+    param_27 <- epp;
+    (aux_1, aux_2, tmp__trace) <@ _poly_add2 (param_28,
+    (BArray512.init_arr (W8.of_int 255)), param_27,
     (BArray512.init_arr (W8.of_int 255)));
     result_13 <- aux_1;
     b_result_5 <- aux_2;
@@ -46816,10 +46660,10 @@ module M = {
     trace___indcpa_enc <-
     (trace___indcpa_enc ++ [(Assert, (BArray512.is_init b_result_5 0 512))]);
     v <- result_13;
-    param_28 <- v;
-    param_27 <- k;
-    (aux_1, aux_2, tmp__trace) <@ _poly_add2 (param_28,
-    (BArray512.init_arr (W8.of_int 255)), param_27,
+    param_30 <- v;
+    param_29 <- k;
+    (aux_1, aux_2, tmp__trace) <@ _poly_add2 (param_30,
+    (BArray512.init_arr (W8.of_int 255)), param_29,
     (BArray512.init_arr (W8.of_int 255)));
     result_14 <- aux_1;
     b_result_4 <- aux_2;
@@ -46827,8 +46671,8 @@ module M = {
     trace___indcpa_enc <-
     (trace___indcpa_enc ++ [(Assert, (BArray512.is_init b_result_4 0 512))]);
     v <- result_14;
-    param_29 <- bp;
-    (aux, aux_0, tmp__trace) <@ __polyvec_reduce (param_29,
+    param_31 <- bp;
+    (aux, aux_0, tmp__trace) <@ __polyvec_reduce (param_31,
     (BArray1024.init_arr (W8.of_int 255)));
     result_15 <- aux;
     b_result_3 <- aux_0;
@@ -46837,8 +46681,8 @@ module M = {
     (trace___indcpa_enc ++
     [(Assert, (BArray1024.is_init b_result_3 0 1024))]);
     bp <- result_15;
-    param_30 <- v;
-    (aux_1, aux_2, tmp__trace) <@ __poly_reduce (param_30,
+    param_32 <- v;
+    (aux_1, aux_2, tmp__trace) <@ __poly_reduce (param_32,
     (BArray512.init_arr (W8.of_int 255)));
     result_16 <- aux_1;
     b_result_2 <- aux_2;
@@ -46849,10 +46693,10 @@ module M = {
     (* Erased call to unspill *)
     ms <- (init_msf);
     b_param_0 <- (SBArray768_640.get_sub8 b_ct 0);
-    param_32 <- (SBArray768_640.get_sub8 ct 0);
-    param_31 <- bp;
-    (result_17, b_result_1, tmp__trace) <@ __i_polyvec_compress (param_32,
-    b_param_0, param_31, (BArray1024.init_arr (W8.of_int 255)));
+    param_34 <- (SBArray768_640.get_sub8 ct 0);
+    param_33 <- bp;
+    (result_17, b_result_1, tmp__trace) <@ __i_polyvec_compress (param_34,
+    b_param_0, param_33, (BArray1024.init_arr (W8.of_int 255)));
     trace___indcpa_enc <- (trace___indcpa_enc ++ tmp__trace);
     trace___indcpa_enc <-
     (trace___indcpa_enc ++ [(Assert, (BArray640.is_init b_result_1 0 640))]);
@@ -46860,10 +46704,10 @@ module M = {
     (SBArray768_640.set_sub8 b_ct 0 (BArray640.init_arr (W8.of_int 255)));
     ct <- (SBArray768_640.set_sub8 ct 0 result_17);
     b_param <- (SBArray768_128.get_sub8 b_ct 640);
-    param_34 <- (SBArray768_128.get_sub8 ct 640);
-    param_33 <- v;
-    (aux_11, aux_12, aux_1, aux_2, tmp__trace) <@ _i_poly_compress (param_34,
-    b_param, param_33, (BArray512.init_arr (W8.of_int 255)));
+    param_36 <- (SBArray768_128.get_sub8 ct 640);
+    param_35 <- v;
+    (aux_11, aux_12, aux_1, aux_2, tmp__trace) <@ _i_poly_compress (param_36,
+    b_param, param_35, (BArray512.init_arr (W8.of_int 255)));
     result_19 <- aux_11;
     b_result_0 <- aux_12;
     result_18 <- aux_1;
@@ -46903,20 +46747,21 @@ module M = {
     var result_1:BArray1024.t;
     var param_4:BArray1024.t;
     var result_2:BArray1024.t;
-    var param_5:BArray1024.t;
+    var param_5:int;
     var param_6:BArray1024.t;
-    var param_7:BArray512.t;
-    var result_3:BArray512.t;
+    var param_7:BArray1024.t;
     var param_8:BArray512.t;
-    var result_4:BArray512.t;
+    var result_3:BArray512.t;
     var param_9:BArray512.t;
+    var result_4:BArray512.t;
     var param_10:BArray512.t;
     var param_11:BArray512.t;
-    var result_5:BArray512.t;
     var param_12:BArray512.t;
-    var result_6:BArray512.t;
+    var result_5:BArray512.t;
     var param_13:BArray512.t;
-    var param_14:BArray32.t;
+    var result_6:BArray512.t;
+    var param_14:BArray512.t;
+    var param_15:BArray32.t;
     var result_7:BArray512.t;
     var result_8:BArray32.t;
     var b_mp:BArray512.t;
@@ -46968,7 +46813,6 @@ module M = {
     param_2 <- witness;
     param_3 <- witness;
     param_4 <- witness;
-    param_5 <- witness;
     param_6 <- witness;
     param_7 <- witness;
     param_8 <- witness;
@@ -46978,6 +46822,7 @@ module M = {
     param_12 <- witness;
     param_13 <- witness;
     param_14 <- witness;
+    param_15 <- witness;
     result <- witness;
     result_0 <- witness;
     result_1 <- witness;
@@ -47045,20 +46890,21 @@ module M = {
     [(Assert, (BArray1024.is_init b_result_5 0 1024))]);
     bp <- result_2;
     b_param_1 <- b_t;
-    param_7 <- t;
-    param_6 <- skpv;
-    param_5 <- bp;
-    (aux_1, aux_2, tmp__trace) <@ __polyvec_pointwise_acc (param_7,
-    b_param_1, param_6, (BArray1024.init_arr (W8.of_int 255)), param_5,
-    (BArray1024.init_arr (W8.of_int 255)));
+    param_8 <- t;
+    param_7 <- skpv;
+    param_6 <- bp;
+    param_5 <- 1;
+    (aux_1, aux_2, tmp__trace) <@ __polyvec_pointwise_acc (param_8,
+    b_param_1, param_7, (BArray1024.init_arr (W8.of_int 255)), param_6,
+    (BArray1024.init_arr (W8.of_int 255)), param_5);
     result_3 <- aux_1;
     b_result_4 <- aux_2;
     trace___indcpa_dec <- (trace___indcpa_dec ++ tmp__trace);
     trace___indcpa_dec <-
     (trace___indcpa_dec ++ [(Assert, (BArray512.is_init b_result_4 0 512))]);
     t <- result_3;
-    param_8 <- t;
-    (aux_1, aux_2, tmp__trace) <@ _poly_invntt (param_8,
+    param_9 <- t;
+    (aux_1, aux_2, tmp__trace) <@ _poly_invntt (param_9,
     (BArray512.init_arr (W8.of_int 255)));
     result_4 <- aux_1;
     b_result_3 <- aux_2;
@@ -47067,11 +46913,11 @@ module M = {
     (trace___indcpa_dec ++ [(Assert, (BArray512.is_init b_result_3 0 512))]);
     t <- result_4;
     b_param_0 <- b_mp;
-    param_11 <- mp;
-    param_10 <- v;
-    param_9 <- t;
-    (aux_1, aux_2, tmp__trace) <@ _poly_sub (param_11, b_param_0, param_10,
-    (BArray512.init_arr (W8.of_int 255)), param_9,
+    param_12 <- mp;
+    param_11 <- v;
+    param_10 <- t;
+    (aux_1, aux_2, tmp__trace) <@ _poly_sub (param_12, b_param_0, param_11,
+    (BArray512.init_arr (W8.of_int 255)), param_10,
     (BArray512.init_arr (W8.of_int 255)));
     result_5 <- aux_1;
     b_result_2 <- aux_2;
@@ -47079,8 +46925,8 @@ module M = {
     trace___indcpa_dec <-
     (trace___indcpa_dec ++ [(Assert, (BArray512.is_init b_result_2 0 512))]);
     mp <- result_5;
-    param_12 <- mp;
-    (aux_1, aux_2, tmp__trace) <@ __poly_reduce (param_12,
+    param_13 <- mp;
+    (aux_1, aux_2, tmp__trace) <@ __poly_reduce (param_13,
     (BArray512.init_arr (W8.of_int 255)));
     result_6 <- aux_1;
     b_result_1 <- aux_2;
@@ -47089,10 +46935,10 @@ module M = {
     (trace___indcpa_dec ++ [(Assert, (BArray512.is_init b_result_1 0 512))]);
     mp <- result_6;
     b_param <- b_msgp;
-    param_14 <- msgp;
-    param_13 <- mp;
-    (aux_3, aux_4, aux_1, aux_2, tmp__trace) <@ _i_poly_tomsg (param_14,
-    b_param, param_13, (BArray512.init_arr (W8.of_int 255)));
+    param_15 <- msgp;
+    param_14 <- mp;
+    (aux_3, aux_4, aux_1, aux_2, tmp__trace) <@ _i_poly_tomsg (param_15,
+    b_param, param_14, (BArray512.init_arr (W8.of_int 255)));
     result_8 <- aux_3;
     b_result_0 <- aux_4;
     result_7 <- aux_1;
@@ -55301,33 +55147,26 @@ op _poly_csubq_spec _rp _b_rp =
    (((_b_rp = b_rp) /\ (_rp = rp)) /\ (BArray512.is_init _b_rp 0 512)) ==>
    ((BArray512.is_init res.`2 0 512) /\ (valid res.`3))].
 
-op __w256_interleave_u16_spec _al _ah =
-   hoare [M.__w256_interleave_u16 :
-   (((_ah = ah) /\ (_al = al)) /\ true) ==> (true /\ (valid res.`3))].
-
-op __w256_deinterleave_u16_spec __zero _a0 _a1 =
-   hoare [M.__w256_deinterleave_u16 :
-   (((_a1 = a1) /\ ((_a0 = a0) /\ (__zero = _zero))) /\ true) ==>
-   (true /\ (valid res.`3))].
-
-op __mont_red_spec _lo _hi _qx16 _qinvx16 =
-   hoare [M.__mont_red :
-   (((_qinvx16 = qinvx16) /\ ((_qx16 = qx16) /\ ((_hi = hi) /\ (_lo = lo)))) /\
-   true) ==> (true /\ (valid res.`2))].
-
-op __wmul_16u16_spec _x _y =
-   hoare [M.__wmul_16u16 :
-   (((_y = y) /\ (_x = x)) /\ true) ==> (true /\ (valid res.`3))].
-
-op __schoolbook16x_spec _are _aim _bre _bim _zeta _zetaqinv _qx16 _qinvx16 _sign =
-   hoare [M.__schoolbook16x :
+op __basemul16x_spec _a _b _c _d _zeta _zetaqinv _qx16 _qinvx16 _sign =
+   hoare [M.__basemul16x :
    (((_sign = sign) /\
     ((_qinvx16 = qinvx16) /\
     ((_qx16 = qx16) /\
     ((_zetaqinv = zetaqinv) /\
-    ((_zeta = zeta_0) /\
-    ((_bim = bim) /\ ((_bre = bre) /\ ((_aim = aim) /\ (_are = are))))))))) /\
+    ((_zeta = zeta_0) /\ ((_d = d) /\ ((_c = c) /\ ((_b = b) /\ (_a = a))))))))) /\
    true) ==> (true /\ (valid res.`3))].
+
+op __poly_basemul_body_spec _rp _b_rp _ap _b_ap _bp _b_bp _acc =
+   hoare [M.__poly_basemul_body :
+   (((_acc = acc) /\
+    ((_b_bp = b_bp) /\
+    ((_bp = bp) /\
+    ((_b_ap = b_ap) /\ ((_ap = ap) /\ ((_b_rp = b_rp) /\ (_rp = rp))))))) /\
+   (true /\
+   (((BArray512.is_init _b_ap 0 (32 * 16)) /\
+    (BArray512.is_init _b_bp 0 (32 * 16))) /\
+   (BArray512.is_init _b_rp 0 ((_acc <> 0) ? (32 * 16) : 0))))) ==>
+   ((BArray512.is_init res.`2 0 (32 * 16)) /\ (valid res.`3))].
 
 op _poly_basemul_spec _rp _b_rp _ap _b_ap _bp _b_bp =
    hoare [M._poly_basemul :
@@ -55336,6 +55175,26 @@ op _poly_basemul_spec _rp _b_rp _ap _b_ap _bp _b_bp =
     ((_b_ap = b_ap) /\ ((_ap = ap) /\ ((_b_rp = b_rp) /\ (_rp = rp)))))) /\
    ((BArray512.is_init _b_ap 0 (32 * 16)) /\
    (BArray512.is_init _b_bp 0 (32 * 16)))) ==>
+   ((BArray512.is_init res.`2 0 (32 * 16)) /\ (valid res.`3))].
+
+op _poly_basemul_acc_spec _rp _b_rp _ap _b_ap _bp _b_bp =
+   hoare [M._poly_basemul_acc :
+   (((_b_bp = b_bp) /\
+    ((_bp = bp) /\
+    ((_b_ap = b_ap) /\ ((_ap = ap) /\ ((_b_rp = b_rp) /\ (_rp = rp)))))) /\
+   (((BArray512.is_init _b_ap 0 (32 * 16)) /\
+    (BArray512.is_init _b_bp 0 (32 * 16))) /\
+   (BArray512.is_init _b_rp 0 (32 * 16)))) ==>
+   ((BArray512.is_init res.`2 0 (32 * 16)) /\ (valid res.`3))].
+
+op _poly_basemul_acc_red_spec _rp _b_rp _ap _b_ap _bp _b_bp =
+   hoare [M._poly_basemul_acc_red :
+   (((_b_bp = b_bp) /\
+    ((_bp = bp) /\
+    ((_b_ap = b_ap) /\ ((_ap = ap) /\ ((_b_rp = b_rp) /\ (_rp = rp)))))) /\
+   (((BArray512.is_init _b_ap 0 (32 * 16)) /\
+    (BArray512.is_init _b_bp 0 (32 * 16))) /\
+   (BArray512.is_init _b_rp 0 (32 * 16)))) ==>
    ((BArray512.is_init res.`2 0 (32 * 16)) /\ (valid res.`3))].
 
 op _i_poly_frombytes_spec _rp _b_rp _ap _b_ap =
@@ -55520,10 +55379,11 @@ op __i_polyvec_tobytes_spec _r _b_r _a _b_a =
    (BArray1024.is_init _b_a 0 (2 * (2 * 256)))) ==>
    ((BArray768.is_init res.`2 0 (2 * 384)) /\ (valid res.`3))].
 
-op __polyvec_pointwise_acc_spec _r _b_r _a _b_a _b _b_b =
+op __polyvec_pointwise_acc_spec _r _b_r _a _b_a _b _b_b _red =
    hoare [M.__polyvec_pointwise_acc :
-   (((_b_b = b_b) /\
-    ((_b = b) /\ ((_b_a = b_a) /\ ((_a = a) /\ ((_b_r = b_r) /\ (_r = r)))))) /\
+   (((_red = red) /\
+    ((_b_b = b_b) /\
+    ((_b = b) /\ ((_b_a = b_a) /\ ((_a = a) /\ ((_b_r = b_r) /\ (_r = r))))))) /\
    ((BArray1024.is_init _b_a 0 ((2 * 256) * 2)) /\
    (BArray1024.is_init _b_b 0 ((2 * 256) * 2)))) ==>
    ((BArray512.is_init res.`2 0 (256 * 2)) /\ (valid res.`3))].
