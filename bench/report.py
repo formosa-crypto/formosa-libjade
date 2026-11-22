@@ -34,6 +34,10 @@ BACKEND_ORDER = ["jasmin", "mlkem-native", "mldsa-native", "pqcrystals",
 # operation order per kind, keyed by a signature operation present in the data
 OPS = {"keypair": ["keypair", "encaps", "decaps"],   # KEM
        "keygen": ["keygen", "sign", "verify"]}       # SIG
+# what the bench adapter of a backend adds to its library, per operation: the
+# FIPS 203 key checks, which pq-crystals does not perform
+ADDED = {(b, op): "key checks"
+         for b in ("pqcrystals", "pqcrystals-ref") for op in ("encaps", "decaps")}
 
 
 def load(stream):
@@ -82,6 +86,12 @@ def ops_of(scheme_data):
     return sorted(present)
 
 
+def shown(backend, ops):
+    """Backend name, with what its adapter adds for these operations."""
+    added = sorted({ADDED[backend, op] for op in ops if (backend, op) in ADDED})
+    return " + ".join([backend] + added)
+
+
 def cell(samples):
     """Median cycles, with the half-range of the passes when there are several."""
     if not samples:
@@ -97,13 +107,13 @@ def table(scheme_data, backends, ops):
            "|" + "---|" + "--:|" * len(ops)]
     for b in backends:
         cells = [cell(scheme_data[b].get(op, [])) for op in ops]
-        out.append(f"| {b} | " + " | ".join(cells) + " |")
+        out.append(f"| {shown(b, ops)} | " + " | ".join(cells) + " |")
     return "\n".join(out)
 
 
 def chart(scheme, op, scheme_data, backends):
     vals = [median(scheme_data[b].get(op, [])) for b in backends]
-    xs = ", ".join(f'"{b}"' for b in backends)
+    xs = ", ".join(f'"{shown(b, [op])}"' for b in backends)
     ys = ", ".join(str(v) for v in vals)
     # anchor the axis at 0 so bars are proportional; mermaid otherwise scales to
     # [min, max] and exaggerates small differences
@@ -129,6 +139,14 @@ def render(data, order, exclude, require, versions):
           "across backends. With several passes, "
           "each cell is the median of the per-pass medians, ± half their range.",
           ""]
+    if any((b, op) in ADDED for s in order for b, ops in data[s].items()
+           if b not in exclude for op in ops):
+        md += ["ML-KEM encaps and decaps include the FIPS 203 key checks "
+               "(modulus check of the encapsulation key, hash check of the "
+               "decapsulation key) in every backend. pq-crystals does not "
+               "perform them: its bench adapter adds them, built from the "
+               "library's own functions (`+ key checks`).",
+               ""]
     if versions:
         md += [versions_table(versions), ""]
     for scheme in order:
