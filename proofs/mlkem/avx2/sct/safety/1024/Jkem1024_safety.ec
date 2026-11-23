@@ -9,17 +9,17 @@ from Jasmin require import Jcheck JSafety.
 require import
 Array1 Array2 Array4 Array5 Array6 Array7 Array8 Array16 Array24 Array25
 Array32 Array33 Array40 Array64 Array128 Array160 Array192 Array200 Array224
-Array256 Array384 Array400 Array512 Array536 Array800 Array1024 Array1410
-Array1536 Array1568 Array1600 Array2048 Array2144 Array3168 Array4096
-Array8192 WArray16 WArray32 WArray64 WArray192 WArray256 WArray800 WArray2048
-BArray1 BArray2 BArray4 BArray8 BArray16 BArray32 BArray33 BArray40 BArray64
-BArray128 BArray160 BArray192 BArray200 BArray224 BArray256 BArray384
-BArray512 BArray536 BArray800 BArray1410 BArray1536 BArray1568 BArray1600
-BArray2048 BArray2144 BArray3168 BArray8192 SBArray4_1 SBArray8_2
-SBArray64_32 SBArray3168_32 SBArray128_128 SBArray1568_160 SBArray536_200
-SBArray1536_384 SBArray2048_512 SBArray8192_512 SBArray2144_536
-SBArray1568_1410 SBArray1568_1536 SBArray3168_1536 SBArray3168_1568
-SBArray8192_2048.
+Array256 Array368 Array384 Array400 Array512 Array536 Array736 Array800
+Array1024 Array1410 Array1536 Array1568 Array1600 Array2048 Array2144
+Array3168 Array4096 Array8192 WArray16 WArray32 WArray64 WArray192 WArray256
+WArray800 WArray2048 BArray1 BArray2 BArray4 BArray8 BArray16 BArray32
+BArray33 BArray40 BArray64 BArray128 BArray160 BArray192 BArray200 BArray224
+BArray256 BArray384 BArray512 BArray536 BArray736 BArray800 BArray1410
+BArray1536 BArray1568 BArray1600 BArray2048 BArray2144 BArray3168 BArray8192
+SBArray4_1 SBArray8_2 SBArray64_32 SBArray3168_32 SBArray128_128
+SBArray1568_160 SBArray536_200 SBArray1536_384 SBArray2048_512
+SBArray8192_512 SBArray2144_536 SBArray1568_1410 SBArray1568_1536
+SBArray3168_1536 SBArray3168_1568 SBArray8192_2048.
 
 abbrev  sample_shuffle_table =
 (BArray2048.of_list8
@@ -44442,16 +44442,16 @@ module M = {
     b_r <- (BArray2048.init_arr (W8.of_int 255));
     return (r, b_r, trace___i_polyvec_decompress);
   }
-  proc __gen_matrix_buf_rejection_filter48 (pol:BArray512.t,
-                                            b_pol:BArray512.t, counter:W64.t,
+  proc __gen_matrix_buf_rejection_filter48 (pol:BArray736.t,
+                                            b_pol:BArray736.t, counter:W64.t,
                                             buf:BArray536.t,
                                             b_buf:BArray536.t,
                                             buf_offset:W64.t,
                                             load_shuffle:W256.t, mask:W256.t,
                                             bounds:W256.t, sst:BArray2048.t,
                                             b_sst:BArray2048.t, ones:W256.t,
-                                            ms:W64.t) : BArray512.t *
-                                                        BArray512.t * W64.t *
+                                            ms:W64.t) : BArray736.t *
+                                                        BArray736.t * W64.t *
                                                         trace = {
     var f0:W256.t;
     var f1:W256.t;
@@ -44495,8 +44495,8 @@ module M = {
      (((((((BArray536.is_init b_buf 0 536) /\
           (BArray2048.is_init b_sst 0 2048)) /\
          (0 <= (W64.to_uint counter))) /\
-        (((W64.to_uint counter) + 32) <= 256)) /\
-       (BArray512.is_init b_pol 0 ((W64.to_uint counter) * 2))) /\
+        (((W64.to_uint counter) + 32) <= 368)) /\
+       (BArray736.is_init b_pol 0 ((W64.to_uint counter) * 2))) /\
       (0 <= (W64.to_uint buf_offset))) /\
      ((((W64.to_uint buf_offset) + 24) + 32) <= 536)))]);
     trace___gen_matrix_buf_rejection_filter48 <-
@@ -44585,145 +44585,60 @@ module M = {
     (trace___gen_matrix_buf_rejection_filter48 ++
     [(Assert,
      ((0 <= (W64.to_uint ((W64.of_int 2) * counter))) /\
-     (((W64.to_uint ((W64.of_int 2) * counter)) + 16) <= 512)))]);
+     (((W64.to_uint ((W64.of_int 2) * counter)) + 16) <= 736)))]);
     b_pol <-
-    (BArray512.set128d b_pol (W64.to_uint ((W64.of_int 2) * counter))
+    (BArray736.set128d b_pol (W64.to_uint ((W64.of_int 2) * counter))
     (W128.of_int 340282366920938463463374607431768211455));
     pol <-
-    (BArray512.set128d pol (W64.to_uint ((W64.of_int 2) * counter))
+    (BArray736.set128d pol (W64.to_uint ((W64.of_int 2) * counter))
     (truncateu128 f0));
     trace___gen_matrix_buf_rejection_filter48 <-
     (trace___gen_matrix_buf_rejection_filter48 ++
     [(Assert,
      ((0 <= (W64.to_uint ((W64.of_int 2) * t0_0))) /\
-     (((W64.to_uint ((W64.of_int 2) * t0_0)) + 16) <= 512)))]);
+     (((W64.to_uint ((W64.of_int 2) * t0_0)) + 16) <= 736)))]);
     b_pol <-
-    (BArray512.set128d b_pol (W64.to_uint ((W64.of_int 2) * t0_0))
+    (BArray736.set128d b_pol (W64.to_uint ((W64.of_int 2) * t0_0))
     (W128.of_int 340282366920938463463374607431768211455));
     pol <-
-    (BArray512.set128d pol (W64.to_uint ((W64.of_int 2) * t0_0))
+    (BArray736.set128d pol (W64.to_uint ((W64.of_int 2) * t0_0))
     (VEXTRACTI128 f0 (W8.of_int 1)));
     trace___gen_matrix_buf_rejection_filter48 <-
     (trace___gen_matrix_buf_rejection_filter48 ++
     [(Assert,
      ((0 <= (W64.to_uint ((W64.of_int 2) * t0_1))) /\
-     (((W64.to_uint ((W64.of_int 2) * t0_1)) + 16) <= 512)))]);
+     (((W64.to_uint ((W64.of_int 2) * t0_1)) + 16) <= 736)))]);
     b_pol <-
-    (BArray512.set128d b_pol (W64.to_uint ((W64.of_int 2) * t0_1))
+    (BArray736.set128d b_pol (W64.to_uint ((W64.of_int 2) * t0_1))
     (W128.of_int 340282366920938463463374607431768211455));
     pol <-
-    (BArray512.set128d pol (W64.to_uint ((W64.of_int 2) * t0_1))
+    (BArray736.set128d pol (W64.to_uint ((W64.of_int 2) * t0_1))
     (truncateu128 f1));
     trace___gen_matrix_buf_rejection_filter48 <-
     (trace___gen_matrix_buf_rejection_filter48 ++
     [(Assert,
      ((0 <= (W64.to_uint ((W64.of_int 2) * t1_0))) /\
-     (((W64.to_uint ((W64.of_int 2) * t1_0)) + 16) <= 512)))]);
+     (((W64.to_uint ((W64.of_int 2) * t1_0)) + 16) <= 736)))]);
     b_pol <-
-    (BArray512.set128d b_pol (W64.to_uint ((W64.of_int 2) * t1_0))
+    (BArray736.set128d b_pol (W64.to_uint ((W64.of_int 2) * t1_0))
     (W128.of_int 340282366920938463463374607431768211455));
     pol <-
-    (BArray512.set128d pol (W64.to_uint ((W64.of_int 2) * t1_0))
+    (BArray736.set128d pol (W64.to_uint ((W64.of_int 2) * t1_0))
     (VEXTRACTI128 f1 (W8.of_int 1)));
     counter <- t1_1;
     return (pol, b_pol, counter, trace___gen_matrix_buf_rejection_filter48);
   }
-  proc __write_u128_boundchk (pol:BArray512.t, b_pol:BArray512.t, ctr:W64.t,
-                              data:W128.t, ms:W64.t) : BArray512.t *
-                                                       BArray512.t * W64.t *
-                                                       trace = {
-    var condition_8:bool;
-    var data_u64:W64.t;
-    var condition_4:bool;
-    var condition_2:bool;
-    var condition_1:bool;
-    var trace___write_u128_boundchk:trace;
-    trace___write_u128_boundchk <- [];
-    trace___write_u128_boundchk <-
-    (trace___write_u128_boundchk ++
-    [(Assert, (BArray512.is_init b_pol 0 (2 * (W64.to_uint ctr))))]);
-    condition_8 <- (ctr \ule (W64.of_int 248));
-    if (condition_8) {
-      ms <- (update_msf condition_8 ms);
-      trace___write_u128_boundchk <-
-      (trace___write_u128_boundchk ++
-      [(Assert,
-       ((0 <= (2 * (W64.to_uint ctr))) /\
-       (((2 * (W64.to_uint ctr)) + 16) <= 512)))]);
-      b_pol <-
-      (BArray512.set128d b_pol (2 * (W64.to_uint ctr))
-      (W128.of_int 340282366920938463463374607431768211455));
-      pol <- (BArray512.set128d pol (2 * (W64.to_uint ctr)) data);
-    } else {
-      ms <- (update_msf (! condition_8) ms);
-      data_u64 <- (MOVV_64 (truncateu64 data));
-      condition_4 <- (ctr \ule (W64.of_int 252));
-      if (condition_4) {
-        ms <- (update_msf condition_4 ms);
-        trace___write_u128_boundchk <-
-        (trace___write_u128_boundchk ++
-        [(Assert,
-         ((0 <= (2 * (W64.to_uint ctr))) /\
-         (((2 * (W64.to_uint ctr)) + 8) <= 512)))]);
-        b_pol <-
-        (BArray512.set64d b_pol (2 * (W64.to_uint ctr))
-        (W64.of_int 18446744073709551615));
-        pol <- (BArray512.set64d pol (2 * (W64.to_uint ctr)) data_u64);
-        data_u64 <- (VPEXTR_64 data (W8.of_int 1));
-        ctr <- (ctr + (W64.of_int 4));
-      } else {
-        ms <- (update_msf (! condition_4) ms);
-      }
-      condition_2 <- (ctr \ule (W64.of_int 254));
-      if (condition_2) {
-        ms <- (update_msf condition_2 ms);
-        trace___write_u128_boundchk <-
-        (trace___write_u128_boundchk ++
-        [(Assert,
-         ((0 <= (2 * (W64.to_uint ctr))) /\
-         (((2 * (W64.to_uint ctr)) + 4) <= 512)))]);
-        b_pol <-
-        (BArray512.set32d b_pol (2 * (W64.to_uint ctr))
-        (W32.of_int 4294967295));
-        pol <-
-        (BArray512.set32d pol (2 * (W64.to_uint ctr)) (truncateu32 data_u64));
-        data_u64 <- (data_u64 `>>` (W8.of_int 32));
-        ctr <- (ctr + (W64.of_int 2));
-      } else {
-        ms <- (update_msf (! condition_2) ms);
-      }
-      condition_1 <- (ctr \ule (W64.of_int 255));
-      if (condition_1) {
-        ms <- (update_msf condition_1 ms);
-        trace___write_u128_boundchk <-
-        (trace___write_u128_boundchk ++
-        [(Assert,
-         ((0 <= (2 * (W64.to_uint ctr))) /\
-         (((2 * (W64.to_uint ctr)) + 2) <= 512)))]);
-        b_pol <-
-        (BArray512.set16d b_pol (2 * (W64.to_uint ctr)) (W16.of_int 65535));
-        pol <-
-        (BArray512.set16d pol (2 * (W64.to_uint ctr)) (truncateu16 data_u64));
-      } else {
-        ms <- (update_msf (! condition_1) ms);
-      }
-    }
-    return (pol, b_pol, ms, trace___write_u128_boundchk);
-  }
-  proc __gen_matrix_buf_rejection_filter24 (pol:BArray512.t,
-                                            b_pol:BArray512.t, counter:W64.t,
+  proc __gen_matrix_buf_rejection_filter24 (pol:BArray736.t,
+                                            b_pol:BArray736.t, counter:W64.t,
                                             buf:BArray536.t,
                                             b_buf:BArray536.t,
                                             buf_offset:W64.t,
                                             load_shuffle:W256.t, mask:W256.t,
                                             bounds:W256.t, sst:BArray2048.t,
                                             b_sst:BArray2048.t, ones:W256.t,
-                                            ms:W64.t) : BArray512.t *
-                                                        BArray512.t * W64.t *
-                                                        W64.t * trace = {
-    var aux:BArray512.t;
-    var aux_0:BArray512.t;
-    var aux_1:W64.t;
+                                            ms:W64.t) : BArray736.t *
+                                                        BArray736.t * W64.t *
+                                                        trace = {
     var f0:W256.t;
     var g0:W256.t;
     var g1:W256.t;
@@ -44733,23 +44648,6 @@ module M = {
     var t0_1:W64.t;
     var shuffle_0_1:W128.t;
     var shuffle_t:W256.t;
-    var t128:W128.t;
-    var param:W64.t;
-    var param_0:W128.t;
-    var param_1:W64.t;
-    var param_2:BArray512.t;
-    var result:W64.t;
-    var result_0:BArray512.t;
-    var param_3:W64.t;
-    var param_4:W128.t;
-    var param_5:W64.t;
-    var param_6:BArray512.t;
-    var result_1:W64.t;
-    var result_2:BArray512.t;
-    var b_result:BArray512.t;
-    var b_param:BArray512.t;
-    var b_result_0:BArray512.t;
-    var b_param_0:BArray512.t;
     var  _0:bool;
     var  _1:bool;
     var  _2:bool;
@@ -44761,14 +44659,6 @@ module M = {
     var  _8:bool;
     var  _9:bool;
     var trace___gen_matrix_buf_rejection_filter24:trace;
-    b_param <- witness;
-    b_param_0 <- witness;
-    b_result <- witness;
-    b_result_0 <- witness;
-    param_2 <- witness;
-    param_6 <- witness;
-    result_0 <- witness;
-    result_2 <- witness;
     trace___gen_matrix_buf_rejection_filter24 <- [];
     trace___gen_matrix_buf_rejection_filter24 <-
     (trace___gen_matrix_buf_rejection_filter24 ++
@@ -44776,10 +44666,10 @@ module M = {
      (((((((BArray536.is_init b_buf 0 536) /\
           (BArray2048.is_init b_sst 0 2048)) /\
          (0 <= (W64.to_uint counter))) /\
-        ((W64.to_uint counter) < 256)) /\
-       (0 <= (W64.to_uint buf_offset))) /\
-      (((W64.to_uint buf_offset) + 32) < 536)) /\
-     (BArray512.is_init b_pol 0 ((W64.to_uint counter) * 2))))]);
+        (((W64.to_uint counter) + 16) <= 368)) /\
+       (BArray736.is_init b_pol 0 ((W64.to_uint counter) * 2))) /\
+      (0 <= (W64.to_uint buf_offset))) /\
+     (((W64.to_uint buf_offset) + 32) <= 536)))]);
     trace___gen_matrix_buf_rejection_filter24 <-
     (trace___gen_matrix_buf_rejection_filter24 ++
     [(Assert,
@@ -44823,65 +44713,44 @@ module M = {
     shuffle_t <- (VPADD_32u8 shuffle_0 ones);
     shuffle_0 <- (VPUNPCKL_32u8 shuffle_0 shuffle_t);
     f0 <- (VPSHUFB_256 f0 shuffle_0);
-    t128 <- (truncateu128 f0);
-    b_param_0 <- b_pol;
-    param_2 <- pol;
-    param_1 <- counter;
-    param_0 <- t128;
-    param <- ms;
-    (aux, aux_0, aux_1, tmp__trace) <@ __write_u128_boundchk (param_2,
-    b_param_0, param_1, param_0, param);
-    result_0 <- aux;
-    b_result_0 <- aux_0;
-    result <- aux_1;
-    trace___gen_matrix_buf_rejection_filter24 <-
-    (trace___gen_matrix_buf_rejection_filter24 ++ tmp__trace);
     trace___gen_matrix_buf_rejection_filter24 <-
     (trace___gen_matrix_buf_rejection_filter24 ++
     [(Assert,
-     (BArray512.is_init b_result_0 0 ((2 * (W64.to_uint param_1)) + 16)))]);
-    b_pol <- b_result_0;
-    pol <- result_0;
-    ms <- result;
-    t128 <- (VEXTRACTI128 f0 (W8.of_int 1));
-    b_param <- b_pol;
-    param_6 <- pol;
-    param_5 <- t0_0;
-    param_4 <- t128;
-    param_3 <- ms;
-    (aux, aux_0, aux_1, tmp__trace) <@ __write_u128_boundchk (param_6,
-    b_param, param_5, param_4, param_3);
-    result_2 <- aux;
-    b_result <- aux_0;
-    result_1 <- aux_1;
-    trace___gen_matrix_buf_rejection_filter24 <-
-    (trace___gen_matrix_buf_rejection_filter24 ++ tmp__trace);
+     ((0 <= (W64.to_uint ((W64.of_int 2) * counter))) /\
+     (((W64.to_uint ((W64.of_int 2) * counter)) + 16) <= 736)))]);
+    b_pol <-
+    (BArray736.set128d b_pol (W64.to_uint ((W64.of_int 2) * counter))
+    (W128.of_int 340282366920938463463374607431768211455));
+    pol <-
+    (BArray736.set128d pol (W64.to_uint ((W64.of_int 2) * counter))
+    (truncateu128 f0));
     trace___gen_matrix_buf_rejection_filter24 <-
     (trace___gen_matrix_buf_rejection_filter24 ++
     [(Assert,
-     (BArray512.is_init b_result 0 ((2 * (W64.to_uint param_5)) + 16)))]);
-    b_pol <- b_result;
-    pol <- result_2;
-    ms <- result_1;
+     ((0 <= (W64.to_uint ((W64.of_int 2) * t0_0))) /\
+     (((W64.to_uint ((W64.of_int 2) * t0_0)) + 16) <= 736)))]);
+    b_pol <-
+    (BArray736.set128d b_pol (W64.to_uint ((W64.of_int 2) * t0_0))
+    (W128.of_int 340282366920938463463374607431768211455));
+    pol <-
+    (BArray736.set128d pol (W64.to_uint ((W64.of_int 2) * t0_0))
+    (VEXTRACTI128 f0 (W8.of_int 1)));
     counter <- t0_1;
-    return (pol, b_pol, counter, ms,
-           trace___gen_matrix_buf_rejection_filter24);
+    return (pol, b_pol, counter, trace___gen_matrix_buf_rejection_filter24);
   }
-  proc _gen_matrix_buf_rejection (pol:BArray512.t, b_pol:BArray512.t,
+  proc _gen_matrix_buf_rejection (pol:BArray736.t, b_pol:BArray736.t,
                                   counter:W64.t, buf:BArray536.t,
-                                  b_buf:BArray536.t, buf_offset:W64.t) : 
-  BArray512.t * BArray512.t * W64.t * trace = {
-    var aux:BArray512.t;
-    var aux_0:BArray512.t;
+                                  b_buf:BArray536.t, buf_offset:W64.t,
+                                  ms:W64.t) : BArray736.t * BArray736.t *
+                                              W64.t * W64.t * trace = {
+    var aux:BArray736.t;
+    var aux_0:BArray736.t;
     var aux_1:W64.t;
-    var aux_2:W64.t;
-    var ms:W64.t;
     var load_shuffle:W256.t;
     var mask:W256.t;
     var bounds:W256.t;
     var ones:W256.t;
     var sst:BArray2048.t;
-    var saved_buf_offset:W64.t;
     var condition_loop:bool;
     var param:W64.t;
     var param_0:W256.t;
@@ -44892,9 +44761,9 @@ module M = {
     var param_5:W64.t;
     var param_6:BArray536.t;
     var param_7:W64.t;
-    var param_8:BArray512.t;
+    var param_8:BArray736.t;
     var result:W64.t;
-    var result_0:BArray512.t;
+    var result_0:BArray736.t;
     var param_9:W64.t;
     var param_10:W256.t;
     var param_11:BArray2048.t;
@@ -44904,14 +44773,13 @@ module M = {
     var param_15:W64.t;
     var param_16:BArray536.t;
     var param_17:W64.t;
-    var param_18:BArray512.t;
+    var param_18:BArray736.t;
     var result_1:W64.t;
-    var result_2:W64.t;
-    var result_3:BArray512.t;
-    var b_result:BArray512.t;
-    var b_param:BArray512.t;
-    var b_result_0:BArray512.t;
-    var b_param_0:BArray512.t;
+    var result_2:BArray736.t;
+    var b_result:BArray736.t;
+    var b_param:BArray736.t;
+    var b_result_0:BArray736.t;
+    var b_param_0:BArray736.t;
     var trace__gen_matrix_buf_rejection:trace;
     b_param <- witness;
     b_param_0 <- witness;
@@ -44924,121 +44792,92 @@ module M = {
     param_16 <- witness;
     param_18 <- witness;
     result_0 <- witness;
-    result_3 <- witness;
+    result_2 <- witness;
     sst <- witness;
     trace__gen_matrix_buf_rejection <- [];
     trace__gen_matrix_buf_rejection <-
     (trace__gen_matrix_buf_rejection ++
     [(Assert,
-     ((((((BArray536.is_init b_buf 0 536) /\ (0 <= (W64.to_uint counter))) /\
-        ((W64.to_uint counter) <= 256)) /\
-       (0 <= (W64.to_uint buf_offset))) /\
-      ((W64.to_uint buf_offset) < 536)) /\
-     (BArray512.is_init b_pol 0 ((W64.to_uint counter) * 2))))]);
-    ms <- (init_msf);
+     (((((((BArray536.is_init b_buf 0 536) /\ (0 <= (W64.to_uint counter))) /\
+         (0 <= (W64.to_uint buf_offset))) /\
+        ((W64.to_uint buf_offset) <= 480)) /\
+       (((W64.to_uint buf_offset) %% 48) = 0)) /\
+      (((3 * (W64.to_uint counter)) + (2 * (504 - (W64.to_uint buf_offset)))) <=
+      1104)) /\
+     (BArray736.is_init b_pol 0 ((W64.to_uint counter) * 2))))]);
     load_shuffle <- (BArray32.get256 sample_load_shuffle 0);
     mask <- sample_mask;
     bounds <- sample_q;
     ones <- sample_ones;
     sst <- sample_shuffle_table;
-    saved_buf_offset <- buf_offset;
-    buf_offset <- buf_offset;
-    condition_loop <- (buf_offset \ult (W64.of_int 457));
+    condition_loop <- (buf_offset \ult (W64.of_int 480));
     while (condition_loop) {
       ms <- (update_msf condition_loop ms);
-      condition_loop <- (counter \ult (W64.of_int 225));
-      if (condition_loop) {
-        ms <- (update_msf condition_loop ms);
-        b_param_0 <- b_pol;
-        param_8 <- pol;
-        param_7 <- counter;
-        param_6 <- buf;
-        param_5 <- buf_offset;
-        param_4 <- load_shuffle;
-        param_3 <- mask;
-        param_2 <- bounds;
-        param_1 <- sst;
-        param_0 <- ones;
-        param <- ms;
-        (aux, aux_0, aux_1, tmp__trace) <@ __gen_matrix_buf_rejection_filter48 (
-        param_8, b_param_0, param_7, param_6,
-        (BArray536.init_arr (W8.of_int 255)), param_5, param_4, param_3,
-        param_2, param_1, (BArray2048.init_arr (W8.of_int 255)), param_0,
-        param);
-        result_0 <- aux;
-        b_result_0 <- aux_0;
-        result <- aux_1;
-        trace__gen_matrix_buf_rejection <-
-        (trace__gen_matrix_buf_rejection ++ tmp__trace);
-        trace__gen_matrix_buf_rejection <-
-        (trace__gen_matrix_buf_rejection ++
-        [(Assert,
-         (((BArray512.is_init b_result_0 0 (2 * (W64.to_uint result))) /\
-          ((W64.to_uint param_7) <= (W64.to_uint result))) /\
-         ((W64.to_uint result) <= 256)))]);
-        b_pol <- b_result_0;
-        pol <- result_0;
-        counter <- result;
-        saved_buf_offset <- (saved_buf_offset + (W64.of_int 48));
-        buf_offset <- saved_buf_offset;
-        buf_offset <- (protect_64 buf_offset ms);
-      } else {
-        ms <- (update_msf (! condition_loop) ms);
-        buf_offset <- (W64.of_int 504);
-      }
-      condition_loop <- (buf_offset \ult (W64.of_int 457));
+      b_param_0 <- b_pol;
+      param_8 <- pol;
+      param_7 <- counter;
+      param_6 <- buf;
+      param_5 <- buf_offset;
+      param_4 <- load_shuffle;
+      param_3 <- mask;
+      param_2 <- bounds;
+      param_1 <- sst;
+      param_0 <- ones;
+      param <- ms;
+      (aux, aux_0, aux_1, tmp__trace) <@ __gen_matrix_buf_rejection_filter48 (
+      param_8, b_param_0, param_7, param_6,
+      (BArray536.init_arr (W8.of_int 255)), param_5, param_4, param_3,
+      param_2, param_1, (BArray2048.init_arr (W8.of_int 255)), param_0,
+      param);
+      result_0 <- aux;
+      b_result_0 <- aux_0;
+      result <- aux_1;
+      trace__gen_matrix_buf_rejection <-
+      (trace__gen_matrix_buf_rejection ++ tmp__trace);
+      trace__gen_matrix_buf_rejection <-
+      (trace__gen_matrix_buf_rejection ++
+      [(Assert,
+       (((BArray736.is_init b_result_0 0 (2 * (W64.to_uint result))) /\
+        ((W64.to_uint param_7) <= (W64.to_uint result))) /\
+       ((W64.to_uint result) <= ((W64.to_uint param_7) + 32))))]);
+      b_pol <- b_result_0;
+      pol <- result_0;
+      counter <- result;
+      buf_offset <- (buf_offset + (W64.of_int 48));
+      condition_loop <- (buf_offset \ult (W64.of_int 480));
     }
     ms <- (update_msf (! condition_loop) ms);
-    buf_offset <- saved_buf_offset;
-    buf_offset <- (protect_64 buf_offset ms);
-    condition_loop <- (buf_offset \ult (W64.of_int 481));
-    while (condition_loop) {
-      ms <- (update_msf condition_loop ms);
-      condition_loop <- (counter \ult (W64.of_int 256));
-      if (condition_loop) {
-        ms <- (update_msf condition_loop ms);
-        (* Erased call to spill *)
-        b_param <- b_pol;
-        param_18 <- pol;
-        param_17 <- counter;
-        param_16 <- buf;
-        param_15 <- buf_offset;
-        param_14 <- load_shuffle;
-        param_13 <- mask;
-        param_12 <- bounds;
-        param_11 <- sst;
-        param_10 <- ones;
-        param_9 <- ms;
-        (aux, aux_0, aux_1, aux_2, tmp__trace) <@ __gen_matrix_buf_rejection_filter24 (
-        param_18, b_param, param_17, param_16,
-        (BArray536.init_arr (W8.of_int 255)), param_15, param_14, param_13,
-        param_12, param_11, (BArray2048.init_arr (W8.of_int 255)), param_10,
-        param_9);
-        result_3 <- aux;
-        b_result <- aux_0;
-        result_2 <- aux_1;
-        result_1 <- aux_2;
-        trace__gen_matrix_buf_rejection <-
-        (trace__gen_matrix_buf_rejection ++ tmp__trace);
-        trace__gen_matrix_buf_rejection <-
-        (trace__gen_matrix_buf_rejection ++
-        [(Assert,
-         (((W64.of_int (W64.to_uint param_17)) \ule result_2) /\
-         (BArray512.is_init b_result 0 (2 * (W64.to_uint result_2)))))]);
-        b_pol <- b_result;
-        pol <- result_3;
-        counter <- result_2;
-        ms <- result_1;
-        (* Erased call to unspill *)
-        buf_offset <- (protect_64 buf_offset ms);
-        buf_offset <- (buf_offset + (W64.of_int 24));
-      } else {
-        ms <- (update_msf (! condition_loop) ms);
-        buf_offset <- (W64.of_int 504);
-      }
-      condition_loop <- (buf_offset \ult (W64.of_int 481));
-    }
-    return (pol, b_pol, counter, trace__gen_matrix_buf_rejection);
+    b_param <- b_pol;
+    param_18 <- pol;
+    param_17 <- counter;
+    param_16 <- buf;
+    param_15 <- buf_offset;
+    param_14 <- load_shuffle;
+    param_13 <- mask;
+    param_12 <- bounds;
+    param_11 <- sst;
+    param_10 <- ones;
+    param_9 <- ms;
+    (aux, aux_0, aux_1, tmp__trace) <@ __gen_matrix_buf_rejection_filter24 (
+    param_18, b_param, param_17, param_16,
+    (BArray536.init_arr (W8.of_int 255)), param_15, param_14, param_13,
+    param_12, param_11, (BArray2048.init_arr (W8.of_int 255)), param_10,
+    param_9);
+    result_2 <- aux;
+    b_result <- aux_0;
+    result_1 <- aux_1;
+    trace__gen_matrix_buf_rejection <-
+    (trace__gen_matrix_buf_rejection ++ tmp__trace);
+    trace__gen_matrix_buf_rejection <-
+    (trace__gen_matrix_buf_rejection ++
+    [(Assert,
+     (((BArray736.is_init b_result 0 (2 * (W64.to_uint result_1))) /\
+      ((W64.to_uint param_17) <= (W64.to_uint result_1))) /\
+     ((W64.to_uint result_1) <= ((W64.to_uint param_17) + 16))))]);
+    b_pol <- b_result;
+    pol <- result_2;
+    counter <- result_1;
+    return (pol, b_pol, counter, ms, trace__gen_matrix_buf_rejection);
   }
   proc gen_matrix_get_indexes (b:W64.t, _t:W64.t) : W64.t * trace = {
     var t:W64.t;
@@ -45062,110 +44901,165 @@ module M = {
     return (t, trace_gen_matrix_get_indexes);
   }
   proc __gen_matrix_fill_polynomial (pol:BArray512.t, b_pol:BArray512.t,
-                                     buf:BArray536.t, b_buf:BArray536.t) : 
-  BArray512.t * BArray512.t * BArray536.t * BArray536.t * trace = {
-    var aux:BArray512.t;
-    var aux_0:BArray512.t;
+                                     buf:BArray536.t, b_buf:BArray536.t,
+                                     ms:W64.t) : BArray512.t * BArray512.t *
+                                                 BArray536.t * BArray536.t *
+                                                 W64.t * trace = {
+    var aux:BArray736.t;
+    var aux_0:BArray736.t;
     var aux_1:W64.t;
-    var buf_offset:W64.t;
+    var aux_2:W64.t;
+    var samples_s:BArray736.t;
+    var samples:BArray736.t;
     var counter:W64.t;
+    var buf_offset:W64.t;
+    var more:bool;
+    var i:int;
+    var t:W256.t;
     var param:W64.t;
-    var param_0:BArray536.t;
-    var param_1:W64.t;
-    var param_2:BArray512.t;
+    var param_0:W64.t;
+    var param_1:BArray536.t;
+    var param_2:W64.t;
+    var param_3:BArray736.t;
     var result:W64.t;
-    var result_0:BArray512.t;
-    var param_3:BArray536.t;
-    var result_1:BArray536.t;
-    var param_4:W64.t;
-    var param_5:BArray536.t;
+    var result_0:W64.t;
+    var result_1:BArray736.t;
+    var param_4:BArray536.t;
+    var result_2:BArray536.t;
+    var param_5:W64.t;
     var param_6:W64.t;
-    var param_7:BArray512.t;
-    var result_2:W64.t;
-    var result_3:BArray512.t;
-    var b_result:BArray512.t;
-    var b_param:BArray512.t;
+    var param_7:BArray536.t;
+    var param_8:W64.t;
+    var param_9:BArray736.t;
+    var result_3:W64.t;
+    var result_4:W64.t;
+    var result_5:BArray736.t;
+    var b_samples:BArray736.t;
+    var b_result:BArray736.t;
+    var b_param:BArray736.t;
     var b_result_0:BArray536.t;
-    var b_result_1:BArray512.t;
-    var b_param_0:BArray512.t;
+    var b_result_1:BArray736.t;
+    var b_param_0:BArray736.t;
+    var b_samples_s:BArray736.t;
     var trace___gen_matrix_fill_polynomial:trace;
     b_param <- witness;
     b_param_0 <- witness;
     b_result <- witness;
     b_result_0 <- witness;
     b_result_1 <- witness;
-    param_0 <- witness;
-    param_2 <- witness;
+    b_samples <- witness;
+    b_samples_s <- witness;
+    param_1 <- witness;
     param_3 <- witness;
-    param_5 <- witness;
+    param_4 <- witness;
     param_7 <- witness;
-    result_0 <- witness;
+    param_9 <- witness;
     result_1 <- witness;
-    result_3 <- witness;
+    result_2 <- witness;
+    result_5 <- witness;
+    samples <- witness;
+    samples_s <- witness;
     trace___gen_matrix_fill_polynomial <- [];
     trace___gen_matrix_fill_polynomial <-
     (trace___gen_matrix_fill_polynomial ++
     [(Assert, (BArray536.is_init b_buf 0 536))]);
-    buf_offset <- (W64.of_int 0);
+    b_samples_s <- (BArray736.init_arr (W8.of_int 0));
+    (* Erased call to spill *)
+    b_samples <- b_samples_s;
+    samples <- samples_s;
     counter <- (W64.of_int 0);
-    b_param_0 <- b_pol;
-    param_2 <- pol;
-    param_1 <- counter;
-    param_0 <- buf;
-    param <- buf_offset;
-    (aux, aux_0, aux_1, tmp__trace) <@ _gen_matrix_buf_rejection (param_2,
-    b_param_0, param_1, param_0, (BArray536.init_arr (W8.of_int 255)),
-    param);
-    result_0 <- aux;
+    buf_offset <- (W64.of_int 0);
+    b_param_0 <- b_samples;
+    param_3 <- samples;
+    param_2 <- counter;
+    param_1 <- buf;
+    param_0 <- buf_offset;
+    param <- ms;
+    (aux, aux_0, aux_1, aux_2, tmp__trace) <@ _gen_matrix_buf_rejection (
+    param_3, b_param_0, param_2, param_1,
+    (BArray536.init_arr (W8.of_int 255)), param_0, param);
+    result_1 <- aux;
     b_result_1 <- aux_0;
-    result <- aux_1;
+    result_0 <- aux_1;
+    result <- aux_2;
     trace___gen_matrix_fill_polynomial <-
     (trace___gen_matrix_fill_polynomial ++ tmp__trace);
     trace___gen_matrix_fill_polynomial <-
     (trace___gen_matrix_fill_polynomial ++
     [(Assert,
-     (((W64.of_int (W64.to_uint param_1)) \ule result) /\
-     (BArray512.is_init b_result_1 0 (2 * (W64.to_uint result)))))]);
-    b_pol <- b_result_1;
-    pol <- result_0;
-    counter <- result;
-    buf_offset <- (W64.of_int 336);
-    while ((counter \ult (W64.of_int 256))) {
+     (((W64.of_int (W64.to_uint param_2)) \ule result_0) /\
+     (BArray736.is_init b_result_1 0 (2 * (W64.to_uint result_0)))))]);
+    b_samples <- b_result_1;
+    samples <- result_1;
+    counter <- result_0;
+    ms <- result;
+    more <- (counter \ult (W64.of_int 256));
+    while (more) {
       (* Erased call to spill *)
-      param_3 <- buf;
-      (result_1, b_result_0, tmp__trace) <@ _shake128_next_state (param_3,
+      param_4 <- buf;
+      (result_2, b_result_0, tmp__trace) <@ _shake128_next_state (param_4,
       (BArray536.init_arr (W8.of_int 255)));
       trace___gen_matrix_fill_polynomial <-
       (trace___gen_matrix_fill_polynomial ++ tmp__trace);
       trace___gen_matrix_fill_polynomial <-
       (trace___gen_matrix_fill_polynomial ++
       [(Assert, (BArray536.is_init b_result_0 0 536))]);
-      buf <- result_1;
+      buf <- result_2;
       (* Erased call to unspill *)
-      b_param <- b_pol;
-      param_7 <- pol;
-      param_6 <- counter;
-      param_5 <- buf;
-      param_4 <- buf_offset;
-      (aux, aux_0, aux_1, tmp__trace) <@ _gen_matrix_buf_rejection (param_7,
-      b_param, param_6, param_5, (BArray536.init_arr (W8.of_int 255)),
-      param_4);
-      result_3 <- aux;
+      ms <- (init_msf);
+      buf_offset <- (W64.of_int 336);
+      b_param <- b_samples;
+      param_9 <- samples;
+      param_8 <- counter;
+      param_7 <- buf;
+      param_6 <- buf_offset;
+      param_5 <- ms;
+      (aux, aux_0, aux_1, aux_2, tmp__trace) <@ _gen_matrix_buf_rejection (
+      param_9, b_param, param_8, param_7,
+      (BArray536.init_arr (W8.of_int 255)), param_6, param_5);
+      result_5 <- aux;
       b_result <- aux_0;
-      result_2 <- aux_1;
+      result_4 <- aux_1;
+      result_3 <- aux_2;
       trace___gen_matrix_fill_polynomial <-
       (trace___gen_matrix_fill_polynomial ++ tmp__trace);
       trace___gen_matrix_fill_polynomial <-
       (trace___gen_matrix_fill_polynomial ++
       [(Assert,
-       (((W64.of_int (W64.to_uint param_6)) \ule result_2) /\
-       (BArray512.is_init b_result 0 (2 * (W64.to_uint result_2)))))]);
-      b_pol <- b_result;
-      pol <- result_3;
-      counter <- result_2;
+       (((W64.of_int (W64.to_uint param_8)) \ule result_4) /\
+       (BArray736.is_init b_result 0 (2 * (W64.to_uint result_4)))))]);
+      b_samples <- b_result;
+      samples <- result_5;
+      counter <- result_4;
+      ms <- result_3;
+      more <- (counter \ult (W64.of_int 256));
+    }
+    ms <- (update_msf (! more) ms);
+    (* Erased call to unspill *)
+    b_pol <- b_pol;
+    pol <- (protect_ptr pol ms);
+    i <- 0;
+    while ((i < 16)) {
+      trace___gen_matrix_fill_polynomial <-
+      (trace___gen_matrix_fill_polynomial ++
+      [(Assert, ((0 <= (32 * i)) /\ (((32 * i) + 32) <= 736)))]);
+      trace___gen_matrix_fill_polynomial <-
+      (trace___gen_matrix_fill_polynomial ++
+      [(Assert, (BArray736.is_init b_samples (32 * i) 32))]);
+      t <- (BArray736.get256d samples (32 * i));
+      trace___gen_matrix_fill_polynomial <-
+      (trace___gen_matrix_fill_polynomial ++
+      [(Assert, ((0 <= (32 * i)) /\ (((32 * i) + 32) <= 512)))]);
+      b_pol <-
+      (BArray512.set256d b_pol (32 * i)
+      (W256.of_int
+      115792089237316195423570985008687907853269984665640564039457584007913129639935
+      ));
+      pol <- (BArray512.set256d pol (32 * i) t);
+      i <- (i + 1);
     }
     b_buf <- (BArray536.init_arr (W8.of_int 255));
-    return (pol, b_pol, buf, b_buf, trace___gen_matrix_fill_polynomial);
+    return (pol, b_pol, buf, b_buf, ms, trace___gen_matrix_fill_polynomial);
   }
   proc _gen_matrix_sample_four_polynomials (polx4:BArray2048.t,
                                             b_polx4:BArray2048.t,
@@ -45182,6 +45076,7 @@ module M = {
     var aux_6:BArray536.t;
     var aux:BArray800.t;
     var aux_0:BArray800.t;
+    var aux_7:W64.t;
     var indexes:BArray8.t;
     var state:BArray800.t;
     var stx4:BArray800.t;
@@ -45199,22 +45094,30 @@ module M = {
     var param_5:BArray800.t;
     var result_1:BArray2144.t;
     var result_2:BArray800.t;
-    var param_6:BArray536.t;
-    var param_7:BArray512.t;
-    var result_3:BArray536.t;
-    var result_4:BArray512.t;
-    var param_8:BArray536.t;
-    var param_9:BArray512.t;
-    var result_5:BArray536.t;
-    var result_6:BArray512.t;
+    var param_6:W64.t;
+    var param_7:BArray536.t;
+    var param_8:BArray512.t;
+    var result_3:W64.t;
+    var result_4:BArray536.t;
+    var result_5:BArray512.t;
+    var param_9:W64.t;
     var param_10:BArray536.t;
     var param_11:BArray512.t;
+    var result_6:W64.t;
     var result_7:BArray536.t;
     var result_8:BArray512.t;
-    var param_12:BArray536.t;
-    var param_13:BArray512.t;
-    var result_9:BArray536.t;
-    var result_10:BArray512.t;
+    var param_12:W64.t;
+    var param_13:BArray536.t;
+    var param_14:BArray512.t;
+    var result_9:W64.t;
+    var result_10:BArray536.t;
+    var result_11:BArray512.t;
+    var param_15:W64.t;
+    var param_16:BArray536.t;
+    var param_17:BArray512.t;
+    var result_12:W64.t;
+    var result_13:BArray536.t;
+    var result_14:BArray512.t;
     var b_pol:BArray512.t;
     var b_bufp:BArray536.t;
     var b_result:BArray536.t;
@@ -45277,26 +45180,26 @@ module M = {
     param_3 <- witness;
     param_4 <- witness;
     param_5 <- witness;
-    param_6 <- witness;
     param_7 <- witness;
     param_8 <- witness;
-    param_9 <- witness;
     param_10 <- witness;
     param_11 <- witness;
-    param_12 <- witness;
     param_13 <- witness;
+    param_14 <- witness;
+    param_16 <- witness;
+    param_17 <- witness;
     pol <- witness;
     result_0 <- witness;
     result_1 <- witness;
     result_2 <- witness;
-    result_3 <- witness;
     result_4 <- witness;
     result_5 <- witness;
-    result_6 <- witness;
     result_7 <- witness;
     result_8 <- witness;
-    result_9 <- witness;
     result_10 <- witness;
+    result_11 <- witness;
+    result_13 <- witness;
+    result_14 <- witness;
     state <- witness;
     stx4 <- witness;
     trace__gen_matrix_sample_four_polynomials <- [];
@@ -45361,15 +45264,17 @@ module M = {
     b_pol <- (SBArray2048_512.get_sub16 b_polx4 0);
     pol <- (SBArray2048_512.get_sub16 polx4 0);
     b_param_6 <- b_pol;
-    param_7 <- pol;
+    param_8 <- pol;
     b_param_5 <- b_bufp;
-    param_6 <- bufp;
-    (aux_3, aux_4, aux_5, aux_6, tmp__trace) <@ __gen_matrix_fill_polynomial (
-    param_7, b_param_6, param_6, b_param_5);
-    result_4 <- aux_3;
+    param_7 <- bufp;
+    param_6 <- ms;
+    (aux_3, aux_4, aux_5, aux_6, aux_7, tmp__trace) <@ __gen_matrix_fill_polynomial (
+    param_8, b_param_6, param_7, b_param_5, param_6);
+    result_5 <- aux_3;
     b_result_6 <- aux_4;
-    result_3 <- aux_5;
+    result_4 <- aux_5;
     b_result_5 <- aux_6;
+    result_3 <- aux_7;
     trace__gen_matrix_sample_four_polynomials <-
     (trace__gen_matrix_sample_four_polynomials ++ tmp__trace);
     trace__gen_matrix_sample_four_polynomials <-
@@ -45377,12 +45282,14 @@ module M = {
     [(Assert,
      ((BArray512.is_init b_result_6 0 512) /\
      (BArray536.is_init b_result_5 0 536)))]);
-    pol <- result_4;
-    bufp <- result_3;
+    pol <- result_5;
+    bufp <- result_4;
+    ms <- result_3;
     (* Erased call to unspill *)
-    ms <- (init_msf);
     b_buf <- (BArray2144.init_arr (W8.of_int 255));
     buf <- (protect_ptr buf ms);
+    b_polx4 <- b_polx4;
+    polx4 <- (protect_ptr polx4 ms);
     b_buf <-
     (SBArray2144_536.set_sub8 b_buf 0 (BArray536.init_arr (W8.of_int 255)));
     buf <- (SBArray2144_536.set_sub8 buf 0 bufp);
@@ -45396,15 +45303,17 @@ module M = {
     b_pol <- (SBArray2048_512.get_sub16 b_polx4 256);
     pol <- (SBArray2048_512.get_sub16 polx4 256);
     b_param_4 <- b_pol;
-    param_9 <- pol;
+    param_11 <- pol;
     b_param_3 <- b_bufp;
-    param_8 <- bufp;
-    (aux_3, aux_4, aux_5, aux_6, tmp__trace) <@ __gen_matrix_fill_polynomial (
-    param_9, b_param_4, param_8, b_param_3);
-    result_6 <- aux_3;
+    param_10 <- bufp;
+    param_9 <- ms;
+    (aux_3, aux_4, aux_5, aux_6, aux_7, tmp__trace) <@ __gen_matrix_fill_polynomial (
+    param_11, b_param_4, param_10, b_param_3, param_9);
+    result_8 <- aux_3;
     b_result_4 <- aux_4;
-    result_5 <- aux_5;
+    result_7 <- aux_5;
     b_result_3 <- aux_6;
+    result_6 <- aux_7;
     trace__gen_matrix_sample_four_polynomials <-
     (trace__gen_matrix_sample_four_polynomials ++ tmp__trace);
     trace__gen_matrix_sample_four_polynomials <-
@@ -45412,12 +45321,14 @@ module M = {
     [(Assert,
      ((BArray512.is_init b_result_4 0 512) /\
      (BArray536.is_init b_result_3 0 536)))]);
-    pol <- result_6;
-    bufp <- result_5;
+    pol <- result_8;
+    bufp <- result_7;
+    ms <- result_6;
     (* Erased call to unspill *)
-    ms <- (init_msf);
     b_buf <- b_buf;
     buf <- (protect_ptr buf ms);
+    b_polx4 <- b_polx4;
+    polx4 <- (protect_ptr polx4 ms);
     b_buf <-
     (SBArray2144_536.set_sub8 b_buf 536 (BArray536.init_arr (W8.of_int 255)));
     buf <- (SBArray2144_536.set_sub8 buf 536 bufp);
@@ -45431,15 +45342,17 @@ module M = {
     b_pol <- (SBArray2048_512.get_sub16 b_polx4 512);
     pol <- (SBArray2048_512.get_sub16 polx4 512);
     b_param_2 <- b_pol;
-    param_11 <- pol;
+    param_14 <- pol;
     b_param_1 <- b_bufp;
-    param_10 <- bufp;
-    (aux_3, aux_4, aux_5, aux_6, tmp__trace) <@ __gen_matrix_fill_polynomial (
-    param_11, b_param_2, param_10, b_param_1);
-    result_8 <- aux_3;
+    param_13 <- bufp;
+    param_12 <- ms;
+    (aux_3, aux_4, aux_5, aux_6, aux_7, tmp__trace) <@ __gen_matrix_fill_polynomial (
+    param_14, b_param_2, param_13, b_param_1, param_12);
+    result_11 <- aux_3;
     b_result_2 <- aux_4;
-    result_7 <- aux_5;
+    result_10 <- aux_5;
     b_result_1 <- aux_6;
+    result_9 <- aux_7;
     trace__gen_matrix_sample_four_polynomials <-
     (trace__gen_matrix_sample_four_polynomials ++ tmp__trace);
     trace__gen_matrix_sample_four_polynomials <-
@@ -45447,12 +45360,14 @@ module M = {
     [(Assert,
      ((BArray512.is_init b_result_2 0 512) /\
      (BArray536.is_init b_result_1 0 536)))]);
-    pol <- result_8;
-    bufp <- result_7;
+    pol <- result_11;
+    bufp <- result_10;
+    ms <- result_9;
     (* Erased call to unspill *)
-    ms <- (init_msf);
     b_buf <- b_buf;
     buf <- (protect_ptr buf ms);
+    b_polx4 <- b_polx4;
+    polx4 <- (protect_ptr polx4 ms);
     b_buf <-
     (SBArray2144_536.set_sub8 b_buf 1072 (BArray536.init_arr (W8.of_int 255))
     );
@@ -45467,15 +45382,17 @@ module M = {
     b_pol <- (SBArray2048_512.get_sub16 b_polx4 768);
     pol <- (SBArray2048_512.get_sub16 polx4 768);
     b_param_0 <- b_pol;
-    param_13 <- pol;
+    param_17 <- pol;
     b_param <- b_bufp;
-    param_12 <- bufp;
-    (aux_3, aux_4, aux_5, aux_6, tmp__trace) <@ __gen_matrix_fill_polynomial (
-    param_13, b_param_0, param_12, b_param);
-    result_10 <- aux_3;
+    param_16 <- bufp;
+    param_15 <- ms;
+    (aux_3, aux_4, aux_5, aux_6, aux_7, tmp__trace) <@ __gen_matrix_fill_polynomial (
+    param_17, b_param_0, param_16, b_param, param_15);
+    result_14 <- aux_3;
     b_result_0 <- aux_4;
-    result_9 <- aux_5;
+    result_13 <- aux_5;
     b_result <- aux_6;
+    result_12 <- aux_7;
     trace__gen_matrix_sample_four_polynomials <-
     (trace__gen_matrix_sample_four_polynomials ++ tmp__trace);
     trace__gen_matrix_sample_four_polynomials <-
@@ -45483,12 +45400,14 @@ module M = {
     [(Assert,
      ((BArray512.is_init b_result_0 0 512) /\
      (BArray536.is_init b_result 0 536)))]);
-    pol <- result_10;
-    bufp <- result_9;
+    pol <- result_14;
+    bufp <- result_13;
+    ms <- result_12;
     (* Erased call to unspill *)
-    ms <- (init_msf);
     b_buf <- b_buf;
     buf <- (protect_ptr buf ms);
+    b_polx4 <- b_polx4;
+    polx4 <- (protect_ptr polx4 ms);
     b_buf <-
     (SBArray2144_536.set_sub8 b_buf 1608 (BArray536.init_arr (W8.of_int 255))
     );
@@ -55503,25 +55422,18 @@ op __gen_matrix_buf_rejection_filter48_spec _pol _b_pol _counter _buf _b_buf _bu
    (((((((BArray536.is_init _b_buf 0 536) /\
         (BArray2048.is_init _b_sst 0 2048)) /\
        (0 <= (W64.to_uint _counter))) /\
-      (((W64.to_uint _counter) + 32) <= 256)) /\
-     (BArray512.is_init _b_pol 0 ((W64.to_uint _counter) * 2))) /\
+      (((W64.to_uint _counter) + 32) <= (256 + ((168 %/ 3) * 2)))) /\
+     (BArray736.is_init _b_pol 0 ((W64.to_uint _counter) * 2))) /\
     (0 <= (W64.to_uint _buf_offset))) /\
    ((((W64.to_uint _buf_offset) + 24) + 32) <= 536)))))))) ==>
    ((true /\
     (true /\
     (true /\
     (true /\
-    (((BArray512.is_init res.`2 0 (2 * (W64.to_uint res.`3))) /\
+    (true /\
+    (((BArray736.is_init res.`2 0 (2 * (W64.to_uint res.`3))) /\
      ((W64.to_uint _counter) <= (W64.to_uint res.`3))) /\
-    ((W64.to_uint res.`3) <= 256)))))) /\
-   (valid res.`4))].
-
-op __write_u128_boundchk_spec _pol _b_pol _ctr _data _ms =
-   hoare [M.__write_u128_boundchk :
-   (((_ms = ms) /\
-    ((_data = data) /\ ((_ctr = ctr) /\ ((_b_pol = b_pol) /\ (_pol = pol))))) /\
-   (true /\ (BArray512.is_init _b_pol 0 (2 * (W64.to_uint _ctr))))) ==>
-   ((true /\ (BArray512.is_init res.`2 0 ((2 * (W64.to_uint _ctr)) + 16))) /\
+    ((W64.to_uint res.`3) <= ((W64.to_uint _counter) + 32)))))))) /\
    (valid res.`4))].
 
 op __gen_matrix_buf_rejection_filter24_spec _pol _b_pol _counter _buf _b_buf _buf_offset _load_shuffle _mask _bounds _sst _b_sst _ones _ms =
@@ -55545,39 +55457,48 @@ op __gen_matrix_buf_rejection_filter24_spec _pol _b_pol _counter _buf _b_buf _bu
    (((((((BArray536.is_init _b_buf 0 536) /\
         (BArray2048.is_init _b_sst 0 2048)) /\
        (0 <= (W64.to_uint _counter))) /\
-      ((W64.to_uint _counter) < 256)) /\
-     (0 <= (W64.to_uint _buf_offset))) /\
-    (((W64.to_uint _buf_offset) + 32) < 536)) /\
-   (BArray512.is_init _b_pol 0 ((W64.to_uint _counter) * 2))))))))) ==>
+      (((W64.to_uint _counter) + 16) <= (256 + ((168 %/ 3) * 2)))) /\
+     (BArray736.is_init _b_pol 0 ((W64.to_uint _counter) * 2))) /\
+    (0 <= (W64.to_uint _buf_offset))) /\
+   (((W64.to_uint _buf_offset) + 32) <= 536)))))))) ==>
    ((true /\
     (true /\
     (true /\
-    (((W64.of_int (W64.to_uint _counter)) \ule res.`3) /\
-    (BArray512.is_init res.`2 0 (2 * (W64.to_uint res.`3))))))) /\
-   (valid res.`5))].
+    (true /\
+    (true /\
+    (((BArray736.is_init res.`2 0 (2 * (W64.to_uint res.`3))) /\
+     ((W64.to_uint _counter) <= (W64.to_uint res.`3))) /\
+    ((W64.to_uint res.`3) <= ((W64.to_uint _counter) + 16)))))))) /\
+   (valid res.`4))].
 
-op _gen_matrix_buf_rejection_spec _pol _b_pol _counter _buf _b_buf _buf_offset =
+op _gen_matrix_buf_rejection_spec _pol _b_pol _counter _buf _b_buf _buf_offset _ms =
    hoare [M._gen_matrix_buf_rejection :
-   (((_buf_offset = buf_offset) /\
+   (((_ms = ms) /\
+    ((_buf_offset = buf_offset) /\
     ((_b_buf = b_buf) /\
     ((_buf = buf) /\
-    ((_counter = counter) /\ ((_b_pol = b_pol) /\ (_pol = pol)))))) /\
+    ((_counter = counter) /\ ((_b_pol = b_pol) /\ (_pol = pol))))))) /\
    (true /\
    (true /\
    (true /\
    (true /\
    (true /\
-   ((((((BArray536.is_init _b_buf 0 536) /\ (0 <= (W64.to_uint _counter))) /\
-      ((W64.to_uint _counter) <= 256)) /\
-     (0 <= (W64.to_uint _buf_offset))) /\
-    ((W64.to_uint _buf_offset) < 536)) /\
-   (BArray512.is_init _b_pol 0 ((W64.to_uint _counter) * 2))))))))) ==>
+   (true /\
+   (true /\
+   (((((((BArray536.is_init _b_buf 0 536) /\ (0 <= (W64.to_uint _counter))) /\
+       (0 <= (W64.to_uint _buf_offset))) /\
+      ((W64.to_uint _buf_offset) <= ((3 * 168) - 24))) /\
+     (((W64.to_uint _buf_offset) %% 48) = 0)) /\
+    (((3 * (W64.to_uint _counter)) +
+     (2 * ((3 * 168) - (W64.to_uint _buf_offset)))) <=
+    (3 * (256 + ((168 %/ 3) * 2))))) /\
+   (BArray736.is_init _b_pol 0 ((W64.to_uint _counter) * 2))))))))))) ==>
    ((true /\
     (true /\
     (true /\
     (((W64.of_int (W64.to_uint _counter)) \ule res.`3) /\
-    (BArray512.is_init res.`2 0 (2 * (W64.to_uint res.`3))))))) /\
-   (valid res.`4))].
+    (BArray736.is_init res.`2 0 (2 * (W64.to_uint res.`3))))))) /\
+   (valid res.`5))].
 
 op gen_matrix_get_indexes_spec _b __t =
    hoare [M.gen_matrix_get_indexes :
@@ -55590,14 +55511,15 @@ op gen_matrix_get_indexes_spec _b __t =
    ((_b + (__t `<<` (W8.of_int (4 + 1)))) \ule
    (W64.of_int ((1 `<<` (4 + 2)) - 8))))))))) ==> (true /\ (valid res.`2))].
 
-op __gen_matrix_fill_polynomial_spec _pol _b_pol _buf _b_buf =
+op __gen_matrix_fill_polynomial_spec _pol _b_pol _buf _b_buf _ms =
    hoare [M.__gen_matrix_fill_polynomial :
-   (((_b_buf = b_buf) /\
-    ((_buf = buf) /\ ((_b_pol = b_pol) /\ (_pol = pol)))) /\
+   (((_ms = ms) /\
+    ((_b_buf = b_buf) /\
+    ((_buf = buf) /\ ((_b_pol = b_pol) /\ (_pol = pol))))) /\
    (BArray536.is_init _b_buf 0 536)) ==>
    (((BArray512.is_init res.`2 0 (256 * 2)) /\
     (BArray536.is_init res.`4 0 536)) /\
-   (valid res.`5))].
+   (valid res.`6))].
 
 op _gen_matrix_sample_four_polynomials_spec _polx4 _b_polx4 _buf _b_buf _rho _b_rho _pos_entry _transposed =
    hoare [M._gen_matrix_sample_four_polynomials :

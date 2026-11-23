@@ -21,7 +21,7 @@ require import Jkem512_safety ByteArrayInit.
 
 require import BArray1 BArray2 BArray4 BArray8 BArray16 BArray32 BArray33 BArray40
   BArray64 BArray128 BArray160 BArray192 BArray200 BArray224 BArray256 BArray384 BArray512
-  BArray536 BArray640 BArray768 BArray800 BArray1024 BArray1632 BArray2048 BArray2144.
+  BArray536 BArray736 BArray640 BArray768 BArray800 BArray1024 BArray1632 BArray2048 BArray2144.
 require import SBArray4_1 SBArray8_2 SBArray64_32 SBArray200_128 SBArray536_200
   SBArray768_128 SBArray768_384 SBArray768_640 SBArray800_768 SBArray1024_512
   SBArray1632_32 SBArray1632_768 SBArray1632_800 SBArray2048_512 SBArray2048_1024
@@ -44,6 +44,7 @@ clone ByteArrayInit as BI256 with theory A <- BArray256.
 clone ByteArrayInit as BI384 with theory A <- BArray384.
 clone ByteArrayInit as BI512 with theory A <- BArray512.
 clone ByteArrayInit as BI536 with theory A <- BArray536.
+clone ByteArrayInit as BI736 with theory A <- BArray736.
 clone ByteArrayInit as BI640 with theory A <- BArray640.
 clone ByteArrayInit as BI768 with theory A <- BArray768.
 clone ByteArrayInit as BI800 with theory A <- BArray800.
@@ -1470,106 +1471,86 @@ move => *. split. split; smt().
 split; smt(). 
 qed.
 
-lemma __write_u128_boundchk_proof _pol _b_pol _ctr _data _ms :
-      (__write_u128_boundchk_spec _pol _b_pol _ctr _data _ms).
-proof.
-hint +safety.
-  rewrite /__write_u128_boundchk_spec .
-  proc. sp 3.
-  if. auto.  move => &m /> ?. rewrite  W64.uleE /=. rewrite /is_init /= => *. smt(W64.to_uint_cmp). 
-  auto. move => &m /> ?. rewrite !uleE /is_init /valid /= => /> *. 
-  split. move => *. rewrite !to_uintD_small /=; smt().
-  move => *. split. move => *. rewrite !to_uintD_small /=; smt().
-  move => *. smt().
-qed .
-
 lemma __gen_matrix_buf_rejection_filter24_proof _pol _b_pol _counter _buf _b_buf _buf_offset _load_shuffle _mask _bounds _sst _b_sst _ones _ms :
-      (__gen_matrix_buf_rejection_filter24_spec _pol _b_pol _counter 
-      _buf _b_buf _buf_offset _load_shuffle _mask _bounds _sst _b_sst 
+      (__gen_matrix_buf_rejection_filter24_spec _pol _b_pol _counter
+      _buf _b_buf _buf_offset _load_shuffle _mask _bounds _sst _b_sst
       _ones _ms).
 proof.
 hint +safety.
 rewrite /__gen_matrix_buf_rejection_filter24_spec .
-  proc. auto. ecall (__write_u128_boundchk_proof param_6 b_param param_5 param_4 param_3). auto.
-  ecall (__write_u128_boundchk_proof param_2 b_param_0 param_1 param_0 param). auto. rewrite /valid  => /> . 
-  have H : forall w,0<= count idfun (W64.w2bits (W64.of_int (W64.to_uint w %% 256))) <= 8.
-  + move => w; rewrite count_ge0 /=. 
-    rewrite w2bitsE (: 64 = 8 + 56) 1://  mkseq_add // count_cat /=.
-    have  ->/= : count idfun (mkseq (fun (i : int) => (W64.of_int (to_uint w %% 256)).[8 + i]) 56) = 0 ; last  by smt(size_mkseq count_ge0 count_size).
-    rewrite /mkseq count_map /preim /idfun /=;apply count_pred0_eq_in => x; rewrite mem_iota  /= => *.
-    rewrite get_to_uint /= (: (0 <= 8 + x < 64)) 1:/# /=.
-    rewrite of_uintK /= (modz_small _ 18446744073709551616); 1:smt().
-    have /= ? : 2^8 <=  2 ^ (8 + x) <= 2^64; last by smt(). 
-    split; 1: by  apply StdOrder.IntOrder.ler_weexpn2l; smt(). 
-    move => ?.  by have  := StdOrder.IntOrder.ler_weexpn2l 2 _ (8+x) 64 _;  smt(). 
-  have H' : forall w',0<= count idfun (W64.w2bits (W64.of_int (W32.to_uint w' %% 256))) <= 8.
-  + move => w'; rewrite count_ge0 /=.   rewrite w2bitsE (: 64 = 8 + 56) 1://  mkseq_add // count_cat /=.
-    have  ->/= : count idfun (mkseq (fun (i : int) => (W64.of_int (to_uint w' %% 256)).[8 + i]) 56) = 0 ; last  by smt(size_mkseq count_ge0 count_size).
-    rewrite /mkseq count_map /preim /idfun /=;apply count_pred0_eq_in => x; rewrite mem_iota  /= => *.
-    rewrite get_to_uint /= (: (0 <= 8 + x < 64)) 1:/# /=.
-    rewrite of_uintK /= (modz_small _ 18446744073709551616); 1:smt().
-    have /= ? : 2^8 <=  2 ^ (8 + x) <= 2^64; last by smt().
-    split; 1: by  apply StdOrder.IntOrder.ler_weexpn2l; smt(). 
-    move => ?.  by have  := StdOrder.IntOrder.ler_weexpn2l 2 _ (8+x) 64 _;  smt(). 
-  pose w := ((Jslh.SLH64.protect_64 _)). 
-  have H255 : 255 = 2^8 - 1 by auto.
-  rewrite H255 !and_mod //=.
-  rewrite / POPCNT_64 /rflags_of_popcnt /flags_w /=. rewrite uleE /=. have h: W32.modulus < 18446744073709551616. by auto.
-  move => *.
-  have h2 : forall w, 0 <=to_uint(W64.of_int (count idfun (w2bits (W64.of_int (W64.to_uint (w) %% 256))))) <=8. move => ?. rewrite !to_uintK_small; smt().
-  rewrite !to_uintD_small /=;1..4: smt(to_uintK).
-  pose c1 := to_uint
-        (W64.of_int (count idfun (w2bits (W64.of_int (to_uint (w _ms) %% 256))))).  
-  pose c2 := to_uint (W64.of_int (count idfun (w2bits (W64.of_int (to_uint (w _ms `>>` W8.of_int 16) %% 256))))).
-  split.  smt(). rewrite /is_init /=.
-  move => *.  split. smt().
-  move => *. split. split; smt().
-  split. smt().
-  split. rewrite W64.to_uintK_small /=; smt(). 
-  split. rewrite W64.to_uintK_small /=; smt(). 
-  by rewrite W64.of_uintK; smt(modz_cmp).
+proc.
+auto => /> *.
+have H : forall w,0<= count idfun (W64.w2bits (W64.of_int (W64.to_uint w %% 256))) <= 8.
++ move => w; rewrite count_ge0 /=.
+  rewrite w2bitsE (: 64 = 8 + 56) 1://  mkseq_add // count_cat /=.
+  have  ->/= : count idfun (mkseq (fun (i : int) => (W64.of_int (to_uint w %% 256)).[8 + i]) 56) = 0 ; last  by smt(size_mkseq count_ge0 count_size).
+  rewrite /mkseq count_map /preim /idfun /=;apply count_pred0_eq_in => x; rewrite mem_iota  /= => *.
+  rewrite get_to_uint /= (: (0 <= 8 + x < 64)) 1:/# /=.
+  rewrite of_uintK /= (modz_small _ 18446744073709551616); 1:smt().
+  have /= ? : 2^8 <=  2 ^ (8 + x) <= 2^64; last by smt().
+  split; 1: by  apply StdOrder.IntOrder.ler_weexpn2l; smt().
+  move => ?.
+  by have  := StdOrder.IntOrder.ler_weexpn2l 2 _ (8+x) 64 _;  smt().
+pose w := ((Jslh.SLH64.protect_64 _)).
+have H255 : 255 = 2^8 - 1 by auto.
+rewrite H255 !and_mod //=.
+rewrite / POPCNT_64 /rflags_of_popcnt /flags_w /=.
+have h : forall w, 0 <= to_uint (W64.of_int (count idfun
+           (w2bits (W64.of_int (W64.to_uint (w) %% 256))))) <= 8.
++ by move => ?; rewrite !to_uintK_small; smt().
+(* the numbers of coefficients kept in the two halves *)
+have hc4 := h (w _ms).
+have hc2 := h (w _ms `>>` W8.of_int 16).
+move: hc4 hc2.
+pose C4 := W64.of_int (count idfun (w2bits (W64.of_int (to_uint (w _ms) %% 256)))).
+pose C2 := W64.of_int (count idfun
+             (w2bits (W64.of_int (to_uint (w _ms `>>` W8.of_int 16) %% 256)))).
+move=> hc4 hc2.
+have e1 : to_uint (C4 + _counter) = to_uint C4 + to_uint _counter.
++ by rewrite to_uintD_small 1:/#.
+have e2 : to_uint (C2 + (C4 + _counter)) = to_uint C2 + to_uint C4 + to_uint _counter.
++ by rewrite to_uintD_small e1 /#.
+have e3 : to_uint (W64.of_int 2 * _counter) = 2 * to_uint _counter.
++ by rewrite to_uintM_small /= /#.
+have e4 : to_uint (W64.of_int 2 * (C4 + _counter)) = 2 * (to_uint C4 + to_uint _counter).
++ by rewrite to_uintM_small /= e1 /#.
+rewrite e2 e3 e4 /=.
+have hm : forall x, 0 <= to_uint (W64.of_int (x %% 256)) < 256.
++ by move=> x; rewrite of_uintK; smt().
+have hm1 := hm (to_uint (w _ms)).
+have hm2 := hm (to_uint (w _ms `>>` W8.of_int 16)).
+split; 2: smt().
+split; 2: smt().
+split; 2: smt().
+apply BI736.is_init_set128d_grow; 2: smt().
+by apply BI736.is_init_set128d_grow => /=; smt().
 qed.
 
-lemma _gen_matrix_buf_rejection_proof _pol _b_pol _counter _buf _b_buf _buf_offset :
-      (_gen_matrix_buf_rejection_spec _pol _b_pol _counter _buf _b_buf _buf_offset).
+lemma _gen_matrix_buf_rejection_proof _pol _b_pol _counter _buf _b_buf _buf_offset _ms :
+      (_gen_matrix_buf_rejection_spec _pol _b_pol _counter _buf _b_buf _buf_offset _ms).
 proof.
 hint +safety.
 rewrite /_gen_matrix_buf_rejection_spec; proc; auto.
+ecall (__gen_matrix_buf_rejection_filter24_proof param_18 b_param param_17 param_16
+  (BArray536.init_arr (W8.of_int 255)) param_15 param_14 param_13 param_12 param_11
+  (BArray2048.init_arr (W8.of_int 255)) param_10 param_9).
+auto.
+(* the bound on the counter leaves room for the candidates still to filter *)
 while (valid trace__gen_matrix_buf_rejection /\ 0 <= W64.to_uint counter /\
-       BArray512.is_init b_pol 0 (2 * W64.to_uint counter) /\
-       (condition_loop => W64.to_uint buf_offset < 481) /\
-       W64.to_uint _counter <= W64.to_uint counter).
-+ auto; sp; if.
-  + auto; ecall (__gen_matrix_buf_rejection_filter24_proof param_18 b_param param_17 param_16
-      (BArray536.init_arr (W8.of_int 255)) param_15 param_14 param_13 param_12 param_11
-      (BArray2048.init_arr (W8.of_int 255)) param_10 param_9).
-    auto => &hr /> *.
-    have ? : W64.to_uint counter{hr} < 256.
-    + by have := W64.ultE counter{hr} (W64.of_int 256); rewrite W64.of_uintK /= /#.
-    split; first smt(W64.to_uint_cmp).
-    move=> *; do! split;
-      [smt(W64.to_uint_cmp) | by rewrite W64.ultE W64.of_uintK /= | smt(W64.uleE)].
-  by auto => /> *.
-wp.
-while (valid trace__gen_matrix_buf_rejection /\ 0 <= W64.to_uint counter /\
-       W64.to_uint counter <= 256 /\ W64.to_uint _counter <= W64.to_uint counter /\
-       BArray512.is_init b_pol 0 (2 * W64.to_uint counter) /\
-       (W64.to_uint counter < 225 => saved_buf_offset = buf_offset) /\
-       (condition_loop => W64.to_uint buf_offset < 457)).
-+ auto; sp; if.
-  + auto; ecall (__gen_matrix_buf_rejection_filter48_proof param_8 b_param_0 param_7 param_6
-      (BArray536.init_arr (W8.of_int 255)) param_5 param_4 param_3 param_2 param_1
-      (BArray2048.init_arr (W8.of_int 255)) param_0 param).
-    auto => &hr /> *.
-    have ? : W64.to_uint counter{hr} < 225.
-    + by have := W64.ultE counter{hr} (W64.of_int 225); rewrite W64.of_uintK /= /#.
-    split; first smt(W64.to_uint_cmp).
-    move=> *; do! split; [smt(W64.to_uint_cmp) | smt() | by rewrite W64.ultE W64.of_uintK /=].
+       W64.to_uint _counter <= W64.to_uint counter /\
+       BArray736.is_init b_pol 0 (2 * W64.to_uint counter) /\
+       W64.to_uint buf_offset %% 48 = 0 /\ W64.to_uint buf_offset <= 480 /\
+       3 * W64.to_uint counter + 2 * (504 - W64.to_uint buf_offset) <= 1104 /\
+       (condition_loop <=> W64.to_uint buf_offset < 480)).
++ auto; ecall (__gen_matrix_buf_rejection_filter48_proof param_8 b_param_0 param_7 param_6
+    (BArray536.init_arr (W8.of_int 255)) param_5 param_4 param_3 param_2 param_1
+    (BArray2048.init_arr (W8.of_int 255)) param_0 param).
   auto => &hr /> *.
-  by have := W64.ultE counter{hr} (W64.of_int 225); rewrite W64.of_uintK /= /#.
+  split; first smt(W64.to_uint_cmp).
+  by move=> *; rewrite W64.ultE W64.to_uintD_small /= 1:/#; smt().
 auto => &hr /> *.
-split; first by split; [smt() | rewrite W64.ultE W64.of_uintK /=].
-move=> *; split; first by rewrite W64.ultE W64.of_uintK /=.
+split; first by rewrite W64.ultE /= /#.
+move=> *; split; first smt().
 by move=> *; rewrite W64.uleE /#.
 qed.
 
@@ -1582,29 +1563,39 @@ proc; auto => &hr />.
 rewrite !W64.uleE /(`<<`) /= => h1 h2; smt(W64.to_uint_cmp).
 qed.
 
-lemma __gen_matrix_fill_polynomial_proof _pol _b_pol _buf _b_buf :
-      (__gen_matrix_fill_polynomial_spec _pol _b_pol _buf _b_buf).
+lemma __gen_matrix_fill_polynomial_proof _pol _b_pol _buf _b_buf _ms :
+      (__gen_matrix_fill_polynomial_spec _pol _b_pol _buf _b_buf _ms).
 proof.
 hint +safety.
 rewrite /__gen_matrix_fill_polynomial_spec; proc; auto.
-while (valid trace___gen_matrix_fill_polynomial /\ 0 <= W64.to_uint counter /\
-       W64.to_uint buf_offset = 336 /\
-       BArray512.is_init b_pol 0 (W64.to_uint counter * 2) /\
-       BArray536.is_init b_buf 0 536).
-+ auto; ecall (_gen_matrix_buf_rejection_proof param_7 b_param param_6 param_5
-    (BArray536.init_arr (W8.of_int 255)) param_4).
-  auto; ecall (_shake128_next_state_proof param_3 (BArray536.init_arr (W8.of_int 255))).
-  auto => &hr /> *.
-  have ? : W64.to_uint counter{hr} < 256.
-  + by have := W64.ultE counter{hr} (W64.of_int 256); rewrite W64.of_uintK /= /#.
+(* the copy: the first 256 samples are initialised *)
+while (valid trace___gen_matrix_fill_polynomial /\ 0 <= i <= 16 /\
+       BArray736.is_init b_samples 0 512 /\
+       BArray512.is_init b_pol 0 (32 * i)).
++ auto => &hr /> *.
+  split; first by do! split; 1,2,4,5: smt();
+    apply (BI736.is_init_sub b_samples{hr} 0 512) => // /#.
   split; first smt().
-  by move=> *; smt(W64.to_uint_cmp).
-auto; ecall (_gen_matrix_buf_rejection_proof param_2 b_param_0 param_1 param_0
-  (BArray536.init_arr (W8.of_int 255)) param).
+  by apply BI512.is_init_set256d_grow => /=; smt().
+auto.
+while (valid trace___gen_matrix_fill_polynomial /\ 0 <= W64.to_uint counter /\
+       BArray736.is_init b_samples 0 (2 * W64.to_uint counter) /\
+       (more <=> W64.to_uint counter < 256)).
++ auto; ecall (_gen_matrix_buf_rejection_proof param_9 b_param param_8 param_7
+    (BArray536.init_arr (W8.of_int 255)) param_6 param_5).
+  auto; ecall (_shake128_next_state_proof param_4 (BArray536.init_arr (W8.of_int 255))).
+  auto => &hr /> *.
+  split; first smt().
+  by move=> *; rewrite W64.ultE /=; smt(W64.to_uint_cmp).
+auto; ecall (_gen_matrix_buf_rejection_proof param_3 b_param_0 param_2 param_1
+  (BArray536.init_arr (W8.of_int 255)) param_0 param).
 auto => /> *.
-split; first smt(W64.to_uint_cmp).
-move=> b c t; rewrite W64.ultE W64.of_uintK /= => *.
-by apply (BI512.is_init_sub b 0 (W64.to_uint c * 2) 0 512) => // /#.
+split; first by rewrite W64.ultE /=; smt(W64.to_uint_cmp).
+move=> bs c m tr *; split.
++ by apply (BI736.is_init_sub bs 0 (2 * W64.to_uint c)) => // /#.
+move=> bp i0 tr1 h1 h2 h3 h4 h5 h6.
+have e : i0 = 16 by smt().
+by move: h6; rewrite e.
 qed.
 
 lemma _gen_matrix_sample_four_polynomials_proof _polx4 _b_polx4 _buf _b_buf _rho _b_rho _pos_entry _transposed :
@@ -1620,10 +1611,10 @@ conseq (_ :
   ==> BArray2048.is_init b_polx4 0 2048
    /\ valid trace__gen_matrix_sample_four_polynomials).
 + by move=> &hr />; rewrite -!(BI32.is_init_full _ 32) //.
-auto; ecall (__gen_matrix_fill_polynomial_proof param_13 b_param_0 param_12 b_param).
-auto; ecall (__gen_matrix_fill_polynomial_proof param_11 b_param_2 param_10 b_param_1).
-auto; ecall (__gen_matrix_fill_polynomial_proof param_9 b_param_4 param_8 b_param_3).
-auto; ecall (__gen_matrix_fill_polynomial_proof param_7 b_param_6 param_6 b_param_5).
+auto; ecall (__gen_matrix_fill_polynomial_proof param_17 b_param_0 param_16 b_param param_15).
+auto; ecall (__gen_matrix_fill_polynomial_proof param_14 b_param_2 param_13 b_param_1 param_12).
+auto; ecall (__gen_matrix_fill_polynomial_proof param_11 b_param_4 param_10 b_param_3 param_9).
+auto; ecall (__gen_matrix_fill_polynomial_proof param_8 b_param_6 param_7 b_param_5 param_6).
 auto; ecall (_shake128x4_squeeze3blocks_proof param_5 ((BArray800.init_arr (W8.of_int 255))) param_4 b_param_7).
 auto; ecall (_shake128x4_absorb_A32_A2_proof param_3 b_param_9 param_2 ((BArray32.init_arr (W8.of_int 255))) param_1 b_param_8).
 auto; ecall (gen_matrix_get_indexes_proof param_0 param).

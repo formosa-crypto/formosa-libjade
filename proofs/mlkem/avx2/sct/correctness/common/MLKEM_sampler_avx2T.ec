@@ -8,10 +8,11 @@ require import AllCore IntDiv List IntMin.
 from Jasmin require import JModel_x86.
 
 from JazzEC require import WArray8 WArray32 Array8 Array25 Array32 Array168 Array256 Array536.
+from JazzEC require import Array368 WArray512 WArray736.
 from JazzEC require import Array1024 Array2048 Array2144.
 
 require import MLKEMFCLib AVX2_Ops.
-require import EclibExtra JWordList.
+require import EclibExtra JWordList JArrayExtra.
 require import Agree Rejstream.
 from CryptoSpecs require import Keccak1600_Spec.
 from Spec require import GFq Rq Sampling Symmetric Correctness.
@@ -28,22 +29,6 @@ clone import Mlkem_filters_bridgeT.Mlkem_filters_bridgeT as Mlkem_filters_bridge
 
 import GFq Rq Sampling Symmetric Correctness.
 
-lemma take_rejection16_done n buf buf_o bo:
- 0 <= buf_o <= bo <= 504 =>
- 3 %| buf_o =>
- 3 %| bo =>
- size (take n (rejection16 (buf_subl buf buf_o bo))) = n =>
- take n (rejection16 (buf_subl buf buf_o bo))
- = take n (rejection16 (buf_subl buf buf_o 504)).
-proof.
-move=> H H1 H2 /size_takel' [Hsz1].
-rewrite size_map => Hsz2.
-rewrite -(buf_subl_cat _ _ bo 504) 1:/# /rejection16 rejection_cat.
- by rewrite size_buf_subl /#.
-rewrite -map_take eq_sym -map_take; congr.
-by rewrite take_cat' ifT.
-qed.
-
 lemma pack32_sample_load_shuffle:
  pack32 (to_list sample_load_shuffle)
  = get256_direct ((init8 ("_.[_]" sample_load_shuffle)))%WArray32 0.
@@ -53,27 +38,69 @@ apply W32u8.Pack.all_eqP.
 by rewrite of_listK 1:/# /all_eq /= !initiE /#.
 qed.
 
-lemma size_rejection16_le buf bstart bend1 bend2:
- 3 %| bstart =>
- 3 %| bend1 =>
- 3 %| bend2 =>
- 0 <= bstart <= bend1 <= bend2 <= 536 =>
- size (rejection16 (buf_subl buf bstart bend1))
- <= size (rejection16 (buf_subl buf bstart bend2)).
-proof.
-move=> H1 H2 H3 H.
-rewrite /rejection16 !size_map.
-rewrite -(buf_subl_cat _ _ bend1 bend2) 1:/#.
-rewrite bytes2coeffs_cat.
- by rewrite size_buf_subl /#.
-by rewrite filter_cat size_cat; smt(size_ge0).
-qed.
-
 lemma rejection16_cat l1 l2:
  3 %| size l1 =>
  rejection16 (l1++l2) = rejection16 l1 ++ rejection16 l2.
 proof.
 by move=> H; rewrite /rejection16 rejection_cat 1:// map_cat.
+qed.
+
+(* at most two coefficients per three bytes *)
+lemma size_rejection16_subl buf o1 o2:
+ 0 <= o1 <= o2 <= 536 =>
+ size (rejection16 (buf_subl buf o1 o2)) <= 2 * (o2 - o1) %/ 3.
+proof.
+move=> H; rewrite /rejection16 size_map.
+by apply (size_rejection_le' (o2 - o1)) => //; rewrite size_buf_subl.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* The buffer window from _bo, filtered up to bo: the coefficients      *)
+(* found are appended to the _ctr ones of _pol. The window starts on a  *)
+(* fresh buffer, or on its third block with fewer than 256 coefficients *)
+(* found: either way they fit in the array.                             *)
+op rej_inv (_pol : W16.t Array368.t) (_ctr _bo : int) (buf : W8.t Array536.t)
+           (pol : W16.t Array368.t) (ctr bo : int) =
+     (_bo = 0 /\ _ctr = 0 \/ _bo = 2*168 /\ 0 <= _ctr < 256)
+  /\ _bo <= bo <= 504 /\ 3 %| (bo - _bo)
+  /\ ctr = _ctr + size (rejection16 (buf_subl buf _bo bo))
+  /\ slist pol ctr = slist _pol _ctr ++ rejection16 (buf_subl buf _bo bo).
+
+lemma rej_inv0 _pol _ctr _bo buf :
+  (_bo = 0 /\ _ctr = 0 \/ _bo = 2*168 /\ 0 <= _ctr < 256) =>
+  rej_inv _pol _ctr _bo buf _pol _ctr _bo.
+proof.
+move=> hs; rewrite /rej_inv buf_subl0 // /rejection16 rejection0 /= cats0.
+by rewrite hs /= dvdz0 /#.
+qed.
+
+lemma rej_inv_bound _pol _ctr _bo buf pol ctr bo :
+  rej_inv _pol _ctr _bo buf pol ctr bo =>
+  0 <= ctr /\ 3 * ctr + 2 * (504 - bo) <= 3 * 368.
+proof.
+move=> [hs [hb [hd [hc hp]]]].
+have := size_rejection16_subl buf _bo bo _; 1: smt().
+smt(size_ge0).
+qed.
+
+(* a filtered piece of the buffer extends the window *)
+lemma rej_inv_step n _pol _ctr _bo buf pol pol' ctr bo :
+  3 %| n => 0 <= n => bo + n <= 504 =>
+  rej_inv _pol _ctr _bo buf pol ctr bo =>
+  slist pol' (ctr + size (rejection16 (buf_subl buf bo (bo + n))))
+  = slist pol ctr ++ rejection16 (buf_subl buf bo (bo + n)) =>
+  rej_inv _pol _ctr _bo buf pol'
+          (ctr + size (rejection16 (buf_subl buf bo (bo + n)))) (bo + n).
+proof.
+move=> h3 ge0n hle [hs [hb [hd [hc hp]]]] hstep.
+have hcat : rejection16 (buf_subl buf _bo (bo + n))
+            = rejection16 (buf_subl buf _bo bo) ++ rejection16 (buf_subl buf bo (bo + n)).
+- by rewrite -(buf_subl_cat _ _bo bo (bo + n)) 1:/# rejection16_cat // size_buf_subl /#.
+split; 1: exact hs.
+split; 1: smt().
+split; 1: smt().
+split; 1: by rewrite hcat size_cat /#.
+by rewrite hstep hp hcat catA.
 qed.
 
 hoare gen_matrix_buf_rejection_h _pol _ctr _buf _buf_offset:
@@ -82,166 +109,59 @@ hoare gen_matrix_buf_rejection_h _pol _ctr _buf _buf_offset:
    /\ pol = _pol
    /\ buf = _buf
    /\ buf_offset = _buf_offset
-   /\ 0 <= to_uint counter < 256
-   /\ (to_uint buf_offset = 0 \/ to_uint buf_offset = 2*168)
+   /\ (   to_uint buf_offset = 0 /\ to_uint counter = 0
+       \/ to_uint buf_offset = 2*168 /\ to_uint counter < 256)
    ==>
-   let l = take (256-to_uint _ctr) (rejection16 (buf_subl _buf (to_uint _buf_offset) 504))
-   in plist res.`1 (to_uint _ctr + size l)
-      = plist _pol (to_uint _ctr) ++ l
-      /\ to_uint _ctr + size l = min 256 (to_uint res.`2).
+   let l = rejection16 (buf_subl _buf (to_uint _buf_offset) 504)
+   in slist res.`1 (to_uint _ctr + size l)
+      = slist _pol (to_uint _ctr) ++ l
+      /\ to_uint res.`2 = to_uint _ctr + size l.
 proof.
 proc; simplify.
-while ( buf=_buf /\ 24 %| to_uint buf_offset /\ 3 %| to_uint _buf_offset /\
-        0 <= to_uint _buf_offset <= to_uint buf_offset <= 504 /\
-        0 <= to_uint _ctr < 256 /\
-        to_uint _ctr <= to_uint counter /\
-        auxdata_ok load_shuffle mask bounds ones sst /\
-        (plist pol (min 256 (to_uint counter))
-         = plist _pol (to_uint _ctr)
-           ++ take (256-to_uint _ctr) (rejection16 (buf_subl _buf (to_uint _buf_offset) (to_uint buf_offset)))
-        ) /\
-        (condition_loop <=> to_uint buf_offset <= 504-24)).
- wp.
- seq 2: (#{/~condition_loop}pre /\ to_uint buf_offset <= 504 - 24 /\ (condition_loop <=> to_uint counter < 256)).
- + by auto => /> &m *; rewrite ultE.
- if; last first.
- + auto => /> &m Hdvd1 Hdvd2 Ho1 Ho2 Ho3 Hctr1 Hctr2 Hctr3 H Hcond1 Hcond2; split; first smt().
-   have : size (take (256 - to_uint _ctr) (rejection16 (buf_subl _buf (to_uint _buf_offset) (to_uint buf_offset{m})))) = 256 - to_uint _ctr.
-   * have : size (plist pol{m} (min 256 (to_uint counter{m}))) = 256 by rewrite size_plist; smt().
-     rewrite H size_cat size_plist; smt().
-   rewrite size_takel' => - [] _ Hsz.
-   move: H; rewrite take_rejection16_done 1, 3:/#; first by [].
-   * rewrite size_take; first smt().
-     by rewrite -/(min _ _) lez_minl.
-   exact.
- wp; ecall (buf_rejection_filter24_h pol counter buf buf_offset).
- auto => &m /> Hdvd1 Hdvd2 Ho1 Ho2 Ho3 Hctr1 Hctr2 Hctr3 H Hcond1 Hcond2.
- have Hsz: min 256 (to_uint counter{m}) = to_uint _ctr + min (256-to_uint _ctr) (size (rejection16 (buf_subl buf{m} (to_uint _buf_offset) (to_uint buf_offset{m})))).
-  rewrite -(size_plist pol{m} (min 256 (to_uint counter{m}))) 1:/# H size_cat size_plist 1:/#; congr.
-  by rewrite size_take_min /#.
- move: H; rewrite take_oversize 1:/# lez_minr 1:/# => H; split; first smt(). 
- move=> Hoff Hcounter [p c' ms'] /= /> Hstep.
- rewrite !to_uintD_small 1:/# !of_uintK=> Hc'; split; first smt().
- split.
-  split; first by rewrite !modz_small 1:// /= /#.
-  by move=> *; rewrite !modz_small 1:// /= /#.
- split; first smt(size_ge0). 
- rewrite modz_small; first smt(size_ge0 size_take_min).
- split; last rewrite ultE to_uintD_small /#.
- rewrite Hc'.
- rewrite Hstep H -catA; congr.
- rewrite -(buf_subl_cat _ (to_uint _buf_offset) (to_uint buf_offset{m}) (to_uint buf_offset{m} + 24)) 1:/#.
- rewrite rejection16_cat.
-  by rewrite size_buf_subl /#.
- by rewrite take_catr 1:/#; congr; congr; smt().
+ecall (buf_rejection_filter24_h pol counter buf buf_offset).
 wp.
-while ( buf=_buf /\ 24 %| to_uint saved_buf_offset /\ 3 %| to_uint _buf_offset /\
-        0 <= to_uint _buf_offset <= to_uint saved_buf_offset <= 504 /\
-        0 <= to_uint _ctr <= to_uint counter <= 256 /\
-        auxdata_ok load_shuffle mask bounds ones sst /\
-        plist pol (min 256 (to_uint counter))
-        = plist _pol (to_uint _ctr)
-           ++ rejection16 (buf_subl _buf (to_uint _buf_offset) (to_uint saved_buf_offset)) /\
-        to_uint _ctr + size (rejection16 (buf_subl _buf (to_uint _buf_offset) (to_uint saved_buf_offset))) <= 256 /\
-        (condition_loop <=> to_uint buf_offset <= 504-48) /\
-        (to_uint buf_offset <= 504 - 48 => saved_buf_offset = buf_offset)).
- seq 2: (#{/~condition_loop}pre /\ to_uint buf_offset <= 504 - 48 /\ saved_buf_offset = buf_offset /\ (condition_loop <=> to_uint counter <= 256 - 32)).
- + auto => &m /> *; rewrite ultE /#.
- if; last by auto.
- wp; ecall (buf_rejection_filter48_h pol counter buf buf_offset).
- auto; rewrite /protect_64 => &m />.
- move => Hdvd1 Hdvd2 Ho1 Ho2 Ho3 Hctr1 Hctr2 Hctr3 + Hbo Hctr4 Hbo4.
- have -> : (min 256 (to_uint counter{m})) = to_uint counter{m} by smt().
- move => H.
- split;1:smt().
- move => ? [p c'] /= /> Hstep. 
- rewrite !to_uintD_small 1:/# !of_uintK; split; first smt().
- split;1: by rewrite !modz_small 1:// /= /#.
- pose R:= rejection16 _.
- have ?: 0 <= size R <= 32.
-  rewrite size_map; split; first smt(size_ge0).
-  move=> _; apply (size_rejection_le' 48); 1:done => /=.
-  by rewrite /buf_subl !size_take 1:/# !size_drop /#.
- rewrite !modz_small 1..2:/#.
-  have -> : (min 256 (to_uint counter{m} + size R)) = to_uint counter{m} + size R by smt().
- split; first smt().
- rewrite -andaE; split.
-  rewrite -(buf_subl_cat _ (to_uint _buf_offset) (to_uint buf_offset{m}) (to_uint buf_offset{m} + 48)) 1:/#.
-  rewrite Hstep H -catA; congr.
-  rewrite rejection16_cat 2://.
-  by rewrite size_buf_subl /#.
- move => HH. 
- have : size (plist p (to_uint counter{m} + size R)) <= 256.
-  by rewrite size_plist /#.
- by rewrite HH size_cat size_plist 1:/# ultE to_uintD_small /#.
-auto; rewrite /protect_64 => &m /> Hctr1 Hctr2 Hbo; split.
- split; first smt().
- split; first smt().
- split; first smt().
- split; first smt().
- split; 1:  by rewrite pack32_sample_load_shuffle.
- have -> : (min 256 (to_uint counter{m})) = to_uint counter{m} by smt().
- split; 1: by rewrite buf_subl0 1:/# /rejection16 rejection0 cats0.
- split; last by rewrite ultE /#.
- by rewrite buf_subl0 1:/# /rejection16 rejection0 /#.
-move => buf_o cond ctr pol saved_buf_offset Hcond Hdvd1 Hdvd2 Hbo1 Hbo2 Hbo3 Hctr3 Hctr4 _ H Hsz Hterm; split.
- by rewrite ultE take_oversize /#.
-move=> buf_o2 cond2 ctr2 pol2 HC2 Hdvd3 Hbo4 Hbo5 Hctr5 HH.
-case: (to_uint ctr2 < 256) => /= C1.
- move=> C2; move: HH; have ->: to_uint buf_o2 = 504 by smt().
- rewrite lez_minr 1:/#.
- move => HH; rewrite andbC -andaE; split.
-  rewrite -(size_plist pol2 (to_uint ctr2)) 1:/# HH.
-  by rewrite size_cat size_plist 1:/#.
- by move => E; move: HH; rewrite -E => ->.
-move: HH.
-have E: min 256 (to_uint ctr2) = 256 by smt().
-rewrite !E => HH.
-rewrite andbC -andaE.
-have HHsz: 256 = to_uint counter{m} + min (256 - to_uint counter{m})
-      (size (rejection16 (buf_subl buf{m} (to_uint buf_offset{m}) (to_uint buf_o2)))).
- rewrite -(size_plist pol2 256) 1:/#.
- by rewrite HH size_cat size_plist 1:/# size_take_min /#.
-rewrite size_take_min 1:/#.
-move => _.
-split; first smt(size_rejection16_le).
-move => ->; rewrite HH; congr.
-apply take_rejection16_done; first 3 smt().
-by rewrite size_take_min /#.
+while (   buf = _buf
+       /\ auxdata_ok load_shuffle mask bounds ones sst
+       /\ rej_inv _pol (to_uint _ctr) (to_uint _buf_offset) buf
+                  pol (to_uint counter) (to_uint buf_offset)
+       /\ 48 %| (to_uint buf_offset - to_uint _buf_offset)
+       /\ to_uint buf_offset <= 480
+       /\ (condition_loop <=> to_uint buf_offset < 480)).
+- wp; ecall (buf_rejection_filter48_h pol counter buf buf_offset).
+  auto => &hr |> haux hinv hd hle hlt.
+  have [ge0c hb] := rej_inv_bound _ _ _ _ _ _ _ hinv.
+  have hbo : to_uint buf_offset{hr} <= 432 by case: hinv => /#.
+  split; 1: smt().
+  move=> _ _ [rp rc] /= hrp ->.
+  have hl := size_rejection16_subl buf{hr} (to_uint buf_offset{hr})
+               (to_uint buf_offset{hr} + 48) _; 1: smt().
+  rewrite ultE to_uintD_small /= 1:/# of_uintK modz_small 1:#smt:(size_ge0).
+  split; 1: by apply (rej_inv_step 48 _ _ _ _ _ rp _ _ _ _ _ hinv hrp) => // /#.
+  by case: hinv => /#.
+auto => &hr |> hs.
+split.
+- rewrite /auxdata_ok /= pack32_sample_load_shuffle /= ultE /=.
+  by split; [apply rej_inv0; smt(W64.to_uint_cmp) | smt()].
+move=> bo cl c p hcl _ hinv hd hle hge.
+have hbo : to_uint bo = 480 by smt().
+have [ge0c hb] := rej_inv_bound _ _ _ _ _ _ _ hinv.
+split; 1: smt().
+move=> _ _ [rp rc] /= hrp ->.
+have := rej_inv_step 24 _ _ _ _ _ rp _ _ _ _ _ hinv hrp; 1..3: smt().
+have hl := size_rejection16_subl buf{hr} (to_uint bo) (to_uint bo + 24) _; 1: smt().
+rewrite of_uintK modz_small 1:#smt:(size_ge0).
+by move: hrp hl; rewrite hbo /= => hrp hl -[_ [_ [_ [hc hp]]]]; rewrite -hc hp.
 qed.
 
 lemma gen_matrix_buf_rejection_ll:
  islossless M._gen_matrix_buf_rejection.
 proof.
 proc.
-seq 13: (true)=> //.
- wp; while ((condition_loop
-            <=> to_uint buf_offset <= 504-48) /\ (condition_loop => saved_buf_offset = buf_offset))
-           (504 - to_uint buf_offset).
-  move=> z.
-  exlim buf_offset => _buf_offset.
-  seq 2: (#{~condition_loop} pre /\ saved_buf_offset = buf_offset /\ to_uint buf_offset <= 504 - 48) => //.
-  - by auto => &m />.
-  - if; last by auto => &m /> /#.
-    wp; call buf_rejection_filter48_ll; auto => &m /> H _.
-    rewrite ultE to_uintD_small /#.
-  by hoare; auto => />.
- auto => &m />.
- rewrite ultE /#.
- exlim buf_offset => _buf_offset.
- exlim counter => _counter.
-while (condition_loop
-       <=> to_uint buf_offset <= 504-24)
-      (504 - to_uint buf_offset).
- move=> z.
- seq 2: (#{~condition_loop}pre /\ to_uint buf_offset <= 504 - 24) => //.
- - auto.
- - if; last auto => &m /> /#.
-    wp; call buf_rejection_filter24_ll; auto => &m /> H _.
-    rewrite /protect_64 ultE to_uintD_small /#.
- by hoare; auto.
-auto => &m />.
-rewrite ultE /#.
+call buf_rejection_filter24_ll; wp.
+while (condition_loop <=> to_uint buf_offset < 480) (504 - to_uint buf_offset).
+- move=> z; wp; call buf_rejection_filter48_ll; auto => &hr |> hlt.
+  by rewrite ultE to_uintD_small /= /#.
+by auto => &hr |>; rewrite ultE /= /#.
 qed.
 
 phoare gen_matrix_buf_rejection_ph _pol _ctr _buf _buf_offset:
@@ -250,13 +170,13 @@ phoare gen_matrix_buf_rejection_ph _pol _ctr _buf _buf_offset:
    /\ pol = _pol
    /\ buf = _buf
    /\ buf_offset = _buf_offset
-   /\ 0 <= to_uint counter < 256
-   /\ (to_uint buf_offset = 0 \/ to_uint buf_offset = 2*168)
+   /\ (   to_uint buf_offset = 0 /\ to_uint counter = 0
+       \/ to_uint buf_offset = 2*168 /\ to_uint counter < 256)
    ==>
-   let l = take (256-to_uint _ctr) (rejection16 (buf_subl _buf (to_uint _buf_offset) 504))
-   in plist res.`1 (to_uint _ctr + size l)
-      = plist _pol (to_uint _ctr) ++ l
-      /\ to_uint _ctr + size l = min 256 (to_uint res.`2)
+   let l = rejection16 (buf_subl _buf (to_uint _buf_offset) 504)
+   in slist res.`1 (to_uint _ctr + size l)
+      = slist _pol (to_uint _ctr) ++ l
+      /\ to_uint res.`2 = to_uint _ctr + size l
  ] = 1%r.
 proof.
 by conseq gen_matrix_buf_rejection_ll (gen_matrix_buf_rejection_h _pol _ctr _buf _buf_offset).
@@ -264,20 +184,20 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 (* The fill loop against the stream: after k blocks, the buffer holds   *)
-(* the sponge state permuted k times, and the polynomial the accepted   *)
-(* prefix of the first k blocks.                                        *)
+(* the sponge state permuted k times, and the array of samples the      *)
+(* coefficients accepted in the first k blocks.                         *)
 op unlift_polyu (a : poly) = Array256.init (fun i => W16.of_int (Zq.asint a.[i])).
 
 lemma unlift_polyuE a:
  unlift_polyu a = Array256.map (fun x => W16.of_int (Zq.asint x)) a.
 proof. by apply Array256.ext_eq => i Hi; rewrite initiE //= mapiE. qed.
 
-op fill_inv seed (k : int) (buf : W8.t Array536.t) (pol : W16.t Array256.t) (ctr : W64.t) =
+op fill_inv seed (k : int) (buf : W8.t Array536.t) (samples : W16.t Array368.t) (ctr : W64.t) =
      3 <= k
   /\ sub buf (2*168) 200
      = state2bytes (FIPS202_SHA3_Spec.st_i (SHAKE128_ABSORB (rejection_seed seed)) k)
-  /\ min 256 (to_uint ctr) = min 256 (size (rejection (expand_seed seed k)))
-  /\ plist pol (min 256 (to_uint ctr)) = take 256 (rejection16 (expand_seed seed k)).
+  /\ to_uint ctr = size (rejection (expand_seed seed k))
+  /\ slist samples (to_uint ctr) = rejection16 (expand_seed seed k).
 
 (* the in-place permutation of the stored state squeezes the next block *)
 lemma next_blockE seed k (buf buf' : W8.t Array536.t) :
@@ -299,22 +219,37 @@ rewrite buf_sublE 1:// /squeezestate_i /squeezestate /c256_r8 -e -hr /=.
 by rewrite /sub take_mkseq.
 qed.
 
-(* a filtered block extends the accepted prefix                         *)
-lemma fill_stepE (ctr rc : int) (pol rp : W16.t Array256.t) (ek blk : W8.t list) :
-  3 %| size ek => 0 <= ctr < 256 =>
-  min 256 ctr = min 256 (size (rejection ek)) =>
-  plist pol ctr = take 256 (rejection16 ek) =>
-  plist rp (ctr + size (take (256 - ctr) (rejection16 blk)))
-  = plist pol ctr ++ take (256 - ctr) (rejection16 blk) =>
-  ctr + size (take (256 - ctr) (rejection16 blk)) = min 256 rc =>
-     min 256 rc = min 256 (size (rejection (ek ++ blk)))
-  /\ plist rp (min 256 rc) = take 256 (rejection16 (ek ++ blk)).
+(* a filtered block extends the accepted coefficients                   *)
+lemma fill_stepE (ctr rc : int) (samples rs : W16.t Array368.t) (ek blk : W8.t list) :
+  3 %| size ek =>
+  ctr = size (rejection ek) =>
+  slist samples ctr = rejection16 ek =>
+  slist rs (ctr + size (rejection16 blk)) = slist samples ctr ++ rejection16 blk =>
+  rc = ctr + size (rejection16 blk) =>
+     rc = size (rejection (ek ++ blk))
+  /\ slist rs rc = rejection16 (ek ++ blk).
 proof.
-move=> h3 rgc hc hp hrp hrc.
-have es : size (rejection16 ek) = ctr by rewrite /rejection16 size_map /#.
-rewrite rejection16_cat // rejection_cat // size_cat -hrc hrp hp.
-rewrite (take_cat 256 (rejection16 ek)) es ifF 1:/# (take_oversize 256 (rejection16 ek)) 1:/#.
-split => //; rewrite size_take 1:/#; move: es; rewrite /rejection16 !size_map; smt(size_ge0).
+move=> h3 hc hp hrp ->.
+rewrite rejection16_cat // rejection_cat // size_cat hrp hp /= hc.
+by rewrite !size_map.
+qed.
+
+(* the 256-bit copy of sixteen coefficients                             *)
+clone JArrayExtra.WAE as WAE512 with op size <- 512, theory A <- WArray512.
+clone JArrayExtra.WAE as WAE736 with op size <- 736, theory A <- WArray736.
+
+lemma copy_stepE (samples : W16.t Array368.t) (pol : W16.t Array256.t) (i j : int) :
+  0 <= i < 16 => 0 <= j < 256 =>
+  (Array256.init (WArray512.get16 (WArray512.set256_direct
+     (WArray512.init16 (fun k => pol.[k])) (32 * i)
+     (WArray736.get256_direct (WArray736.init16 (fun k => samples.[k])) (32 * i))))).[j]
+  = if 16 * i <= j < 16 * i + 16 then samples.[j] else pol.[j].
+proof.
+move=> rgi rgj; rewrite Array256.initiE //= WAE512.get16_set256_direct 1..3:/#.
+rewrite (_ : 32 * i %/ 2 = 16 * i) 1:/#.
+case: (16 * i <= j < 16 * i + 16) => hj; 2: by rewrite WAE512.get16_init16 /#.
+rewrite WAE736.get256_direct_bits16 1,2:/# (_ : 32 * i %/ 2 + (j - 16 * i) = j) 1:/#.
+by rewrite WAE736.get16_init16 /#.
 qed.
 
 (* The buffer holds three squeezed blocks and the state after them.     *)
@@ -332,66 +267,74 @@ pose seed := (_rho, (_j, _i)).
 pose K := needed_blocks seed.
 have geK3 : 3 <= K by apply needed_blocks_ge3.
 proc.
-while (to_uint buf_offset = 2*168 /\ exists k, k <= K /\ fill_inv seed k buf pol counter)
-      (K - argmax idfun (fun k => k <= K /\ fill_inv seed k buf pol counter)).
+(* the copy of the first 256 samples *)
+while (0 <= i <= 16 /\ inc = 16 /\
+       (forall j, 0 <= j < 256 => samples.[j] = (unlift_polyu (parse _rho _j _i)).[j]) /\
+       forall j, 0 <= j < 16 * i => pol.[j] = samples.[j]) (16 - i).
+- move=> z; auto => &hr |> ge0i _ hs hp lti; split; 2: smt().
+  split; 1: smt().
+  move=> j ge0j ltj; rewrite copy_stepE 1,2:/#.
+  by case: (16 * i{hr} <= j < 16 * i{hr} + 16) => hj //; apply hp => /#.
+wp.
+(* the fill loop *)
+while (   (more <=> to_uint counter < 256)
+       /\ exists k, k <= K /\ fill_inv seed k buf samples counter)
+      (K - argmax idfun (fun k => k <= K /\ fill_inv seed k buf samples counter)).
 - move=> z.
-  exlim (argmax idfun (fun k => k <= K /\ fill_inv seed k buf pol counter)) => m.
-  conseq (_ : to_uint buf_offset = 2*168 /\ fill_inv seed m buf pol counter
-              /\ m < K /\ K - m = z /\ to_uint counter < 256 ==> _).
-  + move=> &hr [-> [[[ho [k [hk hinv]]] hc] hz]].
-    have := argmax_bounded (fun k => fill_inv seed k buf{hr} pol{hr} counter{hr}) K k _ hinv.
+  exlim (argmax idfun (fun k => k <= K /\ fill_inv seed k buf samples counter)) => m.
+  conseq (_ : fill_inv seed m buf samples counter /\ m < K /\ K - m = z
+              /\ to_uint counter < 256 ==> _).
+  + move=> &hr [-> [[[hmore [k [hk hinv]]] hc] hz]].
+    have := argmax_bounded (fun k => fill_inv seed k buf{hr} samples{hr} counter{hr}) K k _ hinv.
     - by case: hinv => /#.
-    move=> /= [rgm [hm _]]; rewrite ho /=; split; 1: exact hm.
-    rewrite ultE /= in hc; split; 2: smt().
+    move=> /= [rgm [hm _]]; split; 1: exact hm.
+    have hc' : to_uint counter{hr} < 256 by smt().
+    split; 2: smt().
     case: hm => [ge3m [_ [hcm _]]].
-    pose a := argmax idfun (fun k0 => k0 <= K /\ fill_inv seed k0 buf{hr} pol{hr} counter{hr}).
+    pose a := argmax idfun
+                (fun k0 => k0 <= K /\ fill_inv seed k0 buf{hr} samples{hr} counter{hr}).
     by have := lt_needed_blocks seed a _ _; smt().
-  ecall (gen_matrix_buf_rejection_ph pol counter buf buf_offset).
-  ecall (shake128_next_state_ph buf).
-  skip => &hr |> ho [ge3m [hst [hcm hpm]]] ltmK hc buf1 hb1.
+  wp; ecall (gen_matrix_buf_rejection_ph samples counter buf buf_offset).
+  wp; ecall (shake128_next_state_ph buf).
+  skip => &hr |> [ge3m [hst [hcm hpm]]] ltmK hc buf1 hb1.
   have [hst1 hblk] := next_blockE seed m buf{hr} buf1 _ hst hb1; 1: smt().
-  split; 1: smt(W64.to_uint_cmp).
-  move=> ge0c [rp rc] /= hrp hrc.
-  rewrite ho (_ : 336 = 2 * 168) // hblk in hrp.
-  rewrite ho (_ : 336 = 2 * 168) // hblk in hrc.
-  have hpm' : plist pol{hr} (to_uint counter{hr}) = take 256 (rejection16 (expand_seed seed m)).
-  - by move: hpm; rewrite (_ : min 256 (to_uint counter{hr}) = to_uint counter{hr}) 1:/#.
-  have [hcm1 hpm1] := fill_stepE (to_uint counter{hr}) (to_uint rc) pol{hr} rp
+  move=> [rp rc rms] /=; rewrite (_ : 336 = 2 * 168) // hblk => hrp hrc.
+  have [hcm1 hpm1] := fill_stepE (to_uint counter{hr}) (to_uint rc) samples{hr} rp
                         (expand_seed seed m)
                         (squeezestate_i c256_r8 (SHAKE128_ABSORB (rejection_seed seed)) m)
-                        _ _ hcm hpm' hrp hrc; 2: smt().
+                        _ hcm hpm hrp hrc.
   - by rewrite size_expand_seed 1:/# dvdz_mulr.
   rewrite -expand_seedS 1:/# in hcm1; rewrite -expand_seedS 1:/# in hpm1.
   have hinv : fill_inv seed (m + 1) buf1 rp rc.
   - by split; [smt() | split; [exact hst1 | split; [exact hcm1 | exact hpm1]]].
+  rewrite ultE /=.
   split; 1: by exists (m + 1); split; [smt() | exact hinv].
   have := argmax_bounded (fun k => fill_inv seed k buf1 rp rc) K (m + 1) _ hinv; 1: smt().
   by move=> /= /#.
 - by exlim buf => b; call (shake128_next_state_ph b); auto.
-wp; ecall (gen_matrix_buf_rejection_ph pol counter buf buf_offset); auto => &hr |> hb hst.
-move=> [rp rc] /=; rewrite plist0 /= hb => hrp hrc.
+wp; ecall (gen_matrix_buf_rejection_ph samples counter buf buf_offset); auto => &hr |> hb hst.
+move=> [rp rc rms] /=; rewrite hb {2}/slist mkseq0 /= => hrp hrc.
 split.
-- exists 3; split; 1: smt().
+- rewrite ultE /=; exists 3; split; 1: smt().
   split => //; split; 1: exact hst.
-  have hsz : size (take 256 (rejection16 (expand_seed seed 3)))
-             = min 256 (size (rejection (expand_seed seed 3))).
-  - by rewrite size_take // /rejection16 size_map /#.
-  by rewrite -hrc hsz /= -hsz hrp.
-move=> b0 c0 p0; split.
+  by split; [rewrite hrc /rejection16 size_map | rewrite hrc hrp].
+move=> b0 c0 more0 ms0 s0; split.
 - move=> k hk hinv hv.
-  have := argmax_bounded (fun k => fill_inv seed k b0 p0 c0) K k _ hinv; 1: by case: hinv => /#.
+  have := argmax_bounded (fun k => fill_inv seed k b0 s0 c0) K k _ hinv; 1: by case: hinv => /#.
   move=> /= [rgm [hm _]].
-  have hK : argmax idfun (fun k => k <= K /\ fill_inv seed k b0 p0 c0) = K by smt().
+  have hK : argmax idfun (fun k => k <= K /\ fill_inv seed k b0 s0 c0) = K by smt().
   move: hm; rewrite hK => -[_ [_ [hc _]]].
-  by have := needed_blocksP seed; rewrite /enough_blocks ultE /= => h; smt().
-rewrite ultE /= => hc k hk [ge3k [_ [hcm hpm]]].
-have hsz : 256 <= size (rejection (expand_seed seed k)) by smt().
-rewrite (_ : min 256 (to_uint c0) = 256) 1:/# in hpm.
-apply Array256.ext_eq => idx rgidx.
-rewrite /unlift_polyu initiE //= (parseE _ _ _ k) 1..3:/#.
-have := congr1 (fun l => nth witness l idx) _ _ hpm => /=.
-rewrite /plist nth_mkseq //= nth_take 1,2:/# /rejection16 (nth_map witness) 1:/# /=.
-by move=> h; exact h.
+  by have := needed_blocksP seed; rewrite /enough_blocks => h; smt().
+move=> _ hc k hk [ge3k [_ [hcm hpm]]].
+have hs : forall j, 0 <= j < 256 => s0.[j] = (unlift_polyu (parse _rho _j _i)).[j].
+- move=> j rgj; rewrite /unlift_polyu initiE //= (parseE _ _ _ k) 1..3:/#.
+  have := congr1 (fun l => nth witness l j) _ _ hpm => /=.
+  rewrite /slist nth_mkseq 1:/# /= /rejection16 (nth_map witness) 1:/# /=.
+  by move=> h; exact h.
+split; 1: smt().
+move=> i0 p0; split; 1: smt().
+move=> gei ge0i lei _ hp.
+by apply Array256.ext_eq => j rgj; rewrite -hs 1:// hp /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -473,6 +416,8 @@ wp; call (shake128x4_absorb_A32_A2_ph _rho (idx_of w)).
 wp; call hidx; auto => &hr |> /=.
 have hpp : forall (x : W8.t Array2144.t) ms, SLH64.protect_ptr x ms = x.
 - by rewrite /SLH64.protect_ptr.
+have hpq : forall (x : W16.t Array1024.t) ms, SLH64.protect_ptr x ms = x.
+- by rewrite /SLH64.protect_ptr.
 have /= i0 := idx_subE witness w 0 _; 1: done.
 have /= i1 := idx_subE witness w 1 _; 1: done.
 have /= i2 := idx_subE witness w 2 _; 1: done.
@@ -480,21 +425,21 @@ have /= i3 := idx_subE witness w 3 _; 1: done.
 rewrite i0 i1 i2 i3 => st hst; split; 1: exact hst.
 move=> _ [st' b] /= hb0 hb1 hb2 hb3 hs0 hs1 hs2 hs3.
 split; 1: by apply (lane_okP b _ 0) => // i rgi; rewrite initiE.
-move=> _ _ [p0 b0] /= hp0; rewrite !hpp.
+move=> _ _ [p0 b0 m0] /= hp0; rewrite !hpp !hpq.
 split.
 - apply (lane_okP b _ 536) => //= i rgi.
   by rewrite Array536.initiE //= Array2144.initiE 1:/# /= ifF 1:/#.
-move=> _ _ [p1 b1] /= hp1.
+move=> _ _ [p1 b1 m1] /= hp1; rewrite !hpp !hpq.
 split.
 - apply (lane_okP b _ 1072) => //= i rgi.
   rewrite Array536.initiE //= Array2144.initiE 1:/# /= ifF 1:/#.
   by rewrite Array2144.initiE 1:/# /= ifF 1:/#.
-move=> _ _ [p2 b2] /= hp2.
+move=> _ _ [p2 b2 m2] /= hp2; rewrite !hpp !hpq.
 split.
 - apply (lane_okP b _ 1608) => //= i rgi.
-  rewrite Array536.initiE //= Array2144.initiE 1:/# /= ifF 1:/# hpp.
+  rewrite Array536.initiE //= Array2144.initiE 1:/# /= ifF 1:/#.
   by rewrite Array2144.initiE 1:/# /= ifF 1:/# Array2144.initiE 1:/# /= ifF 1:/#.
-move=> _ _ [p3 b3] /= hp3.
+move=> _ _ [p3 b3 m3] /= hp3; rewrite !hpq.
 apply pack4polyP => i rgi.
 rewrite Array1024.initiE //= hp3 hp2 hp1 hp0.
 smt(Array1024.initiE).

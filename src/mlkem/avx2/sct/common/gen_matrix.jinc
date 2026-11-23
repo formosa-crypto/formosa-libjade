@@ -4,16 +4,24 @@ require "gen_matrix_globals.jinc"
 // BUF_size per entry: 21(rate) + 21(rate) + 25(keccak_state) + 1(pad)
 param int BUF_size = 536; // 168*2+200      (was in u64s: 3*21 + 4 + 1; //544 bytes;
 
+// A polynomial is sampled in an array with room for the candidates of one more
+// block (112 for 168 bytes): the blocks are filtered whole, whatever the number
+// of coefficients found so far, and the coefficients beyond MLKEM_N are dropped.
+param int GENMATRIX_SAMPLES = MLKEM_N + (168 / 3) * 2;
+
 #[safety =
    { requires = is_arr_init(buf,0,BUF_size) && is_arr_init(sst,0,2048) && 
-                0<= (uint) counter && (uint) counter + 32 <= MLKEM_N && is_arr_init(pol,0,((uint) counter * 2)) &&
+                0<= (uint) counter && (uint) counter + 32 <= GENMATRIX_SAMPLES &&
+                is_arr_init(pol,0,((uint) counter * 2)) &&
                 0 <= (uint) buf_offset && (uint) buf_offset + 24 + 32 <= BUF_size
    , res = { final_pol, final_counter }
-   , ensures = is_arr_init(final_pol,0,2* (uint) final_counter) && (uint) counter <=(uint) final_counter && (uint) final_counter <= MLKEM_N
+   , ensures = is_arr_init(final_pol,0,2* (uint) final_counter) &&
+               (uint) counter <=(uint) final_counter &&
+               (uint) final_counter <= (uint) counter + 32
    }
  ]
 inline fn __gen_matrix_buf_rejection_filter48
-( reg mut ptr u16[MLKEM_N] pol
+( reg mut ptr u16[GENMATRIX_SAMPLES] pol
 , reg u64 counter
 , reg const ptr u8[BUF_size] buf
 , reg u64 buf_offset // bytes
@@ -24,7 +32,7 @@ inline fn __gen_matrix_buf_rejection_filter48
 , reg ptr u8[2048] sst
 , reg u256 ones
 , #[msf]reg u64 ms
-) -> reg ptr u16[MLKEM_N], reg u64
+) -> reg ptr u16[GENMATRIX_SAMPLES], reg u64
 {
   reg u256 f0 f1 g0 g1;
   reg u256 shuffle_0 shuffle_1 shuffle_t;
@@ -169,77 +177,19 @@ inline fn __gen_matrix_buf_rejection_filter48
   return pol, counter;
 }
 
-// safe-write (ensured to write inside the array...)
-#[safety =
-   { requires = is_arr_init(pol,0,2* (uint)ctr)
-   , ensures = is_arr_init(pol,0,2*(uint) ctr + 16) 
-   }
- ]
-inline fn __write_u128_boundchk
-( reg mut ptr u16[MLKEM_N] pol
-, reg u64 ctr
-, reg u128 data
-, #[msf]reg u64 ms
-) -> reg ptr u16[MLKEM_N], #[msf]reg u64
-{
-  reg u64 data_u64;
-  reg bool condition_8 condition_4 condition_2 condition_1;
-
-  condition_8 = (ctr <= MLKEM_N-8);
-  if ( condition_8 ) {
-    ms = #update_msf(condition_8, ms);
-
-    pol.[:u128 2*(uint)ctr] = data;
-    // ctr += 8;
-  } else
-  {
-    ms = #update_msf(!condition_8, ms);
-
-    data_u64 = #MOVV(data);
-
-    condition_4 = (ctr <= MLKEM_N-4);
-    if ( condition_4 ) {
-      ms = #update_msf(condition_4, ms);
-
-      pol.[:u64 2*(uint)ctr] = data_u64;
-      data_u64 = #VPEXTR_64(data, 1);
-      ctr += 4;
-    } else
-    { ms = #update_msf(!condition_4, ms); }
-
-    condition_2 = (ctr <= MLKEM_N-2);
-    if ( condition_2 ) {
-      ms = #update_msf(condition_2, ms);
-
-      pol.[:u32 2*(uint)ctr] = (32u) data_u64;
-      data_u64 >>= 32;
-      ctr += 2;
-    } else
-    { ms = #update_msf(!condition_2, ms); }
-
-    condition_1 = (ctr <= MLKEM_N-1);
-    if ( condition_1 ) {
-      ms = #update_msf(condition_1, ms);
-
-      pol.[:u16 2*(uint)ctr] = (16u) data_u64;
-      //ctr += 1;
-    } else
-    { ms = #update_msf(!condition_1, ms); }
-  }
-
-  return pol, ms;
-}
-
 #[safety =
    { requires = is_arr_init(buf,0,BUF_size) && is_arr_init(sst,0,2048) &&
-                0<= (uint) counter &&  (uint) counter < MLKEM_N &&
-                0 <= (uint) buf_offset && (uint) buf_offset + 32 < BUF_size && is_arr_init(pol,0,((uint) counter * 2))
-   , res = { final_pol, final_counter, final_ms }
-   , ensures = (uint) counter <= final_counter && is_arr_init(final_pol,0,2* (uint) final_counter)
+                0<= (uint) counter && (uint) counter + 16 <= GENMATRIX_SAMPLES &&
+                is_arr_init(pol,0,((uint) counter * 2)) &&
+                0 <= (uint) buf_offset && (uint) buf_offset + 32 <= BUF_size
+   , res = { final_pol, final_counter }
+   , ensures = is_arr_init(final_pol,0,2* (uint) final_counter) &&
+               (uint) counter <=(uint) final_counter &&
+               (uint) final_counter <= (uint) counter + 16
    }
  ]
 inline fn __gen_matrix_buf_rejection_filter24
-( reg mut ptr u16[MLKEM_N] pol
+( reg mut ptr u16[GENMATRIX_SAMPLES] pol
 , reg u64 counter
 , reg const ptr u8[BUF_size] buf
 , reg u64 buf_offset // in bytes
@@ -248,11 +198,11 @@ inline fn __gen_matrix_buf_rejection_filter24
 , reg ptr u8[2048] sst
 , reg u256 ones
 , #[msf]reg u64 ms
-) -> reg ptr u16[MLKEM_N], reg u64, #[msf]reg u64
+) -> reg ptr u16[GENMATRIX_SAMPLES], reg u64
 {
   reg u256 f0 g0 g1;
   reg u256 shuffle_0 shuffle_t;
-  reg u128 shuffle_0_1 t128;
+  reg u128 shuffle_0_1;
   reg u64 good t0_0 t0_1;
 
   f0 = #VPERMQ(buf.[:u256 (uint) buf_offset + 0 ], (4u2)[2,1,1,0]);
@@ -289,39 +239,37 @@ inline fn __gen_matrix_buf_rejection_filter24
   f0 = #VPSHUFB_256(f0, shuffle_0);
   //
 
-  t128 = (128u) f0;
-  pol, ms = __write_u128_boundchk(pol, counter, t128, ms);
-
-  t128 = #VEXTRACTI128(f0, 1);
-  pol, ms = __write_u128_boundchk(pol, t0_0, t128, ms);
+  pol.[:u128 2*counter] = (128u)f0;
+  pol.[:u128 2*t0_0] = #VEXTRACTI128(f0, 1);
 
   counter = t0_1;
 
-  return pol, counter, ms;
+  return pol, counter;
 }
 
+// Filters the candidates of the buffer from buf_offset to the end of its third
+// block: 32 per 48 bytes, and 16 in the last 24 bytes.
 #[safety =
-   { requires = is_arr_init(buf,0,BUF_size) && 0<= (uint) counter &&  (uint) counter <= MLKEM_N &&
-          0 <= (uint) buf_offset && (uint) buf_offset < BUF_size && is_arr_init(pol,0,((uint) counter * 2))
-   , res = { final_pol, final_counter }
+   { requires = is_arr_init(buf,0,BUF_size) && 0 <= (uint) counter &&
+          0 <= (uint) buf_offset && (uint) buf_offset <= 3 * 168 - 24 &&
+          (uint) buf_offset % 48 == 0 &&
+          3 * (uint) counter + 2 * (3 * 168 - (uint) buf_offset) <= 3 * GENMATRIX_SAMPLES &&
+          is_arr_init(pol,0,((uint) counter * 2))
+   , res = { final_pol, final_counter, final_ms }
    , ensures = (uint) counter <= final_counter && is_arr_init(final_pol,0,2* (uint) final_counter)
    }
  ]
 fn _gen_matrix_buf_rejection
-( reg mut ptr u16[MLKEM_N] pol		// polynomial
-, reg u64 counter			// number of coefs. already sampled
-, reg const ptr u8[BUF_size] buf	// whole buffer (size=21+21+25 (+1 pad))
-, reg u64 buf_offset			// start looking at... (bytes)
-
-) -> reg ptr u16[MLKEM_N], reg u64	// pol. and counter
+( reg mut ptr u16[GENMATRIX_SAMPLES] pol	// coefficients found so far
+, reg u64 counter				// their number
+, reg const ptr u8[BUF_size] buf		// whole buffer (size=21+21+25 (+1 pad))
+, reg u64 buf_offset				// start looking at... (bytes)
+, #[msf]reg u64 ms
+) -> reg ptr u16[GENMATRIX_SAMPLES], reg u64, #[msf]reg u64	// coefs., counter and flag
 {
   reg bool condition_loop;
   reg ptr u8[2048] sst;
   reg u256 load_shuffle mask bounds ones;
-  #[msf]reg u64 ms;
-  stack u64 saved_buf_offset;
-
-  ms = #init_msf();
 
   load_shuffle = sample_load_shuffle[:u256 0];
   mask = sample_mask;
@@ -329,51 +277,18 @@ fn _gen_matrix_buf_rejection
   ones = sample_ones;
   sst = sample_shuffle_table;
 
-  saved_buf_offset = buf_offset;
-  buf_offset = buf_offset;
-
-  while
-    { condition_loop = buf_offset <u 3 * 168 - 48 + 1;
-    }
-  ( condition_loop )
-    {
+  while { condition_loop = buf_offset <u 3 * 168 - 24; } (condition_loop) {
     ms = #update_msf(condition_loop, ms);
-    condition_loop = counter <u MLKEM_N - 32 + 1;
-    if condition_loop {
-      ms = #update_msf(condition_loop, ms);
-      pol, counter = __gen_matrix_buf_rejection_filter48(pol, counter, buf, buf_offset, load_shuffle, mask, bounds, sst, ones, ms);
-      saved_buf_offset += 48;
-      buf_offset = saved_buf_offset;
-      buf_offset = #protect(buf_offset, ms);
-    } else {
-      ms = #update_msf(!condition_loop, ms);
-      buf_offset = 3 * 168;
-    }
-    }
+    pol, counter = __gen_matrix_buf_rejection_filter48(pol, counter, buf, buf_offset,
+                                                       load_shuffle, mask, bounds, sst, ones, ms);
+    buf_offset += 48;
+  }
   ms = #update_msf(!condition_loop, ms);
 
-  buf_offset = saved_buf_offset;
-  buf_offset = #protect(buf_offset, ms);
+  pol, counter = __gen_matrix_buf_rejection_filter24(pol, counter, buf, buf_offset,
+                                                     load_shuffle, mask, bounds, sst, ones, ms);
 
-  while { condition_loop = buf_offset <u 3 * 168 - 24 + 1; }
-        ( condition_loop )
-  {
-    ms = #update_msf(condition_loop, ms);
-    condition_loop = counter <u MLKEM_N;
-    if condition_loop {
-      ms = #update_msf(condition_loop, ms);
-() = #spill(buf_offset);
-      pol, counter, ms = __gen_matrix_buf_rejection_filter24(pol, counter, buf, buf_offset, load_shuffle, mask, bounds, sst, ones, ms);
-() = #unspill(buf_offset);
-      buf_offset = #protect(buf_offset, ms);
-      buf_offset += 24;
-    } else {
-      ms = #update_msf(!condition_loop, ms);
-      buf_offset = 3 * 168;
-    }
-  }
-
-  return pol, counter;
+  return pol, counter, ms;
 }
 
 param int IDX_TABLE_SIZE = 1 << (MLKEM_K + 2);
@@ -405,22 +320,40 @@ inline fn gen_matrix_get_indexes(
 fn __gen_matrix_fill_polynomial
 ( reg mut ptr u16[MLKEM_N] pol
 , reg mut ptr u8[BUF_size] buf
-) -> reg ptr u16[MLKEM_N], reg ptr u8[BUF_size]
+, #[msf]reg u64 ms
+) -> reg ptr u16[MLKEM_N], reg ptr u8[BUF_size], #[msf]reg u64
 {
+  stack u16[GENMATRIX_SAMPLES] samples_s;
+  reg ptr u16[GENMATRIX_SAMPLES] samples;
   reg u64 counter, buf_offset;
+  reg bool more;
+  reg u256 t;
+  inline int i;
 
-  buf_offset = 0;
+  #spill(pol);
+  samples = samples_s;
   counter = 0;
-  pol, counter = _gen_matrix_buf_rejection(pol, counter, buf, buf_offset);
-  buf_offset = 2*168;
-  while (counter < MLKEM_N) {
-    #spill(pol, counter, buf_offset);
+  buf_offset = 0;
+  samples, counter, ms = _gen_matrix_buf_rejection(samples, counter, buf, buf_offset, ms);
+  while { more = counter < MLKEM_N; } (more) {
+    #spill(samples, counter);
     buf = _shake128_next_state(buf);
-    #unspill(pol, counter, buf_offset);
-    pol, counter = _gen_matrix_buf_rejection(pol, counter, buf, buf_offset);
+    #unspill(samples, counter);
+    ms = #init_msf();
+    buf_offset = 2*168;
+    samples, counter, ms = _gen_matrix_buf_rejection(samples, counter, buf, buf_offset, ms);
+  }
+  ms = #update_msf(!more, ms);
+
+  // the polynomial is the first MLKEM_N samples
+  #unspill(pol);
+  pol = #protect_ptr(pol, ms);
+  for i = 0 to MLKEM_N / 16 {
+    t = samples.[:u256 32 * i];
+    pol.[:u256 32 * i] = t;
   }
 
-  return pol, buf;
+  return pol, buf, ms;
 }
 
 #[safety =
@@ -458,40 +391,40 @@ fn _gen_matrix_sample_four_polynomials
   #spill(buf,polx4);
   bufp = buf[BUF_size * 0 : BUF_size];
   pol = polx4[0*MLKEM_N:MLKEM_N];
-  pol, bufp = __gen_matrix_fill_polynomial(pol, bufp);
+  pol, bufp, ms = __gen_matrix_fill_polynomial(pol, bufp, ms);
   #unspill(buf, polx4);
-  ms = #init_msf();
   buf = #protect_ptr(buf, ms);
+  polx4 = #protect_ptr(polx4, ms);
   buf[BUF_size * 0 : BUF_size] = bufp;
   polx4[0*MLKEM_N:MLKEM_N] = pol;
 
   #spill(buf,polx4);
   bufp = buf[BUF_size * 1 : BUF_size];
   pol = polx4[1*MLKEM_N:MLKEM_N];
-  pol, bufp = __gen_matrix_fill_polynomial(pol, bufp);
+  pol, bufp, ms = __gen_matrix_fill_polynomial(pol, bufp, ms);
   #unspill(buf, polx4);
-  ms = #init_msf();
   buf = #protect_ptr(buf, ms);
+  polx4 = #protect_ptr(polx4, ms);
   buf[BUF_size * 1 : BUF_size] = bufp;
   polx4[1*MLKEM_N:MLKEM_N] = pol;
 
   #spill(buf,polx4);
   bufp = buf[BUF_size * 2 : BUF_size];
   pol = polx4[2*MLKEM_N:MLKEM_N];
-  pol, bufp = __gen_matrix_fill_polynomial(pol, bufp);
+  pol, bufp, ms = __gen_matrix_fill_polynomial(pol, bufp, ms);
   #unspill(buf, polx4);
-  ms = #init_msf();
   buf = #protect_ptr(buf, ms);
+  polx4 = #protect_ptr(polx4, ms);
   buf[BUF_size * 2 : BUF_size] = bufp;
   polx4[2*MLKEM_N:MLKEM_N] = pol;
 
   #spill(buf,polx4);
   bufp = buf[BUF_size * 3 : BUF_size];
   pol = polx4[3*MLKEM_N:MLKEM_N];
-  pol, bufp = __gen_matrix_fill_polynomial(pol, bufp);
+  pol, bufp, ms = __gen_matrix_fill_polynomial(pol, bufp, ms);
   #unspill(buf, polx4);
-  ms = #init_msf();
   buf = #protect_ptr(buf, ms);
+  polx4 = #protect_ptr(polx4, ms);
   buf[BUF_size * 3 : BUF_size] = bufp;
   polx4[3*MLKEM_N:MLKEM_N] = pol;
 
@@ -523,7 +456,8 @@ inline fn __gen_matrix_sample_one_polynomial
   _, buf = _shake128_squeeze3blocks(st, buf);
 
   #unspill(pol);
-  pol, buf = __gen_matrix_fill_polynomial(pol, buf);
+  ms = #init_msf();
+  pol, buf, ms = __gen_matrix_fill_polynomial(pol, buf, ms);
 
   return pol, buf;
 }
