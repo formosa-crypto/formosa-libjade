@@ -109,7 +109,8 @@ case (to_uint p.[k %/ 4 + i * 2] < 3329) => /= *.
   /=;smt(W16.to_uint_cmp).
   congr;congr;congr;congr;congr;congr; 2: by smt().
   rewrite /BS_W32_W4_U.truncateu4 of_uintK /=. 
-  by rewrite /BSW32.shr /BSW32.shl /(`<<`) /(`>>`) /= /#.
+  rewrite /BSW32.shr /BSW32.shl /(`<<`) /(`>>`) /=.
+  by rewrite (_ : (8 * i + k) %/ 4 = k %/ 4 + i * 2) 1:/#.
 
   
 have -> : (incoeff (to_sint p.[(8 * i + k) %/ 4])) = (incoeff (to_sint (p.[(8 * i + k) %/ 4] -

@@ -146,6 +146,20 @@ abstract theory WAE.
   by rewrite W4u8.get_bits8 1:/# /#.
   qed.
 
+  lemma get16_init16 (f : int -> W16.t) (i : int) :
+    0 <= i => 2 * i + 2 <= size =>
+    get16 (init16 f) i = f i.
+  proof.
+  move => Hi0 Hi1.
+  rewrite /get16_direct /init16 /W2u8.pack2_t /=.
+  apply W16.wordP => k kb.
+  rewrite W16.initiE 1:/# /= W2u8.Pack.initiE 1:/# /=.
+  rewrite A.initiE 1:/# /=.
+  rewrite (_: (2 * i + k %/ 8) %/ 2 = i) 1:/#.
+  rewrite (_: (2 * i + k %/ 8) %% 2 = k %/ 8) 1:/#.
+  by rewrite W2u8.get_bits8 1:/# /#.
+  qed.
+
   lemma get32_set256_direct_eq (t : A.t) (j i : int) (w : W256.t) :
     0 <= j =>
     j + 32 <= size =>

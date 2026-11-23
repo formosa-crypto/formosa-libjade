@@ -412,7 +412,7 @@ conseq (_ : rho = _rho /\ rc = W16.of_int ((kvec - 1) * 257)
 + by move=> &hr _ r; rewrite sampleAE; smt(gt0_k).
 proc; exlim buf => b0.
 call (fill_polynomial_ph _rho c c).
-call (shake128_squeeze3blocks_ph b0 st0).
+wp; call (shake128_squeeze3blocks_ph b0 st0).
 wp; call (shake128_absorb_A32_A2_ph _rho (Array2.of_list witness [c; c])).
 auto => &hr |> /=.
 have hc : Array2.init (WArray2.get8 (WArray2.set16_direct
