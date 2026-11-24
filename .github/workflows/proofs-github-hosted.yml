@@ -75,6 +75,10 @@ jobs:
           - core
           - fips202
           - mldsa
+          - mldsa-avx2-generic
+          - mldsa-avx2-44
+          - mldsa-avx2-65
+          - mldsa-avx2-87
           - mlkem
           - mlkem-avx2-generic
           - mlkem-avx2-512

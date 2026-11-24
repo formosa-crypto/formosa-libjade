@@ -22,7 +22,7 @@ ECRUNTEST := env ECMEM_LOG=$(abspath $(MEMORY)) ECMEM_EASYCRYPT=$(shell command 
 endif
 
 CONFIG    := tests.config
-SCENARIOS := core fips202 mldsa mlkem mlkem-avx2-generic mlkem-avx2-512 mlkem-avx2-768 mlkem-avx2-1024 mlkem-safety mldsa-safety fips202-safety
+SCENARIOS := core fips202 mldsa mldsa-avx2-generic mldsa-avx2-44 mldsa-avx2-65 mldsa-avx2-87 mlkem mlkem-avx2-generic mlkem-avx2-512 mlkem-avx2-768 mlkem-avx2-1024 mlkem-safety mldsa-safety fips202-safety
 
 # --------------------------------------------------------------------
 .PHONY: default check all $(SCENARIOS) clean
