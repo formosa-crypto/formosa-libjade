@@ -1164,7 +1164,7 @@ seq 2 0 : (
     KVec.init (fun j => scale (ntt_mmul aT{2} (lift_polyvec (nttpackv sp_0{1}))).[j] (incoeff 169)).
   + by apply kg_loop_post_to_target => j jb; rewrite KVec.initiE //=; case: (hj j jb).
   rewrite nttpackv_lift /=; split.
-  + by apply signed_boundvecnP => j jb; have [_ ?] := hj j jb; smt(param_sets).
+  + by apply signed_boundvecnP => j jb k kb; have [_ /(_ k kb)] := hj j jb; rewrite /b16; smt().
   move=> _ r hr _; split; 1: by move=> k kb; have := hvb k kb; smt(param_sets).
   move=> _ r0 hr0 _; rewrite -hr -hr0 hbp lift_nttpack hv nttunpackK hscale /=.
   apply KVec.tP => j jb; rewrite /mapv /invnttv !KVec.mapiE //= KVec.initiE //=.
