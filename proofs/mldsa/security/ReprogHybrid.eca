@@ -2641,7 +2641,9 @@ proof.
         + by conseq hw => />; apply expr_ge0; smt(p_bounded).
         + by conseq hw => /#.
         move=> /> *; rewrite -exprS /#.
-      by auto => />; smt (expr0 j_bounded).
+      + by auto => />; smt (expr0 j_bounded).
+      + by move=> &hr />; smt (expr0 j_bounded).
+      by move=> &hr; case: (oz{hr} = None) => _ //; apply expr_ge0; smt(p_bounded).
     by rcondf^if; 1: auto => />; conseq />.
   + move=> c; proc; rcondt^if; wp; 1: by auto.
     by conseq (:true) => />; auto.
